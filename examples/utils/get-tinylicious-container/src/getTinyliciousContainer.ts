@@ -7,7 +7,7 @@ import { IRequest } from "@fluidframework/core-interfaces";
 import {
     IRuntimeFactory,
 } from "@fluidframework/container-definitions";
-import { Container, Loader } from "@fluidframework/container-loader";
+import { Container } from "@fluidframework/container-loader";
 import {
     IFluidResolvedUrl,
     IResolvedUrl,
@@ -22,7 +22,7 @@ import { v4 as uuid } from "uuid";
 // In order to avoid imposing requirements on the app's URL shapes, we'll expect our requests to simply include the
 // documentId for the URL (as opposed to a more traditional URL).
 class InsecureTinyliciousUrlResolver implements IUrlResolver {
-    public async resolve(request: IRequest): Promise<IResolvedUrl> {
+    public async resolve(request: IRequest): Promise<IFluidResolvedUrl> {
         const documentId = request.url;
         const encodedDocId = encodeURIComponent(documentId);
 
@@ -85,26 +85,35 @@ export async function getTinyliciousContainer(
     const module = { fluidExport: containerRuntimeFactory };
     const codeLoader = { load: async () => module };
 
-    const loader = new Loader(
-        urlResolver,
-        documentServiceFactory,
-        codeLoader,
-        { blockUpdateMarkers: true },
-        {},
-        new Map(),
-    );
-
     let container: Container;
 
     if (createNew) {
         // We're not actually using the code proposal (our code loader always loads the same module regardless of the
         // proposal), but the Container will only give us a NullRuntime if there's no proposal.  So we'll use a fake
         // proposal.
-        container = await loader.createDetachedContainer({ package: "", config: {} });
+        container = await Container.create(
+            codeLoader,
+            { blockUpdateMarkers: true }, // options
+            {}, // scope
+            { package: "", config: {} }, // source
+            documentServiceFactory,
+            urlResolver,
+        );
         await container.attach({ url: documentId });
     } else {
         // The InsecureTinyliciousUrlResolver expects the url of the request to be the documentId.
-        container = await loader.resolve({ url: documentId });
+        const request = { url: documentId };
+        const resolved = await urlResolver.resolve(request);
+        container = await Container.load(
+            `tinylicious/${documentId}`,
+            documentServiceFactory,
+            codeLoader,
+            { blockUpdateMarkers: true }, // options
+            {}, // scope
+            request,
+            resolved,
+            urlResolver,
+        );
         // If we didn't create the container properly, then it won't function correctly.  So we'll throw if we got a
         // new container here, where we expect this to be loading an existing container.
         if (!container.existing) {

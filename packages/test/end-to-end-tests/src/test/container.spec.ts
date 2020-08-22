@@ -8,9 +8,8 @@ import { IRequest } from "@fluidframework/core-interfaces";
 import {
     IGenericError,
     ContainerErrorType,
-    IProxyLoaderFactory,
 } from "@fluidframework/container-definitions";
-import { Container, ConnectionState, Loader } from "@fluidframework/container-loader";
+import { Container, ConnectionState } from "@fluidframework/container-loader";
 import {
     IFluidResolvedUrl,
     IDocumentServiceFactory,
@@ -30,7 +29,6 @@ describe("Container", () => {
     let deltaConnection: MockDocumentDeltaConnection;
     let serviceFactory: Readonly<IDocumentServiceFactory>;
     let codeLoader: LocalCodeLoader;
-    let loader: Loader;
 
     beforeEach(async () => {
         testDeltaConnectionServer = LocalDeltaConnectionServer.create();
@@ -38,16 +36,6 @@ describe("Container", () => {
         testResolved = await localResolver.resolve(testRequest) as IFluidResolvedUrl;
         serviceFactory = new LocalDocumentServiceFactory(testDeltaConnectionServer);
         codeLoader = new LocalCodeLoader([]);
-        const options = {};
-
-        loader = new Loader(
-            localResolver,
-            serviceFactory,
-            codeLoader,
-            options,
-            {},
-            new Map<string, IProxyLoaderFactory>(),
-        );
     });
 
     it("Load container successfully", async () => {
@@ -59,7 +47,6 @@ describe("Container", () => {
                 codeLoader,
                 {},
                 {},
-                loader,
                 testRequest,
                 testResolved,
                 localResolver);
@@ -90,7 +77,6 @@ describe("Container", () => {
                 codeLoader,
                 {},
                 {},
-                loader,
                 testRequest,
                 testResolved,
                 localResolver);
@@ -121,7 +107,6 @@ describe("Container", () => {
                 codeLoader,
                 {},
                 {},
-                loader,
                 testRequest,
                 testResolved,
                 localResolver);
@@ -155,7 +140,6 @@ describe("Container", () => {
             codeLoader,
             {},
             {},
-            loader,
             testRequest,
             testResolved,
             localResolver);
@@ -188,7 +172,6 @@ describe("Container", () => {
             codeLoader,
             {},
             {},
-            loader,
             testRequest,
             testResolved,
             localResolver);
@@ -230,7 +213,6 @@ describe("Container", () => {
             codeLoader,
             {},
             {},
-            loader,
             testRequest,
             testResolved,
             localResolver);
@@ -253,7 +235,6 @@ describe("Container", () => {
             codeLoader,
             {},
             {},
-            loader,
             testRequest,
             testResolved,
             localResolver);

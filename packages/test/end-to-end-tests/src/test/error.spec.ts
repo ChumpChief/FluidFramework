@@ -7,9 +7,8 @@ import assert from "assert";
 import { IRequest } from "@fluidframework/core-interfaces";
 import {
     ContainerErrorType,
-    IProxyLoaderFactory,
 } from "@fluidframework/container-definitions";
-import { Container, Loader } from "@fluidframework/container-loader";
+import { Container } from "@fluidframework/container-loader";
 import {
     IFluidResolvedUrl,
     IDocumentServiceFactory,
@@ -37,7 +36,6 @@ describe("Errors Types", () => {
     let testResolved: IFluidResolvedUrl;
     let serviceFactory: IDocumentServiceFactory;
     let codeLoader: LocalCodeLoader;
-    let loader: Loader;
 
     it("GeneralError Test", async () => {
         // Setup
@@ -47,15 +45,6 @@ describe("Errors Types", () => {
         serviceFactory = new LocalDocumentServiceFactory(testDeltaConnectionServer);
 
         codeLoader = new LocalCodeLoader([]);
-        const options = {};
-
-        loader = new Loader(
-            localResolver,
-            serviceFactory,
-            codeLoader,
-            options,
-            {},
-            new Map<string, IProxyLoaderFactory>());
 
         try {
             const mockFactory = Object.create(serviceFactory) as IDocumentServiceFactory;
@@ -75,7 +64,6 @@ describe("Errors Types", () => {
                 codeLoader,
                 {},
                 {},
-                loader,
                 testRequest,
                 testResolved,
                 localResolver);
