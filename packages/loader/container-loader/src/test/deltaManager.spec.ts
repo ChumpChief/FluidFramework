@@ -5,8 +5,6 @@
 
 import assert from "assert";
 import { EventEmitter } from "events";
-import { ITelemetryLogger } from "@fluidframework/common-definitions";
-import { DebugLogger } from "@fluidframework/telemetry-utils";
 import { IClient, IDocumentMessage, IProcessMessageResult, MessageType } from "@fluidframework/protocol-definitions";
 import { MockDocumentDeltaConnection, MockDocumentService } from "@fluid-internal/test-loader-utils";
 import { SinonFakeTimers, useFakeTimers } from "sinon";
@@ -17,7 +15,6 @@ describe("Loader", () => {
         describe("Delta Manager", () => {
             let clock: SinonFakeTimers;
             let deltaManager: DeltaManager;
-            let logger: ITelemetryLogger;
             let deltaConnection: MockDocumentDeltaConnection;
             let clientSeqNumber = 0;
             let emitter: EventEmitter;
@@ -69,7 +66,6 @@ describe("Loader", () => {
 
             beforeEach(() => {
                 seq = 1;
-                logger = DebugLogger.create("fluid:testDeltaManager");
                 emitter = new EventEmitter();
                 intendedResult = {};
 
@@ -87,7 +83,6 @@ describe("Loader", () => {
                 deltaManager = new DeltaManager(
                     () => service,
                     client as IClient,
-                    logger,
                     false,
                 );
                 deltaManager.attachOpHandler(0, 0, 1, {

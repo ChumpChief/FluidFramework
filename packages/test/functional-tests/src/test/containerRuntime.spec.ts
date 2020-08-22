@@ -92,7 +92,6 @@ describe("Container Runtime", () => {
             deltaManager = new DeltaManager(
                 () => service,
                 client as IClient,
-                DebugLogger.create("fluid:testDeltaManager"),
                 false,
             );
 

@@ -4,7 +4,7 @@
  */
 
 import assert from "assert";
-import { ITelemetryLogger, IEventProvider } from "@fluidframework/common-definitions";
+import { IEventProvider } from "@fluidframework/common-definitions";
 import {
     IConnectionDetails,
     IDeltaHandlerStrategy,
@@ -15,8 +15,7 @@ import {
     IThrottlingWarning,
     ContainerErrorType,
 } from "@fluidframework/container-definitions";
-import { performanceNow, TypedEventEmitter } from "@fluidframework/common-utils";
-import { PerformanceEvent, TelemetryLogger } from "@fluidframework/telemetry-utils";
+import { TypedEventEmitter } from "@fluidframework/common-utils";
 import {
     IDocumentDeltaStorageService,
     IDocumentService,
@@ -47,7 +46,7 @@ import { ContentCache } from "./contentCache";
 import { debug } from "./debug";
 import { DeltaConnection } from "./deltaConnection";
 import { DeltaQueue } from "./deltaQueue";
-import { logNetworkFailure, waitForConnectedState } from "./networkUtils";
+import { waitForConnectedState } from "./networkUtils";
 
 const MaxReconnectDelaySeconds = 8;
 const InitialReconnectDelaySeconds = 1;
@@ -335,7 +334,6 @@ export class DeltaManager
     constructor(
         private readonly serviceProvider: () => IDocumentService | undefined,
         private client: IClient,
-        private readonly logger: ITelemetryLogger,
         reconnectAllowed: boolean,
     ) {
         super();
@@ -472,7 +470,6 @@ export class DeltaManager
         // But for view-only connection, we have no such signal, and with no traffic
         // on the wire, we might be always behind.
         // See comment at the end of setupNewSuccessfulConnection()
-        this.logger.debugAssert(this.handler !== undefined || fetchOpsFromStorage); // on boot, always fetch ops!
         if (fetchOpsFromStorage && this.handler !== undefined) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.fetchMissingDeltas(args.reason ?? "DocumentOpen", this.lastQueuedSequenceNumber);
@@ -487,15 +484,12 @@ export class DeltaManager
         const connectCore = async () => {
             let connection: DeltaConnection | undefined;
             let delay = InitialReconnectDelaySeconds;
-            let connectRepeatCount = 0;
-            const connectStartTime = performanceNow();
 
             // This loop will keep trying to connect until successful, with a delay between each iteration.
             while (connection === undefined) {
                 if (this.closed) {
                     throw new Error("Attempting to connect a closed DeltaManager");
                 }
-                connectRepeatCount++;
 
                 try {
                     this.client.mode = requestedMode;
@@ -509,18 +503,6 @@ export class DeltaManager
                         throw error;
                     }
 
-                    // Log error once - we get too many errors in logs when we are offline,
-                    // and unfortunately there is no reliable way to detect that.
-                    if (connectRepeatCount === 1) {
-                        logNetworkFailure(
-                            this.logger,
-                            {
-                                delay, // seconds
-                                eventName: "DeltaConnectionFailureToConnect",
-                            },
-                            origError);
-                    }
-
                     const retryDelayFromError = getRetryDelayFromError(origError);
                     delay = retryDelayFromError ?? Math.min(delay * 2, MaxReconnectDelaySeconds);
 
@@ -529,15 +511,6 @@ export class DeltaManager
                     }
                     await waitForConnectedState(delay * 1000);
                 }
-            }
-
-            // If we retried more than once, log an event about how long it took
-            if (connectRepeatCount > 1) {
-                this.logger.sendTelemetryEvent({
-                    attempts: connectRepeatCount,
-                    duration: TelemetryLogger.formatTick(performanceNow() - connectStartTime),
-                    eventName: "MultipleDeltaConnectionFailures",
-                });
             }
 
             this.setupNewSuccessfulConnection(connection, requestedMode);
@@ -639,8 +612,6 @@ export class DeltaManager
     public submitSignal(content: any) {
         if (this.connection !== undefined) {
             this.connection.submitSignal(content);
-        } else {
-            this.logger.sendErrorEvent({ eventName: "submitSignalDisconnected" });
         }
     }
 
@@ -652,20 +623,12 @@ export class DeltaManager
         let retry: number = 0;
         let from: number = fromInitial;
         let deltas: ISequencedDocumentMessage[] = [];
-        let deltasRetrievedTotal = 0;
 
         const docService = this.serviceProvider();
         if (docService === undefined) {
             throw new Error("Delta manager is not attached");
         }
 
-        const telemetryEvent = PerformanceEvent.start(this.logger, {
-            eventName: `GetDeltas_${telemetryEventSuffix}`,
-            from,
-            to,
-        });
-
-        let requests = 0;
         let deltaStorage: IDocumentDeltaStorageService | undefined;
 
         while (!this.closed) {
@@ -686,8 +649,6 @@ export class DeltaManager
                     deltaStorage = await this.deltaStorageP;
                 }
 
-                requests++;
-
                 // Issue async request for deltas - limit the number fetched to MaxBatchDeltas
                 canRetry = true;
                 const deltasP = deltaStorage.get(from, fetchTo);
@@ -703,7 +664,6 @@ export class DeltaManager
                 // Note that server (or driver code) can push here something unexpected, like undefined
                 // Exception thrown as result of it will result in us retrying
                 deltasRetrievedLast = deltas.length;
-                deltasRetrievedTotal += deltasRetrievedLast;
                 const lastFetch = deltasRetrievedLast > 0 ? deltas[deltasRetrievedLast - 1].sequenceNumber : from;
 
                 // If we have no upper bound and fetched less than the max deltas - meaning we got as many as exit -
@@ -716,7 +676,6 @@ export class DeltaManager
                 // 2) else case: if we got what we asked (to - 1) or more, then time to leave.
                 if (to === undefined ? lastFetch < maxFetchTo - 1 : to - 1 <= lastFetch) {
                     callback(deltas);
-                    telemetryEvent.end({ lastFetch, deltasRetrievedTotal, requests });
                     return;
                 }
 
@@ -727,20 +686,8 @@ export class DeltaManager
                 canRetry = canRetry && canRetryOnError(origError);
                 const error = CreateContainerError(origError);
 
-                logNetworkFailure(
-                    this.logger,
-                    {
-                        eventName: "GetDeltas_Error",
-                        fetchTo,
-                        from,
-                        requests,
-                        retry: retry + 1,
-                    },
-                    origError);
-
                 if (!canRetry) {
                     // It's game over scenario.
-                    telemetryEvent.cancel({ category: "error" }, origError);
                     this.close(error);
                     return;
                 }
@@ -766,15 +713,6 @@ export class DeltaManager
                 // Only bail out if we successfully connected to storage, but there were no ops
                 // One (last) successful connection is sufficient, even if user was disconnected all prior attempts
                 if (success && retry >= 100) {
-                    telemetryEvent.cancel({
-                        category: "error",
-                        error: "too many retries",
-                        retry,
-                        requests,
-                        deltasRetrievedTotal,
-                        replayFrom: from,
-                        to,
-                    });
                     const closeError = createGenericNetworkError(
                         "Failed to retrieve ops from storage: giving up after too many retries",
                         false /* canRetry */,
@@ -784,22 +722,8 @@ export class DeltaManager
                 }
             }
 
-            telemetryEvent.reportProgress({
-                delay, // seconds
-                deltasRetrievedLast,
-                deltasRetrievedTotal,
-                replayFrom: from,
-                requests,
-                retry,
-                success,
-            });
-
             await waitForConnectedState(delay * 1000);
         }
-
-        // Might need to change to non-error event
-        this.logger.sendErrorEvent({ eventName: "GetDeltasClosedConnection" });
-        telemetryEvent.cancel({ error: "container closed" });
     }
 
     /**
@@ -949,14 +873,6 @@ export class DeltaManager
                 ? getNackReconnectInfo(message.content) :
                 createGenericNetworkError(`Nack: unknown reason`, true);
 
-            if (this.reconnectMode !== ReconnectMode.Enabled) {
-                this.logger.sendErrorEvent({
-                    eventName: "NackWithNoReconnect",
-                    reason: reconnectInfo.message,
-                    mode: this.connectionMode,
-                });
-            }
-
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.reconnectOnError(
                 connection,
@@ -981,7 +897,6 @@ export class DeltaManager
             // Observation based on early pre-production telemetry:
             // We are getting transport errors from WebSocket here, right before or after "disconnect".
             // This happens only in Firefox.
-            logNetworkFailure(this.logger, { eventName: "DeltaConnectionError" }, error);
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.reconnectOnError(
                 connection,
@@ -1106,13 +1021,7 @@ export class DeltaManager
                 await waitForConnectedState(delay * 1000);
             }
 
-            this.connect({ mode: requestedMode, fetchOpsFromStorage: false }).catch((err) => {
-                // Errors are raised as "error" event and close container.
-                // Have a catch-all case in case we missed something
-                if (!this.closed) {
-                    this.logger.sendErrorEvent({ eventName: "ConnectException" }, err);
-                }
-            });
+            this.connect({ mode: requestedMode, fetchOpsFromStorage: false }).catch((err) => { });
         }
     }
 
@@ -1149,7 +1058,6 @@ export class DeltaManager
 
         let duplicateStart: number | undefined;
         let duplicateEnd: number | undefined;
-        let duplicateCount = 0;
 
         if (messages.length > 0) {
             this.updateLatestKnownOpSeqNumber(messages[messages.length - 1].sequenceNumber);
@@ -1158,7 +1066,6 @@ export class DeltaManager
         for (const message of messages) {
             // Check that the messages are arriving in the expected order
             if (message.sequenceNumber <= this.lastQueuedSequenceNumber) {
-                duplicateCount++;
                 if (duplicateStart === undefined || duplicateStart > message.sequenceNumber) {
                     duplicateStart = message.sequenceNumber;
                 }
@@ -1173,15 +1080,6 @@ export class DeltaManager
                 this.lastQueuedSequenceNumber = message.sequenceNumber;
                 this._inbound.push(message);
             }
-        }
-
-        if (duplicateCount !== 0) {
-            this.logger.sendTelemetryEvent({
-                eventName: `DuplicateMessages_${telemetryEventSuffix}`,
-                start: duplicateStart,
-                end: duplicateEnd,
-                count: duplicateCount,
-            });
         }
     }
 
@@ -1272,7 +1170,6 @@ export class DeltaManager
         }
 
         if (this.closed) {
-            this.logger.sendTelemetryEvent({ eventName: "fetchMissingDeltasClosedConnection" });
             return;
         }
 
@@ -1304,7 +1201,6 @@ export class DeltaManager
             props.to = messages[messages.length - 1].sequenceNumber;
             props.messageGap = this.handler !== undefined ? props.from - this.lastQueuedSequenceNumber - 1 : undefined;
         }
-        this.logger.sendPerformanceEvent(props);
 
         this.catchUpCore(messages, telemetryEventSuffix);
     }
