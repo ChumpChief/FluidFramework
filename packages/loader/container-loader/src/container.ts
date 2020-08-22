@@ -1505,7 +1505,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context = await ContainerContext.createOrLoad(
             this,
             this.scope,
-            this.codeLoader,
             chaincode,
             snapshot ?? null,
             attributes,
@@ -1543,7 +1542,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context = await ContainerContext.createOrLoad(
             this,
             this.scope,
-            this.codeLoader,
             runtimeFactory,
             { id: null, blobs: {}, commits: {}, trees: {} },    // TODO this will be from the offline store
             attributes,

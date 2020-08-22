@@ -26,7 +26,7 @@ import {
 import { IAudience } from "./audience";
 import { IBlobManager } from "./blobs";
 import { ICriticalContainerError, ContainerWarning } from "./error";
-import { ICodeLoader, ILoader } from "./loader";
+import { ILoader } from "./loader";
 import { IMessageScheduler } from "./messageScheduler";
 
 // Represents the attachment state of the entity.
@@ -119,7 +119,6 @@ export interface IContainerContext extends IMessageScheduler, IDisposable {
     readonly quorum: IQuorum;
     readonly audience: IAudience | undefined;
     readonly loader: ILoader;
-    readonly codeLoader: ICodeLoader;
     readonly logger: ITelemetryLogger;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
     readonly version: string;

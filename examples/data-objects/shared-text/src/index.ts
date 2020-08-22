@@ -12,7 +12,6 @@ import { ContainerRuntime } from "@fluidframework/container-runtime";
 import {
     IFluidDataStoreContext,
     IFluidDataStoreFactory,
-    IFluidDataStoreRegistry,
     NamedFluidDataStoreRegistryEntries,
 } from "@fluidframework/runtime-definitions";
 import {
@@ -56,28 +55,6 @@ const defaultRegistryEntries: NamedFluidDataStoreRegistryEntries = [
     ["@fluid-example/image-collection", images.then((m) => m.fluidExport)],
 ];
 
-class MyRegistry implements IFluidDataStoreRegistry {
-    constructor(
-        private readonly context: IContainerContext,
-        private readonly defaultRegistry: string) {
-    }
-
-    public get IFluidDataStoreRegistry() { return this; }
-
-    public async get(name: string): Promise<IFluidDataStoreFactory> {
-        const scope = `${name.split("/")[0]}:cdn`;
-        const config = {};
-        config[scope] = this.defaultRegistry;
-
-        const codeDetails = {
-            package: name,
-            config,
-        };
-        const fluidModule = await this.context.codeLoader.load(codeDetails);
-        return fluidModule.fluidExport.IFluidDataStoreFactory;
-    }
-}
-
 class SharedTextFactoryComponent implements IFluidDataStoreFactory, IRuntimeFactory {
     public static readonly type = "@fluid-example/shared-text";
     public readonly type = SharedTextFactoryComponent.type;
@@ -98,10 +75,6 @@ class SharedTextFactoryComponent implements IFluidDataStoreFactory, IRuntimeFact
             [
                 ...defaultRegistryEntries,
                 [SharedTextFactoryComponent.type, Promise.resolve(this)],
-                [
-                    "verdaccio",
-                    Promise.resolve(new MyRegistry(context, "https://pragueauspkn.azureedge.net")),
-                ],
             ],
             buildRuntimeRequestHandler(
                 defaultRouteRequestHandler(DefaultComponentName),
