@@ -120,7 +120,6 @@ export interface IContainerContext extends IMessageScheduler, IDisposable {
     readonly audience: IAudience | undefined;
     readonly loader: ILoader;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
-    readonly version: string;
     readonly previousRuntimeState: IRuntimeState;
 
     /**

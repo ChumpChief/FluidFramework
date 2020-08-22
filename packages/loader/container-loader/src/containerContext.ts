@@ -58,7 +58,6 @@ export class ContainerContext implements IContainerContext {
         submitSignalFn: (contents: any) => void,
         snapshotFn: (message: string) => Promise<void>,
         closeFn: (error?: ICriticalContainerError) => void,
-        version: string,
         previousRuntimeState: IRuntimeState,
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
@@ -76,7 +75,6 @@ export class ContainerContext implements IContainerContext {
             submitSignalFn,
             snapshotFn,
             closeFn,
-            version,
             previousRuntimeState);
         await context.load();
         return context;
@@ -180,7 +178,6 @@ export class ContainerContext implements IContainerContext {
         public readonly submitSignalFn: (contents: any) => void,
         public readonly snapshotFn: (message: string) => Promise<void>,
         public readonly closeFn: (error?: ICriticalContainerError) => void,
-        public readonly version: string,
         public readonly previousRuntimeState: IRuntimeState,
     ) {
         this.attachListener();

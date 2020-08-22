@@ -146,8 +146,6 @@ class LocalLoader extends EventEmitter implements ILoader {
 }
 
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
-    public static version = "^0.1.0";
-
     /**
      * Load container.
      */
@@ -1342,7 +1340,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
             (error?: ICriticalContainerError) => this.close(error),
-            Container.version,
             previousRuntimeState,
         );
 
@@ -1378,7 +1375,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
             (error?: ICriticalContainerError) => this.close(error),
-            Container.version,
             {},
         );
 
