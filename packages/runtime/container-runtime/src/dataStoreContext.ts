@@ -529,10 +529,8 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
     }
 
     public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        if (this.attachState !== AttachState.Attached) {
-            return undefined;
-        }
-        return this._containerRuntime.getAbsoluteUrl(relativeUrl);
+        // TODO: This will break a few components that expect to get an absolute URL here (Todo, Spaces)
+        return undefined;
     }
 
     /**

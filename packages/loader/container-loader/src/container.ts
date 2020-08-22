@@ -700,7 +700,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.context.hasNullRuntime();
     }
 
-    public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
+    private async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
         if (this.resolvedUrl === undefined) {
             return undefined;
         }

@@ -90,11 +90,10 @@ async function initialize(config: IConfig, password: string) {
     const tenant = `https://${config.server}`;
     const request = urlResolver.createCreateNewRequest(tenant, config.driveId, "/test", "test");
     await container.attach(request);
-    const dataStoreUrl = await container.getAbsoluteUrl("/");
-    console.log(dataStoreUrl);
     container.close();
 
-    return dataStoreUrl;
+    // TODO: Was depending on getAbsoluteUrl which is now removed.
+    return undefined;
 }
 
 async function load(config: IConfig, url: string, password: string) {

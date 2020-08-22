@@ -276,10 +276,6 @@ export class ContainerContext implements IContainerContext {
         return this.runtime instanceof NullRuntime;
     }
 
-    public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        return this.container.getAbsoluteUrl(relativeUrl);
-    }
-
     private async load() {
         this._runtime = await this.runtimeFactory.instantiateRuntime(this);
     }
