@@ -13,13 +13,12 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     ICodeLoader,
-    IContainer,
     ILoader,
     IProxyLoaderFactory,
     LoaderHeader,
     IFluidCodeDetails,
 } from "@fluidframework/container-definitions";
-import { Deferred, performanceNow } from "@fluidframework/common-utils";
+import { performanceNow } from "@fluidframework/common-utils";
 import { ChildLogger, DebugLogger, PerformanceEvent } from "@fluidframework/telemetry-utils";
 import {
     IDocumentServiceFactory,
@@ -47,69 +46,6 @@ function canUseCache(request: IRequest): boolean {
         request.headers[LoaderHeader.reconnect] === false;
 
     return !noCache;
-}
-
-export class RelativeLoader extends EventEmitter implements ILoader {
-    // Because the loader is passed to the container during construction we need to resolve the target container
-    // after construction.
-    private readonly containerDeferred = new Deferred<Container>();
-
-    /**
-     * BaseRequest is the original request that triggered the load. This URL is used in case credentials need
-     * to be fetched again.
-     */
-    constructor(
-        private readonly loader: ILoader,
-        private readonly baseRequest: () => IRequest | undefined,
-    ) {
-        super();
-    }
-
-    public async resolve(request: IRequest): Promise<IContainer> {
-        if (request.url.startsWith("/")) {
-            // If no headers are set that require a reload make use of the same object
-            const container = await this.containerDeferred.promise;
-            return container;
-        }
-
-        return this.loader.resolve(request);
-    }
-
-    public async request(request: IRequest): Promise<IResponse> {
-        const baseRequest = this.baseRequest();
-        if (request.url.startsWith("/")) {
-            if (this.needExecutionContext(request)) {
-                if (baseRequest === undefined) {
-                    throw new Error("Base Request is not provided");
-                }
-                return (this.loader as Loader).requestWorker(baseRequest.url, request);
-            } else {
-                let container: IContainer;
-                if (canUseCache(request)) {
-                    container = await this.containerDeferred.promise;
-                } else if (baseRequest === undefined) {
-                    throw new Error("Base Request is not provided");
-                } else {
-                    container = await this.loader.resolve({ url: baseRequest.url, headers: request.headers });
-                }
-                return container.request(request);
-            }
-        }
-
-        return this.loader.request(request);
-    }
-
-    public async createDetachedContainer(source: IFluidCodeDetails): Promise<Container> {
-        throw new Error("Relative loader should not create a detached container");
-    }
-
-    public resolveContainer(container: Container) {
-        this.containerDeferred.resolve(container);
-    }
-
-    private needExecutionContext(request: IRequest): boolean {
-        return (request.headers !== undefined && request.headers[LoaderHeader.executionContext] !== undefined);
-    }
 }
 
 function createCachedResolver(resolver: IUrlResolver) {
