@@ -4,8 +4,7 @@
  */
 
 import { EventEmitter } from "events";
-import uuid from "uuid";
-import { ITelemetryBaseLogger, ITelemetryLogger } from "@fluidframework/common-definitions";
+import { ITelemetryBaseLogger } from "@fluidframework/common-definitions";
 import {
     IFluidObject,
     IRequest,
@@ -19,7 +18,6 @@ import {
     IFluidCodeDetails,
 } from "@fluidframework/container-definitions";
 import { performanceNow } from "@fluidframework/common-utils";
-import { ChildLogger, DebugLogger, PerformanceEvent } from "@fluidframework/telemetry-utils";
 import {
     IDocumentServiceFactory,
     IFluidResolvedUrl,
@@ -72,8 +70,6 @@ export class Loader extends EventEmitter implements ILoader {
     private readonly containers = new Map<string, Promise<Container>>();
     private readonly resolver: IUrlResolver;
     private readonly documentServiceFactory: IDocumentServiceFactory;
-    private readonly subLogger: ITelemetryLogger;
-    private readonly logger: ITelemetryLogger;
 
     constructor(
         resolver: IUrlResolver | IUrlResolver[],
@@ -86,8 +82,6 @@ export class Loader extends EventEmitter implements ILoader {
     ) {
         super();
 
-        this.subLogger = DebugLogger.mixinDebugLogger("fluid:telemetry", logger, { loaderId: uuid() });
-        this.logger = ChildLogger.create(this.subLogger, "Loader");
         this.resolver = createCachedResolver(MultiUrlResolver.create(resolver));
         this.documentServiceFactory = MultiDocumentServiceFactory.create(documentServiceFactory);
     }
@@ -103,21 +97,17 @@ export class Loader extends EventEmitter implements ILoader {
             source,
             this.documentServiceFactory,
             this.resolver,
-            this.subLogger);
+        );
     }
 
     public async resolve(request: IRequest): Promise<Container> {
-        return PerformanceEvent.timedExecAsync(this.logger, { eventName: "Resolve" }, async () => {
-            const resolved = await this.resolveCore(request);
-            return resolved.container;
-        });
+        const resolved = await this.resolveCore(request);
+        return resolved.container;
     }
 
     public async request(request: IRequest): Promise<IResponse> {
-        return PerformanceEvent.timedExecAsync(this.logger, { eventName: "Request" }, async () => {
-            const resolved = await this.resolveCore(request);
-            return resolved.container.request({ url: resolved.parsed.path });
-        });
+        const resolved = await this.resolveCore(request);
+        return resolved.container.request({ url: resolved.parsed.path });
     }
 
     public async requestWorker(baseUrl: string, request: IRequest): Promise<IResponse> {
@@ -258,6 +248,6 @@ export class Loader extends EventEmitter implements ILoader {
             request,
             resolved,
             this.resolver,
-            this.subLogger);
+        );
     }
 }

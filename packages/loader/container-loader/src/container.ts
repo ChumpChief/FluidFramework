@@ -177,7 +177,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 resolvedUrl,
                 canReconnect: !(request.headers?.[LoaderHeader.reconnect] === false),
             },
-            logger);
+        );
 
         return new Promise<Container>((res, rej) => {
             const version = request.headers?.[LoaderHeader.version];
@@ -226,7 +226,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             serviceFactory,
             urlResolver,
             {},
-            logger);
+        );
         await container.createDetached(source);
 
         return container;
@@ -395,7 +395,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private readonly serviceFactory: IDocumentServiceFactory,
         private readonly urlResolver: IUrlResolver,
         config: IContainerConfig,
-        logger: ITelemetryBaseLogger | undefined,
     ) {
         super();
         this._audience = new Audience();
