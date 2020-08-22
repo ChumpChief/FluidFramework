@@ -105,7 +105,7 @@ export async function getTinyliciousContainer(
         const request = { url: documentId };
         const resolved = await urlResolver.resolve(request);
         container = await Container.load(
-            `tinylicious/${documentId}`,
+            documentId,
             documentServiceFactory,
             codeLoader,
             { blockUpdateMarkers: true }, // options

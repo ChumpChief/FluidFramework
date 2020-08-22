@@ -59,7 +59,7 @@ describe("Errors Types", () => {
             };
 
             await Container.load(
-                "tenantId/documentId",
+                "documentId",
                 mockFactory,
                 codeLoader,
                 {},

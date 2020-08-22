@@ -42,7 +42,7 @@ describe("Container", () => {
         let success: boolean;
         try {
             await Container.load(
-                "tenantId/documentId",
+                "documentId",
                 serviceFactory,
                 codeLoader,
                 {},
@@ -72,7 +72,7 @@ describe("Container", () => {
             };
 
             await Container.load(
-                "tenantId/documentId",
+                "documentId",
                 mockFactory,
                 codeLoader,
                 {},
@@ -102,7 +102,7 @@ describe("Container", () => {
                 return service;
             };
             await Container.load(
-                "tenantId/documentId",
+                "documentId",
                 mockFactory,
                 codeLoader,
                 {},
@@ -135,7 +135,7 @@ describe("Container", () => {
         };
 
         const container = await Container.load(
-            "tenantId/documentId",
+            "documentId",
             mockFactory,
             codeLoader,
             {},
@@ -167,7 +167,7 @@ describe("Container", () => {
         };
         let errorRaised = false;
         const container = await Container.load(
-            "tenantId/documentId",
+            "documentId",
             mockFactory,
             codeLoader,
             {},
@@ -208,7 +208,7 @@ describe("Container", () => {
             return service;
         };
         const container = await Container.load(
-            "tenantId/documentId",
+            "documentId",
             mockFactory,
             codeLoader,
             {},
@@ -230,7 +230,7 @@ describe("Container", () => {
 
     it("Check client details and Id", async () => {
         const container = await Container.load(
-            "tenantId/documentId",
+            "documentId",
             serviceFactory,
             codeLoader,
             {},

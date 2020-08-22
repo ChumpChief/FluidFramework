@@ -149,6 +149,8 @@ export class Loader extends EventEmitter implements ILoader {
         if (parsed === undefined) {
             return Promise.reject(`Invalid URL ${resolvedAsFluid.url}`);
         }
+        // parseUrl returns an id of "tenantId/documentId"
+        const documentId = parsed.id.split("/")[1];
 
         request.headers = request.headers ?? {};
         const { canCache, fromSequenceNumber } = this.parseHeader(parsed, request);
@@ -158,15 +160,15 @@ export class Loader extends EventEmitter implements ILoader {
         let container: Container;
         if (canCache) {
             const versionedId = request.headers[LoaderHeader.version] !== undefined
-                ? `${parsed.id}@${request.headers[LoaderHeader.version]}`
-                : parsed.id;
+                ? `${documentId}@${request.headers[LoaderHeader.version]}`
+                : documentId;
             const maybeContainer = await this.containers.get(versionedId);
             if (maybeContainer !== undefined) {
                 container = maybeContainer;
             } else {
                 const containerP =
                     this.loadContainer(
-                        parsed.id,
+                        documentId,
                         request,
                         resolvedAsFluid);
                 this.containers.set(versionedId, containerP);
@@ -175,7 +177,7 @@ export class Loader extends EventEmitter implements ILoader {
         } else {
             container =
                 await this.loadContainer(
-                    parsed.id,
+                    documentId,
                     request,
                     resolvedAsFluid);
         }
@@ -233,12 +235,12 @@ export class Loader extends EventEmitter implements ILoader {
     }
 
     private async loadContainer(
-        id: string,
+        documentId: string,
         request: IRequest,
         resolved: IFluidResolvedUrl,
     ): Promise<Container> {
         return Container.load(
-            id,
+            documentId,
             this.documentServiceFactory,
             this.codeLoader,
             this.options,

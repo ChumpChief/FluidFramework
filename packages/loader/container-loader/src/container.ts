@@ -152,7 +152,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Load container.
      */
     public static async load(
-        id: string,
+        documentId: string,
         serviceFactory: IDocumentServiceFactory,
         codeLoader: ICodeLoader,
         options: any,
@@ -162,7 +162,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         urlResolver: IUrlResolver,
         logger?: ITelemetryBaseLogger,
     ): Promise<Container> {
-        const [, docId] = id.split("/");
         const container = new Container(
             options,
             scope,
@@ -171,7 +170,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             urlResolver,
             {
                 originalRequest: request,
-                id: decodeURI(docId),
+                id: decodeURI(documentId),
                 resolvedUrl,
                 canReconnect: !(request.headers?.[LoaderHeader.reconnect] === false),
             },
