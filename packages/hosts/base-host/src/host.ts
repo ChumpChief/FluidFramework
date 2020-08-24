@@ -38,7 +38,6 @@ async function createWebLoader(
     //
     config.blockUpdateMarkers = true;
 
-    const scope = hostConfig.scope ? hostConfig.scope : {};
     const proxyLoaderFactories = hostConfig.proxyLoaderFactories ?
         hostConfig.proxyLoaderFactories : new Map<string, IProxyLoaderFactory>();
 
@@ -47,7 +46,6 @@ async function createWebLoader(
         hostConfig.documentServiceFactory,
         codeLoader,
         config,
-        scope,
         proxyLoaderFactories);
 }
 

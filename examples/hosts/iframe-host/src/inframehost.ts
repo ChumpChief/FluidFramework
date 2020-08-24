@@ -93,7 +93,6 @@ export class IFrameOuterHost {
             hostConfig.documentServiceFactory,
             new ProxyCodeLoader(),
             hostConfig.config ?? {},
-            hostConfig.scope ?? {},
             hostConfig.proxyLoaderFactories ?? new Map<string, IProxyLoaderFactory>(),
         );
     }

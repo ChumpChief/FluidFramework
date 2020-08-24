@@ -74,7 +74,6 @@ function createLoader(config: IConfig, password: string) {
         ),
         codeLoader,
         {},
-        {},
         new Map<string, IProxyLoaderFactory>(),
     );
     return loader;

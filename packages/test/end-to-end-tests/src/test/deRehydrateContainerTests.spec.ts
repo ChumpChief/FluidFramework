@@ -52,7 +52,6 @@ describe(`Dehydrate Rehydrate Container Test`, () => {
             documentServiceFactory,
             codeLoader,
             {},
-            {},
             new Map<string, IProxyLoaderFactory>());
     }
 

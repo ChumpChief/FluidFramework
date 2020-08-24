@@ -44,7 +44,6 @@ export async function getSessionStorageContainer(
         documentServiceFactory,
         codeLoader,
         { blockUpdateMarkers: true },
-        {},
         new Map(),
     );
 

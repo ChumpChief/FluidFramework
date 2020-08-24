@@ -48,7 +48,6 @@ export async function createLocalContainerFactory(
         documentServiceFactory,
         codeLoader,
         {},
-        {},
         new Map<string, IProxyLoaderFactory>());
 
     const documentId = uuid();

@@ -80,7 +80,6 @@ describe("Detached Container", () => {
             documentServiceFactory,
             codeLoader,
             {},
-            {},
             new Map<string, IProxyLoaderFactory>());
     }
 

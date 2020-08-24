@@ -280,7 +280,6 @@ export async function load(
         serviceFactory,
         codeLoader,
         options,
-        {},
         new Map<string, IProxyLoaderFactory>(),
     );
     const container = await loader.resolve({ url });

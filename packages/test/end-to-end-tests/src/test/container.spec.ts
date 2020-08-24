@@ -46,7 +46,6 @@ describe("Container", () => {
                 serviceFactory,
                 codeLoader,
                 {},
-                {},
                 testRequest,
                 testResolved,
                 localResolver);
@@ -76,7 +75,6 @@ describe("Container", () => {
                 mockFactory,
                 codeLoader,
                 {},
-                {},
                 testRequest,
                 testResolved,
                 localResolver);
@@ -105,7 +103,6 @@ describe("Container", () => {
                 "documentId",
                 mockFactory,
                 codeLoader,
-                {},
                 {},
                 testRequest,
                 testResolved,
@@ -139,7 +136,6 @@ describe("Container", () => {
             mockFactory,
             codeLoader,
             {},
-            {},
             testRequest,
             testResolved,
             localResolver);
@@ -170,7 +166,6 @@ describe("Container", () => {
             "documentId",
             mockFactory,
             codeLoader,
-            {},
             {},
             testRequest,
             testResolved,
@@ -212,7 +207,6 @@ describe("Container", () => {
             mockFactory,
             codeLoader,
             {},
-            {},
             testRequest,
             testResolved,
             localResolver);
@@ -233,7 +227,6 @@ describe("Container", () => {
             "documentId",
             serviceFactory,
             codeLoader,
-            {},
             {},
             testRequest,
             testResolved,

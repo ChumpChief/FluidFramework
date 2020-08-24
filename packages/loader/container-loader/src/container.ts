@@ -10,7 +10,7 @@ import merge from "lodash/merge";
 import {
     ITelemetryBaseLogger,
 } from "@fluidframework/common-definitions";
-import { IFluidObject, IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
+import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IAudience,
     ICodeLoader,
@@ -154,7 +154,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         serviceFactory: IDocumentServiceFactory,
         codeLoader: ICodeLoader,
         options: any,
-        scope: IFluidObject,
         request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
         urlResolver: IUrlResolver,
@@ -206,7 +205,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async create(
         codeLoader: ICodeLoader,
         options: any,
-        scope: IFluidObject,
         source: IFluidCodeDetails,
         serviceFactory: IDocumentServiceFactory,
         urlResolver: IUrlResolver,

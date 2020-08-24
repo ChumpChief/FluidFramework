@@ -88,7 +88,6 @@ describe("Document Dirty", () => {
             documentServiceFactory,
             codeLoader,
             {},
-            {},
             new Map<string, IProxyLoaderFactory>());
 
         return initializeLocalContainer(id, loader, codeDetails);

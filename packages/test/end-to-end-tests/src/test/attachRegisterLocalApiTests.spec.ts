@@ -71,7 +71,6 @@ describe(`Attach/Bind Api Tests For Attached Container`, () => {
             documentServiceFactory,
             codeLoader,
             {},
-            {},
             new Map<string, IProxyLoaderFactory>());
     }
 

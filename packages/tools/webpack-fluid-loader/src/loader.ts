@@ -160,7 +160,6 @@ async function createWebLoader(
         documentServiceFactory,
         codeLoader,
         { blockUpdateMarkers: true },
-        {},
         new Map<string, IProxyLoaderFactory>());
 }
 

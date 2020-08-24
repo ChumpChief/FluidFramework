@@ -39,7 +39,6 @@ export function createLocalLoader(
         documentServiceFactory,
         codeLoader,
         {},
-        {},
         new Map<string, IProxyLoaderFactory>());
 }
 

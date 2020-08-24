@@ -63,7 +63,6 @@ describe("Errors Types", () => {
                 mockFactory,
                 codeLoader,
                 {},
-                {},
                 testRequest,
                 testResolved,
                 localResolver);

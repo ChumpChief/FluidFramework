@@ -89,7 +89,6 @@ export async function start(): Promise<void> {
         new RouterliciousDocumentServiceFactory(),
         nodeCodeLoader,
         {},
-        {},
         new Map<string, IProxyLoaderFactory>(),
     );
 

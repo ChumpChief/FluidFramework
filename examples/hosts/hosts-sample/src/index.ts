@@ -74,7 +74,6 @@ export async function start(url: string, code: string): Promise<void> {
         documentServicesFactory,
         codeLoader,
         { blockUpdateMarkers: true },
-        {},
         new Map<string, IProxyLoaderFactory>());
 
     // We start by resolving the URL to its underlying Fluid document. This gives low-level access which will enable
