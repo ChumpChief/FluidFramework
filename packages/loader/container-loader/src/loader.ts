@@ -4,7 +4,6 @@
  */
 
 import { EventEmitter } from "events";
-import { ITelemetryBaseLogger } from "@fluidframework/common-definitions";
 import {
     IRequest,
     IResponse,
@@ -76,7 +75,6 @@ export class Loader extends EventEmitter implements ILoader {
         private readonly codeLoader: ICodeLoader,
         private readonly options: any,
         private readonly proxyLoaderFactories: Map<string, IProxyLoaderFactory>,
-        logger?: ITelemetryBaseLogger,
     ) {
         super();
 

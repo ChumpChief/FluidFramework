@@ -321,7 +321,7 @@ class Document {
             codeLoader,
             options,
             new Map<string, IProxyLoaderFactory>(),
-            this.docLogger);
+        );
         const container: Container = await loader.resolve({ url: resolved.url });
 
         assert(container.existing); // ReplayFileDeltaConnection.create() guarantees that

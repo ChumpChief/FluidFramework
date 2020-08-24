@@ -7,9 +7,6 @@ import assert from "assert";
 import { EventEmitter } from "events";
 // eslint-disable-next-line import/no-internal-modules
 import merge from "lodash/merge";
-import {
-    ITelemetryBaseLogger,
-} from "@fluidframework/common-definitions";
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IAudience,
@@ -157,7 +154,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
         urlResolver: IUrlResolver,
-        logger?: ITelemetryBaseLogger,
     ): Promise<Container> {
         const container = new Container(
             options,
@@ -208,7 +204,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         source: IFluidCodeDetails,
         serviceFactory: IDocumentServiceFactory,
         urlResolver: IUrlResolver,
-        logger?: ITelemetryBaseLogger,
     ): Promise<Container> {
         const container = new Container(
             options,
