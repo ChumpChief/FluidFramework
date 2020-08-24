@@ -23,7 +23,6 @@ import {
     IRuntimeState,
     ICriticalContainerError,
     ContainerWarning,
-    IThrottlingWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -883,11 +882,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             };
         }
 
-        // Back-compat: old docs would have ".attributes" instead of "attributes"
-        const attributesHash = ".protocol" in tree.trees
-            ? tree.trees[".protocol"].blobs.attributes
-            : tree.blobs[".attributes"];
-
+        const attributesHash = tree.trees[".protocol"].blobs.attributes;
         const attributes = await readAndParse<IDocumentAttributes>(storage, attributesHash);
 
         return attributes;
@@ -911,13 +906,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             ]);
         }
 
-        const protocolHandler = this.initializeProtocolState(
+        return this.initializeProtocolState(
             attributes,
             members,
             proposals,
-            values);
-
-        return protocolHandler;
+            values,
+        );
     }
 
     private initializeProtocolState(
@@ -972,16 +966,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private getCodeDetailsFromQuorum(): IFluidCodeDetails | undefined {
-        const quorum = this.protocolHandler.quorum;
-
-        let pkg = quorum.get("code");
-
-        // Back compat
-        if (pkg === undefined) {
-            pkg = quorum.get("code2");
-        }
-
-        return pkg;
+        return this.protocolHandler.quorum.get("code");
     }
 
     /**
@@ -1056,22 +1041,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         deltaManager.on("disconnect", (reason: string) => {
             this.setConnectionState(ConnectionState.Disconnected, reason);
-        });
-
-        deltaManager.on("throttled", (warning: IThrottlingWarning) => {
-            this.raiseContainerWarning(warning);
-        });
-
-        deltaManager.on("pong", (latency) => {
-            this.emit("pong", latency);
-        });
-
-        deltaManager.on("processTime", (time) => {
-            this.emit("processTime", time);
-        });
-
-        deltaManager.on("readonly", (readonly) => {
-            this.emit("readonly", readonly);
         });
 
         return deltaManager;
