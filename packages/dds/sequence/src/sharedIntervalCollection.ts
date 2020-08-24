@@ -55,10 +55,9 @@ export class SharedIntervalCollectionFactory implements IChannelFactory {
         runtime: IFluidDataStoreRuntime,
         id: string,
         services: IChannelServices,
-        branchId: string,
         attributes: IChannelAttributes): Promise<SharedIntervalCollection> {
         const map = new SharedIntervalCollection(id, runtime, attributes);
-        await map.load(branchId, services);
+        await map.load(services);
 
         return map;
     }
@@ -174,7 +173,6 @@ export class SharedIntervalCollection<TInterval extends ISerializableInterval = 
     }
 
     protected async loadCore(
-        branchId: string,
         storage: IChannelStorageService) {
         const header = await storage.read(snapshotFileName);
 

@@ -238,13 +238,11 @@ export interface IFluidDataStoreContext extends EventEmitter {
     readonly existing: boolean;
     readonly options: any;
     readonly clientId: string | undefined;
-    readonly parentBranch: string | null;
     readonly connected: boolean;
     readonly leader: boolean;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly blobManager: IBlobManager;
     readonly storage: IDocumentStorageService;
-    readonly branch: string;
     readonly baseSnapshot: ISnapshotTree | undefined;
     readonly loader: ILoader;
     /**

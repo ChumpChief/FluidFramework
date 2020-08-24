@@ -22,7 +22,6 @@ export interface IConsensusRegisterCollectionFactory extends IChannelFactory {
         document: IFluidDataStoreRuntime,
         id: string,
         services: IChannelServices,
-        branchId: string,
         attributes: IChannelAttributes): Promise<IConsensusRegisterCollection>;
 
     create(document: IFluidDataStoreRuntime, id: string): IConsensusRegisterCollection;

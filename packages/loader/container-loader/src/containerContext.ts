@@ -25,7 +25,6 @@ import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     ConnectionState,
     IClientDetails,
-    IDocumentAttributes,
     IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
@@ -46,7 +45,6 @@ export class ContainerContext implements IContainerContext {
         container: Container,
         runtimeFactory: IRuntimeFactory,
         baseSnapshot: ISnapshotTree | null,
-        attributes: IDocumentAttributes,
         blobManager: BlobManager | undefined,
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         quorum: IQuorum,
@@ -62,7 +60,6 @@ export class ContainerContext implements IContainerContext {
             container,
             runtimeFactory,
             baseSnapshot,
-            attributes,
             blobManager,
             deltaManager,
             quorum,
@@ -91,14 +88,6 @@ export class ContainerContext implements IContainerContext {
 
     public get existing(): boolean | undefined {
         return this.container.existing;
-    }
-
-    public get branch(): string {
-        return this.attributes.branch;
-    }
-
-    public get parentBranch(): string | null {
-        return this.container.parentBranch;
     }
 
     // Back-compat: supporting <= 0.16 data stores
@@ -164,7 +153,6 @@ export class ContainerContext implements IContainerContext {
         private readonly container: Container,
         public readonly runtimeFactory: IRuntimeFactory,
         private readonly _baseSnapshot: ISnapshotTree | null,
-        private readonly attributes: IDocumentAttributes,
         public readonly blobManager: BlobManager | undefined,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         public readonly quorum: IQuorum,

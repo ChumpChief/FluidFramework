@@ -551,10 +551,10 @@ export class SharedMatrix<T extends Serializable = Serializable>
         debug(`${this.id} is now disconnected`);
     }
 
-    protected async loadCore(branchId: string, storage: IChannelStorageService) {
+    protected async loadCore(storage: IChannelStorageService) {
         try {
-            await this.rows.load(this.runtime, new ObjectStoragePartition(storage, SnapshotPath.rows), branchId);
-            await this.cols.load(this.runtime, new ObjectStoragePartition(storage, SnapshotPath.cols), branchId);
+            await this.rows.load(this.runtime, new ObjectStoragePartition(storage, SnapshotPath.rows));
+            await this.cols.load(this.runtime, new ObjectStoragePartition(storage, SnapshotPath.cols));
             const [cellData, pendingCliSeqData] = await deserializeBlob(this.runtime, storage, SnapshotPath.cells);
 
             this.cells = SparseArray2D.load(cellData);

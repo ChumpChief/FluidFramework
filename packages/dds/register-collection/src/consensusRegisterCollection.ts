@@ -209,10 +209,7 @@ export class ConsensusRegisterCollection<T>
         return tree;
     }
 
-    protected async loadCore(
-        branchId: string,
-        storage: IChannelStorageService,
-    ): Promise<void> {
+    protected async loadCore(storage: IChannelStorageService): Promise<void> {
         const header = await storage.read(snapshotFileName);
         const dataObj = header !== undefined ? this.parse(fromBase64ToUtf8(header)) : {};
 

@@ -22,7 +22,7 @@ async function populate(directory: SharedDirectory, content: object) {
     const storage = new MockSharedObjectServices({
         header: JSON.stringify(content),
     });
-    return directory.load("branchId", storage);
+    return directory.load(storage);
 }
 
 function serialize(directory: SharedDirectory): string {
@@ -298,7 +298,7 @@ describe("Directory", () => {
 
                 const directory2 = new SharedDirectory("test", dataStoreRuntime, DirectoryFactory.Attributes);
                 const storage = MockSharedObjectServices.createFromTree(tree);
-                await directory2.load("branchId", storage);
+                await directory2.load(storage);
 
                 assert.equal(directory2.get("first"), "second");
                 assert.equal(directory2.get("long1"), longWord);
@@ -338,7 +338,7 @@ describe("Directory", () => {
             services2.deltaConnection = containerRuntime2.createDeltaConnection();
 
             const directory2 = new SharedDirectory("directory2", dataStoreRuntime2, DirectoryFactory.Attributes);
-            await directory2.load("branchId", services2);
+            await directory2.load(services2);
 
             // Now connect the first SharedDirectory
             dataStoreRuntime.local = false;
@@ -381,7 +381,7 @@ describe("Directory", () => {
             services2.deltaConnection = containerRuntime2.createDeltaConnection();
 
             const directory2 = new SharedDirectory("directory2", dataStoreRuntime2, DirectoryFactory.Attributes);
-            await directory2.load("branchId", services2);
+            await directory2.load(services2);
 
             // Now connect the first SharedDirectory
             dataStoreRuntime.local = false;

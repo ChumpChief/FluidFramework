@@ -126,17 +126,12 @@ export abstract class SharedObject<TEvent extends ISharedObjectEvents = ISharedO
     /**
      * A shared object, after construction, can either be loaded in the case that it is already part of
      * a shared document. Or later attached if it is being newly added.
-     * @param branchId - Branch ID
      * @param services - Services used by the shared object
      */
-    public async load(
-        branchId: string,
-        services: IChannelServices): Promise<void> {
+    public async load(services: IChannelServices): Promise<void> {
         this.services = services;
 
-        await this.loadCore(
-            branchId,
-            services.objectStorage);
+        await this.loadCore(services.objectStorage);
         this.attachDeltaHandler();
     }
 
@@ -200,7 +195,6 @@ export abstract class SharedObject<TEvent extends ISharedObjectEvents = ISharedO
      * @param services - Storage used by the shared object
      */
     protected abstract loadCore(
-        branchId: string,
         services: IChannelStorageService): Promise<void>;
 
     /**

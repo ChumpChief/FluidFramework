@@ -75,7 +75,6 @@ import {
 import { Audience } from "./audience";
 import { BlobManager } from "./blobManager";
 import { ContainerContext } from "./containerContext";
-import { debug } from "./debug";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { NullChaincode } from "./nullRuntime";
@@ -237,7 +236,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
     private service: IDocumentService | undefined;
-    private _parentBranch: string | null = null;
     private _connectionState = ConnectionState.Disconnected;
     private readonly _audience: Audience;
 
@@ -361,13 +359,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public get audience(): IAudience {
         return this._audience;
-    }
-
-    /**
-     * Returns the parent branch for this document
-     */
-    public get parentBranch(): string | null {
-        return this._parentBranch;
     }
 
     constructor(
@@ -505,7 +496,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.cachedAttachSummary = undefined;
             // We know this is create new flow.
             this._existing = false;
-            this._parentBranch = this._id;
 
             // Propagate current connection state through the system.
             const connected = this.connectionState === ConnectionState.Connected;
@@ -522,14 +512,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public async snapshot(tagMessage: string, fullTree: boolean = false): Promise<void> {
-        // TODO: Issue-2171 Support for Branch Snapshots
-        if (tagMessage.includes("ReplayTool Snapshot") === false && this.parentBranch !== null) {
-            // The below debug ruins the chrome debugging session
-            // Tracked (https://bugs.chromium.org/p/chromium/issues/detail?id=659515)
-            debug(`Skipping snapshot due to being branch of ${this.parentBranch}`);
-            return;
-        }
-
         // Only snapshot once a code quorum has been established
         if (!this.protocolHandler.quorum.has("code") && !this.protocolHandler.quorum.has("code2")) {
             return;
@@ -712,7 +694,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Save attributes for the document
         const documentAttributes = {
-            branch: this.id,
             minimumSequenceNumber: this._deltaManager.minimumSequenceNumber,
             sequenceNumber: this._deltaManager.lastSequenceNumber,
             term: this._deltaManager.referenceTerm,
@@ -810,7 +791,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // the initial details
         if (maybeSnapshotTree !== undefined) {
             this._existing = true;
-            this._parentBranch = attributes.branch !== this.id ? attributes.branch : null;
             loadDetailsP = Promise.resolve();
         } else {
             if (startConnectionP === undefined) {
@@ -819,7 +799,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
             loadDetailsP = startConnectionP.then((details) => {
                 this._existing = details.existing;
-                this._parentBranch = details.parentBranch;
             });
         }
 
@@ -827,7 +806,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
         [this.blobManager, this._protocolHandler] = await Promise.all([blobManagerP, protocolHandlerP, loadDetailsP]);
 
-        await this.loadContext(attributes, maybeSnapshotTree);
+        await this.loadContext(maybeSnapshotTree);
 
         // Internal context is fully loaded at this point
         this.loaded = true;
@@ -848,7 +827,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private async createDetached(source: IFluidCodeDetails) {
         const attributes: IDocumentAttributes = {
-            branch: "",
+            branch: "", // not used
             sequenceNumber: 0,
             term: 1,
             minimumSequenceNumber: 0,
@@ -877,7 +856,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             values);
 
         // The load context - given we seeded the quorum - will be great
-        await this.createDetachedContext(attributes);
+        await this.createDetachedContext();
 
         this.loaded = true;
 
@@ -898,7 +877,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     ): Promise<IDocumentAttributes> {
         if (tree === undefined) {
             return {
-                branch: this.id,
+                branch: "", // not used
                 minimumSequenceNumber: 0,
                 sequenceNumber: 0,
                 term: 1,
@@ -954,7 +933,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         values: [string, any][],
     ): ProtocolOpHandler {
         const protocol = new ProtocolOpHandler(
-            attributes.branch,
+            "", // branchId, not used
             attributes.minimumSequenceNumber,
             attributes.sequenceNumber,
             attributes.term,
@@ -1235,7 +1214,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async loadContext(
-        attributes: IDocumentAttributes,
         snapshot?: ISnapshotTree,
         previousRuntimeState: IRuntimeState = {},
     ) {
@@ -1250,7 +1228,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this,
             chaincode,
             snapshot ?? null,
-            attributes,
             this.blobManager,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
@@ -1269,7 +1246,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     /**
      * Creates a new, unattached container context
      */
-    private async createDetachedContext(attributes: IDocumentAttributes) {
+    private async createDetachedContext() {
         this.pkg = this.getCodeDetailsFromQuorum();
         if (this.pkg === undefined) {
             throw new Error("pkg should be provided in create flow!!");
@@ -1284,7 +1261,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this,
             runtimeFactory,
             { id: null, blobs: {}, commits: {}, trees: {} },    // TODO this will be from the offline store
-            attributes,
             this.blobManager,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),

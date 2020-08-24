@@ -36,10 +36,9 @@ export class ConsensusQueueFactory implements IConsensusOrderedCollectionFactory
         runtime: IFluidDataStoreRuntime,
         id: string,
         services: IChannelServices,
-        branchId: string,
         attributes: IChannelAttributes): Promise<IConsensusOrderedCollection> {
         const collection = new ConsensusQueue(id, runtime, attributes);
-        await collection.load(branchId, services);
+        await collection.load(services);
         return collection;
     }
 

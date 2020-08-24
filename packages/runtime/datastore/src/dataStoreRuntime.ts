@@ -90,7 +90,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             context,
             context.documentId,
             context.id,
-            context.parentBranch,
             context.existing,
             context.options,
             context.blobManager,
@@ -176,7 +175,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         private readonly dataStoreContext: IFluidDataStoreContext,
         public readonly documentId: string,
         public readonly id: string,
-        public readonly parentBranch: string | null,
         public existing: boolean,
         public readonly options: any,
         private readonly blobManager: IBlobManager,
@@ -205,7 +203,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                     tree.trees[path],
                     this.sharedObjectRegistry,
                     undefined /* extraBlobs */,
-                    dataStoreContext.branch,
                     this.dataStoreContext.summaryTracker.createOrGetChild(
                         path,
                         this.deltaManager.lastSequenceNumber,
@@ -452,9 +449,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                 } else {
                     assert(!this.contexts.has(id), "Unexpected attach channel OP");
 
-                    // Create storage service that wraps the attach data
-                    const origin = message.origin?.id ?? this.documentId;
-
                     const flatBlobs = new Map<string, string>();
                     const snapshotTreeP = buildSnapshotTree(attachMessage.snapshot.entries, flatBlobs);
                     // flatBlobsP's validity is contingent on snapshotTreeP's resolution
@@ -470,7 +464,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                         snapshotTreeP,
                         this.sharedObjectRegistry,
                         flatBlobsP,
-                        origin,
                         this.dataStoreContext.summaryTracker.createOrGetChild(
                             id,
                             message.sequenceNumber,
