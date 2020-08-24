@@ -17,8 +17,6 @@ import {
     Clicker,
     ExampleUsingProviders,
 } from "./data-objects";
-import { IFluidUserInformation } from "./interfaces";
-import { userInfoFactory } from "./providers";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
 const pkg = require("../package.json");
@@ -118,9 +116,4 @@ export const fluidExport = new ContainerRuntimeFactoryWithDefaultDataStore(
     new Map([
         Pond.getFactory().registryEntry,
     ]),
-    [
-        {
-            type: IFluidUserInformation,
-            provider: async (dc) => userInfoFactory(dc),
-        },
-    ]);
+);

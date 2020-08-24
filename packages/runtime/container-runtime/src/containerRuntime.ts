@@ -467,7 +467,7 @@ export class ContainerRuntime extends EventEmitter
         registryEntries: NamedFluidDataStoreRegistryEntries,
         requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
         runtimeOptions?: IContainerRuntimeOptions,
-        containerScope: IFluidObject = context.scope,
+        containerScope: IFluidObject = {},
     ): Promise<ContainerRuntime> {
         // Back-compat: <= 0.18 loader
         if (context.deltaManager.lastSequenceNumber === undefined) {

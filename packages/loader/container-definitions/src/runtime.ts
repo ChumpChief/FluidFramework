@@ -5,7 +5,6 @@
 
 import { IDisposable } from "@fluidframework/common-definitions";
 import {
-    IFluidObject,
     IFluidConfiguration,
     IRequest,
     IResponse,
@@ -121,11 +120,6 @@ export interface IContainerContext extends IMessageScheduler, IDisposable {
     readonly loader: ILoader;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
     readonly previousRuntimeState: IRuntimeState;
-
-    /**
-     * Ambient services provided with the context
-     */
-    readonly scope: IFluidObject;
 
     raiseContainerWarning(warning: ContainerWarning): void;
     requestSnapshot(tagMessage: string): Promise<void>;

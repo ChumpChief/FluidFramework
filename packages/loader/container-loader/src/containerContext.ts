@@ -5,7 +5,6 @@
 
 import assert from "assert";
 import {
-    IFluidObject,
     IFluidConfiguration,
     IRequest,
     IResponse,
@@ -45,7 +44,6 @@ import { NullRuntime } from "./nullRuntime";
 export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
-        scope: IFluidObject,
         runtimeFactory: IRuntimeFactory,
         baseSnapshot: ISnapshotTree | null,
         attributes: IDocumentAttributes,
@@ -62,7 +60,6 @@ export class ContainerContext implements IContainerContext {
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
             container,
-            scope,
             runtimeFactory,
             baseSnapshot,
             attributes,
@@ -165,7 +162,6 @@ export class ContainerContext implements IContainerContext {
 
     constructor(
         private readonly container: Container,
-        public readonly scope: IFluidObject,
         public readonly runtimeFactory: IRuntimeFactory,
         private readonly _baseSnapshot: ISnapshotTree | null,
         private readonly attributes: IDocumentAttributes,

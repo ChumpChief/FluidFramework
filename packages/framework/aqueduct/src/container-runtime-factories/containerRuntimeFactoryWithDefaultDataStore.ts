@@ -5,7 +5,6 @@
 
 import { NamedFluidDataStoreRegistryEntries } from "@fluidframework/runtime-definitions";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
-import { DependencyContainerRegistry } from "@fluidframework/synthesize";
 import { MountableView } from "@fluidframework/view-adapters";
 import {
     RuntimeRequestHandler,
@@ -28,12 +27,10 @@ export class ContainerRuntimeFactoryWithDefaultDataStore extends BaseContainerRu
     constructor(
         private readonly defaultDataStoreName: string,
         registryEntries: NamedFluidDataStoreRegistryEntries,
-        providerEntries: DependencyContainerRegistry = [],
         requestHandlers: RuntimeRequestHandler[] = [],
     ) {
         super(
             registryEntries,
-            providerEntries,
             [
                 // The mountable view request handler must go before any other request handlers that we might
                 // want to return mountable views, so it can correctly handle the header and reissue the request.

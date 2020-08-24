@@ -162,7 +162,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     ): Promise<Container> {
         const container = new Container(
             options,
-            scope,
             codeLoader,
             serviceFactory,
             urlResolver,
@@ -215,7 +214,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     ): Promise<Container> {
         const container = new Container(
             options,
-            scope,
             codeLoader,
             serviceFactory,
             urlResolver,
@@ -384,7 +382,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     constructor(
         public readonly options: any,
-        private readonly scope: IFluidObject,
         private readonly codeLoader: ICodeLoader,
         private readonly serviceFactory: IDocumentServiceFactory,
         private readonly urlResolver: IUrlResolver,
@@ -1327,7 +1324,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this._context = await ContainerContext.createOrLoad(
             this,
-            this.scope,
             chaincode,
             snapshot ?? null,
             attributes,
@@ -1362,7 +1358,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this._context = await ContainerContext.createOrLoad(
             this,
-            this.scope,
             runtimeFactory,
             { id: null, blobs: {}, commits: {}, trees: {} },    // TODO this will be from the offline store
             attributes,
