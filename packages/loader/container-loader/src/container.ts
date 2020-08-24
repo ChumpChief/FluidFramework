@@ -39,8 +39,6 @@ import {
     CreateNewHeader,
 } from "@fluidframework/driver-definitions";
 import {
-    BlobCacheStorageService,
-    buildSnapshotTree,
     readAndParse,
     ensureFluidResolvedUrl,
     combineAppAndProtocolSummary,
@@ -232,7 +230,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
         return this._storageService;
     }
-    private blobsCacheStorageService: IDocumentStorageService | undefined;
 
     private _clientId: string | undefined;
     private _id: string | undefined;
@@ -591,7 +588,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get storage(): IDocumentStorageService | undefined {
-        return this.blobsCacheStorageService ?? this._storageService;
+        return this._storageService;
     }
 
     /**
@@ -601,13 +598,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public raiseContainerWarning(warning: ContainerWarning) {
         this.emit("warning", warning);
-    }
-
-    public async reloadContext(): Promise<void> {
-        return this.reloadContextCore().catch((error) => {
-            this.close(CreateContainerError(error));
-            throw error;
-        });
     }
 
     public hasNullRuntime() {
@@ -647,49 +637,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
 
         throw new Error("Url Resolver does not support creating urls");
-    }
-
-    private async reloadContextCore(): Promise<void> {
-        await Promise.all([
-            this.deltaManager.inbound.systemPause(),
-            this.deltaManager.inboundSignal.systemPause()]);
-
-        const previousContextState = await this.context.snapshotRuntimeState();
-        this.context.dispose();
-
-        let snapshot: ISnapshotTree | undefined;
-        const blobs = new Map();
-        if (previousContextState.snapshot !== undefined) {
-            snapshot = await buildSnapshotTree(previousContextState.snapshot.entries, blobs);
-
-            /**
-             * Should be removed / updated after issue #2914 is fixed.
-             * There are currently two scenarios where this is called:
-             * 1. When a new code proposal is accepted - This should be set to true before `this.loadContext` is
-             * called which creates and loads the ContainerRuntime. This is because for "read" mode clients this
-             * flag is false which causes ContainerRuntime to create the internal compoents again.
-             * 2. When the first client connects in "write" mode - This happens when a clent does not create the
-             * Container in detached mode. In this case, when the code proposal is accepted, we come here and we
-             * need to create the internal data stores in ContainerRuntime.
-             * Once we move to using detached container everywhere, this can move outside this block.
-             */
-            this._existing = true;
-        }
-
-        if (blobs.size > 0) {
-            this.blobsCacheStorageService = new BlobCacheStorageService(this.storageService, Promise.resolve(blobs));
-        }
-        const attributes: IDocumentAttributes = {
-            branch: this.id,
-            minimumSequenceNumber: this._deltaManager.minimumSequenceNumber,
-            sequenceNumber: this._deltaManager.lastSequenceNumber,
-            term: this._deltaManager.referenceTerm,
-        };
-
-        await this.loadContext(attributes, snapshot, previousContextState);
-
-        this.deltaManager.inbound.systemResume();
-        this.deltaManager.inboundSignal.systemResume();
     }
 
     private async snapshotCore(tagMessage: string, fullTree: boolean = false) {
@@ -1032,22 +979,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 this._deltaManager.updateQuorumLeave();
             }
         });
-
-        protocol.quorum.on(
-            "approveProposal",
-            (sequenceNumber, key, value) => {
-                debug(`approved ${key}`);
-                if (key === "code" || key === "code2") {
-                    debug(`loadRuntimeFactory ${JSON.stringify(value)}`);
-
-                    if (value === this.pkg) {
-                        return;
-                    }
-
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                    this.reloadContext();
-                }
-            });
 
         return protocol;
     }

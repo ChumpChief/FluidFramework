@@ -123,7 +123,6 @@ export interface IContainerContext extends IMessageScheduler, IDisposable {
 
     raiseContainerWarning(warning: ContainerWarning): void;
     requestSnapshot(tagMessage: string): Promise<void>;
-    reloadContext(): Promise<void>;
 
     /**
      * Indicates the attachment state of the container to a host service.
