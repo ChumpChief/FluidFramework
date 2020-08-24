@@ -22,7 +22,6 @@ import {
     LoaderHeader,
     IRuntimeState,
     ICriticalContainerError,
-    ContainerWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -570,15 +569,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get storage(): IDocumentStorageService | undefined {
         return this._storageService;
-    }
-
-    /**
-     * Raise non-critical error to host. Calling this API will not close container.
-     * For critical errors, please call Container.close(error).
-     * @param error - an error to raise
-     */
-    public raiseContainerWarning(warning: ContainerWarning) {
-        this.emit("warning", warning);
     }
 
     public hasNullRuntime() {
@@ -1194,7 +1184,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
             loader,
-            (warning: ContainerWarning) => this.raiseContainerWarning(warning),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
@@ -1227,7 +1216,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
             loader,
-            (warning: ContainerWarning) => this.raiseContainerWarning(warning),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),

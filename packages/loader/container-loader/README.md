@@ -90,7 +90,7 @@ There are two ways errors are exposed:
 
 Critical errors can show up in #1 & #2 workflows. For example, data store URI may point to a deleted file, which will result in errors on container open. But file can also be deleted while container is opened, resulting in same error type being raised through "error" handler.
 
-Errors are of [ICriticalContainerError](../container-definitions/src/error.ts) type, and warnings are of [ContainerWarning](../container-definitions/src/error.ts) type. Both have `errorType` property, describing type of an error (and appropriate interface of error object):
+Errors are of [ICriticalContainerError](../container-definitions/src/error.ts) type. It has the `errorType` property, describing type of an error (and appropriate interface of error object):
 ```ts
      readonly errorType: string;
 ```

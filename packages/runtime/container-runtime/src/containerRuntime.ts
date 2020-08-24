@@ -25,7 +25,6 @@ import {
     ILoader,
     IRuntime,
     IRuntimeState,
-    ContainerWarning,
     ICriticalContainerError,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -1292,10 +1291,6 @@ export class ContainerRuntime extends EventEmitter
     public getAudience(): IAudience {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return this.context.audience!;
-    }
-
-    public raiseContainerWarning(warning: ContainerWarning) {
-        this.context.raiseContainerWarning(warning);
     }
 
     /**

@@ -19,7 +19,7 @@ import {
     LoaderHeader,
 } from "@fluidframework/container-definitions";
 import { ISequencedClient } from "@fluidframework/protocol-definitions";
-import { ISummarizer, Summarizer, createSummarizingWarning, ISummarizingWarning } from "./summarizer";
+import { ISummarizer, Summarizer } from "./summarizer";
 
 export const summarizerClientType = "summarizer";
 
@@ -308,10 +308,6 @@ export class SummaryManager extends EventEmitter implements IDisposable {
         }
     }
 
-    private raiseContainerWarning(warning: ISummarizingWarning) {
-        this.context.raiseContainerWarning(warning);
-    }
-
     private start() {
         if (!this.summariesEnabled) {
             // If we should never summarize, lock in disabled state
@@ -329,16 +325,9 @@ export class SummaryManager extends EventEmitter implements IDisposable {
 
         // throttle creation of new summarizer containers to prevent spamming the server with websocket connections
         const delayMs = this.startThrottler.getDelay();
-        if (delayMs >= defaultThrottleMaxDelayMs) {
-            // we can't create a summarizer for some reason; raise error on container
-            this.raiseContainerWarning(
-                createSummarizingWarning("SummaryManager: CreateSummarizer Max Throttle Delay", false));
-        }
 
         this.createSummarizer(delayMs).then((summarizer) => {
             this.setNextSummarizer(summarizer.setSummarizer());
-            summarizer.on("summarizingError",
-                (warning: ISummarizingWarning) => this.raiseContainerWarning(warning));
             this.run(summarizer);
         }, (error) => {
             this.logger.sendErrorEvent({

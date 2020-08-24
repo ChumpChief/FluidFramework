@@ -31,11 +31,6 @@ export interface IErrorBase {
 }
 
 /**
- * Represents warnings raised on container.
- */
-export type ContainerWarning = IErrorBase;
-
-/**
  * Represents errors raised on container.
  */
 export type ICriticalContainerError = IErrorBase;

@@ -16,7 +16,6 @@ import {
     IBlobManager,
     IDeltaManager,
     IGenericBlob,
-    ContainerWarning,
     ILoader,
     BindState,
     AttachState,
@@ -460,10 +459,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         this.verifyNotClosed();
         assert(this.channel);
         return this._containerRuntime.submitDataStoreSignal(this.id, type, content);
-    }
-
-    public raiseContainerWarning(warning: ContainerWarning): void {
-        this.containerRuntime.raiseContainerWarning(warning);
     }
 
     /**

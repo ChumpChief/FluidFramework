@@ -13,7 +13,7 @@ import {
 import { IResolvedUrl } from "@fluidframework/driver-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
-import { ICriticalContainerError, ContainerWarning } from "./error";
+import { ICriticalContainerError } from "./error";
 import { IFluidModule } from "./fluidModule";
 import { IFluidCodeDetails, IFluidPackage } from "./fluidPackage";
 import { AttachState } from "./runtime";
@@ -70,7 +70,6 @@ export interface ICodeAllowList {
 }
 
 export interface IContainerEvents extends IEvent {
-    (event: "readonly", listener: (readonly: boolean) => void): void;
     (event: "connected", listener: (clientId: string) => void);
     /**
      * @param opsBehind - number of ops this client is behind (if present).
@@ -79,9 +78,7 @@ export interface IContainerEvents extends IEvent {
     (event: "contextChanged", listener: (codeDetails: IFluidCodeDetails) => void);
     (event: "disconnected" | "attaching" | "attached", listener: () => void);
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
-    (event: "warning", listener: (error: ContainerWarning) => void);
     (event: "op", listener: (message: ISequencedDocumentMessage) => void);
-    (event: "pong" | "processTime", listener: (latency: number) => void);
 }
 
 export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRouter {

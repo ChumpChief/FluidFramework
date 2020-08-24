@@ -11,7 +11,6 @@ import {
     IAudience,
     IBlobManager,
     IDeltaManager,
-    ContainerWarning,
     ILoader,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -108,11 +107,6 @@ export interface IContainerRuntime extends
      * Returns the current audience.
      */
     getAudience(): IAudience;
-
-    /**
-     * Used to raise an unrecoverable error on the runtime.
-     */
-    raiseContainerWarning(warning: ContainerWarning): void;
 
     /**
      * Returns true of document is dirty, i.e. there are some pending local changes that

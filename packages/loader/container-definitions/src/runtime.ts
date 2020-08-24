@@ -24,7 +24,7 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { IAudience } from "./audience";
 import { IBlobManager } from "./blobs";
-import { ICriticalContainerError, ContainerWarning } from "./error";
+import { ICriticalContainerError } from "./error";
 import { ILoader } from "./loader";
 import { IMessageScheduler } from "./messageScheduler";
 
@@ -119,7 +119,6 @@ export interface IContainerContext extends IMessageScheduler, IDisposable {
     readonly serviceConfiguration: IServiceConfiguration | undefined;
     readonly previousRuntimeState: IRuntimeState;
 
-    raiseContainerWarning(warning: ContainerWarning): void;
     requestSnapshot(tagMessage: string): Promise<void>;
 
     /**
