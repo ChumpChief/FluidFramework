@@ -510,7 +510,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public async snapshot(tagMessage: string, fullTree: boolean = false): Promise<void> {
         // Only snapshot once a code quorum has been established
-        if (!this.protocolHandler.quorum.has("code") && !this.protocolHandler.quorum.has("code2")) {
+        if (!this.protocolHandler.quorum.has("code")) {
             return;
         }
 
@@ -767,23 +767,18 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const protocolHandlerP =
             this.loadAndInitializeProtocolState(attributes, this.storageService, maybeSnapshotTree);
 
-        let loadDetailsP: Promise<void>;
-
-        // Initialize document details - if loading a snapshot use that - otherwise we need to wait on
-        // the initial details
-        if (maybeSnapshotTree !== undefined) {
-            this._existing = true;
-            loadDetailsP = Promise.resolve();
+        if (maybeSnapshotTree === undefined) {
+            // It's ok to await here because loadContext can't instantiateRuntime without knowing existing state
+            this._existing = await startConnectionP.then((details) => details.existing);
         } else {
-            // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
-            loadDetailsP = startConnectionP.then((details) => {
-                this._existing = details.existing;
-            });
+            // If we have a snapshot, it must already exist.
+            this._existing = true;
         }
 
         // LoadContext directly requires blobManager and protocolHandler to be ready, and eventually calls
         // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
-        [this.blobManager, this._protocolHandler] = await Promise.all([blobManagerP, protocolHandlerP, loadDetailsP]);
+        [this.blobManager, this._protocolHandler] =
+            await Promise.all([blobManagerP, protocolHandlerP]);
 
         await this.loadContext(maybeSnapshotTree);
 
