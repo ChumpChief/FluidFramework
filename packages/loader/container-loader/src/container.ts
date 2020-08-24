@@ -165,7 +165,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         return new Promise<Container>((res, rej) => {
             const version = request.headers?.[LoaderHeader.version];
-            const pause = request.headers?.[LoaderHeader.pause];
 
             const onClosed = (err?: ICriticalContainerError) => {
                 // Depending where error happens, we can be attempting to connect to web socket
@@ -177,7 +176,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             };
             container.on("closed", onClosed);
 
-            container.load(version, pause === true)
+            container.load(version)
                 .finally(() => {
                     container.removeListener("closed", onClosed);
                 })
@@ -726,15 +725,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      *   - null: use ops, no snapshots
      *   - undefined - fetch latest snapshot
      *   - otherwise, version sha to load snapshot
-     * @param pause - start the container in a paused state
      */
-    private async load(specifiedVersion: string | null | undefined, pause: boolean) {
+    private async load(specifiedVersion: string | null | undefined) {
         if (this._resolvedUrl === undefined) {
             throw new Error("Attempting to load without a resolved url");
         }
         this.service = await this.serviceFactory.createDocumentService(this._resolvedUrl, undefined);
-
-        let startConnectionP: Promise<IConnectionDetails> | undefined;
 
         // Ideally we always connect as "read" by default.
         // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.
@@ -749,10 +745,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-        if (!pause) {
-            startConnectionP = this.connectToDeltaStream(connectionArgs);
-            startConnectionP.catch((error) => { });
-        }
+        const startConnectionP = this.connectToDeltaStream(connectionArgs);
+        startConnectionP.catch((error) => { });
 
         this._storageService = await this.getDocumentStorageService();
         this._attachState = AttachState.Attached;
@@ -781,9 +775,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this._existing = true;
             loadDetailsP = Promise.resolve();
         } else {
-            if (startConnectionP === undefined) {
-                startConnectionP = this.connectToDeltaStream(connectionArgs);
-            }
             // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
             loadDetailsP = startConnectionP.then((details) => {
                 this._existing = details.existing;
@@ -802,9 +793,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Propagate current connection state through the system.
         this.propagateConnectionState();
 
-        if (!pause) {
-            this.resume();
-        }
+        this.resume();
 
         return {
             existing: this._existing,
@@ -1089,8 +1078,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
-        const outboundMessageType: string = type;
-        switch (outboundMessageType) {
+        switch (type) {
             case MessageType.Operation:
             case MessageType.RemoteHelp:
             case MessageType.Summarize:
@@ -1158,8 +1146,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         if (version !== undefined) {
             this._loadedFromVersion = version;
             return await this.storageService.getSnapshotTree(version) ?? undefined;
-        } else if (specifiedVersion !== undefined) {
-            // We should have a defined version to load from if specified version requested
         }
 
         return undefined;
