@@ -755,6 +755,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const maybeSnapshotTree = specifiedVersion === null ? undefined
             : await this.fetchSnapshotTree(specifiedVersion);
 
+        // We want to start this process early, but we don't need the blob manager just yet so we don't await.
         const blobManagerP = this.loadBlobManager(this.storageService, maybeSnapshotTree);
 
         const attributes = await this.getDocumentAttributes(this.storageService, maybeSnapshotTree);
@@ -762,23 +763,23 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Attach op handlers to start processing ops
         this.attachDeltaManagerOpHandler(attributes);
 
-        // ...load in the existing quorum
-        // Initialize the protocol handler
-        const protocolHandlerP =
-            this.loadAndInitializeProtocolState(attributes, this.storageService, maybeSnapshotTree);
+        // Initialize the protocol handler (quorum, etc.)
+        // It's ok to await here because all of our promises are already kicked off and we need the
+        // protocol handler before we can loadContext.
+        this._protocolHandler =
+            await this.loadAndInitializeProtocolState(attributes, this.storageService, maybeSnapshotTree);
 
         if (maybeSnapshotTree === undefined) {
-            // It's ok to await here because loadContext can't instantiateRuntime without knowing existing state
+            // It's ok to await here because all of our promises are already kicked off and
+            // loadContext can't instantiateRuntime without knowing existing state.
             this._existing = await startConnectionP.then((details) => details.existing);
         } else {
             // If we have a snapshot, it must already exist.
             this._existing = true;
         }
 
-        // LoadContext directly requires blobManager and protocolHandler to be ready, and eventually calls
-        // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
-        [this.blobManager, this._protocolHandler] =
-            await Promise.all([blobManagerP, protocolHandlerP]);
+        // We must await here because loadContext requires the blobManager.
+        this.blobManager = await blobManagerP;
 
         await this.loadContext(maybeSnapshotTree);
 
