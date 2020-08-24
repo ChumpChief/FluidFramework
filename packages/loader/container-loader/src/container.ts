@@ -696,7 +696,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const documentAttributes = {
             minimumSequenceNumber: this._deltaManager.minimumSequenceNumber,
             sequenceNumber: this._deltaManager.lastSequenceNumber,
-            term: this._deltaManager.referenceTerm,
         };
         entries.push({
             mode: FileMode.File,
@@ -829,7 +828,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const attributes: IDocumentAttributes = {
             branch: "", // not used
             sequenceNumber: 0,
-            term: 1,
+            term: 0, // not used
             minimumSequenceNumber: 0,
         };
 
@@ -880,7 +879,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 branch: "", // not used
                 minimumSequenceNumber: 0,
                 sequenceNumber: 0,
-                term: 1,
+                term: 0, // not used
             };
         }
 
@@ -890,11 +889,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             : tree.blobs[".attributes"];
 
         const attributes = await readAndParse<IDocumentAttributes>(storage, attributesHash);
-
-        // Back-compat for older summaries with no term
-        if (attributes.term === undefined) {
-            attributes.term = 1;
-        }
 
         return attributes;
     }
@@ -936,7 +930,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             "", // branchId, not used
             attributes.minimumSequenceNumber,
             attributes.sequenceNumber,
-            attributes.term,
+            0, // term, not used
             members,
             proposals,
             values,
@@ -1095,7 +1089,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._deltaManager.attachOpHandler(
             attributes.minimumSequenceNumber,
             attributes.sequenceNumber,
-            attributes.term ?? 1,
             {
                 process: (message) => this.processRemoteMessage(message),
                 processSignal: (message) => {

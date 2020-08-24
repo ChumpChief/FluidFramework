@@ -85,7 +85,7 @@ describe("Loader", () => {
                     client as IClient,
                     false,
                 );
-                deltaManager.attachOpHandler(0, 0, 1, {
+                deltaManager.attachOpHandler(0, 0, {
                     process: (message) => intendedResult,
                     processSignal() { },
                 });

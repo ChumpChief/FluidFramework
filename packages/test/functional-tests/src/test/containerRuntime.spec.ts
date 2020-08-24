@@ -116,7 +116,7 @@ describe("Container Runtime", () => {
                 assert.strictEqual(batchBegin, batchEnd, "Received batchEnd without corresponding batchBegin");
             });
 
-            deltaManager.attachOpHandler(0, 0, 1, {
+            deltaManager.attachOpHandler(0, 0, {
                 process(message: ISequencedDocumentMessage) {
                     processOp(message);
                     return {};
