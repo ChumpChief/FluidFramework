@@ -584,7 +584,6 @@ export class ContainerRuntime extends EventEmitter
     private readonly _logger: ITelemetryLogger;
     // publicly visible logger, to be used by stores, summarize, etc.
     public readonly logger: ITelemetryLogger;
-    public readonly previousState: IPreviousState;
     private readonly summaryManager: SummaryManager;
     private latestSummaryAck: ISummaryContext;
     // back-compat: summarizerNode - remove all summary trackers
@@ -768,8 +767,6 @@ export class ContainerRuntime extends EventEmitter
             this.clearPartialChunks(clientId);
         });
 
-        this.previousState = {};
-
         // We always create the summarizer in the case that we are asked to generate summaries. But this may
         // want to be on demand instead.
         // Don't use optimizations when generating summaries with a document loaded using snapshots.
@@ -781,7 +778,8 @@ export class ContainerRuntime extends EventEmitter
             async (full: boolean, safe: boolean) => this.generateSummary(full, safe),
             async (propHandle, ackHandle, refSeq) => this.refreshLatestSummaryAck(propHandle, ackHandle, refSeq),
             this.IFluidHandleContext,
-            this.previousState.summaryCollection);
+            undefined,
+        );
 
         // Create the SummaryManager and mark the initial state
         this.summaryManager = new SummaryManager(
@@ -790,8 +788,8 @@ export class ContainerRuntime extends EventEmitter
             !!this.runtimeOptions.enableWorker,
             this.logger,
             (summarizer) => { this.nextSummarizerP = summarizer; },
-            this.previousState.nextSummarizerP,
-            !!this.previousState.reload,
+            undefined,
+            false,
             this.runtimeOptions.initialSummarizerDelayMs);
 
         if (this.connected) {

@@ -30,7 +30,7 @@ import {
     ISummaryConfiguration,
     MessageType,
 } from "@fluidframework/protocol-definitions";
-import { GenerateSummaryData, IPreviousState } from "./containerRuntime";
+import { GenerateSummaryData } from "./containerRuntime";
 import { IConnectableRuntime, RunWhileConnectedCoordinator } from "./runWhileConnectedCoordinator";
 import { IClientSummaryWatcher, SummaryCollection } from "./summaryCollection";
 import { SummarizerHandle } from "./summarizerHandle";
@@ -94,7 +94,6 @@ export interface ISummarizer
 export interface ISummarizerRuntime extends IConnectableRuntime {
     readonly logger: ITelemetryLogger;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-    readonly previousState: IPreviousState;
     readonly summarizerClientId: string | undefined;
     nextSummarizerD?: Deferred<Summarizer>;
     closeFn(): void;
@@ -610,7 +609,6 @@ export class Summarizer extends EventEmitter implements ISummarizer {
         this.runtime.deltaManager.inbound.on("op",
             (op) => this.summaryCollection.handleOp(op));
 
-        this.runtime.previousState.nextSummarizerD?.resolve(this);
         this.innerHandle = new SummarizerHandle(this, this.url, handleContext);
     }
 
