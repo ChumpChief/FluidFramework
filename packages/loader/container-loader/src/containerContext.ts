@@ -201,14 +201,7 @@ export class ContainerContext implements IContainerContext {
 
         assert.strictEqual(connected, this.connected, "Mismatch in connection state while setting");
 
-        // Back-compat: supporting <= 0.16 data stores
-        if (runtime.setConnectionState !== undefined) {
-            runtime.setConnectionState(connected, clientId);
-        } else if (runtime.changeConnectionState !== undefined) {
-            runtime.changeConnectionState(this.connectionState, clientId);
-        } else {
-            assert.fail("Runtime missing both setConnectionState and changeConnectionState");
-        }
+        runtime.setConnectionState(connected, clientId);
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean, context: any) {

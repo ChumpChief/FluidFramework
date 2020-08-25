@@ -299,14 +299,7 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const channel: IFluidDataStoreChannel = this.channel!;
 
-        // Back-compat: supporting <= 0.16 stores
-        if (channel.setConnectionState) {
-            channel.setConnectionState(connected, clientId);
-        } else if (channel.changeConnectionState) {
-            channel.changeConnectionState(this.connectionState, clientId);
-        } else {
-            assert(false);
-        }
+        channel.setConnectionState(connected, clientId);
     }
 
     public process(messageArg: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void {

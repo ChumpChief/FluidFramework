@@ -50,7 +50,6 @@ import {
     TreeTreeEntry,
 } from "@fluidframework/protocol-base";
 import {
-    ConnectionState,
     IClientDetails,
     IDocumentMessage,
     IHelpMessage,
@@ -968,13 +967,6 @@ export class ContainerRuntime extends EventEmitter
         return this.context.requestSnapshot(tagMessage);
     }
 
-    // Back-compat: <= 0.17
-    public changeConnectionState(state: ConnectionState, clientId?: string) {
-        if (state !== ConnectionState.Connecting) {
-            this.setConnectionState(state === ConnectionState.Connected, clientId);
-        }
-    }
-
     public setConnectionState(connected: boolean, clientId?: string) {
         this.verifyNotClosed();
 
@@ -993,15 +985,10 @@ export class ContainerRuntime extends EventEmitter
             this.pendingStateManager.replayPendingStates();
         }
 
-        for (const [fluidDataStore, context] of this.contexts) {
+        for (const context of this.contexts.values()) {
             try {
                 context.setConnectionState(connected, clientId);
             } catch (error) {
-                this._logger.sendErrorEvent({
-                    eventName: "ChangeConnectionStateError",
-                    clientId,
-                    fluidDataStore,
-                }, error);
             }
         }
 
