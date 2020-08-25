@@ -169,8 +169,6 @@ export class DeltaManager
 
     private messageBuffer: IDocumentMessage[] = [];
 
-    private connectFirstConnection = true;
-
     public get inbound(): IDeltaQueue<ISequencedDocumentMessage> {
         return this._inbound;
     }
@@ -272,7 +270,7 @@ export class DeltaManager
      * Automatic reconnecting enabled or disabled.
      * If set to Never, then reconnecting will never be allowed.
      */
-    public get reconnectMode(): ReconnectMode {
+    private get reconnectMode(): ReconnectMode {
         return this._reconnectMode;
     }
 
@@ -878,7 +876,7 @@ export class DeltaManager
             initialMessages,
             connection.details.initialContents ?? [],
             connection.details.initialSignals ?? [],
-            this.connectFirstConnection);
+        );
 
         // if we have some op on the wire (or will have a "join" op for ourselves for r/w connection), then client
         // can detect it has a gap and fetch missing ops. However if we are connecting as view-only, then there
@@ -887,8 +885,6 @@ export class DeltaManager
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
         }
-
-        this.connectFirstConnection = false;
     }
 
     /**
@@ -967,7 +963,6 @@ export class DeltaManager
         messages: ISequencedDocumentMessage[],
         contents: IContentMessage[],
         signals: ISignalMessage[],
-        firstConnection: boolean,
     ): void {
         for (const content of contents) {
             this.contentCache.set(content);
