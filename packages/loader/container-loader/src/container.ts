@@ -910,9 +910,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         protocol.quorum.on("addMember", (clientId, details) => {
             // This is the only one that requires the pending client ID
             if (clientId === this.pendingClientId) {
-                this.setConnectionState(
-                    ConnectionState.Connected,
-                    `joined @ ${details.sequenceNumber}`);
+                this.setConnectionState(ConnectionState.Connected);
             }
         });
 
@@ -1001,9 +999,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.emit("connect", opsBehind);
 
             if (deltaManager.connectionMode === "read") {
-                this.setConnectionState(
-                    ConnectionState.Connected,
-                    `joined as readonly`);
+                this.setConnectionState(ConnectionState.Connected);
             }
 
             // Back-compat for new client and old server.
@@ -1014,8 +1010,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
         });
 
-        deltaManager.on("disconnect", (reason: string) => {
-            this.setConnectionState(ConnectionState.Disconnected, reason);
+        deltaManager.on("disconnect", () => {
+            this.setConnectionState(ConnectionState.Disconnected);
         });
 
         return deltaManager;
@@ -1041,9 +1037,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             });
     }
 
-    private setConnectionState(
-        value: ConnectionState,
-        reason: string) {
+    private setConnectionState(value: ConnectionState) {
         assert(value !== ConnectionState.Connecting);
         if (this.connectionState === value) {
             // Already in the desired state - exit early

@@ -417,10 +417,10 @@ export class DeltaManager
         // If so, it's time to process any accumulated ops
         // Or request OPs from snapshot / or point zero (if we have no ops at all)
         if (this.pending.length > 0) {
-            this.catchUp([], "DocumentOpen");
+            this.catchUp([]);
         } else if (this.connection !== undefined || this.connectionP !== undefined) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            this.fetchMissingDeltas("DocumentOpen", this.lastQueuedSequenceNumber);
+            this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
         }
     }
 
@@ -465,7 +465,7 @@ export class DeltaManager
         // See comment at the end of setupNewSuccessfulConnection()
         if (fetchOpsFromStorage && this.handler !== undefined) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            this.fetchMissingDeltas(args.reason ?? "DocumentOpen", this.lastQueuedSequenceNumber);
+            this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
         }
 
         const docService = this.serviceProvider();
@@ -609,7 +609,6 @@ export class DeltaManager
     }
 
     private async getDeltas(
-        telemetryEventSuffix: string,
         fromInitial: number,
         to: number | undefined,
         callback: (messages: ISequencedDocumentMessage[]) => void) {
@@ -939,7 +938,7 @@ export class DeltaManager
         // is no good signal to realize if client is behind. Thus we have to hit storage to see if any ops are there.
         if (this.handler !== undefined && connection.details.mode !== "write" && initialMessages.length === 0) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            this.fetchMissingDeltas("Reconnect", this.lastQueuedSequenceNumber);
+            this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
         }
 
         this.connectFirstConnection = false;
@@ -1028,7 +1027,7 @@ export class DeltaManager
             this.contentCache.set(content);
         }
         if (messages.length > 0) {
-            this.catchUp(messages, firstConnection ? "InitialOps" : "ReconnectOps");
+            this.catchUp(messages);
         }
         for (const signal of signals) {
             this._inboundSignal.push(signal);
@@ -1068,7 +1067,7 @@ export class DeltaManager
             } else if (message.sequenceNumber !== this.lastQueuedSequenceNumber + 1) {
                 this.pending.push(message);
                 // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                this.fetchMissingDeltas(telemetryEventSuffix, this.lastQueuedSequenceNumber, message.sequenceNumber);
+                this.fetchMissingDeltas(this.lastQueuedSequenceNumber, message.sequenceNumber);
             } else {
                 this.lastQueuedSequenceNumber = message.sequenceNumber;
                 this._inbound.push(message);
@@ -1150,7 +1149,7 @@ export class DeltaManager
     /**
      * Retrieves the missing deltas between the given sequence numbers
      */
-    private async fetchMissingDeltas(telemetryEventSuffix: string, from: number, to?: number): Promise<void> {
+    private async fetchMissingDeltas(from: number, to?: number): Promise<void> {
         // Exit out early if we're already fetching deltas
         if (this.fetching) {
             return;
@@ -1162,24 +1161,22 @@ export class DeltaManager
 
         this.fetching = true;
 
-        await this.getDeltas(telemetryEventSuffix, from, to, (messages) => {
+        await this.getDeltas(from, to, (messages) => {
             this.cancelDelayInfo(RetryFor.DeltaStorage);
-            this.catchUpCore(messages, telemetryEventSuffix);
+            this.catchUpCore(messages);
         });
 
         this.fetching = false;
     }
 
-    private catchUp(messages: ISequencedDocumentMessage[], telemetryEventSuffix: string): void {
+    private catchUp(messages: ISequencedDocumentMessage[]): void {
         const props: {
-            eventName: string;
             messageCount: number;
             pendingCount: number;
             from?: number;
             to?: number;
             messageGap?: number;
         } = {
-            eventName: `CatchUp_${telemetryEventSuffix}`,
             messageCount: messages.length,
             pendingCount: this.pending.length,
         };
@@ -1189,12 +1186,12 @@ export class DeltaManager
             props.messageGap = this.handler !== undefined ? props.from - this.lastQueuedSequenceNumber - 1 : undefined;
         }
 
-        this.catchUpCore(messages, telemetryEventSuffix);
+        this.catchUpCore(messages);
     }
 
-    private catchUpCore(messages: ISequencedDocumentMessage[], telemetryEventSuffix?: string): void {
+    private catchUpCore(messages: ISequencedDocumentMessage[]): void {
         // Apply current operations
-        this.enqueueMessages(messages, telemetryEventSuffix);
+        this.enqueueMessages(messages);
 
         // Then sort pending operations and attempt to apply them again.
         // This could be optimized to stop handling messages once we realize we need to fetch missing values.
@@ -1203,7 +1200,7 @@ export class DeltaManager
         if (this.handler !== undefined) {
             const pendingSorted = this.pending.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
             this.pending = [];
-            this.enqueueMessages(pendingSorted, telemetryEventSuffix);
+            this.enqueueMessages(pendingSorted);
         }
     }
 
