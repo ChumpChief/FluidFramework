@@ -267,7 +267,6 @@ function generate(
             let waitRejected = false;
             waitAcquireAndComplete(collection2)
                 .catch(() => { waitRejected = true; });
-            dataStore2.runtime.deltaManager.close();
 
             await collection1.add("testValue");
 

@@ -142,8 +142,6 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
      */
     readonly readonly?: boolean;
 
-    close(): void;
-
     submitSignal(content: any): void;
 }
 

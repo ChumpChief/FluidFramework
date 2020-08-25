@@ -145,10 +145,6 @@ export class DeltaManagerProxy
         this.inboundSignal = new DeltaQueueProxy(deltaManager.inboundSignal);
     }
 
-    public close(): void {
-        return this.deltaManager.close();
-    }
-
     public submitSignal(content: any): void {
         return this.deltaManager.submitSignal(content);
     }
