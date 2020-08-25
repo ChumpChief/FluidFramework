@@ -222,7 +222,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
         return this._context;
     }
-    private codeDetails: IFluidCodeDetails | undefined;
     private _protocolHandler: ProtocolOpHandler | undefined;
     private get protocolHandler() {
         if (this._protocolHandler === undefined) {
@@ -316,10 +315,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get clientDetails(): IClientDetails {
         return this._deltaManager.clientDetails;
-    }
-
-    public get chaincodePackage(): IFluidCodeDetails | undefined {
-        return this.codeDetails;
     }
 
     /**
@@ -1115,9 +1110,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async loadContext(snapshot?: ISnapshotTree) {
-        this.codeDetails = this.getCodeDetailsFromQuorum();
-        const chaincode = this.codeDetails !== undefined
-            ? await this.loadRuntimeFactory(this.codeDetails)
+        const codeDetails = this.getCodeDetailsFromQuorum();
+        const runtimeFactory = codeDetails !== undefined
+            ? await this.loadRuntimeFactory(codeDetails)
             : new NullChaincode();
 
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
@@ -1126,7 +1121,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this._context = await ContainerContext.createOrLoad(
             this,
-            chaincode,
+            runtimeFactory,
             snapshot ?? null,
             this.blobManager,
             new DeltaManagerProxy(this._deltaManager),
@@ -1138,18 +1133,18 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             () => this.close(),
         );
 
-        this.emit("contextChanged", this.codeDetails);
+        this.emit("contextChanged", codeDetails);
     }
 
     /**
      * Creates a new, unattached container context
      */
     private async createDetachedContext() {
-        this.codeDetails = this.getCodeDetailsFromQuorum();
-        if (this.codeDetails === undefined) {
+        const codeDetails = this.getCodeDetailsFromQuorum();
+        if (codeDetails === undefined) {
             throw new Error("pkg should be provided in create flow!!");
         }
-        const runtimeFactory = await this.loadRuntimeFactory(this.codeDetails);
+        const runtimeFactory = await this.loadRuntimeFactory(codeDetails);
 
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
         // are set. Global requests will still go to this loader
@@ -1169,6 +1164,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             () => this.close(),
         );
 
-        this.emit("contextChanged", this.codeDetails);
+        this.emit("contextChanged", codeDetails);
     }
 }

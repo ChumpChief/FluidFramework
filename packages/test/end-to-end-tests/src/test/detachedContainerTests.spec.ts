@@ -98,8 +98,6 @@ describe("Detached Container", () => {
         assert.strictEqual(container.getQuorum().getMembers().size, 0, "Quorum should not contain any memebers");
         assert.strictEqual(container.connectionState, ConnectionState.Disconnected,
             "Container should be in disconnected state!!");
-        assert.strictEqual(container.chaincodePackage.package, pkg.package,
-            "Package should be same as provided");
         assert.strictEqual(container.id, "", "Detached container's id should be empty string");
         assert.strictEqual(container.clientDetails.capabilities.interactive, true,
             "Client details should be set with interactive as true");
