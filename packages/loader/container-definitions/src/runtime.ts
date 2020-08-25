@@ -117,7 +117,6 @@ export interface IContainerContext extends IMessageScheduler, IDisposable {
     readonly audience: IAudience | undefined;
     readonly loader: ILoader;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
-    readonly previousRuntimeState: IRuntimeState;
 
     requestSnapshot(tagMessage: string): Promise<void>;
 

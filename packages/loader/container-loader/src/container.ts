@@ -20,7 +20,6 @@ import {
     ILoader,
     IRuntimeFactory,
     LoaderHeader,
-    IRuntimeState,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -1115,10 +1114,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return undefined;
     }
 
-    private async loadContext(
-        snapshot?: ISnapshotTree,
-        previousRuntimeState: IRuntimeState = {},
-    ) {
+    private async loadContext(snapshot?: ISnapshotTree) {
         this.codeDetails = this.getCodeDetailsFromQuorum();
         const chaincode = this.codeDetails !== undefined
             ? await this.loadRuntimeFactory(this.codeDetails)
@@ -1140,7 +1136,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
             () => this.close(),
-            previousRuntimeState,
         );
 
         this.emit("contextChanged", this.codeDetails);
@@ -1172,7 +1167,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
             () => this.close(),
-            {},
         );
 
         this.emit("contextChanged", this.codeDetails);
