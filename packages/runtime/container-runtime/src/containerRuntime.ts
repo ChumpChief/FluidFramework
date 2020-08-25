@@ -821,16 +821,10 @@ export class ContainerRuntime extends EventEmitter
         this.summarizer.dispose();
 
         // close/stop all store contexts
-        for (const [fluidDataStoreId, contextD] of this.contextsDeferred) {
+        for (const contextD of this.contextsDeferred.values()) {
             contextD.promise.then((context) => {
                 context.dispose();
-            }).catch((contextError) => {
-                this._logger.sendErrorEvent({
-                    eventName: "FluidDataStoreContextDisposeError",
-                    fluidDataStoreId,
-                },
-                    contextError);
-            });
+            }).catch(() => { });
         }
 
         this.emit("dispose");
@@ -981,7 +975,7 @@ export class ContainerRuntime extends EventEmitter
             }
         }
 
-        raiseConnectedEvent(this._logger, this, connected, clientId);
+        raiseConnectedEvent(undefined, this, connected, clientId);
 
         if (connected) {
             assert(clientId);
@@ -1068,17 +1062,7 @@ export class ContainerRuntime extends EventEmitter
         }
 
         const context = this.contexts.get(envelope.address);
-        if (!context) {
-            // Attach message may not have been processed yet
-            assert(!local);
-            this._logger.sendTelemetryEvent({
-                eventName: "SignalFluidDataStoreNotFound",
-                fluidDataStoreId: envelope.address,
-            });
-            return;
-        }
-
-        context.processSignal(transformed, local);
+        context?.processSignal(transformed, local);
     }
 
     public async getRootDataStore(id: string, wait = true): Promise<IFluidRouter> {
@@ -1733,9 +1717,6 @@ export class ContainerRuntime extends EventEmitter
         // That said, we can preserve existing behavior by not flushing existing buffer.
         // That might be not what caller hopes to get, but we can look deeper if telemetry tells us it's a problem.
         const middleOfBatch = this.flushMode === FlushMode.Manual && this.needsFlush;
-        if (middleOfBatch) {
-            this._logger.sendErrorEvent({ eventName: "submitSystemMessageError", type });
-        }
 
         return this.context.submitFn(
             type,

@@ -9,7 +9,7 @@ import {
 } from "@fluidframework/common-definitions";
 
 export function raiseConnectedEvent(
-    logger: ITelemetryLogger,
+    logger: ITelemetryLogger | undefined,
     emitter: EventEmitter,
     connected: boolean,
     clientId?: string) {
@@ -20,6 +20,6 @@ export function raiseConnectedEvent(
             emitter.emit("disconnected");
         }
     } catch (error) {
-        logger.sendErrorEvent({ eventName: "RaiseConnectedEventError", clientId }, error);
+        logger?.sendErrorEvent({ eventName: "RaiseConnectedEventError", clientId }, error);
     }
 }
