@@ -496,7 +496,7 @@ export class ContainerRuntime extends EventEmitter
         return runtime;
     }
 
-    public get id(): string {
+    private get id(): string {
         return this.context.id;
     }
 

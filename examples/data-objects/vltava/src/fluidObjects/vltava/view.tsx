@@ -80,9 +80,7 @@ export class VltavaView extends React.Component<IVltavaViewProps, IVltavaViewSta
             <div>
                 <div style={viewStyle}>
                     <div>
-                        <h2>
-                            {this.props.dataModel.getTitle()}
-                        </h2>
+                        <h2>Vltava Document</h2>
                     </div>
                     <VltavaFacepile users={this.state.users} />
                     <div

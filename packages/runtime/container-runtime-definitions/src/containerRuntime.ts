@@ -47,7 +47,6 @@ export interface IContainerRuntime extends
     IProvideContainerRuntime,
     Partial<IProvideContainerRuntimeDirtyable>,
     IContainerRuntimeBase {
-    readonly id: string;
     readonly existing: boolean;
     readonly options: any;
     readonly clientId: string | undefined;

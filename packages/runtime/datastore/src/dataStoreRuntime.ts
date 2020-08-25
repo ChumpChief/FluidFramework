@@ -87,7 +87,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         const logger = ChildLogger.create(undefined, undefined, { dataStoreId: uuid() });
         const runtime = new FluidDataStoreRuntime(
             context,
-            context.documentId,
             context.id,
             context.existing,
             context.options,
@@ -172,7 +171,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
 
     private constructor(
         private readonly dataStoreContext: IFluidDataStoreContext,
-        public readonly documentId: string,
         public readonly id: string,
         public existing: boolean,
         public readonly options: any,

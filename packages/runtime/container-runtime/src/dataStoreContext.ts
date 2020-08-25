@@ -95,10 +95,6 @@ interface FluidDataStoreMessage {
 export abstract class FluidDataStoreContext extends EventEmitter implements
     IFluidDataStoreContext,
     IDisposable {
-    public get documentId(): string {
-        return this._containerRuntime.id;
-    }
-
     public get packagePath(): readonly string[] {
         // The store must be loaded before the path is accessed.
         assert(this.loaded);

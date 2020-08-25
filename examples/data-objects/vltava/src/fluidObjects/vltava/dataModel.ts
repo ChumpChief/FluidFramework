@@ -26,7 +26,6 @@ export interface IVltavaLastEditedState {
 
 export interface IVltavaDataModel extends EventEmitter {
     getDefaultFluidObject(): Promise<IFluidObject>;
-    getTitle(): string;
     getUsers(): IVltavaUserDetails[];
     getLastEditedState(): Promise<IVltavaLastEditedState | undefined>;
 }
@@ -61,10 +60,6 @@ export class VltavaDataModel extends EventEmitter implements IVltavaDataModel {
 
     public async getDefaultFluidObject(): Promise<IFluidObject> {
         return this.root.get<IFluidHandle>("tabs-id").get();
-    }
-
-    public getTitle(): string {
-        return this.context.documentId;
     }
 
     public getUsers(): IVltavaUserDetails[] {
