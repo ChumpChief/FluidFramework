@@ -87,7 +87,6 @@ enum RetryFor {
 export interface IConnectionArgs {
     mode?: ConnectionMode;
     fetchOpsFromStorage?: boolean;
-    reason?: string;
 }
 
 export enum ReconnectMode {
@@ -730,7 +729,7 @@ export class DeltaManager
         this.stopSequenceNumberUpdate();
 
         // This raises "disconnect" event
-        this.disconnectFromDeltaStream(error !== undefined ? `${error.message}` : "Container closed");
+        this.disconnectFromDeltaStream();
 
         this._inbound.clear();
         this._outbound.clear();
@@ -822,7 +821,7 @@ export class DeltaManager
 
         if (this.closed) {
             // Raise proper events, Log telemetry event and close connection.
-            this.disconnectFromDeltaStream(`Disconnect on close`);
+            this.disconnectFromDeltaStream();
             assert(!connection.connected); // Check we indeed closed it!
             return;
         }
@@ -948,7 +947,7 @@ export class DeltaManager
      * Disconnect the current connection.
      * @param reason - Text description of disconnect reason to emit with disconnect event
      */
-    private disconnectFromDeltaStream(reason: string) {
+    private disconnectFromDeltaStream() {
         const connection = this.connection;
         if (connection === undefined) {
             return;
@@ -967,7 +966,7 @@ export class DeltaManager
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this._outbound.systemPause();
         this._outbound.clear();
-        this.emit("disconnect", reason);
+        this.emit("disconnect");
 
         connection.close();
     }
@@ -990,7 +989,7 @@ export class DeltaManager
             return;
         }
 
-        this.disconnectFromDeltaStream(error.message);
+        this.disconnectFromDeltaStream();
 
         // If reconnection is not an option, close the DeltaManager
         const canRetry = canRetryOnError(error);
@@ -1163,33 +1162,13 @@ export class DeltaManager
 
         await this.getDeltas(from, to, (messages) => {
             this.cancelDelayInfo(RetryFor.DeltaStorage);
-            this.catchUpCore(messages);
+            this.catchUp(messages);
         });
 
         this.fetching = false;
     }
 
     private catchUp(messages: ISequencedDocumentMessage[]): void {
-        const props: {
-            messageCount: number;
-            pendingCount: number;
-            from?: number;
-            to?: number;
-            messageGap?: number;
-        } = {
-            messageCount: messages.length,
-            pendingCount: this.pending.length,
-        };
-        if (messages.length !== 0) {
-            props.from = messages[0].sequenceNumber;
-            props.to = messages[messages.length - 1].sequenceNumber;
-            props.messageGap = this.handler !== undefined ? props.from - this.lastQueuedSequenceNumber - 1 : undefined;
-        }
-
-        this.catchUpCore(messages);
-    }
-
-    private catchUpCore(messages: ISequencedDocumentMessage[]): void {
         // Apply current operations
         this.enqueueMessages(messages);
 

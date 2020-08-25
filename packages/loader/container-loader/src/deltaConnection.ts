@@ -81,8 +81,8 @@ export class DeltaConnection
             this.emit("nack", documentId, message);
         });
 
-        connection.on("disconnect", (reason) => {
-            this.emit("disconnect", reason);
+        connection.on("disconnect", () => {
+            this.emit("disconnect");
             this.close();
         });
 

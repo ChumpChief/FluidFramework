@@ -498,7 +498,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             const connected = this.connectionState === ConnectionState.Connected;
             assert(!connected || this._deltaManager.connectionMode === "read", "Unexpected connection state");
             this.propagateConnectionState();
-            this.resumeInternal({ fetchOpsFromStorage: false, reason: "createDetached" });
+            this.resumeInternal({ fetchOpsFromStorage: false });
         } finally {
             this.attachInProgress = false;
         }
@@ -539,7 +539,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         if (reconnect) {
             // Ensure connection to web socket
-            this.connectToDeltaStream({ reason: "autoReconnect" }).catch((error) => { });
+            this.connectToDeltaStream().catch((error) => { });
         }
     }
 
