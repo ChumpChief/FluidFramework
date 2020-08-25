@@ -42,11 +42,6 @@ export enum BindState {
     Bound = "Bound",
 }
 
-export interface IRuntimeState {
-    snapshot?: ITree,
-    state?: unknown,
-}
-
 /**
  * The IRuntime represents an instantiation of a code package within a container.
  */
@@ -69,15 +64,6 @@ export interface IRuntime extends IDisposable {
 
     // Back-compat: supporting <= 0.16 data stores
     changeConnectionState?: (value: ConnectionState, clientId?: string) => void;
-
-    /**
-     * @deprecated in 0.14 async stop()
-     * Use snapshot to get a snapshot for an IRuntimeState as needed, followed by dispose
-     *
-     * Stops the runtime. Once stopped no more messages will be delivered and the context passed to the runtime
-     * on creation will no longer be active
-     */
-    stop(): Promise<IRuntimeState>;
 
     /**
      * Processes the given message

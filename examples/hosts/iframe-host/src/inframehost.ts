@@ -13,7 +13,6 @@ import {
     IContainerContext,
     IRuntime,
     IRuntimeFactory,
-    IRuntimeState,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { MultiUrlResolver, MultiDocumentServiceFactory } from "@fluidframework/driver-utils";
@@ -36,9 +35,6 @@ class ProxyRuntime implements IRuntime {
         throw new Error("Method not implemented.");
     }
     async setConnectionState(connected: boolean, clientId?: string) {
-    }
-    async stop(): Promise<IRuntimeState> {
-        throw new Error("Method not implemented.");
     }
     async process(message: ISequencedDocumentMessage, local: boolean, context: any) {
     }

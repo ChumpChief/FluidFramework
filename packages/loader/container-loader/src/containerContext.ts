@@ -16,7 +16,6 @@ import {
     ILoader,
     IRuntime,
     IRuntimeFactory,
-    IRuntimeState,
     ICriticalContainerError,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -187,13 +186,6 @@ export class ContainerContext implements IContainerContext {
 
     public getLoadedFromVersion(): IVersion | undefined {
         return this.container.loadedFromVersion;
-    }
-
-    /**
-     * Snapshot and close the runtime, and return its state if available
-     */
-    public async snapshotRuntimeState(): Promise<IRuntimeState> {
-        return this.runtime.stop();
     }
 
     public get attachState(): AttachState {

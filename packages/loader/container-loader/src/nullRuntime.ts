@@ -14,7 +14,6 @@ import {
     IContainerContext,
     IRuntime,
     IRuntimeFactory,
-    IRuntimeState,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -61,11 +60,6 @@ export class NullRuntime extends EventEmitter implements IRuntime {
 
     public setConnectionState(connected: boolean, clientId?: string) {
         return;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/promise-function-async
-    public stop(): Promise<IRuntimeState> {
-        return Promise.resolve({});
     }
 
     public createSummary(): ISummaryTree {

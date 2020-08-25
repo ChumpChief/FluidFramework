@@ -24,7 +24,6 @@ import {
     IDeltaSender,
     ILoader,
     IRuntime,
-    IRuntimeState,
     ICriticalContainerError,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -967,22 +966,6 @@ export class ContainerRuntime extends EventEmitter
 
     public async requestSnapshot(tagMessage: string): Promise<void> {
         return this.context.requestSnapshot(tagMessage);
-    }
-
-    public async stop(): Promise<IRuntimeState> {
-        this.verifyNotClosed();
-
-        const snapshot = await this.snapshot("", true);
-        const state: IPreviousState = {
-            reload: true,
-            summaryCollection: this.summarizer.summaryCollection,
-            nextSummarizerP: this.nextSummarizerP,
-            nextSummarizerD: this.nextSummarizerD,
-        };
-
-        this.dispose();
-
-        return { snapshot, state };
     }
 
     // Back-compat: <= 0.17
