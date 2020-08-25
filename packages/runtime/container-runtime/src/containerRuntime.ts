@@ -36,7 +36,6 @@ import {
 import {
     ChildLogger,
     raiseConnectedEvent,
-    PerformanceEvent,
 } from "@fluidframework/telemetry-utils";
 import { IDocumentStorageService, ISummaryContext } from "@fluidframework/driver-definitions";
 import {
@@ -109,10 +108,8 @@ import { ISummarizerRuntime, Summarizer } from "./summarizer";
 import { SummaryManager, summarizerClientType } from "./summaryManager";
 import { analyzeTasks } from "./taskAnalyzer";
 import { DeltaScheduler } from "./deltaScheduler";
-import { ReportOpPerfTelemetry } from "./connectionTelemetry";
 import { SummaryCollection } from "./summaryCollection";
 import { PendingStateManager } from "./pendingStateManager";
-import { pkgVersion } from "./packageVersion";
 
 const chunksBlobName = ".chunks";
 
@@ -580,8 +577,6 @@ export class ContainerRuntime extends EventEmitter
 
     // internal logger for ContainerRuntime
     private readonly _logger: ITelemetryLogger;
-    // publicly visible logger, to be used by stores, summarize, etc.
-    public readonly logger: ITelemetryLogger;
     private readonly summaryManager: SummaryManager;
     private latestSummaryAck: ISummaryContext;
     // back-compat: summarizerNode - remove all summary trackers
@@ -666,11 +661,7 @@ export class ContainerRuntime extends EventEmitter
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
-        this.logger = ChildLogger.create(undefined, undefined, {
-            runtimeVersion: pkgVersion,
-        });
-
-        this._logger = ChildLogger.create(this.logger, "ContainerRuntime");
+        this._logger = ChildLogger.create(undefined, "ContainerRuntime");
 
         this.latestSummaryAck = {
             proposalHandle: undefined,
@@ -688,7 +679,7 @@ export class ContainerRuntime extends EventEmitter
         const enableSummarizerNode = this.runtimeOptions.enableSummarizerNode
             ?? (typeof localStorage === "object" && localStorage?.fluidDisableSummarizerNode ? false : true);
         const summarizerNode = SummarizerNode.createRoot(
-            this.logger,
+            this._logger,
             // Summarize function to call when summarize is called
             async (fullTree: boolean) => this.summarizeInternal(fullTree),
             // Latest change sequence number, no changes since summary applied yet
@@ -754,7 +745,7 @@ export class ContainerRuntime extends EventEmitter
         this.scheduleManager = new ScheduleManager(
             context.deltaManager,
             this,
-            ChildLogger.create(this.logger, "ScheduleManager"),
+            ChildLogger.create(undefined, "ScheduleManager"),
         );
 
         this.deltaSender = this.deltaManager;
@@ -784,7 +775,7 @@ export class ContainerRuntime extends EventEmitter
             context,
             this.runtimeOptions.generateSummaries !== false,
             !!this.runtimeOptions.enableWorker,
-            this.logger,
+            this._logger,
             (summarizer) => { this.nextSummarizerP = summarizer; },
             undefined,
             false,
@@ -818,8 +809,6 @@ export class ContainerRuntime extends EventEmitter
                 this.pendingStateManager.replayPendingStates();
             }
         });
-
-        ReportOpPerfTelemetry(this.context.clientId, this.deltaManager, this.logger);
     }
 
     public dispose(): void {
@@ -1918,27 +1907,8 @@ export class ContainerRuntime extends EventEmitter
 
         if (this.summarizerNode.enabled) {
             const getSnapshot = async () => {
-                const perfEvent = PerformanceEvent.start(this.logger, {
-                    eventName: "RefreshLatestSummaryGetSnapshot",
-                    hasVersion: !!version, // expected in this case
-                });
-                const stats: { getVersionDuration?: number; getSnapshotDuration?: number } = {};
-                let snapshot: ISnapshotTree | undefined;
-                try {
-                    const trace = Trace.start();
-
-                    const versionToUse = version ?? await this.getVersionFromStorage(ackHandle);
-                    stats.getVersionDuration = trace.trace().duration;
-
-                    snapshot = await this.getSnapshotFromStorage(versionToUse);
-                    stats.getSnapshotDuration = trace.trace().duration;
-                } catch (error) {
-                    perfEvent.cancel(stats, error);
-                    throw error;
-                }
-
-                perfEvent.end(stats);
-                return snapshot;
+                const versionToUse = version ?? await this.getVersionFromStorage(ackHandle);
+                return this.getSnapshotFromStorage(versionToUse);
             };
 
             await this.summarizerNode.node.refreshLatestSummary(

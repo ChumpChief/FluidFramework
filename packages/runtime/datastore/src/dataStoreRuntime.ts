@@ -84,7 +84,7 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         sharedObjectRegistry: ISharedObjectRegistry,
         dataStoreRegistry?: IFluidDataStoreRegistry,
     ): FluidDataStoreRuntime {
-        const logger = ChildLogger.create(context.containerRuntime.logger, undefined, { dataStoreId: uuid() });
+        const logger = ChildLogger.create(undefined, undefined, { dataStoreId: uuid() });
         const runtime = new FluidDataStoreRuntime(
             context,
             context.documentId,

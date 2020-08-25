@@ -1030,9 +1030,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private propagateConnectionState() {
         assert(this.loaded);
 
-        const state = this._connectionState === ConnectionState.Connected;
-        this.context.setConnectionState(state, this.clientId);
-        this.protocolHandler.quorum.setConnectionState(state, this.clientId);
+        const connected = this._connectionState === ConnectionState.Connected;
+        this.context.setConnectionState(connected, this.clientId);
+        this.protocolHandler.quorum.setConnectionState(connected, this.clientId);
     }
 
     private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {

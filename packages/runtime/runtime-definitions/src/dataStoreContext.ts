@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from "events";
-import { ITelemetryLogger, IDisposable } from "@fluidframework/common-definitions";
+import { IDisposable } from "@fluidframework/common-definitions";
 import {
     IFluidObject,
     IFluidRouter,
@@ -59,7 +59,6 @@ export interface IContainerRuntimeBase extends
     /* TODO: Used by spaces. we should switch to IoC to provide the global registry */
     IProvideFluidDataStoreRegistry {
 
-    readonly logger: ITelemetryLogger;
     readonly clientDetails: IClientDetails;
 
     /**
