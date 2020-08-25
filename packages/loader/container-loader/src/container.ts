@@ -1062,7 +1062,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
-            () => { },
         );
 
         this.emit("contextChanged", codeDetails);
@@ -1093,7 +1092,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
-            () => { },
         );
 
         this.emit("contextChanged", codeDetails);

@@ -95,7 +95,6 @@ export interface ISummarizerRuntime extends IConnectableRuntime {
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly summarizerClientId: string | undefined;
     nextSummarizerD?: Deferred<Summarizer>;
-    closeFn(): void;
     on(event: "batchEnd", listener: (error: any, op: ISequencedDocumentMessage) => void): this;
     on(event: "disconnected", listener: () => void): this;
     removeListener(event: "batchEnd", listener: (error: any, op: ISequencedDocumentMessage) => void): this;
@@ -628,7 +627,6 @@ export class Summarizer extends EventEmitter implements ISummarizer {
                 if (this.runningSummarizer) {
                     await this.runningSummarizer.waitStop();
                 }
-                this.runtime.closeFn();
             }
             this.dispose();
         }

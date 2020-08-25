@@ -192,18 +192,6 @@ export class PendingStateManager {
         // Processing part - Verify that there has been no data corruption.
         // The clientSequenceNumber of the incoming message must match that of the pending message.
         if (pendingState.clientSequenceNumber !== message.clientSequenceNumber) {
-            // Close the container because this indicates data corruption.
-            const error = new DataCorruptionError(
-                "Unexpected ack received",
-                {
-                    clientId: message.clientId,
-                    sequenceNumber: message.sequenceNumber,
-                    clientSequenceNumber: message.clientSequenceNumber,
-                    expectedClientSequenceNumber: pendingState.clientSequenceNumber,
-                },
-            );
-
-            this.containerRuntime.closeFn(error);
             return;
         }
 

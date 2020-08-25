@@ -23,7 +23,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { IAudience } from "./audience";
 import { IBlobManager } from "./blobs";
-import { ICriticalContainerError } from "./error";
 import { ILoader } from "./loader";
 import { IMessageScheduler } from "./messageScheduler";
 
@@ -92,7 +91,6 @@ export interface IContainerContext extends IMessageScheduler, IDisposable {
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
     readonly snapshotFn: (message: string) => Promise<void>;
-    readonly closeFn: (error?: ICriticalContainerError) => void;
     readonly quorum: IQuorum;
     readonly audience: IAudience | undefined;
     readonly loader: ILoader;

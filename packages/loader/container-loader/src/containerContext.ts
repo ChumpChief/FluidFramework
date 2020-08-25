@@ -16,7 +16,6 @@ import {
     ILoader,
     IRuntime,
     IRuntimeFactory,
-    ICriticalContainerError,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -50,7 +49,6 @@ export class ContainerContext implements IContainerContext {
         submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         submitSignalFn: (contents: any) => void,
         snapshotFn: (message: string) => Promise<void>,
-        closeFn: (error?: ICriticalContainerError) => void,
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
             container,
@@ -63,7 +61,6 @@ export class ContainerContext implements IContainerContext {
             submitFn,
             submitSignalFn,
             snapshotFn,
-            closeFn,
         );
         await context.load();
         return context;
@@ -147,7 +144,6 @@ export class ContainerContext implements IContainerContext {
         public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
         public readonly snapshotFn: (message: string) => Promise<void>,
-        public readonly closeFn: (error?: ICriticalContainerError) => void,
     ) {
         this.attachListener();
     }

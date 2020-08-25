@@ -23,7 +23,6 @@ import {
     IDeltaSender,
     ILoader,
     IRuntime,
-    ICriticalContainerError,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IContainerRuntime, IContainerRuntimeDirtyable } from "@fluidframework/container-runtime-definitions";
@@ -42,7 +41,6 @@ import {
     buildSnapshotTree,
     readAndParse,
 } from "@fluidframework/driver-utils";
-import { CreateContainerError } from "@fluidframework/container-utils";
 import {
     BlobTreeEntry,
     TreeTreeEntry,
@@ -529,10 +527,6 @@ export class ContainerRuntime extends EventEmitter
     public get reSubmitFn(): (type: ContainerMessageType, content: any, localOpMetadata: unknown) => void {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         return this.reSubmit;
-    }
-
-    public get closeFn(): (error?: ICriticalContainerError) => void {
-        return this.context.closeFn;
     }
 
     public get loader(): ILoader {
@@ -1770,9 +1764,7 @@ export class ContainerRuntime extends EventEmitter
                         this.updateLeader(false);
                     }
                 });
-            }).catch((err) => {
-                this.closeFn(CreateContainerError(err));
-            });
+            }).catch(() => { });
 
             this.context.quorum.on("removeMember", (clientId: string) => {
                 if (this.leader) {
