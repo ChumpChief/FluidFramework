@@ -178,7 +178,6 @@ describe("Container", () => {
         assert.strictEqual(container.connectionState, ConnectionState.Disconnected,
             "Container should be in Disconnected state");
         // All errors on socket are not critical!
-        assert.strictEqual(container.closed, false, "Container should not be closed");
         assert.strictEqual(errorRaised, false, "Error event should not be raised.");
         deltaConnection.removeAllListeners();
     });
@@ -209,10 +208,8 @@ describe("Container", () => {
         });
         assert.strictEqual(container.connectionState, ConnectionState.Connecting,
             "Container should be in Connecting state");
-        container.close();
         assert.strictEqual(container.connectionState, ConnectionState.Disconnected,
             "Container should be in Disconnected state");
-        assert.strictEqual(container.closed, true, "Container should be closed");
         deltaConnection.removeAllListeners();
     });
 

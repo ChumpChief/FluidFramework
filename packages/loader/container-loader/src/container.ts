@@ -146,32 +146,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             request,
             decodeURI(documentId),
         );
-
-        return new Promise<Container>((res, rej) => {
-            const version = request.headers?.[LoaderHeader.version];
-
-            const onClosed = () => {
-                // Depending where error happens, we can be attempting to connect to web socket
-                // and continuously retrying (consider offline mode)
-                // Host has no container to close, so it's prudent to do it here
-                container.close();
-                rej();
-            };
-            container.on("closed", onClosed);
-
-            container.load(version)
-                .finally(() => {
-                    container.removeListener("closed", onClosed);
-                })
-                .then(
-                    () => {
-                        res(container);
-                    },
-                    () => {
-                        onClosed();
-                    },
-                );
-        });
+        const version = request.headers?.[LoaderHeader.version];
+        await container.load(version);
+        return container;
     }
 
     public static async create(
@@ -231,8 +208,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private cachedAttachSummary: ISummaryTree | undefined;
     private attachInProgress = false;
 
-    private _closed = false;
-
     public get IFluidRouter(): IFluidRouter { return this; }
 
     public get resolvedUrl(): IResolvedUrl | undefined {
@@ -259,10 +234,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public forceReadonly(readonly: boolean) {
         this._deltaManager.forceReadonly(readonly);
-    }
-
-    public get closed(): boolean {
-        return this._closed;
     }
 
     public get id(): string {
@@ -347,25 +318,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public getQuorum(): IQuorum {
         return this.protocolHandler.quorum;
-    }
-
-    public close() {
-        if (this._closed) {
-            return;
-        }
-        this._closed = true;
-
-        this._deltaManager.close();
-
-        this._protocolHandler?.close();
-
-        this._context?.dispose();
-
-        assert.strictEqual(this.connectionState, ConnectionState.Disconnected, "disconnect event was not raised!");
-
-        this.emit("closed");
-
-        this.removeAllListeners();
     }
 
     public get attachState(): AttachState {
@@ -494,10 +446,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public setAutoReconnect(reconnect: boolean) {
         assert(this.resumedOpProcessingAfterLoad);
 
-        if (reconnect && this.closed) {
-            throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
-        }
-
         this._deltaManager.setAutomaticReconnect(reconnect);
 
         if (reconnect) {
@@ -512,10 +460,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     protected resumeInternal(args: IConnectionArgs = {}) {
         assert(this.loaded);
-
-        if (this.closed) {
-            throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
-        }
 
         // Resume processing ops
         assert(!this.resumedOpProcessingAfterLoad);
@@ -979,10 +923,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private attachDeltaManagerOpHandler(attributes: IDocumentAttributes): void {
-        this._deltaManager.on("closed", () => {
-            this.close();
-        });
-
         // If we're the outer frame, do we want to do this?
         // Begin fetching any pending deltas once we know the base sequence #. Can this fail?
         // It seems like something, like reconnection, that we would want to retry but otherwise allow
@@ -1035,7 +975,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             case MessageType.Summarize:
                 break;
             default:
-                this.close();
                 return -1;
         }
         return this.submitMessage(type, contents, batch, metadata);
@@ -1123,7 +1062,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
-            () => this.close(),
+            () => { },
         );
 
         this.emit("contextChanged", codeDetails);
@@ -1154,7 +1093,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
-            () => this.close(),
+            () => { },
         );
 
         this.emit("contextChanged", codeDetails);

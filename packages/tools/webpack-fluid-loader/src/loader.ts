@@ -210,7 +210,6 @@ export async function start(
          */
         if (!container1.existing) {
             console.warn(`Document with id ${documentId} not found. Falling back to creating a new document.`);
-            container1.close();
 
             documentId = moniker.choose();
             url = url.replace(id, documentId);

@@ -92,7 +92,6 @@ describe("Detached Container", () => {
     it("Create detached container", async () => {
         const container = await loader.createDetachedContainer(pkg);
         assert.strictEqual(container.attachState, AttachState.Detached, "Container should be detached");
-        assert.strictEqual(container.closed, false, "Container should be open");
         assert.strictEqual(container.deltaManager.inbound.length, 0, "Inbound queue should be empty");
         assert.strictEqual(container.getQuorum().getMembers().size, 0, "Quorum should not contain any memebers");
         assert.strictEqual(container.connectionState, ConnectionState.Disconnected,
@@ -106,7 +105,6 @@ describe("Detached Container", () => {
         const container = await loader.createDetachedContainer(pkg);
         await container.attach(request);
         assert.strictEqual(container.attachState, AttachState.Attached, "Container should be attached");
-        assert.strictEqual(container.closed, false, "Container should be open");
         assert.strictEqual(container.deltaManager.inbound.length, 0, "Inbound queue should be empty");
         assert.strictEqual(container.id, documentId, "Doc id is not matching!!");
     });
@@ -590,6 +588,5 @@ describe("Detached Container", () => {
     });
 
     afterEach(async () => {
-        await testDeltaConnectionServer.webSocketServer.close();
     });
 });

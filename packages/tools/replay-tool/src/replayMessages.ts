@@ -266,7 +266,6 @@ class Document {
     }
 
     public close() {
-        this.container.close();
     }
 
     private resolveC = () => { };
