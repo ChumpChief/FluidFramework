@@ -243,7 +243,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
         return this._context;
     }
-    private pkg: IFluidCodeDetails | undefined;
+    private codeDetails: IFluidCodeDetails | undefined;
     private _protocolHandler: ProtocolOpHandler | undefined;
     private get protocolHandler() {
         if (this._protocolHandler === undefined) {
@@ -341,7 +341,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get chaincodePackage(): IFluidCodeDetails | undefined {
-        return this.pkg;
+        return this.codeDetails;
     }
 
     /**
@@ -1145,8 +1145,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         snapshot?: ISnapshotTree,
         previousRuntimeState: IRuntimeState = {},
     ) {
-        this.pkg = this.getCodeDetailsFromQuorum();
-        const chaincode = this.pkg !== undefined ? await this.loadRuntimeFactory(this.pkg) : new NullChaincode();
+        this.codeDetails = this.getCodeDetailsFromQuorum();
+        const chaincode = this.codeDetails !== undefined
+            ? await this.loadRuntimeFactory(this.codeDetails)
+            : new NullChaincode();
 
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
         // are set. Global requests will still go to this loader
@@ -1167,18 +1169,18 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             previousRuntimeState,
         );
 
-        this.emit("contextChanged", this.pkg);
+        this.emit("contextChanged", this.codeDetails);
     }
 
     /**
      * Creates a new, unattached container context
      */
     private async createDetachedContext() {
-        this.pkg = this.getCodeDetailsFromQuorum();
-        if (this.pkg === undefined) {
+        this.codeDetails = this.getCodeDetailsFromQuorum();
+        if (this.codeDetails === undefined) {
             throw new Error("pkg should be provided in create flow!!");
         }
-        const runtimeFactory = await this.loadRuntimeFactory(this.pkg);
+        const runtimeFactory = await this.loadRuntimeFactory(this.codeDetails);
 
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
         // are set. Global requests will still go to this loader
@@ -1199,6 +1201,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             {},
         );
 
-        this.emit("contextChanged", this.pkg);
+        this.emit("contextChanged", this.codeDetails);
     }
 }
