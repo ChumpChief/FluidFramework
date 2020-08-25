@@ -69,10 +69,6 @@ export class ContainerContext implements IContainerContext {
         return context;
     }
 
-    public get id(): string {
-        return this.container.id;
-    }
-
     public get clientId(): string | undefined {
         return this.container.clientId;
     }

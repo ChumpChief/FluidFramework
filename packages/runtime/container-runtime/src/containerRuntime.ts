@@ -496,10 +496,6 @@ export class ContainerRuntime extends EventEmitter
         return runtime;
     }
 
-    private get id(): string {
-        return this.context.id;
-    }
-
     public get existing(): boolean {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return this.context.existing!;
@@ -1527,17 +1523,6 @@ export class ContainerRuntime extends EventEmitter
             const handle = await this.storage.uploadSummaryWithContext(
                 treeWithStats.summary,
                 this.latestSummaryAck);
-
-            // safe mode refreshes the latest summary ack
-            if (safe) {
-                const version = await this.getVersionFromStorage(this.id);
-                await this.refreshLatestSummaryAck(
-                    undefined,
-                    version.id,
-                    this.summaryTracker.referenceSequenceNumber,
-                    version,
-                );
-            }
 
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             const parent = this.latestSummaryAck.ackHandle!;

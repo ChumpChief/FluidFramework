@@ -81,7 +81,6 @@ export interface IRuntime extends IDisposable {
 }
 
 export interface IContainerContext extends IMessageScheduler, IDisposable {
-    readonly id: string;
     readonly existing: boolean | undefined;
     readonly options: any;
     readonly configuration: IFluidConfiguration;
