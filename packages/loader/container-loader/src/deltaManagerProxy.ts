@@ -145,13 +145,6 @@ export class DeltaManagerProxy
         this.inboundSignal = new DeltaQueueProxy(deltaManager.inboundSignal);
     }
 
-    public dispose(): void {
-        this.inbound.dispose();
-        this.outbound.dispose();
-        this.inboundSignal.dispose();
-        super.dispose();
-    }
-
     public close(): void {
         return this.deltaManager.close();
     }

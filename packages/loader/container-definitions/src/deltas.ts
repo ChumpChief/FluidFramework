@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IDisposable, IEventProvider, IEvent, IErrorEvent } from "@fluidframework/common-definitions";
+import { IEventProvider, IEvent, IErrorEvent } from "@fluidframework/common-definitions";
 import {
     ConnectionMode,
     IClientDetails,
@@ -92,7 +92,7 @@ export interface IDeltaManagerEvents extends IEvent {
     (event: "readonly", listener: (readonly: boolean) => void);
 }
 
-export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>, IDeltaSender, IDisposable {
+export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>, IDeltaSender {
     // The queue of inbound delta messages
     readonly inbound: IDeltaQueue<T>;
 
@@ -152,7 +152,7 @@ export interface IDeltaQueueEvents<T> extends IErrorEvent {
     (event: "idle", listener: () => void);
 }
 
-export interface IDeltaQueue<T> extends IEventProvider<IDeltaQueueEvents<T>>, IDisposable {
+export interface IDeltaQueue<T> extends IEventProvider<IDeltaQueueEvents<T>> {
     /**
      * Flag indicating whether or not the queue was paused
      */

@@ -177,7 +177,6 @@ export class ContainerContext implements IContainerContext {
 
         this.runtime.dispose(error);
         this.quorum.dispose();
-        this.deltaManager.dispose();
     }
 
     public async snapshot(tagMessage: string = "", fullTree: boolean = false): Promise<ITree | null> {
