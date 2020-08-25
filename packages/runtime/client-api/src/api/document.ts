@@ -74,7 +74,7 @@ export class Document extends EventEmitter {
     }
 
     public get options(): any {
-        return this.runtime.options;
+        return {};
     }
 
     /**
@@ -268,7 +268,6 @@ export async function load(
         resolver,
         serviceFactory,
         codeLoader,
-        options,
         new Map<string, IProxyLoaderFactory>(),
     );
     const container = await loader.resolve({ url });

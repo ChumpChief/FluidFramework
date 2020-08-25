@@ -102,10 +102,6 @@ export class ContainerContext implements IContainerContext {
         return this.container.audience;
     }
 
-    public get options(): any {
-        return this.container.options;
-    }
-
     public get configuration(): IFluidConfiguration {
         const config: Partial<IFluidConfiguration> = {
             canReconnect: this.container.canReconnect,

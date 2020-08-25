@@ -15,10 +15,9 @@ export class WebWorkerLoaderFactory implements IProxyLoaderFactory {
     public readonly environment = "webworker";
     public async createProxyLoader(
         id: string,
-        options: any,
         resolved: IFluidResolvedUrl,
         fromSequenceNumber: number,
     ): Promise<ILoader> {
-        return WebWorkerLoader.load(id, options, resolved, fromSequenceNumber);
+        return WebWorkerLoader.load(id, resolved, fromSequenceNumber);
     }
 }

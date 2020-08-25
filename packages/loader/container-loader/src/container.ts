@@ -133,13 +133,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         documentId: string,
         serviceFactory: IDocumentServiceFactory,
         codeLoader: ICodeLoader,
-        options: any,
         request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
         urlResolver: IUrlResolver,
     ): Promise<Container> {
         const container = new Container(
-            options,
             codeLoader,
             serviceFactory,
             urlResolver,
@@ -178,13 +176,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public static async create(
         codeLoader: ICodeLoader,
-        options: any,
         source: IFluidCodeDetails,
         serviceFactory: IDocumentServiceFactory,
         urlResolver: IUrlResolver,
     ): Promise<Container> {
         const container = new Container(
-            options,
             codeLoader,
             serviceFactory,
             urlResolver,
@@ -332,7 +328,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     constructor(
-        public readonly options: any,
         private readonly codeLoader: ICodeLoader,
         private readonly serviceFactory: IDocumentServiceFactory,
         private readonly urlResolver: IUrlResolver,
@@ -924,17 +919,15 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private get client(): IClient {
-        const client: IClient = this.options?.client !== undefined
-            ? (this.options.client as IClient)
-            : {
-                details: {
-                    capabilities: { interactive: true },
-                },
-                mode: "read", // default reconnection mode on lost connection / connection error
-                permission: [],
-                scopes: [],
-                user: { id: "" },
-            };
+        const client: IClient = {
+            details: {
+                capabilities: { interactive: true },
+            },
+            mode: "read", // default reconnection mode on lost connection / connection error
+            permission: [],
+            scopes: [],
+            user: { id: "" },
+        };
 
         // Client info from headers overrides client info from loader options
         const headerClientDetails = this.originalRequest?.headers?.[LoaderHeader.clientDetails];

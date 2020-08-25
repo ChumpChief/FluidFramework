@@ -43,7 +43,6 @@ export async function getSessionStorageContainer(
         urlResolver,
         documentServiceFactory,
         codeLoader,
-        { blockUpdateMarkers: true },
         new Map(),
     );
 

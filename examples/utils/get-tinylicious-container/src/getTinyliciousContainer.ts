@@ -93,7 +93,6 @@ export async function getTinyliciousContainer(
         // proposal.
         container = await Container.create(
             codeLoader,
-            { blockUpdateMarkers: true }, // options
             { package: "", config: {} }, // source
             documentServiceFactory,
             urlResolver,
@@ -107,7 +106,6 @@ export async function getTinyliciousContainer(
             documentId,
             documentServiceFactory,
             codeLoader,
-            { blockUpdateMarkers: true }, // options
             request,
             resolved,
             urlResolver,

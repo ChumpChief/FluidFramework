@@ -18,7 +18,6 @@ import {
 import {
     IAudience,
     IBlobManager,
-    IFluidTokenProvider,
     IContainerContext,
     IDeltaManager,
     IDeltaSender,
@@ -501,10 +500,6 @@ export class ContainerRuntime extends EventEmitter
         return this.context.existing!;
     }
 
-    public get options(): any {
-        return this.context.options;
-    }
-
     public get clientId(): string | undefined {
         return this.context.clientId;
     }
@@ -828,12 +823,6 @@ export class ContainerRuntime extends EventEmitter
     }
 
     public get IFluidTokenProvider() {
-        if (this.options && this.options.intelligence) {
-            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-            return {
-                intelligence: this.options.intelligence,
-            } as IFluidTokenProvider;
-        }
         return undefined;
     }
 

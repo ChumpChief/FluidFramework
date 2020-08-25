@@ -32,12 +32,6 @@ async function createWebLoader(
         }
     }
 
-    const config = hostConfig.config ? hostConfig.config : {};
-
-    // We need to extend options, otherwise we nest properties, like client, too deeply
-    //
-    config.blockUpdateMarkers = true;
-
     const proxyLoaderFactories = hostConfig.proxyLoaderFactories ?
         hostConfig.proxyLoaderFactories : new Map<string, IProxyLoaderFactory>();
 
@@ -45,7 +39,6 @@ async function createWebLoader(
         hostConfig.urlResolver,
         hostConfig.documentServiceFactory,
         codeLoader,
-        config,
         proxyLoaderFactories);
 }
 

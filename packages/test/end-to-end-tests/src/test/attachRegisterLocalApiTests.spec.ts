@@ -70,7 +70,6 @@ describe(`Attach/Bind Api Tests For Attached Container`, () => {
             urlResolver,
             documentServiceFactory,
             codeLoader,
-            {},
             new Map<string, IProxyLoaderFactory>());
     }
 

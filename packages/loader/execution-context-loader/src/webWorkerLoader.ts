@@ -30,14 +30,13 @@ interface IProxyLoader extends ILoader, IFluidRunnable {
 export class WebWorkerLoader implements ILoader, IFluidRunnable, IFluidRouter {
     public static async load(
         id: string,
-        options: any,
         resolved: IFluidResolvedUrl,
         fromSequenceNumber: number,
     ) {
         const ProxyLoader = Comlink.wrap<IProxyLoader>(new Worker("/public/scripts/dist/worker.min.js"));
         const proxyLoader = await new ProxyLoader(
             id,
-            options,
+            {},
             resolved,
             fromSequenceNumber,
         );

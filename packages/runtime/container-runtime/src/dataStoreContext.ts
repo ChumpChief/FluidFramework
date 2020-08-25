@@ -103,7 +103,7 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
     }
 
     public get options(): any {
-        return this._containerRuntime.options;
+        return {};
     }
 
     public get clientId(): string | undefined {

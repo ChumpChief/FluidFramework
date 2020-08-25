@@ -73,7 +73,6 @@ export class Loader extends EventEmitter implements ILoader {
         resolver: IUrlResolver | IUrlResolver[],
         documentServiceFactory: IDocumentServiceFactory | IDocumentServiceFactory[],
         private readonly codeLoader: ICodeLoader,
-        private readonly options: any,
         private readonly proxyLoaderFactories: Map<string, IProxyLoaderFactory>,
     ) {
         super();
@@ -87,7 +86,6 @@ export class Loader extends EventEmitter implements ILoader {
 
         return Container.create(
             this.codeLoader,
-            this.options,
             source,
             this.documentServiceFactory,
             this.resolver,
@@ -125,7 +123,6 @@ export class Loader extends EventEmitter implements ILoader {
                 this.parseHeader(parsed, { url: baseUrl, headers: request.headers });
             const proxyLoader = await proxyLoaderFactory.createProxyLoader(
                 parsed.id,
-                this.options,
                 resolvedAsFluid,
                 fromSequenceNumber,
             );
@@ -238,7 +235,6 @@ export class Loader extends EventEmitter implements ILoader {
             documentId,
             this.documentServiceFactory,
             this.codeLoader,
-            this.options,
             request,
             resolved,
             this.resolver,

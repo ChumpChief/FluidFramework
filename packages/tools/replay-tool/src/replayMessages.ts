@@ -311,7 +311,6 @@ class Document {
                 ["@ms/tablero/TableroDocument", Promise.resolve(chaincode)],
                 ["@fluid-example/table-document/TableDocument", Promise.resolve(chaincode)],
             ]);
-        const options = {};
 
         // Load the Fluid document
         this.docLogger = ChildLogger.create(new Logger(containerDescription, errorHandler));
@@ -319,7 +318,6 @@ class Document {
             resolver,
             serviceFactory,
             codeLoader,
-            options,
             new Map<string, IProxyLoaderFactory>(),
         );
         const container: Container = await loader.resolve({ url: resolved.url });
