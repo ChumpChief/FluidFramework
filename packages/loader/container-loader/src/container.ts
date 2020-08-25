@@ -171,7 +171,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 // and continuously retrying (consider offline mode)
                 // Host has no container to close, so it's prudent to do it here
                 const error = err ?? CreateContainerError("Container closed without an error");
-                container.close(error);
+                container.close();
                 rej(error);
             };
             container.on("closed", onClosed);
@@ -386,21 +386,21 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.protocolHandler.quorum;
     }
 
-    public close(error?: ICriticalContainerError) {
+    public close() {
         if (this._closed) {
             return;
         }
         this._closed = true;
 
-        this._deltaManager.close(error);
+        this._deltaManager.close();
 
         this._protocolHandler?.close();
 
-        this._context?.dispose(error !== undefined ? new Error(error.message) : undefined);
+        this._context?.dispose();
 
         assert.strictEqual(this.connectionState, ConnectionState.Disconnected, "disconnect event was not raised!");
 
-        this.emit("closed", error);
+        this.emit("closed");
 
         this.removeAllListeners();
     }
@@ -1018,8 +1018,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private attachDeltaManagerOpHandler(attributes: IDocumentAttributes): void {
-        this._deltaManager.on("closed", (error?: ICriticalContainerError) => {
-            this.close(error);
+        this._deltaManager.on("closed", () => {
+            this.close();
         });
 
         // If we're the outer frame, do we want to do this?
@@ -1074,7 +1074,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             case MessageType.Summarize:
                 break;
             default:
-                this.close(CreateContainerError(`Runtime can't send arbitrary message type: ${type}`));
+                this.close();
                 return -1;
         }
         return this.submitMessage(type, contents, batch, metadata);
@@ -1165,7 +1165,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
-            (error?: ICriticalContainerError) => this.close(error),
+            () => this.close(),
             previousRuntimeState,
         );
 
@@ -1197,7 +1197,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
             async (message) => this.snapshot(message),
-            (error?: ICriticalContainerError) => this.close(error),
+            () => this.close(),
             {},
         );
 
