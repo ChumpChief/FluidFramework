@@ -12,7 +12,6 @@ import {
     IDeltaManagerEvents,
     IDeltaQueue,
     ICriticalContainerError,
-    IThrottlingWarning,
 } from "@fluidframework/container-definitions";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
 import {

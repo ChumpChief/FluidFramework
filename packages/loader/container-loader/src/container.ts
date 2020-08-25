@@ -21,7 +21,6 @@ import {
     IRuntimeFactory,
     LoaderHeader,
     IRuntimeState,
-    ICriticalContainerError,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -41,7 +40,6 @@ import {
     ensureFluidResolvedUrl,
     combineAppAndProtocolSummary,
 } from "@fluidframework/driver-utils";
-import { CreateContainerError } from "@fluidframework/container-utils";
 import {
     isSystemMessage,
     ProtocolOpHandler,
@@ -166,13 +164,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return new Promise<Container>((res, rej) => {
             const version = request.headers?.[LoaderHeader.version];
 
-            const onClosed = (err?: ICriticalContainerError) => {
+            const onClosed = () => {
                 // Depending where error happens, we can be attempting to connect to web socket
                 // and continuously retrying (consider offline mode)
                 // Host has no container to close, so it's prudent to do it here
-                const error = err ?? CreateContainerError("Container closed without an error");
                 container.close();
-                rej(error);
+                rej();
             };
             container.on("closed", onClosed);
 
@@ -181,12 +178,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     container.removeListener("closed", onClosed);
                 })
                 .then(
-                    (props) => {
+                    () => {
                         res(container);
                     },
-                    (error) => {
-                        const err = CreateContainerError(error);
-                        onClosed(err);
+                    () => {
+                        onClosed();
                     },
                 );
         });

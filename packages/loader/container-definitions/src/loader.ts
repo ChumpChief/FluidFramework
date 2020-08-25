@@ -13,7 +13,6 @@ import {
 import { IResolvedUrl } from "@fluidframework/driver-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
-import { ICriticalContainerError } from "./error";
 import { IFluidModule } from "./fluidModule";
 import { IFluidCodeDetails, IFluidPackage } from "./fluidPackage";
 import { AttachState } from "./runtime";
@@ -76,8 +75,7 @@ export interface IContainerEvents extends IEvent {
      */
     (event: "connect", listener: (opsBehind?: number) => void);
     (event: "contextChanged", listener: (codeDetails: IFluidCodeDetails) => void);
-    (event: "disconnected" | "attaching" | "attached", listener: () => void);
-    (event: "closed", listener: (error?: ICriticalContainerError) => void);
+    (event: "disconnected" | "attaching" | "attached" | "closed", listener: () => void);
     (event: "op", listener: (message: ISequencedDocumentMessage) => void);
 }
 
