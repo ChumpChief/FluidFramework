@@ -36,7 +36,6 @@ import {
     ScopeType,
 } from "@fluidframework/protocol-definitions";
 import {
-    createWriteError,
     createGenericNetworkError,
 } from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
@@ -93,7 +92,7 @@ export enum ReconnectMode {
  * but not exposed on the public interface IDeltaManager
  */
 export interface IDeltaManagerInternalEvents extends IDeltaManagerEvents {
-    (event: "closed", listener: (error?: ICriticalContainerError) => void);
+    (event: "closed", listener: () => void);
 }
 
 /**
@@ -331,7 +330,7 @@ export class DeltaManager
             });
 
         this._inbound.on("error", (error) => {
-            this.close(CreateContainerError(error));
+            this.close();
         });
 
         // Outbound message queue. The outbound queue is represented as a queue of an array of ops. Ops contained
@@ -345,7 +344,7 @@ export class DeltaManager
             });
 
         this._outbound.on("error", (error) => {
-            this.close(CreateContainerError(error));
+            this.close();
         });
 
         // Inbound signal queue
@@ -360,7 +359,7 @@ export class DeltaManager
         });
 
         this._inboundSignal.on("error", (error) => {
-            this.close(CreateContainerError(error));
+            this.close();
         });
 
         // Require the user to start the processing
@@ -480,7 +479,7 @@ export class DeltaManager
 
                     // Socket.io error when we connect to wrong socket, or hit some multiplexing bug
                     if (!canRetryOnError(origError)) {
-                        this.close(error);
+                        this.close();
                         throw error;
                     }
 
@@ -501,10 +500,10 @@ export class DeltaManager
             // Regardless of how the connection attempt concludes, we'll clear the promise and remove the listener
 
             // Reject the connection promise if the DeltaManager gets closed during connection
-            const cleanupAndReject = (error) => {
+            const cleanupAndReject = () => {
                 this.connectionP = undefined;
                 this.removeListener("closed", cleanupAndReject);
-                reject(error);
+                reject();
             };
             this.on("closed", cleanupAndReject);
 
@@ -537,7 +536,7 @@ export class DeltaManager
         // const maxOpSize = this.context.deltaManager.maxMessageSize;
 
         if (this.readonly) {
-            this.close(CreateContainerError("Op is sent in read-only document state"));
+            this.close();
             return -1;
         }
 
@@ -661,11 +660,10 @@ export class DeltaManager
                 from = lastFetch;
             } catch (origError) {
                 canRetry = canRetry && canRetryOnError(origError);
-                const error = CreateContainerError(origError);
 
                 if (!canRetry) {
                     // It's game over scenario.
-                    this.close(error);
+                    this.close();
                     return;
                 }
                 success = false;
@@ -686,11 +684,7 @@ export class DeltaManager
                 // Only bail out if we successfully connected to storage, but there were no ops
                 // One (last) successful connection is sufficient, even if user was disconnected all prior attempts
                 if (success && retry >= 100) {
-                    const closeError = createGenericNetworkError(
-                        "Failed to retrieve ops from storage: giving up after too many retries",
-                        false /* canRetry */,
-                    );
-                    this.close(closeError);
+                    this.close();
                     return;
                 }
             }
@@ -702,7 +696,7 @@ export class DeltaManager
     /**
      * Closes the connection and clears inbound & outbound queues.
      */
-    public close(error?: ICriticalContainerError): void {
+    public close(): void {
         if (this.closed) {
             return;
         }
@@ -733,7 +727,7 @@ export class DeltaManager
         // This needs to be the last thing we do (before removing listeners), as it causes
         // Container to dispose context and break ability of data stores / runtime to "hear"
         // from delta manager, including notification (above) about readonly state.
-        this.emit("closed", error);
+        this.emit("closed");
 
         this.removeAllListeners();
     }
@@ -810,7 +804,7 @@ export class DeltaManager
             const message = messages[0];
             // TODO: we should remove this check when service updates?
             if (this._readonlyPermissions) {
-                this.close(createWriteError("WriteOnReadOnlyDocument"));
+                this.close();
             }
 
             // check message.content for Back-compat with old service.
@@ -951,7 +945,7 @@ export class DeltaManager
             // Do not raise container error if we are closing just because we lost connection.
             // Those errors (like IdleDisconnect) would show up in telemetry dashboards and
             // are very misleading, as first initial reaction - some logic is broken.
-            this.close(canRetry ? undefined : error);
+            this.close();
         }
 
         // If closed then we can't reconnect
