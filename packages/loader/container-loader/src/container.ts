@@ -77,15 +77,6 @@ import { NullChaincode } from "./nullRuntime";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 import { parseUrl, convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
 
-const PackageNotFactoryError = "Code package does not implement IRuntimeFactory";
-
-export interface IContainerConfig {
-    resolvedUrl?: IResolvedUrl;
-    canReconnect?: boolean;
-    originalRequest?: IRequest;
-    id?: string;
-}
-
 export enum ConnectionState {
     /**
      * The document is no longer connected to the delta server
@@ -153,12 +144,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             codeLoader,
             serviceFactory,
             urlResolver,
-            {
-                originalRequest: request,
-                id: decodeURI(documentId),
-                resolvedUrl,
-                canReconnect: !(request.headers?.[LoaderHeader.reconnect] === false),
-            },
+            resolvedUrl,
+            !(request.headers?.[LoaderHeader.reconnect] === false),
+            request,
+            decodeURI(documentId),
         );
 
         return new Promise<Container>((res, rej) => {
@@ -200,14 +189,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             codeLoader,
             serviceFactory,
             urlResolver,
-            {},
         );
         await container.createDetached(source);
 
         return container;
     }
-
-    private _canReconnect: boolean = true;
 
     private pendingClientId: string | undefined;
     private loaded = false;
@@ -224,8 +210,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private _clientId: string | undefined;
-    private _id: string | undefined;
-    private originalRequest: IRequest | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
     private service: IDocumentService | undefined;
@@ -250,7 +234,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private resumedOpProcessingAfterLoad = false;
     private _loadedFromVersion: IVersion | undefined;
-    private _resolvedUrl: IResolvedUrl | undefined;
     private cachedAttachSummary: ISummaryTree | undefined;
     private attachInProgress = false;
 
@@ -359,18 +342,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private readonly codeLoader: ICodeLoader,
         private readonly serviceFactory: IDocumentServiceFactory,
         private readonly urlResolver: IUrlResolver,
-        config: IContainerConfig,
+        private _resolvedUrl?: IResolvedUrl | undefined,
+        private _canReconnect: boolean = true,
+        private originalRequest?: IRequest | undefined,
+        private _id?: string | undefined,
     ) {
         super();
         this._audience = new Audience();
-
-        // Initialize from config
-        this.originalRequest = config.originalRequest;
-        this._id = config.id;
-        this._resolvedUrl = config.resolvedUrl;
-        if (config.canReconnect !== undefined) {
-            this._canReconnect = config.canReconnect;
-        }
 
         this._deltaManager = this.createDeltaManager();
     }
@@ -946,7 +924,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         const factory = fluidModule.fluidExport.IRuntimeFactory;
         if (factory === undefined) {
-            throw new Error(PackageNotFactoryError);
+            throw new Error("Code package does not implement IRuntimeFactory");
         }
         return factory;
     }
