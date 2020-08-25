@@ -13,7 +13,6 @@ import {
     IDeltaQueue,
     ICriticalContainerError,
     IThrottlingWarning,
-    ContainerErrorType,
 } from "@fluidframework/container-definitions";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
 import {
@@ -79,11 +78,6 @@ function createReconnectError(prefix: string, err: any) {
     return error2;
 }
 
-enum RetryFor {
-    DeltaStream,
-    DeltaStorage,
-}
-
 export interface IConnectionArgs {
     mode?: ConnectionMode;
     fetchOpsFromStorage?: boolean;
@@ -100,7 +94,6 @@ export enum ReconnectMode {
  * but not exposed on the public interface IDeltaManager
  */
 export interface IDeltaManagerInternalEvents extends IDeltaManagerEvents {
-    (event: "throttled", listener: (error: IThrottlingWarning) => void);
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
 }
 
@@ -179,9 +172,6 @@ export class DeltaManager
     private messageBuffer: IDocumentMessage[] = [];
 
     private connectFirstConnection = true;
-
-    private deltaStorageDelay: number = 0;
-    private deltaStreamDelay: number = 0;
 
     public get inbound(): IDeltaQueue<ISequencedDocumentMessage> {
         return this._inbound;
@@ -498,9 +488,6 @@ export class DeltaManager
                     const retryDelayFromError = getRetryDelayFromError(origError);
                     delay = retryDelayFromError ?? Math.min(delay * 2, MaxReconnectDelaySeconds);
 
-                    if (retryDelayFromError !== undefined) {
-                        this.emitDelayInfo(RetryFor.DeltaStream, retryDelayFromError, error);
-                    }
                     await waitForConnectedState(delay * 1000);
                 }
             }
@@ -684,10 +671,6 @@ export class DeltaManager
                 }
                 success = false;
                 retryAfter = getRetryDelayFromError(origError);
-
-                if (retryAfter !== undefined && retryAfter >= 0) {
-                    this.emitDelayInfo(RetryFor.DeltaStorage, retryAfter, error);
-                }
             }
 
             let delay: number;
@@ -774,32 +757,6 @@ export class DeltaManager
         }
     }
 
-    private cancelDelayInfo(retryEndpoint: number) {
-        if (retryEndpoint === RetryFor.DeltaStorage) {
-            this.deltaStorageDelay = 0;
-        } else if (retryEndpoint === RetryFor.DeltaStream) {
-            this.deltaStreamDelay = 0;
-        }
-    }
-
-    private emitDelayInfo(retryEndpoint: number, delaySeconds: number, error: ICriticalContainerError) {
-        if (retryEndpoint === RetryFor.DeltaStorage) {
-            this.deltaStorageDelay = delaySeconds;
-        } else if (retryEndpoint === RetryFor.DeltaStream) {
-            this.deltaStreamDelay = delaySeconds;
-        }
-
-        const delayTime = Math.max(this.deltaStorageDelay, this.deltaStreamDelay);
-        if (delayTime > 0) {
-            const throttlingError: IThrottlingWarning = {
-                errorType: ContainerErrorType.throttlingError,
-                message: `Service busy/throttled: ${error.message}`,
-                retryAfterSeconds: delayTime,
-            };
-            this.emit("throttled", throttlingError);
-        }
-    }
-
     /**
      * Once we've successfully gotten a DeltaConnection, we need to set up state, attach event listeners, and process
      * initial messages.
@@ -816,8 +773,6 @@ export class DeltaManager
             "claims/connectionMode mismatch");
         assert(!readonly || this.connectionMode === "read", "readonly perf with write connection");
         this.set_readonlyPermissions(readonly);
-
-        this.cancelDelayInfo(RetryFor.DeltaStream);
 
         if (this.closed) {
             // Raise proper events, Log telemetry event and close connection.
@@ -1008,7 +963,6 @@ export class DeltaManager
         if (this.reconnectMode === ReconnectMode.Enabled) {
             const delay = getRetryDelayFromError(error);
             if (delay !== undefined) {
-                this.emitDelayInfo(RetryFor.DeltaStream, delay, error);
                 await waitForConnectedState(delay * 1000);
             }
 
@@ -1161,7 +1115,6 @@ export class DeltaManager
         this.fetching = true;
 
         await this.getDeltas(from, to, (messages) => {
-            this.cancelDelayInfo(RetryFor.DeltaStorage);
             this.catchUp(messages);
         });
 
