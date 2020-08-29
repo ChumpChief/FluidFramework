@@ -173,10 +173,6 @@ export class ReplayFileDeltaConnection
         return this.details.existing;
     }
 
-    public get parentBranch(): string | null {
-        return this.details.parentBranch;
-    }
-
     public get version(): string {
         return this.details.version;
     }

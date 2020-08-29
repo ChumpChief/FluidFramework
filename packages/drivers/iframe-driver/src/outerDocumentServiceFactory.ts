@@ -210,7 +210,7 @@ export class DocumentServiceFactoryProxy implements IDocumentServiceFactoryProxy
             get initialSignals() { return deltaStream.initialSignals; },
             maxMessageSize: deltaStream.maxMessageSize,
             mode: deltaStream.mode,
-            parentBranch: deltaStream.parentBranch,
+            parentBranch: null,
             serviceConfiguration: deltaStream.serviceConfiguration,
             version: deltaStream.version,
             supportedVersions: ["^0.3.0", "^0.2.0", "^0.1.0"],
