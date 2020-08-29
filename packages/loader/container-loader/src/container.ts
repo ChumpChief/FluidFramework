@@ -374,11 +374,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             ensureFluidResolvedUrl(createNewResolvedUrl);
             // Actually go and create the resolved document
             if (this.service === undefined) {
-                this.service = await this.serviceFactory.createContainer(
+                await this.serviceFactory.submitContainer(
                     this.cachedAttachSummary,
                     createNewResolvedUrl,
                     undefined,
                 );
+                this.service = await this.serviceFactory.createDocumentService(createNewResolvedUrl);
             }
             ensureFluidResolvedUrl(createNewResolvedUrl);
             this._resolvedUrl = createNewResolvedUrl;

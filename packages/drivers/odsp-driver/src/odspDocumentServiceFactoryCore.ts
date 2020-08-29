@@ -38,11 +38,11 @@ export class OdspDocumentServiceFactoryCore implements IDocumentServiceFactory {
 
     private readonly nonPersistentCache = new NonPersistentCache();
 
-    public async createContainer(
+    public async submitContainer(
         createNewSummary: ISummaryTree,
         createNewResolvedUrl: IResolvedUrl,
         logger?: ITelemetryBaseLogger,
-    ): Promise<IDocumentService> {
+    ): Promise<void> {
         ensureFluidResolvedUrl(createNewResolvedUrl);
 
         let odspResolvedUrl = createNewResolvedUrl as IOdspResolvedUrl;
@@ -73,11 +73,9 @@ export class OdspDocumentServiceFactoryCore implements IDocumentServiceFactory {
                     newFileParams,
                     logger2,
                     createNewSummary);
-                const docService = this.createDocumentService(odspResolvedUrl, logger);
                 event.end({
                     docId: odspResolvedUrl.hashedDocumentId,
                 });
-                return docService;
             });
     }
 

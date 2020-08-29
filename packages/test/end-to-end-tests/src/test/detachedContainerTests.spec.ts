@@ -191,16 +191,16 @@ describe("Detached Container", () => {
     it("ReAttach detached container on failed attach", async () => {
         const container = await loader.createDetachedContainer(pkg);
         // eslint-disable-next-line @typescript-eslint/unbound-method
-        const oldFunc = documentServiceFactory.createContainer;
+        const oldFunc = documentServiceFactory.submitContainer;
         // eslint-disable-next-line @typescript-eslint/unbound-method
-        documentServiceFactory.createContainer = (a, b, c) => { throw new Error("Test Error"); };
+        documentServiceFactory.submitContainer = (a, b, c) => { throw new Error("Test Error"); };
         let failedOnce = false;
         try {
             await container.attach(request);
         } catch (e) {
             failedOnce = true;
             // eslint-disable-next-line @typescript-eslint/unbound-method
-            documentServiceFactory.createContainer = oldFunc;
+            documentServiceFactory.submitContainer = oldFunc;
         }
         assert.strictEqual(failedOnce, true, "Attach call should fail");
         assert.strictEqual(container.attachState, AttachState.Attaching, "Container should be in attaching state");

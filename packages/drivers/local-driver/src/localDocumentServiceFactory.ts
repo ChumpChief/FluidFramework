@@ -35,11 +35,11 @@ export class LocalDocumentServiceFactory implements IDocumentServiceFactory {
      */
     constructor(private readonly localDeltaConnectionServer: ILocalDeltaConnectionServer) { }
 
-    public async createContainer(
+    public async submitContainer(
         createNewSummary: ISummaryTree,
         resolvedUrl: IResolvedUrl,
         logger?: ITelemetryBaseLogger,
-    ): Promise<IDocumentService> {
+    ): Promise<void> {
         ensureFluidResolvedUrl(resolvedUrl);
         const pathName = new URL(resolvedUrl.url).pathname;
         const pathArr = pathName.split("/");
@@ -66,7 +66,6 @@ export class LocalDocumentServiceFactory implements IDocumentServiceFactory {
             documentAttributes.term ?? 1,
             quorumValues,
         );
-        return this.createDocumentService(resolvedUrl, logger);
     }
 
     /**

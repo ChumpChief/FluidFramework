@@ -56,11 +56,11 @@ export class MultiDocumentServiceFactory implements IDocumentServiceFactory {
         return factory.createDocumentService(resolvedUrl, logger);
     }
 
-    public async createContainer(
+    public async submitContainer(
         createNewSummary: ISummaryTree,
         createNewResolvedUrl: IResolvedUrl,
         logger?: ITelemetryBaseLogger,
-    ): Promise<IDocumentService> {
+    ): Promise<void> {
         ensureFluidResolvedUrl(createNewResolvedUrl);
         const urlObj = parse(createNewResolvedUrl.url);
         if (urlObj.protocol === undefined) {
@@ -70,6 +70,6 @@ export class MultiDocumentServiceFactory implements IDocumentServiceFactory {
         if (factory === undefined) {
             throw new Error("Unknown fluid protocol");
         }
-        return factory.createContainer(createNewSummary, createNewResolvedUrl, logger);
+        return factory.submitContainer(createNewSummary, createNewResolvedUrl, logger);
     }
 }

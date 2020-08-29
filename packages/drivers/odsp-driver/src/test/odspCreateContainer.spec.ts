@@ -52,10 +52,15 @@ describe("Odsp Create Container Test", () => {
     const createService = async (
         summary: ISummaryTree,
         resolved: IOdspResolvedUrl,
-    ): Promise<IDocumentService> => odspDocumentServiceFactory.createContainer(
-        summary,
-        resolved,
-        DebugLogger.create("fluid:createContainer"));
+    ): Promise<IDocumentService> => {
+        const logger = DebugLogger.create("fluid:createContainer");
+        await odspDocumentServiceFactory.submitContainer(
+            summary,
+            resolved,
+            logger,
+        );
+        return odspDocumentServiceFactory.createDocumentService(resolved, logger);
+    };
 
     beforeEach(() => {
         resolver = new OdspDriverUrlResolver();

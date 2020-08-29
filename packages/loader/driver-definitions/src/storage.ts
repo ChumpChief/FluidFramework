@@ -252,11 +252,11 @@ export interface IDocumentServiceFactory {
     createDocumentService(resolvedUrl: IResolvedUrl, logger?: ITelemetryBaseLogger): Promise<IDocumentService>;
 
     // Creates a new document on the host with the provided options. Returns the document service.
-    createContainer(
+    submitContainer(
         createNewSummary: ISummaryTree,
         createNewResolvedUrl: IResolvedUrl,
         logger?: ITelemetryBaseLogger,
-    ): Promise<IDocumentService>;
+    ): Promise<void>;
 }
 
 /**

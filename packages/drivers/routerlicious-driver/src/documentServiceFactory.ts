@@ -38,11 +38,11 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
     ) {
     }
 
-    public async createContainer(
+    public async submitContainer(
         createNewSummary: ISummaryTree,
         resolvedUrl: IResolvedUrl,
         logger?: ITelemetryBaseLogger,
-    ): Promise<IDocumentService> {
+    ): Promise<void> {
         ensureFluidResolvedUrl(resolvedUrl);
         assert(resolvedUrl.endpoints.ordererUrl);
         const parsedUrl = parse(resolvedUrl.url);
@@ -65,7 +65,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
                 sequenceNumber: documentAttributes.sequenceNumber,
                 values: quorumValues,
             });
-        return this.createDocumentService(resolvedUrl, logger);
     }
 
     /**

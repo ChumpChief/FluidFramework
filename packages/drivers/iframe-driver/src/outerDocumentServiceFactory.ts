@@ -113,11 +113,11 @@ export class DocumentServiceFactoryProxy implements IDocumentServiceFactoryProxy
     }
 
     // TODO: Issue-2109 Implement detach container api or put appropriate comment.
-    public async createContainer(
+    public async submitContainer(
         createNewSummary: ISummaryTree,
         resolvedUrl: IResolvedUrl,
         logger?: ITelemetryBaseLogger,
-    ): Promise<IDocumentService> {
+    ): Promise<void> {
         throw new Error("Not implemented");
     }
 

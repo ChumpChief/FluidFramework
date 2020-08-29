@@ -180,11 +180,11 @@ export class StaticStorageDocumentServiceFactory implements IDocumentServiceFact
     }
 
     // TODO: Issue-2109 Implement detach container api or put appropriate comment.
-    public async createContainer(
+    public async submitContainer(
         createNewSummary: ISummaryTree,
         resolvedUrl: IResolvedUrl,
         logger: ITelemetryLogger,
-    ): Promise<IDocumentService> {
+    ): Promise<void> {
         throw new Error("Not implemented");
     }
 }
