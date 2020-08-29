@@ -48,7 +48,7 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         if (!parsedUrl.pathname) {
             throw new Error("Parsed url should contain tenant and doc Id!!");
         }
-        const [, tenantId, id] = parsedUrl.pathname.split("/");
+        const [, tenantId, documentId] = parsedUrl.pathname.split("/");
         const protocolSummary = createNewSummary.tree[".protocol"] as ISummaryTree;
         const appSummary = createNewSummary.tree[".app"] as ISummaryTree;
         if (!(protocolSummary && appSummary)) {
@@ -59,7 +59,7 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         await Axios.post(
             `${resolvedUrl.endpoints.ordererUrl}/documents/${tenantId}`,
             {
-                id,
+                id: documentId,
                 summary: appSummary,
                 sequenceNumber: documentAttributes.sequenceNumber,
                 values: quorumValues,
