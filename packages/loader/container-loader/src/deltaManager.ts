@@ -439,15 +439,13 @@ export class DeltaManager
                 try {
                     this.client.mode = requestedMode;
                     connection = await DeltaConnection.connect(docService, this.client);
-                } catch (origError) {
-                    const error = CreateContainerError(origError);
-
+                } catch (error) {
                     // Socket.io error when we connect to wrong socket, or hit some multiplexing bug
-                    if (!canRetryOnError(origError)) {
-                        throw error;
+                    if (!canRetryOnError(error)) {
+                        throw CreateContainerError(error);
                     }
 
-                    const retryDelayFromError = getRetryDelayFromError(origError);
+                    const retryDelayFromError = getRetryDelayFromError(error);
                     delay = retryDelayFromError ?? Math.min(delay * 2, MaxReconnectDelaySeconds);
 
                     await waitForConnectedState(delay * 1000);
