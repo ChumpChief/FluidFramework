@@ -26,7 +26,6 @@ import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions"
 import {
     ensureFluidResolvedUrl,
     MultiUrlResolver,
-    MultiDocumentServiceFactory,
 } from "@fluidframework/driver-utils";
 import { Container } from "./container";
 import { debug } from "./debug";
@@ -67,18 +66,16 @@ function createCachedResolver(resolver: IUrlResolver) {
 export class Loader extends EventEmitter implements ILoader {
     private readonly containers = new Map<string, Promise<Container>>();
     private readonly resolver: IUrlResolver;
-    private readonly documentServiceFactory: IDocumentServiceFactory;
 
     constructor(
         resolver: IUrlResolver | IUrlResolver[],
-        documentServiceFactory: IDocumentServiceFactory | IDocumentServiceFactory[],
+        private readonly documentServiceFactory: IDocumentServiceFactory,
         private readonly codeLoader: ICodeLoader,
         private readonly proxyLoaderFactories: Map<string, IProxyLoaderFactory>,
     ) {
         super();
 
         this.resolver = createCachedResolver(MultiUrlResolver.create(resolver));
-        this.documentServiceFactory = MultiDocumentServiceFactory.create(documentServiceFactory);
     }
 
     public async createDetachedContainer(source: IFluidCodeDetails): Promise<Container> {

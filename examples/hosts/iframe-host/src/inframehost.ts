@@ -15,7 +15,7 @@ import {
     IRuntimeFactory,
     AttachState,
 } from "@fluidframework/container-definitions";
-import { MultiUrlResolver, MultiDocumentServiceFactory } from "@fluidframework/driver-utils";
+import { MultiUrlResolver } from "@fluidframework/driver-utils";
 import { IRequest, IResponse, IFluidObject } from "@fluidframework/core-interfaces";
 import { IDocumentServiceFactory, IUrlResolver } from "@fluidframework/driver-definitions";
 import { ISequencedDocumentMessage, ITree, ISummaryTree } from "@fluidframework/protocol-definitions";
@@ -65,7 +65,7 @@ class ProxyCodeLoader implements ICodeLoader {
 }
 
 export interface IFrameOuterHostConfig {
-    documentServiceFactory: IDocumentServiceFactory | IDocumentServiceFactory[];
+    documentServiceFactory: IDocumentServiceFactory;
     urlResolver: IUrlResolver | IUrlResolver[];
 
     // Any config to be provided to loader.
@@ -94,7 +94,7 @@ export class IFrameOuterHost {
 
     public async load(request: IRequest, iframe: HTMLIFrameElement): Promise<Container> {
         const proxy = await IFrameDocumentServiceProxyFactory.create(
-            MultiDocumentServiceFactory.create(this.hostConfig.documentServiceFactory),
+            this.hostConfig.documentServiceFactory,
             iframe,
             this.hostConfig.config,
             MultiUrlResolver.create(this.hostConfig.urlResolver));

@@ -13,7 +13,7 @@ import { IDocumentServiceFactory, IUrlResolver } from "@fluidframework/driver-de
  * of resolved url.
  */
 export interface IBaseHostConfig {
-    documentServiceFactory: IDocumentServiceFactory | IDocumentServiceFactory[];
+    documentServiceFactory: IDocumentServiceFactory;
     urlResolver: IUrlResolver | IUrlResolver[];
 
     // Any config to be provided to loader.
