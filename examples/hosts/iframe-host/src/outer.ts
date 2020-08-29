@@ -30,7 +30,6 @@ const getTinyliciousResolver =
 
 const getTinyliciousDocumentServiceFactory =
     () => new RouterliciousDocumentServiceFactory(
-        false,
         new DefaultErrorTracking(),
         false,
         true,

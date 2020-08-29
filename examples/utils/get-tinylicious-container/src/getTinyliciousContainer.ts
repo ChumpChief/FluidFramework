@@ -71,7 +71,6 @@ export async function getTinyliciousContainer(
     createNew: boolean,
 ): Promise<Container> {
     const documentServiceFactory = new RouterliciousDocumentServiceFactory(
-        false,
         new DefaultErrorTracking(),
         false,
         true,

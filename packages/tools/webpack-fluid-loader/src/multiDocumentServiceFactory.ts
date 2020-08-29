@@ -25,7 +25,6 @@ export function getDocumentServiceFactory(documentId: string, options: RouteOpti
             async () => options.mode === "spo" || options.mode === "spo-df" ? options.pushAccessToken : undefined,
         ),
         new RouterliciousDocumentServiceFactory(
-            false,
             new DefaultErrorTracking(),
             false,
             true,

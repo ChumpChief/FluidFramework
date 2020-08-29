@@ -20,7 +20,6 @@ import {
 } from "@fluidframework/driver-utils";
 import Axios from "axios";
 import { DocumentService } from "./documentService";
-import { DocumentService2 } from "./documentService2";
 import { DefaultErrorTracking } from "./errorTracking";
 import { TokenProvider } from "./tokens";
 
@@ -31,7 +30,6 @@ import { TokenProvider } from "./tokens";
 export class RouterliciousDocumentServiceFactory implements IDocumentServiceFactory {
     public readonly protocolName = "fluid:";
     constructor(
-        private readonly useDocumentService2: boolean = false,
         private readonly errorTracking: IErrorTrackingService = new DefaultErrorTracking(),
         private readonly disableCache: boolean = false,
         private readonly historianApi: boolean = true,
@@ -105,32 +103,18 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
 
         const tokenProvider = new TokenProvider(jwtToken);
 
-        if (this.useDocumentService2) {
-            return new DocumentService2(
-                fluidResolvedUrl,
-                ordererUrl,
-                deltaStorageUrl,
-                storageUrl,
-                this.errorTracking,
-                this.disableCache,
-                this.historianApi,
-                this.credentials,
-                tokenProvider,
-                tenantId,
-                documentId);
-        } else {
-            return new DocumentService(
-                ordererUrl,
-                deltaStorageUrl,
-                storageUrl,
-                this.errorTracking,
-                this.disableCache,
-                this.historianApi,
-                this.credentials,
-                this.gitCache,
-                tokenProvider,
-                tenantId,
-                documentId);
-        }
+        return new DocumentService(
+            ordererUrl,
+            deltaStorageUrl,
+            storageUrl,
+            this.errorTracking,
+            this.disableCache,
+            this.historianApi,
+            this.credentials,
+            this.gitCache,
+            tokenProvider,
+            tenantId,
+            documentId,
+        );
     }
 }
