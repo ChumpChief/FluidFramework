@@ -223,9 +223,6 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
 }
 
 export interface IDocumentService {
-
-    resolvedUrl: IResolvedUrl;
-
     /**
      * Access to storage associated with the document...
      */

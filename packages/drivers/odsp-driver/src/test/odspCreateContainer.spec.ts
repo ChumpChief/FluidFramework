@@ -11,8 +11,6 @@ import { ISummaryTree, SummaryType } from "@fluidframework/protocol-definitions"
 import { OdspDriverUrlResolver } from "../odspDriverUrlResolver";
 import { OdspDocumentServiceFactory } from "../odspDocumentServiceFactory";
 import { IOdspResolvedUrl } from "../contracts";
-import { getHashedDocumentId } from "../odspUtils";
-import { mockFetch } from "./mockFetch";
 
 describe("Odsp Create Container Test", () => {
     const siteUrl = "https://www.localhost.xxx";
@@ -21,16 +19,6 @@ describe("Odsp Create Container Test", () => {
     const fileName = "fileName";
     let resolver: OdspDriverUrlResolver;
     let request: IRequest;
-
-    const itemId = "fakeItemId";
-    const expectedResponse: any = {
-        context: "http://sp.devinstall/_api/v2.1/$metadata#",
-        sequenceNumber: 1,
-        sha: "shaxxshaxx",
-        itemUrl: `http://fake.microsoft.com/_api/v2.1/drives/${driveId}/items/${itemId}`,
-        driveId,
-        itemId,
-    };
 
     const odspDocumentServiceFactory = new OdspDocumentServiceFactory(
         async (url: string, refresh: boolean) => "token",
@@ -72,29 +60,6 @@ describe("Odsp Create Container Test", () => {
     beforeEach(() => {
         resolver = new OdspDriverUrlResolver();
         request = resolver.createCreateNewRequest(siteUrl, driveId, filePath, fileName);
-    });
-
-    it("Check Document Service Successfully", async () => {
-        const resolved = await resolver.resolve(request);
-        const docID = getHashedDocumentId(driveId, itemId);
-        const summary = createSummary(true, true, 0);
-        const docService = await mockFetch(
-            expectedResponse,
-            async () => odspDocumentServiceFactory.createContainer(
-                summary,
-                resolved,
-                DebugLogger.create("fluid:createContainer")));
-        const finalResolverUrl = docService.resolvedUrl as IOdspResolvedUrl;
-        assert.strictEqual(finalResolverUrl.driveId, driveId, "Drive Id should match");
-        assert.strictEqual(finalResolverUrl.itemId, itemId, "ItemId should match");
-        assert.strictEqual(finalResolverUrl.siteUrl, siteUrl, "SiteUrl should match");
-        assert.strictEqual(finalResolverUrl.hashedDocumentId, docID, "DocId should match");
-
-        const url = `fluid-odsp://placeholder/placeholder/${
-            docID}/?driveId=${driveId}&itemId=${itemId}&path=${encodeURIComponent("/")}`;
-        const snapshotUrl = `${siteUrl}/_api/v2.1/drives/${driveId}/items/${itemId}/opStream/snapshots`;
-        assert.strictEqual(finalResolverUrl.url, url, "Url should match");
-        assert.strictEqual(finalResolverUrl.endpoints.snapshotStorageUrl, snapshotUrl, "Snapshot url should match");
     });
 
     it("No App Summary", async () => {

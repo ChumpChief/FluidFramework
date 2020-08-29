@@ -120,7 +120,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
                 documentId);
         } else {
             return new DocumentService(
-                fluidResolvedUrl,
                 ordererUrl,
                 deltaStorageUrl,
                 storageUrl,

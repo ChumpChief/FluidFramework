@@ -30,7 +30,6 @@ export function createDocumentService(
     credentials?,
     seedData?: IGitCache): IDocumentService {
     const service = new DocumentService(
-        resolvedUrl,
         ordererUrl,
         deltaStorageUrl,
         gitUrl,

@@ -380,14 +380,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     undefined,
                 );
             }
-            const resolvedUrl = this.service.resolvedUrl;
-            ensureFluidResolvedUrl(resolvedUrl);
-            this._resolvedUrl = resolvedUrl;
+            ensureFluidResolvedUrl(createNewResolvedUrl);
+            this._resolvedUrl = createNewResolvedUrl;
             const url = await this.getAbsoluteUrl("");
             assert(url !== undefined, "Container url undefined");
             this.originalRequest = { url };
             this._canReconnect = !(request.headers?.[LoaderHeader.reconnect] === false);
-            const parsedUrl = parseUrl(resolvedUrl.url);
+            const parsedUrl = parseUrl(createNewResolvedUrl.url);
             if (parsedUrl === undefined) {
                 throw new Error("Unable to parse Url");
             }

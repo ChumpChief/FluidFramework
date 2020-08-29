@@ -27,7 +27,6 @@ export class DocumentService2 extends DocumentService {
         tenantId: string,
         documentId: string) {
         super(
-            resolvedUrl,
             ordererUrl,
             deltaStorageUrl,
             gitUrl,
