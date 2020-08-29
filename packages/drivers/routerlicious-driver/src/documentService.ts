@@ -3,11 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { fromUtf8ToBase64 } from "@fluidframework/common-utils";
 import * as api from "@fluidframework/driver-definitions";
 import { IClient, IErrorTrackingService } from "@fluidframework/protocol-definitions";
 import { GitManager, Historian, ICredentials, IGitCache } from "@fluidframework/server-services-client";
-import Axios from "axios";
 import io from "socket.io-client";
 import { DeltaStorageService, DocumentDeltaStorageService } from "./deltaStorageService";
 import { DocumentStorageService } from "./documentStorageService";
@@ -109,17 +107,6 @@ export class DocumentService implements api.IDocumentService {
             io,
             client,
             this.ordererUrl);
-    }
-
-    public async branch(): Promise<string> {
-        let headers: { Authorization: string } | null = null;
-        headers = {
-            Authorization: `Basic ${fromUtf8ToBase64(`${this.tenantId}:${this.tokenProvider.token}`)}`,
-        };
-
-        // eslint-disable-next-line max-len
-        const result = await Axios.post<string>(`${this.ordererUrl}/documents/${this.tenantId}/${this.documentId}/forks`, { headers });
-        return result.data;
     }
 
     public getErrorTrackingService() {
