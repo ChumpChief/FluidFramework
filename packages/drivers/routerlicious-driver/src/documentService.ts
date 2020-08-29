@@ -21,7 +21,7 @@ import { TokenProvider } from "./tokens";
  */
 export class DocumentService implements api.IDocumentService {
     constructor(
-        protected ordererUrl: string,
+        private readonly ordererUrl: string,
         private readonly deltaStorageUrl: string,
         private readonly gitUrl: string,
         private readonly errorTracking: IErrorTrackingService,
@@ -29,9 +29,9 @@ export class DocumentService implements api.IDocumentService {
         private readonly historianApi: boolean,
         private readonly directCredentials: ICredentials | undefined,
         private readonly gitCache: IGitCache | null | undefined,
-        protected tokenProvider: TokenProvider,
-        protected tenantId: string,
-        protected documentId: string,
+        private readonly tokenProvider: TokenProvider,
+        private readonly tenantId: string,
+        private readonly documentId: string,
     ) {
     }
 
