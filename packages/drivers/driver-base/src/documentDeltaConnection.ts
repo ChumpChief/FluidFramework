@@ -72,7 +72,8 @@ export class DocumentDeltaConnection
         io: SocketIOClientStatic,
         client: IClient,
         url: string,
-        timeoutMs: number = 20000): Promise<IDocumentDeltaConnection> {
+    ): Promise<IDocumentDeltaConnection> {
+        const timeoutMs = 20000;
         const socket = io(
             url,
             {
@@ -341,40 +342,35 @@ export class DocumentDeltaConnection
 
     /**
      * Disconnect from the websocket
-     * @param socketProtocolError - true if error happened on socket / socket.io protocol level
-     *  (not on Fluid protocol level)
      */
-    public disconnect(socketProtocolError: boolean = false) {
+    public disconnect() {
         this.removeTrackedListeners(false);
         this.socket.disconnect();
     }
 
     protected async initialize(connectMessage: IConnect, timeout: number) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        this.socket.on("op", this.earlyOpHandler!);
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        this.socket.on("op-content", this.earlyContentHandler!);
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        this.socket.on("signal", this.earlySignalHandler!);
+        this.socket.on("op", this.earlyOpHandler);
+        this.socket.on("op-content", this.earlyContentHandler);
+        this.socket.on("signal", this.earlySignalHandler);
 
         this._details = await new Promise<IConnected>((resolve, reject) => {
             // Listen for connection issues
             this.addConnectionListener("connect_error", (error) => {
                 debug(`Socket connection error: [${error}]`);
-                this.disconnect(true);
+                this.disconnect();
                 reject(createErrorObject("connect_error", error));
             });
 
             // Listen for timeouts
             this.addConnectionListener("connect_timeout", () => {
-                this.disconnect(true);
+                this.disconnect();
                 reject(createErrorObject("connect_timeout", "Socket connection timed out"));
             });
 
             // Socket can be disconnected while waiting for Fluid protocol messages
             // (connect_document_error / connect_document_success)
             this.addConnectionListener("disconnect", (reason) => {
-                this.disconnect(true);
+                this.disconnect();
                 reject(createErrorObject("disconnect", reason));
             });
 
@@ -404,7 +400,7 @@ export class DocumentDeltaConnection
                 this.emit("error", errorObj);
 
                 // Safety net - disconnect socket if client did not do so as result of processing "error" event.
-                this.disconnect(true);
+                this.disconnect();
             }));
 
             this.addConnectionListener("connect_document_error", ((error) => {
@@ -418,7 +414,7 @@ export class DocumentDeltaConnection
                 // This is not an error for the socket - it's a protocol error.
                 // In this case we disconnect the socket and indicate that we were unable to create the
                 // DocumentDeltaConnection.
-                this.disconnect(false);
+                this.disconnect();
                 reject(createErrorObject("connect_document_error", error));
             }));
 
@@ -431,40 +427,31 @@ export class DocumentDeltaConnection
         });
     }
 
-    protected earlyOpHandler?= (documentId: string, msgs: ISequencedDocumentMessage[]) => {
+    protected earlyOpHandler = (documentId: string, msgs: ISequencedDocumentMessage[]) => {
         debug("Queued early ops", msgs.length);
         this.queuedMessages.push(...msgs);
     };
 
-    protected earlyContentHandler?= (msg: IContentMessage) => {
+    protected earlyContentHandler = (msg: IContentMessage) => {
         debug("Queued early contents");
         this.queuedContents.push(msg);
     };
 
-    protected earlySignalHandler?= (msg: ISignalMessage) => {
+    protected earlySignalHandler = (msg: ISignalMessage) => {
         debug("Queued early signals");
         this.queuedSignals.push(msg);
     };
 
     private removeEarlyOpHandler() {
-        if (this.earlyOpHandler) {
-            this.socket.removeListener("op", this.earlyOpHandler);
-            this.earlyOpHandler = undefined;
-        }
+        this.socket.removeListener("op", this.earlyOpHandler);
     }
 
     private removeEarlyContentsHandler() {
-        if (this.earlyContentHandler) {
-            this.socket.removeListener("op-content", this.earlyContentHandler);
-            this.earlyContentHandler = undefined;
-        }
+        this.socket.removeListener("op-content", this.earlyContentHandler);
     }
 
     private removeEarlySignalHandler() {
-        if (this.earlySignalHandler) {
-            this.socket.removeListener("signal", this.earlySignalHandler);
-            this.earlySignalHandler = undefined;
-        }
+        this.socket.removeListener("signal", this.earlySignalHandler);
     }
 
     private addConnectionListener(event: string, listener: (...args: any[]) => void) {
