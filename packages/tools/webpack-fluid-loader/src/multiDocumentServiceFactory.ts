@@ -6,7 +6,7 @@
 import { ILocalDeltaConnectionServer, LocalDeltaConnectionServer } from "@fluidframework/server-local-server";
 import { LocalDocumentServiceFactory, LocalSessionStorageDbFactory } from "@fluidframework/local-driver";
 import { OdspDocumentServiceFactory } from "@fluidframework/odsp-driver";
-import { RouterliciousDocumentServiceFactory, DefaultErrorTracking } from "@fluidframework/routerlicious-driver";
+import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicious-driver";
 import { RouteOptions } from "./loader";
 
 const deltaConns = new Map<string, ILocalDeltaConnectionServer>();
@@ -16,12 +16,7 @@ export function getDocumentServiceFactory(documentId: string, options: RouteOpti
         case "docker":
         case "r11s":
         case "tinylicious":
-            return new RouterliciousDocumentServiceFactory(
-                new DefaultErrorTracking(),
-                false,
-                true,
-                undefined,
-            );
+            return new RouterliciousDocumentServiceFactory();
 
         case "spo":
         case "spo-df":

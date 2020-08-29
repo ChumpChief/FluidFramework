@@ -2,10 +2,7 @@
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Licensed under the MIT License.
  */
-import {
-    DefaultErrorTracking,
-    RouterliciousDocumentServiceFactory,
-} from "@fluidframework/routerlicious-driver";
+import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicious-driver";
 import { IFluidCodeDetails } from "@fluidframework/container-definitions";
 import { BaseHost } from "@fluidframework/base-host";
 import { IRequest } from "@fluidframework/core-interfaces";
@@ -28,12 +25,7 @@ const getTinyliciousResolver =
         { id: "userid0" },
         "bearer");
 
-const getTinyliciousDocumentServiceFactory =
-    () => new RouterliciousDocumentServiceFactory(
-        new DefaultErrorTracking(),
-        false,
-        true,
-        undefined);
+const getTinyliciousDocumentServiceFactory = () => new RouterliciousDocumentServiceFactory();
 
 export async function loadFrame(iframeId: string, logId: string) {
     const iframe = document.getElementById(iframeId) as HTMLIFrameElement;

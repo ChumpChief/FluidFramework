@@ -26,7 +26,7 @@ export class DocumentService implements api.IDocumentService {
         private readonly disableCache: boolean,
         private readonly historianApi: boolean,
         private readonly directCredentials: ICredentials | undefined,
-        private readonly gitCache: IGitCache | null | undefined,
+        private readonly gitCache: IGitCache | undefined,
         private readonly tokenProvider: TokenProvider,
         private readonly tenantId: string,
         private readonly documentId: string,
