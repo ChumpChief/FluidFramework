@@ -242,11 +242,6 @@ export interface IDocumentService {
 
 export interface IDocumentServiceFactory {
     /**
-     * Name of the protocol used by factory
-     */
-    protocolName: string;
-
-    /**
      * Returns an instance of IDocumentService
      */
     createDocumentService(resolvedUrl: IResolvedUrl, logger?: ITelemetryBaseLogger): Promise<IDocumentService>;

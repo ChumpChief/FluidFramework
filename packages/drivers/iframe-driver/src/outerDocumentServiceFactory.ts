@@ -270,8 +270,6 @@ export class IFrameDocumentServiceProxyFactory {
         return new IFrameDocumentServiceProxyFactory(documentServiceFactory, frame, options, urlResolver);
     }
 
-    public readonly protocolName = "fluid-outer:";
-
     constructor(
         private readonly documentServiceFactory: IDocumentServiceFactory,
         private readonly frame: HTMLIFrameElement,

@@ -21,12 +21,9 @@ export class ReplayDocumentServiceFactory implements IDocumentServiceFactory {
         );
     }
 
-    public readonly protocolName;
-
     public constructor(
         private readonly documentServiceFactory: IDocumentServiceFactory,
         private readonly controller: ReplayController) {
-        this.protocolName = documentServiceFactory.protocolName;
     }
 
     /**

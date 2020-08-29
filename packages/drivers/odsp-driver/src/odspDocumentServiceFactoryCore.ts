@@ -34,8 +34,6 @@ import { createNewFluidFile } from "./createFile";
  * to leverage code splitting as a means to keep bundles as small as possible.
  */
 export class OdspDocumentServiceFactoryCore implements IDocumentServiceFactory {
-    public readonly protocolName = "fluid-odsp:";
-
     private readonly nonPersistentCache = new NonPersistentCache();
 
     public async submitContainer(

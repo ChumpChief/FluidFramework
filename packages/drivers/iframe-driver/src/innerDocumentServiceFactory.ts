@@ -58,8 +58,6 @@ export class InnerDocumentServiceFactory implements IDocumentServiceFactory {
         return new InnerDocumentServiceFactory(rtnProxy, url);
     }
 
-    public static readonly protocolName = "fluid:";
-    public readonly protocolName = InnerDocumentServiceFactory.protocolName;
     public readonly urlResolver: IUrlResolver;
     private constructor(
         private readonly outerProxy: Comlink.Remote<IDocumentServiceFactoryProxy>,
