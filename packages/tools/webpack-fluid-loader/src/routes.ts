@@ -8,22 +8,11 @@ import path from "path";
 import express from "express";
 import nconf from "nconf";
 import WebpackDevServer from "webpack-dev-server";
-import { IOdspTokens, getServer } from "@fluidframework/odsp-utils";
-import {
-    getMicrosoftConfiguration,
-    OdspTokenManager,
-    odspTokensCache,
-    OdspTokenConfig,
-} from "@fluidframework/tool-utils";
 import { IFluidPackage } from "@fluidframework/container-definitions";
 import Axios from "axios";
 import { RouteOptions } from "./loader";
 import { createManifestResponse } from "./bohemiaIntercept";
 import { tinyliciousUrls } from "./multiResolver";
-
-const tokenManager = new OdspTokenManager(odspTokensCache);
-let odspAuthStage = 0;
-let odspAuthLock: Promise<void> | undefined;
 
 const getThisOrigin = (options: RouteOptions): string => `http://localhost:${options.port}`;
 
@@ -35,11 +24,6 @@ export const before = async (app: express.Application) => {
 export const after = (app: express.Application, server: WebpackDevServer, baseDir: string, env: RouteOptions) => {
     const options: RouteOptions = { mode: "local", ...env, ...{ port: server.options.port } };
     const config: nconf.Provider = nconf.env("__").file(path.join(baseDir, "config.json"));
-    const buildTokenConfig = (response, redirectUriCallback?): OdspTokenConfig => ({
-        type: "browserLogin",
-        navigator: (url: string) => response.redirect(url),
-        redirectUriCallback,
-    });
 
     // Check that tinylicious is running when it is selected
     switch (options.mode) {
@@ -87,140 +71,17 @@ export const after = (app: express.Application, server: WebpackDevServer, baseDi
         throw new Error("You must provide a tenantId and tenantSecret to connect to a live routerlicious server");
     }
 
-    let readyP: ((req: express.Request, res: express.Response) => Promise<boolean>) | undefined;
-    if (options.mode === "spo-df" || options.mode === "spo") {
-        if (!options.forceReauth && options.odspAccessToken) {
-            odspAuthStage = options.pushAccessToken ? 2 : 1;
-        }
-        readyP = async (req: express.Request, res: express.Response) => {
-            if (req.url === "/favicon.ico") {
-                // ignore these
-                return false;
-            }
-
-            while (odspAuthLock !== undefined) {
-                await odspAuthLock;
-            }
-            let lockResolver: () => void;
-            odspAuthLock = new Promise((resolve) => {
-                lockResolver = () => {
-                    resolve();
-                    odspAuthLock = undefined;
-                };
-            });
-            try {
-                const originalUrl = `${getThisOrigin(options)}${req.url}`;
-                if (odspAuthStage >= 2) {
-                    if (!options.odspAccessToken || !options.pushAccessToken) {
-                        throw Error("Failed to authenticate.");
-                    }
-                    return true;
-                }
-
-                options.server = getServer(options.mode);
-
-                if (odspAuthStage === 0) {
-                    await tokenManager.getOdspTokens(
-                        options.server,
-                        getMicrosoftConfiguration(),
-                        buildTokenConfig(res, async (tokens: IOdspTokens) => {
-                            options.odspAccessToken = tokens.accessToken;
-                            return originalUrl;
-                        }),
-                        true /* forceRefresh */,
-                        options.forceReauth,
-                    );
-                    odspAuthStage = 1;
-                    return false;
-                }
-                await tokenManager.getPushTokens(
-                    options.server,
-                    getMicrosoftConfiguration(),
-                    buildTokenConfig(res, async (tokens: IOdspTokens) => {
-                        options.pushAccessToken = tokens.accessToken;
-                        return originalUrl;
-                    }),
-                    true /* forceRefresh */,
-                    options.forceReauth,
-                );
-                odspAuthStage = 2;
-                return false;
-            } finally {
-                lockResolver();
-            }
-        };
-    }
-
-    app.get("/odspLogin", async (req, res) => {
-        if (options.mode !== "spo-df" && options.mode !== "spo") {
-            res.write("Mode must be spo or spo-df to login to ODSP.");
-            res.end();
-            return;
-        }
-        await tokenManager.getOdspTokens(
-            options.server,
-            getMicrosoftConfiguration(),
-            buildTokenConfig(res, async (tokens: IOdspTokens) => {
-                options.odspAccessToken = tokens.accessToken;
-                return `${getThisOrigin(options)}/pushLogin`;
-            }),
-            undefined /* forceRefresh */,
-            true /* forceReauth */,
-        );
-    });
-
-    app.get("/pushLogin", async (req, res) => {
-        if (options.mode !== "spo-df" && options.mode !== "spo") {
-            res.write("Mode must be spo or spo-df to login to Push.");
-            res.end();
-            return;
-        }
-        options.pushAccessToken = (await tokenManager.getPushTokens(
-            options.server,
-            getMicrosoftConfiguration(),
-            buildTokenConfig(res),
-            undefined /* forceRefresh */,
-            true /* forceReauth */,
-        )).accessToken;
-    });
-
     app.get("/file*", (req, res) => {
         const buffer = fs.readFileSync(req.params[0].substr(1));
         res.end(buffer);
     });
-
-    const isReady = async (req, res) => {
-        if (readyP !== undefined) {
-            let canContinue = false;
-            try {
-                canContinue = await readyP(req, res);
-            } catch (error) {
-                let toLog = error;
-                try {
-                    toLog = JSON.stringify(error);
-                } catch { }
-                console.log(toLog);
-            }
-            if (!canContinue) {
-                if (!res.finished) {
-                    res.end();
-                }
-                return false;
-            }
-        }
-
-        return true;
-    };
 
     /**
      * For urls of format - http://localhost:8080/doc/<id>.
      * This is when user is trying to load an existing document. We try to load a Container with `id` as documentId.
      */
     app.get("/doc/:id*", async (req, res) => {
-        const ready = await isReady(req, res);
-        if (ready) {
-            fluid(req, res, baseDir, options);
-        }
+        fluid(req, res, baseDir, options);
     });
 
     /**
@@ -246,10 +107,7 @@ export const after = (app: express.Application, server: WebpackDevServer, baseDi
             return;
         }
 
-        const ready = await isReady(req, res);
-        if (ready) {
-            fluid(req, res, baseDir, options);
-        }
+        fluid(req, res, baseDir, options);
     });
 };
 

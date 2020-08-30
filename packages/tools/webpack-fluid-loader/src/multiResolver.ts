@@ -11,7 +11,6 @@ import { InsecureUrlResolver } from "@fluidframework/test-runtime-utils";
 import uuid from "uuid/v4";
 import { getRandomName } from "@fluidframework/server-services-client";
 import { RouteOptions, IDevServerUser } from "./loader";
-import { OdspUrlResolver } from "./odspUrlResolver";
 
 export const dockerUrls = {
     hostUrl: "http://localhost:3000",
@@ -56,12 +55,6 @@ function getUrlResolver(options: RouteOptions): IUrlResolver {
                 getUser(),
                 options.bearerSecret);
 
-        case "spo":
-        case "spo-df":
-            return new OdspUrlResolver(
-                options.server,
-                { accessToken: options.odspAccessToken });
-
         default: // Local
             return new LocalResolver();
     }
@@ -101,10 +94,6 @@ export class MultiUrlResolver implements IUrlResolver {
             case "docker":
             case "tinylicious":
                 return (this.urlResolver as InsecureUrlResolver).createCreateNewRequest(fileName);
-
-            case "spo":
-            case "spo-df":
-                return (this.urlResolver as OdspUrlResolver).createCreateNewRequest(fileName);
 
             default: // Local
                 return (this.urlResolver as LocalResolver).createCreateNewRequest(fileName);

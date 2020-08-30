@@ -76,22 +76,6 @@
                     "Base-Definitions"
                 ]
             },
-            "Other-Utils": {
-                "dot": false,
-                "packages": [
-                    "@fluidframework/odsp-utils"
-                ]
-            },
-            "Tool-Utils": {
-                "dot": false,
-                "packages": [
-                    "@fluidframework/tool-utils"
-                ],
-                "deps": [
-                    "Base-Utils",
-                    "Other-Utils"
-                ]
-            },
             "Telemetry-Utils": {
                 "packages": [
                     "@fluidframework/telemetry-utils"
@@ -198,9 +182,7 @@
                 ],
                 "deps": [
                     "Framework",
-                    "Routerlicious-Driver",
-                    "Other-Utils",
-                    "Tool-Utils"
+                    "Routerlicious-Driver"
                 ]
             },
             "Test": {
