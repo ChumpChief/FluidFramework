@@ -3,12 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { ILocalDeltaConnectionServer, LocalDeltaConnectionServer } from "@fluidframework/server-local-server";
-import { LocalDocumentServiceFactory, LocalSessionStorageDbFactory } from "@fluidframework/local-driver";
 import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicious-driver";
 import { RouteOptions } from "./loader";
-
-const deltaConns = new Map<string, ILocalDeltaConnectionServer>();
 
 export function getDocumentServiceFactory(documentId: string, options: RouteOptions) {
     switch (options.mode) {
@@ -17,11 +13,7 @@ export function getDocumentServiceFactory(documentId: string, options: RouteOpti
         case "tinylicious":
             return new RouterliciousDocumentServiceFactory();
 
-        default: { // Local
-            const deltaConn = deltaConns.get(documentId) ??
-                LocalDeltaConnectionServer.create(new LocalSessionStorageDbFactory(documentId));
-            deltaConns.set(documentId, deltaConn);
-            return new LocalDocumentServiceFactory(deltaConn);
-        }
+        default:
+            throw new Error("Only supporting Routerlicious");
     }
 }
