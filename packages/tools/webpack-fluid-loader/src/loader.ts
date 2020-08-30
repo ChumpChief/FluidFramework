@@ -36,11 +36,6 @@ export interface IBaseRouteOptions {
     npm?: string;
 }
 
-export interface ILocalRouteOptions extends IBaseRouteOptions {
-    mode: "local";
-    single?: boolean;
-}
-
 export interface IDockerRouteOptions extends IBaseRouteOptions {
     mode: "docker";
     tenantId?: string;
@@ -61,21 +56,10 @@ export interface ITinyliciousRouteOptions extends IBaseRouteOptions {
     bearerSecret?: string;
 }
 
-export interface IOdspRouteOptions extends IBaseRouteOptions {
-    mode: "spo" | "spo-df";
-    server?: string;
-    odspAccessToken?: string;
-    pushAccessToken?: string;
-    forceReauth?: boolean;
-    driveId?: string;
-}
-
 export type RouteOptions =
-    | ILocalRouteOptions
     | IDockerRouteOptions
     | IRouterliciousRouteOptions
-    | ITinyliciousRouteOptions
-    | IOdspRouteOptions;
+    | ITinyliciousRouteOptions;
 
 function wrapWithRuntimeFactoryIfNeeded(packageJson: IFluidPackage, fluidModule: IFluidModule): IFluidModule {
     if (fluidModule.fluidExport.IRuntimeFactory === undefined) {
@@ -95,18 +79,6 @@ function wrapWithRuntimeFactoryIfNeeded(packageJson: IFluidPackage, fluidModule:
         };
     }
     return fluidModule;
-}
-
-// Invoked by `start()` when the 'double' option is enabled to create the side-by-side panes.
-function makeSideBySideDiv(divId: string) {
-    const div = document.createElement("div");
-    div.style.flexGrow = "1";
-    div.style.width = "50%"; // ensure the divs don't encroach on each other
-    div.style.border = "1px solid lightgray";
-    div.style.boxSizing = "border-box";
-    div.style.position = "relative"; // Make the new <div> a CSS containing block.
-    div.id = divId;
-    return div;
 }
 
 class WebpackCodeResolver implements IFluidCodeResolver {
@@ -219,46 +191,19 @@ export async function start(
         }
     }
 
-    let leftDiv: HTMLDivElement = div;
-    let rightDiv: HTMLDivElement;
-
-    // For side by side mode, create two divs.
-    if (options.mode === "local" && !options.single) {
-        div.style.display = "flex";
-        leftDiv = makeSideBySideDiv("sbs-left");
-        rightDiv = makeSideBySideDiv("sbs-right");
-        div.append(leftDiv, rightDiv);
-    }
-
     const reqParser = new RequestParser({ url });
     const fluidObjectUrl = `/${reqParser.createSubRequest(4).url}`;
 
     // Load and render the fluid object.
-    await getFluidObjectAndRender(container1, fluidObjectUrl, leftDiv);
+    await getFluidObjectAndRender(container1, fluidObjectUrl, div);
     // Handle the code upgrade scenario (which fires contextChanged)
     container1.on("contextChanged", () => {
-        getFluidObjectAndRender(container1, fluidObjectUrl, leftDiv).catch(() => { });
+        getFluidObjectAndRender(container1, fluidObjectUrl, div).catch(() => { });
     });
 
     // We have rendered the fluid object. If the container is detached, attach it now.
     if (container1.attachState === AttachState.Detached) {
-        await attachContainer(container1, urlResolver, documentId, url, rightDiv, manualAttach);
-    }
-
-    // For side by side mode, we need to create a second container and fluid object.
-    if (rightDiv) {
-        // Create a new loader that is used to load the second container.
-        const loader2 = await createWebLoader(documentId, fluidModule, options, urlResolver, codeDetails);
-
-        // Create a new request url from the resolvedUrl of the first container.
-        const requestUrl2 = await urlResolver.getAbsoluteUrl(container1.resolvedUrl, "");
-        const container2 = await loader2.resolve({ url: requestUrl2 });
-
-        await getFluidObjectAndRender(container2, fluidObjectUrl, rightDiv);
-        // Handle the code upgrade scenario (which fires contextChanged)
-        container2.on("contextChanged", () => {
-            getFluidObjectAndRender(container2, fluidObjectUrl, rightDiv).catch(() => { });
-        });
+        await attachContainer(container1, urlResolver, documentId, url, manualAttach);
     }
 }
 
@@ -309,7 +254,6 @@ async function attachContainer(
     urlResolver: MultiUrlResolver,
     documentId: string,
     url: string,
-    div: HTMLDivElement | undefined,
     manualAttach: boolean,
 ) {
     // This is called once loading is complete to replace the url in the address bar with the new `url`.
@@ -335,20 +279,11 @@ async function attachContainer(
                     attachDiv.remove();
                     replaceUrl();
 
-                    if (div) {
-                        div.innerText = "";
-                    }
-
                     attached.resolve();
                 }, (error) => {
                     console.error(error);
                 });
         };
-
-        // If we are in side-by-side mode, we need to display the following message in the right div passed here.
-        if (div) {
-            div.innerText = "Waiting for container attach";
-        }
     } else {
         await container.attach(attachUrl);
         replaceUrl();
