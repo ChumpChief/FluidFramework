@@ -77,7 +77,6 @@
     "@fluidframework/matrix": "^0.25.1",
     "@fluidframework/merge-tree": "^0.25.1",
     "@fluidframework/mocha-test-setup": "^0.25.1",
-    "@fluidframework/odsp-driver": "^0.25.1",
     "@fluidframework/ordered-collection": "^0.25.1",
     "@fluidframework/protocol-definitions": "^0.1011.1-0",
     "@fluidframework/register-collection": "^0.25.1",

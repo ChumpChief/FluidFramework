@@ -5,7 +5,6 @@
 
 import { ILocalDeltaConnectionServer, LocalDeltaConnectionServer } from "@fluidframework/server-local-server";
 import { LocalDocumentServiceFactory, LocalSessionStorageDbFactory } from "@fluidframework/local-driver";
-import { OdspDocumentServiceFactory } from "@fluidframework/odsp-driver";
 import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicious-driver";
 import { RouteOptions } from "./loader";
 
@@ -17,14 +16,6 @@ export function getDocumentServiceFactory(documentId: string, options: RouteOpti
         case "r11s":
         case "tinylicious":
             return new RouterliciousDocumentServiceFactory();
-
-        case "spo":
-        case "spo-df":
-            // TODO: web socket token
-            return new OdspDocumentServiceFactory(
-                async () => options.mode === "spo" || options.mode === "spo-df" ? options.odspAccessToken : undefined,
-                async () => options.mode === "spo" || options.mode === "spo-df" ? options.pushAccessToken : undefined,
-            );
 
         default: { // Local
             const deltaConn = deltaConns.get(documentId) ??
