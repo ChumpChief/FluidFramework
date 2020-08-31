@@ -7,7 +7,6 @@ import { IEventProvider, IEvent, IErrorEvent } from "@fluidframework/common-defi
 import {
     ConnectionMode,
     IClientDetails,
-    IContentMessage,
     IDocumentMessage,
     IProcessMessageResult,
     ISequencedDocumentMessage,
@@ -26,7 +25,6 @@ export interface IConnectionDetails {
     version: string;
     initialClients: ISignalClient[];
     initialMessages: ISequencedDocumentMessage[];
-    initialContents: IContentMessage[];
     initialSignals: ISignalMessage[];
     maxMessageSize: number;
     serviceConfiguration: IServiceConfiguration;

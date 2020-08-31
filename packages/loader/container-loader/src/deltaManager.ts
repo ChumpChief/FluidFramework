@@ -23,7 +23,6 @@ import {
     ConnectionMode,
     IClient,
     IClientDetails,
-    IContentMessage,
     IDocumentMessage,
     IDocumentSystemMessage,
     INack,
@@ -39,7 +38,6 @@ import {
     createGenericNetworkError,
 } from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
-import { ContentCache } from "./contentCache";
 import { debug } from "./debug";
 import { DeltaConnection } from "./deltaConnection";
 import { DeltaQueue } from "./deltaQueue";
@@ -54,8 +52,6 @@ const DefaultChunkSize = 16 * 1024;
 
 // This can be anything other than null
 const ImmediateNoOpResponse = "";
-
-const DefaultContentBufferSize = 10;
 
 // Test if we deal with NetworkError object and if it has enough information to make a call.
 // If in doubt, allow retries.
@@ -152,8 +148,6 @@ export class DeltaManager
 
     private handler: IDeltaHandlerStrategy | undefined;
     private deltaStorageP: Promise<IDocumentDeltaStorageService> | undefined;
-
-    private readonly contentCache = new ContentCache(DefaultContentBufferSize);
 
     private messageBuffer: IDocumentMessage[] = [];
 
@@ -701,10 +695,6 @@ export class DeltaManager
             }
         });
 
-        connection.on("op-content", (message: IContentMessage) => {
-            this.contentCache.set(message);
-        });
-
         connection.on("signal", (message: ISignalMessage) => {
             this._inboundSignal.push(message);
         });
@@ -781,7 +771,6 @@ export class DeltaManager
 
         this.processInitialMessages(
             initialMessages,
-            connection.details.initialContents ?? [],
             connection.details.initialSignals ?? [],
         );
 
@@ -854,12 +843,8 @@ export class DeltaManager
 
     private processInitialMessages(
         messages: ISequencedDocumentMessage[],
-        contents: IContentMessage[],
         signals: ISignalMessage[],
     ): void {
-        for (const content of contents) {
-            this.contentCache.set(content);
-        }
         if (messages.length > 0) {
             this.catchUp(messages);
         }

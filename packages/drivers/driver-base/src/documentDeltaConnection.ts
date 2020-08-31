@@ -12,7 +12,6 @@ import {
     IClient,
     IConnect,
     IConnected,
-    IContentMessage,
     IDocumentMessage,
     ISequencedDocumentMessage,
     IServiceConfiguration,
@@ -112,7 +111,6 @@ export class DocumentDeltaConnection
 
     // Listen for ops sent before we receive a response to connect_document
     protected readonly queuedMessages: ISequencedDocumentMessage[] = [];
-    private readonly queuedContents: IContentMessage[] = [];
     protected readonly queuedSignals: ISignalMessage[] = [];
 
     private readonly submitManager: BatchManager<IDocumentMessage[]>;
@@ -243,28 +241,6 @@ export class DocumentDeltaConnection
     }
 
     /**
-     * Get contents sent during the connection
-     *
-     * @returns contents sent during the connection
-     */
-    public get initialContents(): IContentMessage[] {
-        this.removeEarlyContentsHandler();
-
-        assert(this.listeners("op-content").length !== 0, "No op-content handler is setup!");
-
-        if (this.queuedContents.length > 0) {
-            this.details.initialContents.push(...this.queuedContents);
-
-            this.details.initialContents.sort((a, b) =>
-                (a.clientId === b.clientId) ? 0 : ((a.clientId < b.clientId) ? -1 : 1) ||
-                    a.clientSequenceNumber - b.clientSequenceNumber);
-            this.queuedContents.length = 0;
-        }
-
-        return this.details.initialContents;
-    }
-
-    /**
      * Get signals sent during the connection
      *
      * @returns signals sent during the connection
@@ -302,27 +278,6 @@ export class DocumentDeltaConnection
     }
 
     /**
-     * Submits a new message to the server without queueing
-     *
-     * @param message - message to submit
-     */
-    public async submitAsync(messages: IDocumentMessage[]): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            this.socket.emit(
-                "submitContent",
-                this.clientId,
-                messages,
-                (error) => {
-                    if (error) {
-                        reject();
-                    } else {
-                        resolve();
-                    }
-                });
-        });
-    }
-
-    /**
      * Submits a new signal to the server
      *
      * @param message - signal to submit
@@ -341,7 +296,6 @@ export class DocumentDeltaConnection
 
     protected async initialize(connectMessage: IConnect, timeout: number) {
         this.socket.on("op", this.earlyOpHandler);
-        this.socket.on("op-content", this.earlyContentHandler);
         this.socket.on("signal", this.earlySignalHandler);
 
         this._details = await new Promise<IConnected>((resolve, reject) => {
@@ -423,11 +377,6 @@ export class DocumentDeltaConnection
         this.queuedMessages.push(...msgs);
     };
 
-    protected earlyContentHandler = (msg: IContentMessage) => {
-        debug("Queued early contents");
-        this.queuedContents.push(msg);
-    };
-
     protected earlySignalHandler = (msg: ISignalMessage) => {
         debug("Queued early signals");
         this.queuedSignals.push(msg);
@@ -435,10 +384,6 @@ export class DocumentDeltaConnection
 
     private removeEarlyOpHandler() {
         this.socket.removeListener("op", this.earlyOpHandler);
-    }
-
-    private removeEarlyContentsHandler() {
-        this.socket.removeListener("op-content", this.earlyContentHandler);
     }
 
     private removeEarlySignalHandler() {
@@ -468,7 +413,6 @@ export class DocumentDeltaConnection
 
         if (!connectionListenerOnly) {
             this.removeEarlyOpHandler();
-            this.removeEarlyContentsHandler();
             this.removeEarlySignalHandler();
         }
     }
