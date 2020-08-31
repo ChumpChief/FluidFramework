@@ -4,6 +4,7 @@
  */
 
 import assert from "assert";
+import { Buffer } from "buffer";
 import { gitHashFile } from "@fluidframework/common-utils";
 import { IDocumentStorageService, ISummaryContext } from "@fluidframework/driver-definitions";
 import * as resources from "@fluidframework/gitresources";
