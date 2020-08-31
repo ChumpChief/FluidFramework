@@ -4,5 +4,3 @@
  */
 
 export const TableDocumentType = "@fluid-example/table-document/TableDocument";
-
-export const TableSliceType = "@fluid-example/table-document/TableSlice";

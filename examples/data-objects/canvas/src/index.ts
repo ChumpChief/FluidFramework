@@ -20,7 +20,6 @@ export const CanvasInstantiationFactory = new DataObjectFactory(
     [
         Ink.getFactory(),
     ],
-    {},
 );
 
 export const fluidExport = new ContainerRuntimeFactoryWithDefaultDataStore(

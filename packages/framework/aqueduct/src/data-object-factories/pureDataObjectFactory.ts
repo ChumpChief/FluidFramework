@@ -15,10 +15,6 @@ import {
     NamedFluidDataStoreRegistryEntry,
 } from "@fluidframework/runtime-definitions";
 import { IChannelFactory } from "@fluidframework/datastore-definitions";
-import {
-    FluidObjectSymbolProvider,
-    DependencyContainer,
-} from "@fluidframework/synthesize";
 import { requestFluidObject } from "@fluidframework/runtime-utils";
 
 import {
@@ -35,7 +31,7 @@ import {
  * P - represents a type that will define optional providers that will be injected
  * S - the initial state type that the produced data store may take during creation
  */
-export class PureDataObjectFactory<P extends IFluidObject, S = undefined> implements
+export class PureDataObjectFactory<P extends IFluidObject> implements
     IFluidDataStoreFactory,
     Partial<IProvideFluidDataStoreRegistry>
 {
@@ -44,9 +40,8 @@ export class PureDataObjectFactory<P extends IFluidObject, S = undefined> implem
 
     constructor(
         public readonly type: string,
-        private readonly ctor: new (props: IDataObjectProps<P>) => PureDataObject<P, S>,
+        private readonly ctor: new (props: IDataObjectProps<P>) => PureDataObject<P>,
         sharedObjects: readonly IChannelFactory[],
-        private readonly optionalProviders: FluidObjectSymbolProvider<P>,
         registryEntries?: NamedFluidDataStoreRegistryEntries,
         private readonly onDemandInstantiation = true,
     ) {
@@ -78,7 +73,7 @@ export class PureDataObjectFactory<P extends IFluidObject, S = undefined> implem
      * @param context - data store context used to load a data store runtime
      */
     public instantiateDataStore(context: IFluidDataStoreContext): void {
-        this.instantiateDataStoreWithInitialState(context, undefined);
+        this.instantiateDataStoreWithInitialState(context);
     }
 
     /**
@@ -86,9 +81,7 @@ export class PureDataObjectFactory<P extends IFluidObject, S = undefined> implem
      * @param context - data store context used to load a data store runtime
      * @param initialState  - The initial state to provide the created data store
      */
-    private instantiateDataStoreWithInitialState(
-        context: IFluidDataStoreContext,
-        initialState?: S): void {
+    private instantiateDataStoreWithInitialState(context: IFluidDataStoreContext): void {
         // Create a new runtime for our data store
         // The runtime is what Fluid uses to create DDS' and route to your data store
         const runtime = FluidDataStoreRuntime.load(
@@ -102,14 +95,14 @@ export class PureDataObjectFactory<P extends IFluidObject, S = undefined> implem
         // run the initialization.
         if (!this.onDemandInstantiation || !runtime.existing) {
             // Create a new instance of our data store up front
-            instanceP = this.instantiateInstance(runtime, context, initialState);
+            instanceP = this.instantiateInstance(runtime, context);
         }
 
         runtime.registerRequestHandler(async (request: IRequest) => {
             // eslint-disable-next-line @typescript-eslint/no-misused-promises
             if (!instanceP) {
                 // Create a new instance of our data store on demand
-                instanceP = this.instantiateInstance(runtime, context, initialState);
+                instanceP = this.instantiateInstance(runtime, context);
             }
             const instance = await instanceP;
             return instance.request(request);
@@ -124,13 +117,10 @@ export class PureDataObjectFactory<P extends IFluidObject, S = undefined> implem
     private async instantiateInstance(
         runtime: FluidDataStoreRuntime,
         context: IFluidDataStoreContext,
-        initialState?: S,
     ) {
-        const dependencyContainer = new DependencyContainer(context.scope.IFluidDependencySynthesizer);
-        const providers = dependencyContainer.synthesize<P>(this.optionalProviders, {});
         // Create a new instance of our data store
-        const instance = new this.ctor({ runtime, context, providers });
-        await instance.initialize(initialState);
+        const instance = new this.ctor({ runtime, context });
+        await instance.initialize();
         return instance;
     }
 
@@ -143,10 +133,7 @@ export class PureDataObjectFactory<P extends IFluidObject, S = undefined> implem
      * @returns A promise for a data store that will have been initialized. Caller is responsible
      * for attaching the data store to the provided runtime's container such as by storing its handle
      */
-    public async createInstance(
-        context: IFluidDataStoreContext,
-        initialState?: S,
-    ): Promise<IFluidObject & IFluidLoadable> {
+    public async createInstance(context: IFluidDataStoreContext): Promise<IFluidObject & IFluidLoadable> {
         if (this.type === "") {
             throw new Error("undefined type member");
         }
@@ -155,9 +142,9 @@ export class PureDataObjectFactory<P extends IFluidObject, S = undefined> implem
 
         const router = await context.containerRuntime.createDataStoreWithRealizationFn(
             packagePath,
-            (newContext) => { this.instantiateDataStoreWithInitialState(newContext, initialState); },
+            (newContext) => { this.instantiateDataStoreWithInitialState(newContext); },
         );
 
-        return requestFluidObject<PureDataObject<P, S>>(router, "/");
+        return requestFluidObject<PureDataObject<P>>(router, "/");
     }
 }

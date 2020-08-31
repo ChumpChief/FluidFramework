@@ -19,5 +19,4 @@ export const BadgeInstantiationFactory = new DataObjectFactory(
         SharedCell.getFactory(),
         SharedObjectSequence.getFactory(),
     ],
-    {},
 );

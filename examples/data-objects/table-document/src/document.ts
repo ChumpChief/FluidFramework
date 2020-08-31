@@ -5,10 +5,9 @@
 
 import { DataObject, DataObjectFactory } from "@fluidframework/aqueduct";
 import { IFluidHandle } from "@fluidframework/core-interfaces";
-import { ICombiningOp, IntervalType, LocalReference, PropertySet } from "@fluidframework/merge-tree";
+import { ICombiningOp, LocalReference, PropertySet } from "@fluidframework/merge-tree";
 import {
     positionToRowCol,
-    rowColToPosition,
     SharedNumberSequence,
     SparseMatrix,
     SequenceDeltaEvent,
@@ -18,8 +17,6 @@ import { IEvent } from "@fluidframework/common-definitions";
 import { CellRange } from "./cellrange";
 import { TableDocumentType } from "./componentTypes";
 import { ConfigKey } from "./configKey";
-import { debug } from "./debug";
-import { TableSlice } from "./slice";
 import { ITable, TableDocumentItem } from "./table";
 
 export interface ITableDocumentEvents extends IEvent {
@@ -39,10 +36,7 @@ export class TableDocument extends DataObject<{}, {}, ITableDocumentEvents> impl
             SparseMatrix.getFactory(),
             SharedNumberSequence.getFactory(),
         ],
-        {},
-        [
-            TableSlice.getFactory().registryEntry,
-        ],
+        [],
         true,
     );
 
@@ -69,21 +63,6 @@ export class TableDocument extends DataObject<{}, {}, ITableDocumentEvents> impl
         return new CellRange(interval, this.localRefToRowCol);
     }
 
-    public async createSlice(
-        sliceId: string,
-        name: string,
-        minRow: number,
-        minCol: number,
-        maxRow: number,
-        maxCol: number): Promise<ITable> {
-        const component = await TableSlice.getFactory().createInstance(
-            this.context,
-            { docId: this.runtime.id, name, minRow, minCol, maxRow, maxCol },
-        ) as TableSlice;
-        this.root.set(sliceId, component.handle);
-        return component;
-    }
-
     public annotateRows(startRow: number, endRow: number, properties: PropertySet, op?: ICombiningOp) {
         this.maybeRows.annotateRange(startRow, endRow, properties, op);
     }
@@ -106,15 +85,6 @@ export class TableDocument extends DataObject<{}, {}, ITableDocumentEvents> impl
 
     public getCellProperties(row: number, col: number): PropertySet {
         return this.matrix.getPositionProperties(row, col);
-    }
-
-    // For internal use by TableSlice: Please do not use.
-    public createInterval(label: string, minRow: number, minCol: number, maxRow: number, maxCol: number) {
-        debug(`createInterval(${label}, ${minRow}:${minCol}..${maxRow}:${maxCol})`);
-        const start = rowColToPosition(minRow, minCol);
-        const end = rowColToPosition(maxRow, maxCol);
-        const intervals = this.matrix.getIntervalCollection(label);
-        intervals.add(start, end, IntervalType.SlideOnRemove);
     }
 
     public insertRows(startRow: number, numRows: number) {

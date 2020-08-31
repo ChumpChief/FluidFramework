@@ -31,7 +31,6 @@ export class Constellation extends DataObject implements IConstellation {
         Constellation.ComponentName,
         Constellation,
         [],
-        {},
         new Map([
             Coordinate.getFactory().registryEntry,
         ]),

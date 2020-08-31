@@ -12,7 +12,6 @@ import {
     IRequest,
     IResponse,
 } from "@fluidframework/core-interfaces";
-import { AsyncFluidObjectProvider, FluidObjectKey } from "@fluidframework/synthesize";
 import { IFluidDataStoreContext } from "@fluidframework/runtime-definitions";
 import { IFluidDataStoreRuntime } from "@fluidframework/datastore-definitions";
 import { FluidObjectHandle } from "@fluidframework/datastore";
@@ -26,7 +25,6 @@ import { serviceRoutePathRoot } from "../container-services";
 export interface IDataObjectProps<P extends IFluidObject = object> {
     readonly runtime: IFluidDataStoreRuntime,
     readonly context: IFluidDataStoreContext,
-    readonly providers: AsyncFluidObjectProvider<FluidObjectKey<P>, FluidObjectKey<object>>,
 }
 
 /**
@@ -56,15 +54,6 @@ export abstract class PureDataObject<P extends IFluidObject = object, S = undefi
      */
     protected readonly context: IFluidDataStoreContext;
 
-    /**
-     * Providers are IFluidObject keyed objects that provide back
-     * a promise to the corresponding IFluidObject or undefined.
-     * Providers injected/provided by the Container and/or HostingApplication
-     *
-     * To define providers set IFluidObject interfaces in the generic O type for your data store
-     */
-    protected readonly providers: AsyncFluidObjectProvider<FluidObjectKey<P>, FluidObjectKey<object>>;
-
     public get disposed() { return this._disposed; }
 
     public get id() { return this.runtime.id; }
@@ -81,7 +70,6 @@ export abstract class PureDataObject<P extends IFluidObject = object, S = undefi
         super();
         this.runtime = props.runtime;
         this.context = props.context;
-        this.providers = props.providers;
 
         // Create a FluidObjectHandle with empty string as `path`. This is because reaching this PureDataObject is the
         // same as reaching its routeContext (FluidDataStoreRuntime) so there is so the relative path to it from the

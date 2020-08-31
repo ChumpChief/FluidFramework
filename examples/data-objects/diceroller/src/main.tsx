@@ -118,6 +118,4 @@ export class DiceRoller extends DataObject implements IDiceRoller, IFluidHTMLVie
 export const DiceRollerInstantiationFactory = new DataObjectFactory(
     DiceRoller.ComponentName,
     DiceRoller,
-    [],
-    {},
 );

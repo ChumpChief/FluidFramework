@@ -4,7 +4,6 @@
  */
 
 export { TableDocument } from "./document";
-export { TableSlice } from "./slice";
 export { ITable } from "./table";
 export * from "./componentTypes";
 export { parseRange, colIndexToName } from "./cellrange";

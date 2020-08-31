@@ -7,7 +7,6 @@ import assert from "assert";
 import { PropertySet } from "@fluidframework/merge-tree";
 import { IFluidDataStoreContext } from "@fluidframework/runtime-definitions";
 import { ITable, TableDocumentItem } from "../table";
-import { TableDocument } from "../document";
 
 /**
  * - Create a new object from the passed ITable object.
@@ -16,8 +15,6 @@ import { TableDocument } from "../document";
  * - Use these new properties to call the underlying TableDocument.
  * - The propertyInterceptionCallback and the call to the underlying TableDocument are wrapped around an
  *   orderSequentially call to batch any operations that might happen in the callback.
- * - Modify the createSlice method for TableDocument object to return a wrapped object by calling
- *   createTableWithInterception on the created TableSlice object.
  *
  * @param table - The underlying ITable object
  * @param context - The IFluidDataStoreContext that will be used to call orderSequentially
@@ -73,20 +70,6 @@ export function createTableWithInterception<T extends ITable>(
             }
         });
     };
-
-    // Override createSlice only for TableDocument because other objects (TableSlice) does not have this method.
-    if (table instanceof TableDocument) {
-        tableWithInterception.createSlice = async (
-            sliceId: string,
-            name: string,
-            minRow: number,
-            minCol: number,
-            maxRow: number,
-            maxCol: number): Promise<ITable> => {
-            const tableSlice = await table.createSlice(sliceId, name, minRow, minCol, maxRow, maxCol);
-            return createTableWithInterception(tableSlice, context, propertyInterceptionCallback);
-        };
-    }
 
     return tableWithInterception as T;
 }

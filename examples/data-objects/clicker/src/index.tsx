@@ -120,7 +120,6 @@ export const ClickerInstantiationFactory = new DataObjectFactory(
     ClickerName,
     Clicker,
     [SharedCounter.getFactory()],
-    {},
 );
 
 export const fluidExport = ClickerInstantiationFactory;
