@@ -93,20 +93,11 @@ export class DocumentDeltaConnection
             versions: protocolVersions,
         };
 
-        const deltaConnection = new DocumentDeltaConnection(socket, id);
+        const deltaConnection = new DocumentDeltaConnection(socket);
 
         await deltaConnection.initialize(connectMessage, timeoutMs);
         return deltaConnection;
     }
-
-    /**
-     * Last known sequence number to ordering service at the time of connection
-     * It may lap actual last sequence number (quite a bit, if container  is very active).
-     * But it's best information for client to figure out how far it is behind, at least
-     * for "read" connections. "write" connections may use own "join" op to similar information,
-     * that is likely to be more up-to-date.
-     */
-    public checkpointSequenceNumber: number | undefined;
 
     // Listen for ops sent before we receive a response to connect_document
     private readonly queuedMessages: ISequencedDocumentMessage[] = [];
@@ -130,9 +121,7 @@ export class DocumentDeltaConnection
      * @param documentId - ID of the document
      * @param details - details of the websocket connection
      */
-    private constructor(
-        private readonly socket: SocketIOClient.Socket,
-        public documentId: string) {
+    private constructor(private readonly socket: SocketIOClient.Socket) {
         super();
 
         this.submitManager = new BatchManager<IDocumentMessage[]>(
@@ -319,9 +308,6 @@ export class DocumentDeltaConnection
                     response.nonce !== connectMessage.nonce) {
                     return;
                 }
-
-                // TODO: Get latest server bits
-                this.checkpointSequenceNumber = (response as any).checkpointSequenceNumber;
 
                 this.removeTrackedListeners(true);
                 resolve(response);
