@@ -62,7 +62,6 @@ export class DocumentDeltaConnection
      * @param client - information about the client
      * @param mode - connection mode
      * @param url - websocket URL
-     * @param timeoutMs - timeout for socket connection attempt in milliseconds (default: 20000)
      */
     public static async create(
         tenantId: string,
@@ -110,18 +109,14 @@ export class DocumentDeltaConnection
     public checkpointSequenceNumber: number | undefined;
 
     // Listen for ops sent before we receive a response to connect_document
-    protected readonly queuedMessages: ISequencedDocumentMessage[] = [];
-    protected readonly queuedSignals: ISignalMessage[] = [];
+    private readonly queuedMessages: ISequencedDocumentMessage[] = [];
+    private readonly queuedSignals: ISignalMessage[] = [];
 
     private readonly submitManager: BatchManager<IDocumentMessage[]>;
 
     private _details: IConnected | undefined;
 
     private trackedListeners: IEventListener[] = [];
-
-    protected get hasDetails(): boolean {
-        return !!this._details;
-    }
 
     private get details(): IConnected {
         if (!this._details) {
@@ -135,8 +130,8 @@ export class DocumentDeltaConnection
      * @param documentId - ID of the document
      * @param details - details of the websocket connection
      */
-    protected constructor(
-        protected readonly socket: SocketIOClient.Socket,
+    private constructor(
+        private readonly socket: SocketIOClient.Socket,
         public documentId: string) {
         super();
 
@@ -223,8 +218,6 @@ export class DocumentDeltaConnection
      * @returns messages sent during the connection
      */
     public get initialMessages(): ISequencedDocumentMessage[] {
-        // Can't really calling initialMessages() twice - we do not keep ops after first call!
-        assert(this.earlyOpHandler !== undefined, "initialMessages called twice");
         // We will lose ops and perf will tank as we need to go to storage to become current!
         assert(this.listeners("op").length !== 0, "No op handler is setup!");
 
@@ -294,7 +287,7 @@ export class DocumentDeltaConnection
         this.socket.disconnect();
     }
 
-    protected async initialize(connectMessage: IConnect, timeout: number) {
+    private async initialize(connectMessage: IConnect, timeout: number) {
         this.socket.on("op", this.earlyOpHandler);
         this.socket.on("signal", this.earlySignalHandler);
 
@@ -372,12 +365,12 @@ export class DocumentDeltaConnection
         });
     }
 
-    protected earlyOpHandler = (documentId: string, msgs: ISequencedDocumentMessage[]) => {
+    private readonly earlyOpHandler = (documentId: string, msgs: ISequencedDocumentMessage[]) => {
         debug("Queued early ops", msgs.length);
         this.queuedMessages.push(...msgs);
     };
 
-    protected earlySignalHandler = (msg: ISignalMessage) => {
+    private readonly earlySignalHandler = (msg: ISignalMessage) => {
         debug("Queued early signals");
         this.queuedSignals.push(msg);
     };
@@ -395,7 +388,7 @@ export class DocumentDeltaConnection
         this.trackedListeners.push({ event, connectionListener: true, listener });
     }
 
-    protected addTrackedListener(event: string, listener: (...args: any[]) => void) {
+    private addTrackedListener(event: string, listener: (...args: any[]) => void) {
         this.socket.on(event, listener);
         this.trackedListeners.push({ event, connectionListener: false, listener });
     }

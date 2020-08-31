@@ -3,13 +3,13 @@
  * Licensed under the MIT License.
  */
 
+import { DocumentDeltaConnection } from "@fluidframework/driver-base";
 import * as api from "@fluidframework/driver-definitions";
 import { IClient, IErrorTrackingService } from "@fluidframework/protocol-definitions";
 import { GitManager, Historian, ICredentials, IGitCache } from "@fluidframework/server-services-client";
 import io from "socket.io-client";
 import { DeltaStorageService, DocumentDeltaStorageService } from "./deltaStorageService";
 import { DocumentStorageService } from "./documentStorageService";
-import { R11sDocumentDeltaConnection } from "./documentDeltaConnection";
 import { NullBlobStorageService } from "./nullBlobStorageService";
 import { TokenProvider } from "./tokens";
 
@@ -100,7 +100,7 @@ export class DocumentService implements api.IDocumentService {
      * @returns returns the document delta stream service for routerlicious driver.
      */
     public async connectToDeltaStream(client: IClient): Promise<api.IDocumentDeltaConnection> {
-        return R11sDocumentDeltaConnection.create(
+        return DocumentDeltaConnection.create(
             this.tenantId,
             this.documentId,
             this.tokenProvider.token,
