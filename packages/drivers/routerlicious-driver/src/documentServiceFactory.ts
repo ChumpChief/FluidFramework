@@ -12,7 +12,6 @@ import {
 } from "@fluidframework/driver-definitions";
 import { ITelemetryBaseLogger } from "@fluidframework/common-definitions";
 import { IErrorTrackingService, ISummaryTree } from "@fluidframework/protocol-definitions";
-import { ICredentials, IGitCache } from "@fluidframework/server-services-client";
 import {
     ensureFluidResolvedUrl,
     getDocAttributesFromProtocolSummary,
@@ -28,19 +27,11 @@ import { TokenProvider } from "./tokens";
  * use the routerlicious implementation.
  */
 export class RouterliciousDocumentServiceFactory implements IDocumentServiceFactory {
-    constructor(
-        private readonly errorTracking: IErrorTrackingService = new DefaultErrorTracking(),
-        private readonly disableCache: boolean = false,
-        private readonly historianApi: boolean = true,
-        private readonly gitCache: IGitCache | undefined = undefined,
-        private readonly credentials?: ICredentials,
-    ) {
-    }
+    private readonly errorTracking: IErrorTrackingService = new DefaultErrorTracking();
 
     public async submitContainer(
         createNewSummary: ISummaryTree,
         resolvedUrl: IResolvedUrl,
-        logger?: ITelemetryBaseLogger,
     ): Promise<void> {
         ensureFluidResolvedUrl(resolvedUrl);
         assert(resolvedUrl.endpoints.ordererUrl);
@@ -106,10 +97,10 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
             deltaStorageUrl,
             storageUrl,
             this.errorTracking,
-            this.disableCache,
-            this.historianApi,
-            this.credentials,
-            this.gitCache,
+            false, // disableCache
+            true, // historianApi
+            undefined, // credentials
+            undefined, // gitCache
             tokenProvider,
             tenantId,
             documentId,

@@ -377,7 +377,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 await this.serviceFactory.submitContainer(
                     this.cachedAttachSummary,
                     createNewResolvedUrl,
-                    undefined,
                 );
                 this.service = await this.serviceFactory.createDocumentService(createNewResolvedUrl);
             }

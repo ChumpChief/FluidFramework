@@ -250,7 +250,6 @@ export interface IDocumentServiceFactory {
     submitContainer(
         createNewSummary: ISummaryTree,
         createNewResolvedUrl: IResolvedUrl,
-        logger?: ITelemetryBaseLogger,
     ): Promise<void>;
 }
 
