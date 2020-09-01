@@ -32,7 +32,7 @@ export class DocumentStorageService implements IDocumentStorageService {
     constructor(public readonly id: string, public manager: gitStorage.GitManager) {
     }
 
-    public async getSnapshotTree(version?: IVersion): Promise<ISnapshotTree | null> {
+    public async getSnapshotTree(version: IVersion): Promise<ISnapshotTree | null> {
         let requestVersion = version;
         if (!requestVersion) {
             const versions = await this.getVersions(this.id, 1);

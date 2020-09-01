@@ -14,7 +14,7 @@ export class PrefetchDocumentStorageService extends DocumentStorageServiceProxy 
     private readonly prefetchCache = new Map<string, Promise<string>>();
     private prefetchEnabled = true;
 
-    public async getSnapshotTree(version?: IVersion): Promise<ISnapshotTree | null> {
+    public async getSnapshotTree(version: IVersion): Promise<ISnapshotTree | null> {
         const p = this.internalStorageService.getSnapshotTree(version);
         if (this.prefetchEnabled) {
             // We don't care if the prefetch succeed

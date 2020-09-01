@@ -42,7 +42,7 @@ export interface IDocumentStorageService {
     /**
      * Returns the snapshot tree.
      */
-    getSnapshotTree(version?: IVersion): Promise<ISnapshotTree | null>;
+    getSnapshotTree(version: IVersion): Promise<ISnapshotTree | null>;
 
     /**
      * Retrieves all versions of the document starting at the specified versionId - or null if from the head

@@ -20,7 +20,7 @@ import {
 export class DocumentStorageServiceProxy implements IDocumentStorageService {
     constructor(protected readonly internalStorageService: IDocumentStorageService) { }
 
-    public async getSnapshotTree(version?: IVersion): Promise<ISnapshotTree | null> {
+    public async getSnapshotTree(version: IVersion): Promise<ISnapshotTree | null> {
         return this.internalStorageService.getSnapshotTree(version);
     }
 

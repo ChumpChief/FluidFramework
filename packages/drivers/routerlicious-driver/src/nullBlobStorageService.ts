@@ -16,7 +16,7 @@ export class NullBlobStorageService implements IDocumentStorageService {
         throw new Error("Invalid operation");
     }
 
-    public async getSnapshotTree(version?: api.IVersion): Promise<api.ISnapshotTree | null> {
+    public async getSnapshotTree(version: api.IVersion): Promise<api.ISnapshotTree | null> {
         return version ? Promise.reject("Invalid operation") : null;
     }
 
