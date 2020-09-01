@@ -94,10 +94,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
             ordererUrl,
             deltaStorageUrl,
             storageUrl,
-            false, // disableCache
-            true, // historianApi
-            undefined, // credentials
-            undefined, // gitCache
             tokenProvider,
             tenantId,
             documentId,
