@@ -60,7 +60,6 @@ export class DocumentDeltaConnection
      * @param token - authorization token for storage service
      * @param io - websocket library
      * @param client - information about the client
-     * @param mode - connection mode
      * @param url - websocket URL
      */
     public static async create(
@@ -302,13 +301,6 @@ export class DocumentDeltaConnection
             });
 
             this.addConnectionListener("connect_document_success", (response: IConnected) => {
-                // If we sent a nonce and the server supports nonces, check that the nonces match
-                if (connectMessage.nonce !== undefined &&
-                    response.nonce !== undefined &&
-                    response.nonce !== connectMessage.nonce) {
-                    return;
-                }
-
                 this.removeTrackedListeners(true);
                 resolve(response);
             });
@@ -328,13 +320,6 @@ export class DocumentDeltaConnection
             }));
 
             this.addConnectionListener("connect_document_error", ((error) => {
-                // If we sent a nonce and the server supports nonces, check that the nonces match
-                if (connectMessage.nonce !== undefined &&
-                    error.nonce !== undefined &&
-                    error.nonce !== connectMessage.nonce) {
-                    return;
-                }
-
                 // This is not an error for the socket - it's a protocol error.
                 // In this case we disconnect the socket and indicate that we were unable to create the
                 // DocumentDeltaConnection.
