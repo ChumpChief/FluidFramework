@@ -8,7 +8,7 @@ import * as api from "@fluidframework/driver-definitions";
 import { IClient, IErrorTrackingService } from "@fluidframework/protocol-definitions";
 import { GitManager, Historian, ICredentials, IGitCache } from "@fluidframework/server-services-client";
 import io from "socket.io-client";
-import { DeltaStorageService, DocumentDeltaStorageService } from "./deltaStorageService";
+import { DocumentDeltaStorageService } from "./deltaStorageService";
 import { DocumentStorageService } from "./documentStorageService";
 import { NullBlobStorageService } from "./nullBlobStorageService";
 import { TokenProvider } from "./tokens";
@@ -90,8 +90,7 @@ export class DocumentService implements api.IDocumentService {
      * @returns returns the document delta storage service for routerlicious driver.
      */
     public async connectToDeltaStorage(): Promise<api.IDocumentDeltaStorageService> {
-        const deltaStorage = new DeltaStorageService(this.deltaStorageUrl);
-        return new DocumentDeltaStorageService(this.tenantId, this.documentId, this.tokenProvider, deltaStorage);
+        return new DocumentDeltaStorageService(this.tenantId, this.tokenProvider, this.deltaStorageUrl);
     }
 
     /**

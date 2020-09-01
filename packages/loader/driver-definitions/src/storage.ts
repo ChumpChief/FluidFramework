@@ -20,26 +20,10 @@ import {
     ISummaryHandle,
     ISummaryTree,
     ITokenClaims,
-    ITokenProvider,
     ITree,
     IVersion,
 } from "@fluidframework/protocol-definitions";
 import { IResolvedUrl } from "./urlResolver";
-
-/**
- * Interface to provide access to stored deltas for a shared object
- */
-export interface IDeltaStorageService {
-    /**
-     * Retrieves all the delta operations within the inclusive sequence number range
-     */
-    get(
-        tenantId: string,
-        id: string,
-        tokenProvider: ITokenProvider,
-        from?: number,
-        to?: number): Promise<ISequencedDocumentMessage[]>;
-}
 
 /**
  * Interface to provide access to stored deltas for a shared object
