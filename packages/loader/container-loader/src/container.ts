@@ -457,7 +457,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.resumeInternal();
     }
 
-    protected resumeInternal(args: IConnectionArgs = {}) {
+    private resumeInternal(args: IConnectionArgs = {}) {
         assert(this.loaded);
 
         // Resume processing ops

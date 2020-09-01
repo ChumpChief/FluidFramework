@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import assert from "assert";
 import querystring from "querystring";
 import { fromUtf8ToBase64 } from "@fluidframework/common-utils";
 import { IDeltaStorageService, IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
@@ -52,27 +51,8 @@ export class DeltaStorageService implements IDeltaStorageService {
             };
         }
 
-        const opPromise = Axios.get<api.ISequencedDocumentMessage[]>(
-            `${this.url}?${query}`, { headers });
+        const opData = await Axios.get<api.ISequencedDocumentMessage[]>(`${this.url}?${query}`, { headers });
 
-        const contentPromise = Axios.get<any[]>(
-            `${this.url}/content?${query}`, { headers });
-
-        const [opData, contentData] = await Promise.all([opPromise, contentPromise]);
-
-        const contents = contentData.data;
-        const ops = opData.data;
-        let contentIndex = 0;
-        for (const op of ops) {
-            if (op.contents === undefined) {
-                assert.ok(contentIndex < contents.length, "Delta content not found");
-                const content = contents[contentIndex];
-                assert.equal(op.sequenceNumber, content.sequenceNumber, "Invalid delta content order");
-                op.contents = content.op.contents;
-                ++contentIndex;
-            }
-        }
-
-        return ops;
+        return opData.data;
     }
 }
