@@ -18,10 +18,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 
 export class DocumentStorageServiceProxy implements IDocumentStorageService {
-    public get repositoryUrl(): string {
-        return this.internalStorageService.repositoryUrl;
-    }
-
     constructor(protected readonly internalStorageService: IDocumentStorageService) { }
 
     public async getSnapshotTree(version?: IVersion): Promise<ISnapshotTree | null> {

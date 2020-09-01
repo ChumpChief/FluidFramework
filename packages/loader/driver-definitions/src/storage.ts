@@ -39,8 +39,6 @@ export interface IDocumentDeltaStorageService {
  * Interface to provide access to snapshots saved for a shared object
  */
 export interface IDocumentStorageService {
-    repositoryUrl: string;
-
     /**
      * Returns the snapshot tree.
      */

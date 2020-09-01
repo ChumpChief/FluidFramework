@@ -29,10 +29,6 @@ export class DocumentStorageService implements IDocumentStorageService {
     // The values of this cache is useless. We only need the keys. So we are always putting
     // empty strings as values.
     private readonly blobsShaCache = new Map<string, string>();
-    public get repositoryUrl(): string {
-        return "";
-    }
-
     constructor(public readonly id: string, public manager: gitStorage.GitManager) {
     }
 
