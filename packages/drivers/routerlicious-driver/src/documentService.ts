@@ -10,7 +10,6 @@ import { GitManager, Historian, ICredentials, IGitCache } from "@fluidframework/
 import io from "socket.io-client";
 import { DocumentDeltaStorageService } from "./deltaStorageService";
 import { DocumentStorageService } from "./documentStorageService";
-import { NullBlobStorageService } from "./nullBlobStorageService";
 import { TokenProvider } from "./tokens";
 
 /**
@@ -39,10 +38,6 @@ export class DocumentService implements api.IDocumentService {
      * @returns returns the document storage service for routerlicious driver.
      */
     public async connectToStorage(): Promise<api.IDocumentStorageService> {
-        if (this.gitUrl === undefined) {
-            return new NullBlobStorageService();
-        }
-
         // Craft credentials - either use the direct credentials (i.e. a GitHub user + PAT) - or make use of our
         // tenant token
         let credentials: ICredentials | undefined;

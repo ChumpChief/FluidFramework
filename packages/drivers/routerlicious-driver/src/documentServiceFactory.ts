@@ -73,9 +73,10 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         const storageUrl = fluidResolvedUrl.endpoints.storageUrl;
         const ordererUrl = fluidResolvedUrl.endpoints.ordererUrl;
         const deltaStorageUrl = fluidResolvedUrl.endpoints.deltaStorageUrl;
-        if (!ordererUrl || !deltaStorageUrl) {
+        if (ordererUrl === undefined || deltaStorageUrl === undefined || storageUrl === undefined) {
             throw new Error(
-                `All endpoints urls must be provided. [ordererUrl:${ordererUrl}][deltaStorageUrl:${deltaStorageUrl}]`);
+                // eslint-disable-next-line max-len
+                `All endpoints urls must be provided. [ordererUrl:${ordererUrl}][deltaStorageUrl:${deltaStorageUrl}][storageUrl:${storageUrl}]`);
         }
 
         const parsedUrl = parse(fluidResolvedUrl.url);
