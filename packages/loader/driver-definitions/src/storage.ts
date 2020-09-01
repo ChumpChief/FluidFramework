@@ -10,7 +10,6 @@ import {
     IClient,
     ICreateBlobResponse,
     IDocumentMessage,
-    IErrorTrackingService,
     INack,
     ISequencedDocumentMessage,
     IServiceConfiguration,
@@ -192,12 +191,6 @@ export interface IDocumentService {
      * Subscribes to the document delta stream
      */
     connectToDeltaStream(client: IClient): Promise<IDocumentDeltaConnection>;
-
-    /**
-     * Returns the error tracking service
-     */
-    getErrorTrackingService(): IErrorTrackingService | null;
-
 }
 
 export interface IDocumentServiceFactory {

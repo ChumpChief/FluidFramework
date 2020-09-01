@@ -12,7 +12,6 @@ import {
 } from "@fluidframework/driver-definitions";
 import {
     IClient,
-    IErrorTrackingService,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import {
@@ -54,9 +53,6 @@ export class MockDocumentService implements IDocumentService {
             : new MockDocumentDeltaConnection(`mock_client_${this.nextClientId++}`);
     }
     public async branch(): Promise<string> {
-        throw new Error("Method not implemented.");
-    }
-    public getErrorTrackingService(): IErrorTrackingService {
         throw new Error("Method not implemented.");
     }
 }

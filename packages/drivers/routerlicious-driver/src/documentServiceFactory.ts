@@ -11,7 +11,7 @@ import {
     IResolvedUrl,
 } from "@fluidframework/driver-definitions";
 import { ITelemetryBaseLogger } from "@fluidframework/common-definitions";
-import { IErrorTrackingService, ISummaryTree } from "@fluidframework/protocol-definitions";
+import { ISummaryTree } from "@fluidframework/protocol-definitions";
 import {
     ensureFluidResolvedUrl,
     getDocAttributesFromProtocolSummary,
@@ -19,7 +19,6 @@ import {
 } from "@fluidframework/driver-utils";
 import Axios from "axios";
 import { DocumentService } from "./documentService";
-import { DefaultErrorTracking } from "./errorTracking";
 import { TokenProvider } from "./tokens";
 
 /**
@@ -27,8 +26,6 @@ import { TokenProvider } from "./tokens";
  * use the routerlicious implementation.
  */
 export class RouterliciousDocumentServiceFactory implements IDocumentServiceFactory {
-    private readonly errorTracking: IErrorTrackingService = new DefaultErrorTracking();
-
     public async submitContainer(
         createNewSummary: ISummaryTree,
         resolvedUrl: IResolvedUrl,
@@ -97,7 +94,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
             ordererUrl,
             deltaStorageUrl,
             storageUrl,
-            this.errorTracking,
             false, // disableCache
             true, // historianApi
             undefined, // credentials
