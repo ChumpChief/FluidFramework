@@ -42,7 +42,6 @@ function createErrorObject(handler: string, error: any, canRetry = true) {
 
 interface IEventListener {
     event: string;
-    connectionListener: boolean; // True if this event listener only needed while connection is in progress
     listener(...args: any[]): void;
 }
 
@@ -106,7 +105,7 @@ export class DocumentDeltaConnection
 
     private _details: IConnected | undefined;
 
-    private trackedListeners: IEventListener[] = [];
+    private readonly trackedListeners: IEventListener[] = [];
 
     private get details(): IConnected {
         if (!this._details) {
@@ -128,19 +127,19 @@ export class DocumentDeltaConnection
                 this.socket.emit(submitType, this.clientId, work);
             });
 
-        this.addTrackedListener("nack", (...args: any[]) => {
+        this.socket.on("nack", (...args: any[]) => {
             this.emit("nack", ...args);
         });
 
-        this.addTrackedListener("disconnect", (...args: any[]) => {
+        this.socket.on("disconnect", (...args: any[]) => {
             this.emit("disconnect", ...args);
         });
 
-        this.addTrackedListener("op", (...args: any[]) => {
+        this.socket.on("op", (...args: any[]) => {
             this.emit("op", ...args);
         });
 
-        this.addTrackedListener("signal", (...args: any[]) => {
+        this.socket.on("signal", (...args: any[]) => {
             this.emit("signal", ...args);
         });
     }
@@ -299,7 +298,6 @@ export class DocumentDeltaConnection
             // Socket can be disconnected while waiting for Fluid protocol messages
             // (connect_document_error / connect_document_success)
             this.addConnectionListener("disconnect", (reason) => {
-                this.disconnect();
                 reject(createErrorObject("disconnect", reason));
             });
 
@@ -308,10 +306,7 @@ export class DocumentDeltaConnection
                 resolve(response);
             });
 
-            // WARNING: this has to stay as addTrackedListener listener and not be removed after successful connection.
-            // Reason: this.on() implementation does not subscribe to "error" socket events to propagate it to consumers
-            // of this class - it relies on this code to do so.
-            this.addTrackedListener("error", ((error) => {
+            this.socket.on("error", ((error) => {
                 // First, raise an error event, to give clients a chance to observe error contents
                 // This includes "Invalid namespace" error, which we consider critical (reconnecting will not help)
                 const errorObj = createErrorObject("error", error, error !== "Invalid namespace");
@@ -359,23 +354,12 @@ export class DocumentDeltaConnection
 
     private addConnectionListener(event: string, listener: (...args: any[]) => void) {
         this.socket.on(event, listener);
-        this.trackedListeners.push({ event, connectionListener: true, listener });
-    }
-
-    private addTrackedListener(event: string, listener: (...args: any[]) => void) {
-        this.socket.on(event, listener);
-        this.trackedListeners.push({ event, connectionListener: false, listener });
+        this.trackedListeners.push({ event, listener });
     }
 
     private removeTrackedListeners() {
-        const remaining: IEventListener[] = [];
-        for (const { event, connectionListener, listener } of this.trackedListeners) {
-            if (connectionListener) {
-                this.socket.off(event, listener);
-            } else {
-                remaining.push({ event, connectionListener, listener });
-            }
+        for (const { event, listener } of this.trackedListeners) {
+            this.socket.off(event, listener);
         }
-        this.trackedListeners = remaining;
     }
 }
