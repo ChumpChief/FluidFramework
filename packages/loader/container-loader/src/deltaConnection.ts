@@ -31,16 +31,11 @@ export class DeltaConnection
         return this._details;
     }
 
-    public get nacked(): boolean {
-        return this._nacked;
-    }
-
     public get connected(): boolean {
         return this._connection !== undefined;
     }
 
     private readonly _details: IConnectionDetails;
-    private _nacked = false;
     private _connection?: IDocumentDeltaConnection;
 
     private get connection(): IDocumentDeltaConnection {
@@ -68,8 +63,6 @@ export class DeltaConnection
         };
 
         connection.on("nack", (documentId: string, message: INack[]) => {
-            // Mark nacked and also pause any outbound communication
-            this._nacked = true;
             this.emit("nack", documentId, message);
         });
 
