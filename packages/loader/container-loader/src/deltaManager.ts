@@ -209,10 +209,6 @@ export class DeltaManager
         return res;
     }
 
-    public get socketDocumentId(): string | undefined {
-        return this.connection?.details.claims.documentId;
-    }
-
     /**
      * The current connection mode, initially write.
      */
