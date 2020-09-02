@@ -88,7 +88,6 @@ export interface IDocumentDeltaConnectionEvents extends IErrorEvent {
     (event: "disconnect", listener: (reason: any) => void);
     (event: "op", listener: (documentId: string, messages: ISequencedDocumentMessage[]) => void);
     (event: "signal", listener: (message: ISignalMessage) => void);
-    (event: "pong", listener: (latency: number) => void);
 }
 
 export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaConnectionEvents> {

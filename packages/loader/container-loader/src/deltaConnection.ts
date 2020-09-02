@@ -43,7 +43,7 @@ export class DeltaConnection
     private readonly _details: IConnectionDetails;
     private _nacked = false;
 
-    private readonly forwardEvents = ["op", "signal", "error", "pong"];
+    private readonly forwardEvents = ["op", "signal", "error"];
     private readonly nonForwardEvents = ["nack", "disconnect"];
 
     private _connection?: IDocumentDeltaConnection;

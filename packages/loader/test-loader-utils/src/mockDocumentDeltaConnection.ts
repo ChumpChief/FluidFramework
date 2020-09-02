@@ -87,9 +87,6 @@ export class MockDocumentDeltaConnection
     public emitNack(documentId: string, message: Partial<INack>[]) {
         this.emit("nack", documentId, message);
     }
-    public emitPong(latency: number) {
-        this.emit("pong", latency);
-    }
     public emitError(error: any) {
         this.emit("error", error);
     }

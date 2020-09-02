@@ -14,9 +14,6 @@ import {
 import { performanceNow } from "@fluidframework/common-utils";
 
 class OpPerfTelemetry {
-    private pongCount: number = 0;
-    private socketLatency = 0;
-
     // Collab window tracking. This is timestamp of %1000 message.
     private opSendTimeForLatencyStatisticsForMsnStatistics: number | undefined;
 
@@ -38,7 +35,6 @@ class OpPerfTelemetry {
         logger: ITelemetryLogger) {
         this.logger = ChildLogger.create(logger, "OpPerf");
 
-        this.deltaManager.on("pong", (latency) => this.recordPingTime(latency));
         this.deltaManager.on("submitOp", (message) => this.beforeOpSubmit(message));
         this.deltaManager.on("beforeOpProcessing", (message) => this.beforeProcessingOp(message));
         this.deltaManager.on("connect", (details, opsBehind) => {
@@ -78,17 +74,6 @@ class OpPerfTelemetry {
                 undefined,
             firstConnection: this.firstConnection,
         });
-    }
-
-    private recordPingTime(latency: number) {
-        this.pongCount++;
-        this.socketLatency += latency;
-        const aggregateCount = 100;
-        if (this.pongCount === aggregateCount) {
-            this.logger.sendTelemetryEvent({ eventName: "DeltaLatency", value: this.socketLatency / aggregateCount });
-            this.pongCount = 0;
-            this.socketLatency = 0;
-        }
     }
 
     private beforeOpSubmit(message: IDocumentMessage) {

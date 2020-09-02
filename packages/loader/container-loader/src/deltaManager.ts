@@ -735,10 +735,6 @@ export class DeltaManager
             );
         });
 
-        connection.on("pong", (latency: number) => {
-            this.emit("pong", latency);
-        });
-
         const initialMessages = connection.details.initialMessages;
 
         let hasOpsBehindInfo = false;
