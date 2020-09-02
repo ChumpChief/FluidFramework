@@ -275,7 +275,6 @@ export class DocumentDeltaConnection
      * Disconnect from the websocket
      */
     public disconnect() {
-        this.removeTrackedListeners(false);
         this.socket.disconnect();
     }
 
@@ -305,7 +304,7 @@ export class DocumentDeltaConnection
             });
 
             this.addConnectionListener("connect_document_success", (response: IConnected) => {
-                this.removeTrackedListeners(true);
+                this.removeTrackedListeners();
                 resolve(response);
             });
 
@@ -368,20 +367,15 @@ export class DocumentDeltaConnection
         this.trackedListeners.push({ event, connectionListener: false, listener });
     }
 
-    private removeTrackedListeners(connectionListenerOnly) {
+    private removeTrackedListeners() {
         const remaining: IEventListener[] = [];
         for (const { event, connectionListener, listener } of this.trackedListeners) {
-            if (!connectionListenerOnly || connectionListener) {
+            if (connectionListener) {
                 this.socket.off(event, listener);
             } else {
                 remaining.push({ event, connectionListener, listener });
             }
         }
         this.trackedListeners = remaining;
-
-        if (!connectionListenerOnly) {
-            this.removeEarlyOpHandler();
-            this.removeEarlySignalHandler();
-        }
     }
 }
