@@ -128,16 +128,20 @@ export class DocumentDeltaConnection
                 this.socket.emit(submitType, this.clientId, work);
             });
 
-        this.on("newListener", (event, listener) => {
-            // Register for the event on socket.io
-            // "error" is special - we already subscribed to it to modify error object on the fly.
-            if (event !== "error" && this.listeners(event).length === 0) {
-                this.addTrackedListener(
-                    event,
-                    (...args: any[]) => {
-                        this.emit(event, ...args);
-                    });
-            }
+        this.addTrackedListener("nack", (...args: any[]) => {
+            this.emit("nack", ...args);
+        });
+
+        this.addTrackedListener("disconnect", (...args: any[]) => {
+            this.emit("disconnect", ...args);
+        });
+
+        this.addTrackedListener("op", (...args: any[]) => {
+            this.emit("op", ...args);
+        });
+
+        this.addTrackedListener("signal", (...args: any[]) => {
+            this.emit("signal", ...args);
         });
     }
 
