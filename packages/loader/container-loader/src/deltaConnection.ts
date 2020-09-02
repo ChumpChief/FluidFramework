@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import assert from "assert";
 import {
     IConnectionDetails,
 } from "@fluidframework/container-definitions";
@@ -42,10 +41,6 @@ export class DeltaConnection
 
     private readonly _details: IConnectionDetails;
     private _nacked = false;
-
-    private readonly forwardEvents = ["op", "signal", "error"];
-    private readonly nonForwardEvents = ["nack", "disconnect"];
-
     private _connection?: IDocumentDeltaConnection;
 
     private get connection(): IDocumentDeltaConnection {
@@ -83,25 +78,16 @@ export class DeltaConnection
             this.close();
         });
 
-        this.on("newListener", (event: string, listener: (...args: any[]) => void) => {
-            // Register for the event on connection
-            // A number of events that are pass-through.
-            // Note that we delay subscribing to op / signal on purpose, as
-            // that is used as a signal in DocumentDeltaConnection to know if anyone has subscribed
-            // to these events, and thus stop accumulating ops / signals in early handlers.
-            // See DocumentDeltaConnection.initialMessages() implementation for details.
-            if (this.forwardEvents.includes(event)) {
-                if (this.listeners(event).length === 0) {
-                    this.connection.on(
-                        event as any,
-                        (...args: any[]) => {
-                            this.emit(event, ...args);
-                        });
-                }
-            } else {
-                // These are events that we already subscribed to and already emit on object.
-                assert(this.nonForwardEvents.includes(event));
-            }
+        connection.on("op", (...args: any[]) => {
+            this.emit("op", ...args);
+        });
+
+        connection.on("signal", (...args: any[]) => {
+            this.emit("signal", ...args);
+        });
+
+        connection.on("error", (...args: any[]) => {
+            this.emit("error", ...args);
         });
     }
 
