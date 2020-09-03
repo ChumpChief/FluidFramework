@@ -175,7 +175,8 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @param message - delta operation to submit
      */
     public submit(message: IDocumentMessage): void {
-        this.socket.emit("submitOp", this.connectionInfo.clientId, message);
+        // I don't really want to submit as an array, but currently Tinylicious will barf if it's not.
+        this.socket.emit("submitOp", this.connectionInfo.clientId, [message]);
     }
 
     /**
@@ -184,7 +185,8 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @param message - signal to submit
      */
     public submitSignal(message: IDocumentMessage): void {
-        this.socket.emit("submitSignal", this.connectionInfo.clientId, message);
+        // I don't really want to submit as an array, but currently Tinylicious will barf if it's not.
+        this.socket.emit("submitSignal", this.connectionInfo.clientId, [message]);
     }
 
     /**
