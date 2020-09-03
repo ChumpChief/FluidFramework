@@ -4,7 +4,7 @@
  */
 
 import assert from "assert";
-import { BatchManager, TypedEventEmitter } from "@fluidframework/common-utils";
+import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDocumentDeltaConnection, IDocumentDeltaConnectionEvents } from "@fluidframework/driver-definitions";
 import { createGenericNetworkError } from "@fluidframework/driver-utils";
 import {
@@ -77,11 +77,6 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
                 timeout: timeoutMs,
             });
 
-        this.submitManager = new BatchManager<IDocumentMessage[]>(
-            (submitType, work) => {
-                this.socket.emit(submitType, this.clientId, work);
-            });
-
         this.socket.on("nack", (...args: any[]) => {
             this.emit("nack", ...args);
         });
@@ -120,8 +115,6 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     // Listen for ops sent before we receive a response to connect_document
     private readonly queuedMessages: ISequencedDocumentMessage[] = [];
     private readonly queuedSignals: ISignalMessage[] = [];
-
-    private readonly submitManager: BatchManager<IDocumentMessage[]>;
 
     private _details: IConnected | undefined;
 
@@ -248,7 +241,9 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @param message - delta operation to submit
      */
     public submit(messages: IDocumentMessage[]): void {
-        this.submitManager.add("submitOp", messages);
+        for (const message of messages) {
+            this.socket.emit("submitOp", this.clientId, message);
+        }
     }
 
     /**
@@ -257,7 +252,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @param message - signal to submit
      */
     public submitSignal(message: IDocumentMessage): void {
-        this.submitManager.add("submitSignal", [message]);
+        this.socket.emit("submitSignal", this.clientId, message);
     }
 
     /**
