@@ -8,6 +8,7 @@ import { IEventProvider, IErrorEvent, ITelemetryBaseLogger } from "@fluidframewo
 import {
     ConnectionMode,
     IClient,
+    IConnected,
     ICreateBlobResponse,
     IDocumentMessage,
     INack,
@@ -158,47 +159,32 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
 }
 
 export interface IDocumentDeltaConnectionEvents2 extends IErrorEvent {
+    // Document connection state
+    (event: "connected" | "disconnected", listener: () => void);
+
+    // Protocol messages not handled at this layer, rebroadcast up to higher layers
     (event: "nack", listener: (documentId: string, message: INack[]) => void);
-    (event: "disconnect", listener: (reason: any) => void);
     (event: "op", listener: (documentId: string, messages: ISequencedDocumentMessage[]) => void);
     (event: "signal", listener: (message: ISignalMessage) => void);
 }
 
 export interface IDocumentDeltaConnection2 extends IEventProvider<IDocumentDeltaConnectionEvents2> {
-    /**
-     * ClientID for the connection
-     */
-    clientId: string;
+    readonly connected: boolean;
+    readonly connectionInfo: IConnected;
 
     /**
-     * Claims for the client
+     * Connect to the document.  After resolving, document messages will start flowing.
+     * @param tenantId - ID for the tenant
+     * @param documentId - ID for the document
+     * @param token - token for access
+     * @param client - client info for the connect message (TODO break this up)
      */
-    claims: ITokenClaims;
-
-    /**
-     * Mode of the client
-     */
-    mode: ConnectionMode;
-
-    /**
-     * Whether the connection was made to a new or existing document
-     */
-    existing: boolean;
-
-    /**
-     * Maximum size of a message that can be sent to the server. Messages larger than this size must be chunked.
-     */
-    maxMessageSize: number;
-
-    /**
-     * Protocol version being used with the service
-     */
-    version: string;
-
-    /**
-     * Configuration details provided by the service
-     */
-    serviceConfiguration: IServiceConfiguration;
+    connect(
+        tenantId: string,
+        documentId: string,
+        token: string | null,
+        client: IClient,
+    ): Promise<void>;
 
     /**
      * Submit a new message to the server
@@ -208,7 +194,7 @@ export interface IDocumentDeltaConnection2 extends IEventProvider<IDocumentDelta
     /**
      * Submit a new signal to the server
      */
-    submitSignal(message: any): void;
+    submitSignal(message: IDocumentMessage): void;
 
     /**
      * Disconnects the given delta connection

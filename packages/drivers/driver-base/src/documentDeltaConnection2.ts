@@ -6,13 +6,10 @@
 import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDocumentDeltaConnection2, IDocumentDeltaConnectionEvents2 } from "@fluidframework/driver-definitions";
 import {
-    ConnectionMode,
     IClient,
     IConnect,
     IConnected,
     IDocumentMessage,
-    IServiceConfiguration,
-    ITokenClaims,
 } from "@fluidframework/protocol-definitions";
 import io from "socket.io-client";
 
@@ -79,18 +76,25 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     }
 
     public get connected() {
+        return this._connectionInfo !== undefined;
+    }
+
+    public get connectionInfo() {
+        if (this._connectionInfo === undefined) {
+            throw new Error("Cannot access connectionInfo when not document-connected");
+        }
         return this._connectionInfo;
     }
 
     public async connect(
         tenantId: string,
-        id: string,
+        documentId: string,
         token: string | null,
         client: IClient,
     ) {
         const connectMessage: IConnect = {
             client,
-            id,
+            id: documentId,
             mode: client.mode,
             tenantId,
             token,  // Token is going to indicate tenant level information, etc...
@@ -149,9 +153,9 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
                 removeListeners();
                 reject();
             };
-            const resolveAndRemoveListeners = (details: IConnected) => {
+            const resolveAndRemoveListeners = (connectionInfo: IConnected) => {
                 removeListeners();
-                this._connectionInfo = details;
+                this._connectionInfo = connectionInfo;
                 this.emit("connected");
                 resolve();
             };
@@ -163,79 +167,13 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     }
     /* eslint-enable @typescript-eslint/no-use-before-define */
 
-    private get connectionInfo(): IConnected {
-        if (!this._connectionInfo) {
-            throw new Error("Internal error: calling method before _details is initialized!");
-        }
-        return this._connectionInfo;
-    }
-
-    /**
-     * Get the ID of the client who is sending the message
-     *
-     * @returns the client ID
-     */
-    public get clientId(): string {
-        return this.connectionInfo.clientId;
-    }
-
-    /**
-     * Get the mode of the client
-     *
-     * @returns the client mode
-     */
-    public get mode(): ConnectionMode {
-        return this.connectionInfo.mode;
-    }
-
-    /**
-     * Get the claims of the client who is sending the message
-     *
-     * @returns client claims
-     */
-    public get claims(): ITokenClaims {
-        return this.connectionInfo.claims;
-    }
-
-    /**
-     * Get whether or not this is an existing document
-     *
-     * @returns true if the document exists
-     */
-    public get existing(): boolean {
-        return this.connectionInfo.existing;
-    }
-
-    /**
-     * Get the maximum size of a message before chunking is required
-     *
-     * @returns the maximum size of a message before chunking is required
-     */
-    public get maxMessageSize(): number {
-        return this.connectionInfo.maxMessageSize;
-    }
-
-    /**
-     * Semver of protocol being used with the service
-     */
-    public get version(): string {
-        return this.connectionInfo.version;
-    }
-
-    /**
-     * Configuration details provided by the service
-     */
-    public get serviceConfiguration(): IServiceConfiguration {
-        return this.connectionInfo.serviceConfiguration;
-    }
-
     /**
      * Submits a new delta operation to the server
      *
      * @param message - delta operation to submit
      */
     public submit(message: IDocumentMessage): void {
-        this.socket.emit("submitOp", this.clientId, message);
+        this.socket.emit("submitOp", this.connectionInfo.clientId, message);
     }
 
     /**
@@ -244,7 +182,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @param message - signal to submit
      */
     public submitSignal(message: IDocumentMessage): void {
-        this.socket.emit("submitSignal", this.clientId, message);
+        this.socket.emit("submitSignal", this.connectionInfo.clientId, message);
     }
 
     /**
