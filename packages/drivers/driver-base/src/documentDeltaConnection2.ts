@@ -27,6 +27,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     implements IDocumentDeltaConnection2
 {
     private readonly socket: SocketIOClient.Socket;
+    private _connected: boolean = false;
     /**
      * @param socket - websocket to be used
      */
@@ -51,16 +52,19 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
             },
         );
 
-        // Fire connect and disconnect to help consumers understand our current state.  Should probably also offer
-        // a .connected API to query current state.
+        // connected and disconnected events reflect document connection
+        // (not websocket connection, though they are related)
         this.socket.on("connect_document_success", () => {
+            this._connected = true;
             this.emit("connected");
         });
 
         this.socket.on("disconnect", () => {
+            this._connected = false;
             this.emit("disconnected");
         });
 
+        // Re-emit protocol messages, we don't handle them at this layer.
         this.socket.on("nack", (...args: any[]) => {
             this.emit("nack", ...args);
         });
@@ -72,6 +76,10 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
         this.socket.on("signal", (...args: any[]) => {
             this.emit("signal", ...args);
         });
+    }
+
+    public get connected() {
+        return this._connected;
     }
 
     public async connect(
@@ -95,6 +103,10 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
 
     /* eslint-disable @typescript-eslint/no-use-before-define */
     private async connectWebSocket() {
+        if (this.socket.connected) {
+            return;
+        }
+
         return new Promise<void>((resolve, reject) => {
             const removeListeners = () => {
                 this.socket.off("connect_error", rejectAndRemoveListeners);
@@ -119,6 +131,10 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     }
 
     private async connectDocument(connectMessage: IConnect) {
+        if (this.connected) {
+            return;
+        }
+
         return new Promise<IConnected>((resolve, reject) => {
             const removeListeners = () => {
                 this.socket.off("connect_document_error", rejectAndRemoveListeners);
