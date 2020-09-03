@@ -57,8 +57,10 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
         // connected and disconnected events reflect document connection
         // (not websocket connection, though they are related)
         this.socket.on("disconnect", () => {
-            this._connectionInfo = undefined;
-            this.emit("disconnected");
+            if (this.connected) {
+                this._connectionInfo = undefined;
+                this.emit("disconnected");
+            }
         });
 
         // Re-emit protocol messages, we don't handle them at this layer.
