@@ -3,19 +3,15 @@
  * Licensed under the MIT License.
  */
 
-import assert from "assert";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
-import { IDocumentDeltaConnection, IDocumentDeltaConnectionEvents } from "@fluidframework/driver-definitions";
+import { IDocumentDeltaConnection2, IDocumentDeltaConnectionEvents2 } from "@fluidframework/driver-definitions";
 import {
     ConnectionMode,
     IClient,
     IConnect,
     IConnected,
     IDocumentMessage,
-    ISequencedDocumentMessage,
     IServiceConfiguration,
-    ISignalClient,
-    ISignalMessage,
     ITokenClaims,
 } from "@fluidframework/protocol-definitions";
 import io from "socket.io-client";
@@ -27,10 +23,10 @@ const timeoutMs = 20000;
 /**
  * Represents a connection to a stream of delta updates
  */
-export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaConnectionEvents>
-    implements IDocumentDeltaConnection
+export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaConnectionEvents2>
+    implements IDocumentDeltaConnection2
 {
-    private readonly socket: SocketIOClient.Socket
+    private readonly socket: SocketIOClient.Socket;
     /**
      * @param socket - websocket to be used
      */
@@ -52,14 +48,21 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
                 reconnection: false,
                 transports: ["websocket"],
                 timeout: timeoutMs,
-            });
+            },
+        );
+
+        // Fire connect and disconnect to help consumers understand our current state.  Should probably also offer
+        // a .connected API to query current state.
+        this.socket.on("connect_document_success", () => {
+            this.emit("connected");
+        });
+
+        this.socket.on("disconnect", () => {
+            this.emit("disconnected");
+        });
 
         this.socket.on("nack", (...args: any[]) => {
             this.emit("nack", ...args);
-        });
-
-        this.socket.on("disconnect", (...args: any[]) => {
-            this.emit("disconnect", ...args);
         });
 
         this.socket.on("op", (...args: any[]) => {
@@ -90,6 +93,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
         this._details = await this.connectDocument(connectMessage);
     }
 
+    /* eslint-disable @typescript-eslint/no-use-before-define */
     private async connectWebSocket() {
         return new Promise<void>((resolve, reject) => {
             const removeListeners = () => {
@@ -133,10 +137,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
             this.socket.emit("connect_document", connectMessage);
         });
     }
-
-    // Listen for ops sent before we receive a response to connect_document
-    private readonly queuedMessages: ISequencedDocumentMessage[] = [];
-    private readonly queuedSignals: ISignalMessage[] = [];
+    /* eslint-enable @typescript-eslint/no-use-before-define */
 
     private _details: IConnected | undefined;
 
@@ -204,55 +205,6 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      */
     public get serviceConfiguration(): IServiceConfiguration {
         return this.details.serviceConfiguration;
-    }
-
-    /**
-     * Get messages sent during the connection
-     *
-     * @returns messages sent during the connection
-     */
-    public get initialMessages(): ISequencedDocumentMessage[] {
-        // We will lose ops and perf will tank as we need to go to storage to become current!
-        assert(this.listeners("op").length !== 0, "No op handler is setup!");
-
-        this.removeEarlyOpHandler();
-
-        if (this.queuedMessages.length > 0) {
-            // Some messages were queued.
-            // add them to the list of initialMessages to be processed
-            this.details.initialMessages.push(...this.queuedMessages);
-            this.details.initialMessages.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
-            this.queuedMessages.length = 0;
-        }
-        return this.details.initialMessages;
-    }
-
-    /**
-     * Get signals sent during the connection
-     *
-     * @returns signals sent during the connection
-     */
-    public get initialSignals(): ISignalMessage[] {
-        this.removeEarlySignalHandler();
-
-        assert(this.listeners("signal").length !== 0, "No signal handler is setup!");
-
-        if (this.queuedSignals.length > 0) {
-            // Some signals were queued.
-            // add them to the list of initialSignals to be processed
-            this.details.initialSignals.push(...this.queuedSignals);
-            this.queuedSignals.length = 0;
-        }
-        return this.details.initialSignals;
-    }
-
-    /**
-     * Get initial client list
-     *
-     * @returns initial client list sent during the connection
-     */
-    public get initialClients(): ISignalClient[] {
-        return this.details.initialClients;
     }
 
     /**

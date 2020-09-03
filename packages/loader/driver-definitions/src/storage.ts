@@ -157,6 +157,65 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
     disconnect();
 }
 
+export interface IDocumentDeltaConnectionEvents2 extends IErrorEvent {
+    (event: "nack", listener: (documentId: string, message: INack[]) => void);
+    (event: "disconnect", listener: (reason: any) => void);
+    (event: "op", listener: (documentId: string, messages: ISequencedDocumentMessage[]) => void);
+    (event: "signal", listener: (message: ISignalMessage) => void);
+}
+
+export interface IDocumentDeltaConnection2 extends IEventProvider<IDocumentDeltaConnectionEvents2> {
+    /**
+     * ClientID for the connection
+     */
+    clientId: string;
+
+    /**
+     * Claims for the client
+     */
+    claims: ITokenClaims;
+
+    /**
+     * Mode of the client
+     */
+    mode: ConnectionMode;
+
+    /**
+     * Whether the connection was made to a new or existing document
+     */
+    existing: boolean;
+
+    /**
+     * Maximum size of a message that can be sent to the server. Messages larger than this size must be chunked.
+     */
+    maxMessageSize: number;
+
+    /**
+     * Protocol version being used with the service
+     */
+    version: string;
+
+    /**
+     * Configuration details provided by the service
+     */
+    serviceConfiguration: IServiceConfiguration;
+
+    /**
+     * Submit a new message to the server
+     */
+    submit(messages: IDocumentMessage[]): void;
+
+    /**
+     * Submit a new signal to the server
+     */
+    submitSignal(message: any): void;
+
+    /**
+     * Disconnects the given delta connection
+     */
+    disconnect();
+}
+
 export interface IDocumentService {
     /**
      * Access to storage associated with the document...
