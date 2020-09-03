@@ -203,7 +203,7 @@ export interface IDocumentDeltaConnection2 extends IEventProvider<IDocumentDelta
     /**
      * Submit a new message to the server
      */
-    submit(messages: IDocumentMessage[]): void;
+    submit(messages: IDocumentMessage): void;
 
     /**
      * Submit a new signal to the server

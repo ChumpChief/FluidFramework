@@ -27,7 +27,12 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     implements IDocumentDeltaConnection2
 {
     private readonly socket: SocketIOClient.Socket;
-    private _connected: boolean = false;
+    /**
+     * Contains information about the connection if document-connected, or undefined if not document-connected
+     * Note that there is a period where we are socket-connected but not document-connected.
+     */
+    private _connectionInfo: IConnected | undefined;
+
     /**
      * @param socket - websocket to be used
      */
@@ -54,13 +59,8 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
 
         // connected and disconnected events reflect document connection
         // (not websocket connection, though they are related)
-        this.socket.on("connect_document_success", () => {
-            this._connected = true;
-            this.emit("connected");
-        });
-
         this.socket.on("disconnect", () => {
-            this._connected = false;
+            this._connectionInfo = undefined;
             this.emit("disconnected");
         });
 
@@ -79,7 +79,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     }
 
     public get connected() {
-        return this._connected;
+        return this._connectionInfo;
     }
 
     public async connect(
@@ -98,7 +98,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
         };
 
         await this.connectWebSocket();
-        this._details = await this.connectDocument(connectMessage);
+        await this.connectDocument(connectMessage);
     }
 
     /* eslint-disable @typescript-eslint/no-use-before-define */
@@ -115,12 +115,12 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
                 this.socket.off("connect", resolveAndRemoveListeners);
             };
             const rejectAndRemoveListeners = () => {
-                reject();
                 removeListeners();
+                reject();
             };
             const resolveAndRemoveListeners = () => {
-                resolve();
                 removeListeners();
+                resolve();
             };
             this.socket.on("connect_error", rejectAndRemoveListeners);
             this.socket.on("connect_timeout", rejectAndRemoveListeners);
@@ -131,23 +131,31 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     }
 
     private async connectDocument(connectMessage: IConnect) {
+        if (!this.socket.connected) {
+            throw new Error("Cannot connectDocument until the socket is connected");
+        }
+
         if (this.connected) {
             return;
         }
 
-        return new Promise<IConnected>((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const removeListeners = () => {
+                this.socket.off("disconnect", rejectAndRemoveListeners);
                 this.socket.off("connect_document_error", rejectAndRemoveListeners);
                 this.socket.off("connect_document_success", resolveAndRemoveListeners);
             };
             const rejectAndRemoveListeners = () => {
-                reject();
                 removeListeners();
+                reject();
             };
             const resolveAndRemoveListeners = (details: IConnected) => {
-                resolve(details);
                 removeListeners();
+                this._connectionInfo = details;
+                this.emit("connected");
+                resolve();
             };
+            this.socket.on("disconnect", rejectAndRemoveListeners);
             this.socket.on("connect_document_error", rejectAndRemoveListeners);
             this.socket.on("connect_document_success", resolveAndRemoveListeners);
             this.socket.emit("connect_document", connectMessage);
@@ -155,13 +163,11 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     }
     /* eslint-enable @typescript-eslint/no-use-before-define */
 
-    private _details: IConnected | undefined;
-
-    private get details(): IConnected {
-        if (!this._details) {
+    private get connectionInfo(): IConnected {
+        if (!this._connectionInfo) {
             throw new Error("Internal error: calling method before _details is initialized!");
         }
-        return this._details;
+        return this._connectionInfo;
     }
 
     /**
@@ -170,7 +176,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @returns the client ID
      */
     public get clientId(): string {
-        return this.details.clientId;
+        return this.connectionInfo.clientId;
     }
 
     /**
@@ -179,7 +185,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @returns the client mode
      */
     public get mode(): ConnectionMode {
-        return this.details.mode;
+        return this.connectionInfo.mode;
     }
 
     /**
@@ -188,7 +194,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @returns client claims
      */
     public get claims(): ITokenClaims {
-        return this.details.claims;
+        return this.connectionInfo.claims;
     }
 
     /**
@@ -197,7 +203,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @returns true if the document exists
      */
     public get existing(): boolean {
-        return this.details.existing;
+        return this.connectionInfo.existing;
     }
 
     /**
@@ -206,21 +212,21 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      * @returns the maximum size of a message before chunking is required
      */
     public get maxMessageSize(): number {
-        return this.details.maxMessageSize;
+        return this.connectionInfo.maxMessageSize;
     }
 
     /**
      * Semver of protocol being used with the service
      */
     public get version(): string {
-        return this.details.version;
+        return this.connectionInfo.version;
     }
 
     /**
      * Configuration details provided by the service
      */
     public get serviceConfiguration(): IServiceConfiguration {
-        return this.details.serviceConfiguration;
+        return this.connectionInfo.serviceConfiguration;
     }
 
     /**
@@ -228,10 +234,8 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      *
      * @param message - delta operation to submit
      */
-    public submit(messages: IDocumentMessage[]): void {
-        for (const message of messages) {
-            this.socket.emit("submitOp", this.clientId, message);
-        }
+    public submit(message: IDocumentMessage): void {
+        this.socket.emit("submitOp", this.clientId, message);
     }
 
     /**
