@@ -521,7 +521,6 @@ export class DeltaManager
 
         const outbound = this.createOutboundMessage(type, message);
         this.stopSequenceNumberUpdate();
-        this.emit("submitOp", message);
 
         if (!batch) {
             this.flush();
@@ -881,8 +880,6 @@ export class DeltaManager
     }
 
     private processInboundMessage(message: ISequencedDocumentMessage): void {
-        const startTime = Date.now();
-
         // All non-system messages are coming from some client, and should have clientId
         // System messages may have no clientId (but some do, like propose, noop, summarize)
         // Note: NoClient has not been added yet to isSystemMessage (in 0.16.x branch)
@@ -939,16 +936,11 @@ export class DeltaManager
         assert.equal(message.sequenceNumber, this.lastProcessedSequenceNumber + 1, "non-seq seq#");
         this.lastProcessedSequenceNumber = message.sequenceNumber;
 
-        this.emit("beforeOpProcessing", message);
-
         if (this.handler === undefined) {
             throw new Error("Attempted to process an inbound message without a handler attached");
         }
         const result = this.handler.process(message);
         this.scheduleSequenceNumberUpdate(message, result.immediateNoOp === true);
-
-        const endTime = Date.now();
-        this.emit("processTime", endTime - startTime);
     }
 
     /**
