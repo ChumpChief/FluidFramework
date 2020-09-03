@@ -4,7 +4,7 @@
  */
 
 import { TypedEventEmitter } from "@fluidframework/common-utils";
-import { IDocumentDeltaConnection2, IDocumentDeltaConnectionEvents2 } from "@fluidframework/driver-definitions";
+import { IDeltaFeed, IDeltaFeedEvents } from "@fluidframework/driver-definitions";
 import {
     IClient,
     IConnect,
@@ -20,9 +20,7 @@ const timeoutMs = 20000;
 /**
  * Represents a connection to a stream of delta updates
  */
-export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaConnectionEvents2>
-    implements IDocumentDeltaConnection2
-{
+export class DeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> implements IDeltaFeed {
     private readonly socket: SocketIOClient.Socket;
     /**
      * Contains information about the connection if document-connected, or undefined if not document-connected

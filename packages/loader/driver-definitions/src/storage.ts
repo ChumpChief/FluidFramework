@@ -158,7 +158,7 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
     disconnect();
 }
 
-export interface IDocumentDeltaConnectionEvents2 extends IErrorEvent {
+export interface IDeltaFeedEvents extends IErrorEvent {
     // Document connection state
     (event: "connected" | "disconnected", listener: () => void);
 
@@ -168,7 +168,7 @@ export interface IDocumentDeltaConnectionEvents2 extends IErrorEvent {
     (event: "signal", listener: (message: ISignalMessage) => void);
 }
 
-export interface IDocumentDeltaConnection2 extends IEventProvider<IDocumentDeltaConnectionEvents2> {
+export interface IDeltaFeed extends IEventProvider<IDeltaFeedEvents> {
     readonly connected: boolean;
     readonly connectionInfo: IConnected;
 
