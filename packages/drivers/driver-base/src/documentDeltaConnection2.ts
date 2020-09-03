@@ -6,7 +6,6 @@
 import assert from "assert";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDocumentDeltaConnection, IDocumentDeltaConnectionEvents } from "@fluidframework/driver-definitions";
-import { createGenericNetworkError } from "@fluidframework/driver-utils";
 import {
     ConnectionMode,
     IClient,
@@ -20,31 +19,8 @@ import {
     ITokenClaims,
 } from "@fluidframework/protocol-definitions";
 import io from "socket.io-client";
-import { debug } from "./debug";
 
 const protocolVersions = ["^0.4.0", "^0.3.0", "^0.2.0", "^0.1.0"];
-
-/**
- * Error raising for socket.io issues
- */
-function createErrorObject(handler: string, error: any, canRetry = true) {
-    // Note: we suspect the incoming error object is either:
-    // - a string: log it in the message (if not a string, it may contain PII but will print as [object Object])
-    // - a socketError: add it to the OdspError object for driver to be able to parse it and reason
-    //   over it.
-    const errorObj = createGenericNetworkError(
-        `socket.io error: ${handler}: ${error}`,
-        canRetry,
-    );
-
-    (errorObj as any).socketError = error;
-    return errorObj;
-}
-
-interface IEventListener {
-    event: string;
-    listener(...args: any[]): void;
-}
 
 const timeoutMs = 20000;
 
@@ -68,6 +44,7 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
         this.socket = io(
             url,
             {
+                autoConnect: false,
                 query: {
                     documentId,
                     tenantId,
@@ -109,7 +86,52 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
             versions: protocolVersions,
         };
 
-        await this.initialize(connectMessage);
+        await this.connectWebSocket();
+        this._details = await this.connectDocument(connectMessage);
+    }
+
+    private async connectWebSocket() {
+        return new Promise<void>((resolve, reject) => {
+            const removeListeners = () => {
+                this.socket.off("connect_error", rejectAndRemoveListeners);
+                this.socket.off("connect_timeout", rejectAndRemoveListeners);
+                this.socket.off("error", rejectAndRemoveListeners);
+                this.socket.off("connect", resolveAndRemoveListeners);
+            };
+            const rejectAndRemoveListeners = () => {
+                reject();
+                removeListeners();
+            };
+            const resolveAndRemoveListeners = () => {
+                resolve();
+                removeListeners();
+            };
+            this.socket.on("connect_error", rejectAndRemoveListeners);
+            this.socket.on("connect_timeout", rejectAndRemoveListeners);
+            this.socket.on("error", rejectAndRemoveListeners);
+            this.socket.on("connect", resolveAndRemoveListeners);
+            this.socket.connect();
+        });
+    }
+
+    private async connectDocument(connectMessage: IConnect) {
+        return new Promise<IConnected>((resolve, reject) => {
+            const removeListeners = () => {
+                this.socket.off("connect_document_error", rejectAndRemoveListeners);
+                this.socket.off("connect_document_success", resolveAndRemoveListeners);
+            };
+            const rejectAndRemoveListeners = () => {
+                reject();
+                removeListeners();
+            };
+            const resolveAndRemoveListeners = (details: IConnected) => {
+                resolve(details);
+                removeListeners();
+            };
+            this.socket.on("connect_document_error", rejectAndRemoveListeners);
+            this.socket.on("connect_document_success", resolveAndRemoveListeners);
+            this.socket.emit("connect_document", connectMessage);
+        });
     }
 
     // Listen for ops sent before we receive a response to connect_document
@@ -117,8 +139,6 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
     private readonly queuedSignals: ISignalMessage[] = [];
 
     private _details: IConnected | undefined;
-
-    private readonly trackedListeners: IEventListener[] = [];
 
     private get details(): IConnected {
         if (!this._details) {
@@ -260,91 +280,5 @@ export class DocumentDeltaConnection2 extends TypedEventEmitter<IDocumentDeltaCo
      */
     public disconnect() {
         this.socket.disconnect();
-    }
-
-    private async initialize(connectMessage: IConnect) {
-        this.socket.on("op", this.earlyOpHandler);
-        this.socket.on("signal", this.earlySignalHandler);
-
-        this._details = await new Promise<IConnected>((resolve, reject) => {
-            // Listen for connection issues
-            this.addConnectionListener("connect_error", (error) => {
-                debug(`Socket connection error: [${error}]`);
-                this.disconnect();
-                reject(createErrorObject("connect_error", error));
-            });
-
-            // Listen for timeouts
-            this.addConnectionListener("connect_timeout", () => {
-                this.disconnect();
-                reject(createErrorObject("connect_timeout", "Socket connection timed out"));
-            });
-
-            // Socket can be disconnected while waiting for Fluid protocol messages
-            // (connect_document_error / connect_document_success)
-            this.addConnectionListener("disconnect", (reason) => {
-                reject(createErrorObject("disconnect", reason));
-            });
-
-            this.addConnectionListener("connect_document_success", (response: IConnected) => {
-                this.removeTrackedListeners();
-                resolve(response);
-            });
-
-            this.socket.on("error", ((error) => {
-                // First, raise an error event, to give clients a chance to observe error contents
-                // This includes "Invalid namespace" error, which we consider critical (reconnecting will not help)
-                const errorObj = createErrorObject("error", error, error !== "Invalid namespace");
-                reject(errorObj);
-                this.emit("error", errorObj);
-
-                // Safety net - disconnect socket if client did not do so as result of processing "error" event.
-                this.disconnect();
-            }));
-
-            this.addConnectionListener("connect_document_error", ((error) => {
-                // This is not an error for the socket - it's a protocol error.
-                // In this case we disconnect the socket and indicate that we were unable to create the
-                // DocumentDeltaConnection.
-                this.disconnect();
-                reject(createErrorObject("connect_document_error", error));
-            }));
-
-            this.socket.emit("connect_document", connectMessage);
-
-            // Give extra 2 seconds for handshake on top of socket connection timeout
-            setTimeout(() => {
-                reject(createErrorObject("Timeout waiting for handshake from ordering service", undefined));
-            }, timeoutMs + 2000);
-        });
-    }
-
-    private readonly earlyOpHandler = (documentId: string, msgs: ISequencedDocumentMessage[]) => {
-        debug("Queued early ops", msgs.length);
-        this.queuedMessages.push(...msgs);
-    };
-
-    private readonly earlySignalHandler = (msg: ISignalMessage) => {
-        debug("Queued early signals");
-        this.queuedSignals.push(msg);
-    };
-
-    private removeEarlyOpHandler() {
-        this.socket.removeListener("op", this.earlyOpHandler);
-    }
-
-    private removeEarlySignalHandler() {
-        this.socket.removeListener("signal", this.earlySignalHandler);
-    }
-
-    private addConnectionListener(event: string, listener: (...args: any[]) => void) {
-        this.socket.on(event, listener);
-        this.trackedListeners.push({ event, listener });
-    }
-
-    private removeTrackedListeners() {
-        for (const { event, listener } of this.trackedListeners) {
-            this.socket.off(event, listener);
-        }
     }
 }
