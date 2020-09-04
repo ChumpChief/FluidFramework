@@ -34,7 +34,9 @@
   "dependencies": {
     "@fluidframework/aqueduct": "^0.25.1",
     "@fluidframework/driver-base": "^0.25.1",
-    "@fluidframework/get-tinylicious-container": "^0.25.1"
+    "@fluidframework/get-tinylicious-container": "^0.25.1",
+    "jsonwebtoken": "^8.4.0",
+    "uuid": "^3.3.2"
   },
   "devDependencies": {
     "@fluidframework/build-common": "^0.18.0",

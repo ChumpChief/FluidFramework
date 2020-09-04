@@ -3,11 +3,16 @@
  * Licensed under the MIT License.
  */
 
+import { SocketIODeltaFeed } from "@fluidframework/driver-base";
 import { getTinyliciousContainer } from "@fluidframework/get-tinylicious-container";
+import jwt from "jsonwebtoken";
+import { v4 as uuid } from "uuid";
 
 import { DiceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
 import { renderDiceRoller } from "./view";
+
+/* eslint-disable dot-notation */
 
 // In interacting with the service, we need to be explicit about whether we're creating a new document vs. loading
 // an existing one.  We also need to provide the unique ID for the document we are creating or loading from.
@@ -23,6 +28,29 @@ if (location.hash.length === 0) {
 }
 const documentId = location.hash.substring(1);
 document.title = documentId;
+
+const testFeed = new SocketIODeltaFeed(documentId, "tinylicious", "http://localhost:3000");
+window["testFeed"] = testFeed;
+// IClient
+const client = {
+    details: {
+        capabilities: { interactive: true },
+    },
+    mode: "write",
+    permission: [],
+    scopes: [],
+    user: { id: "" },
+};
+window["oldClient"] = client;
+
+// ITokenClaims
+const token = jwt.sign({
+    documentId,
+    scopes: ["doc:read", "doc:write", "summary:write"],
+    tenantId: "tinylicious",
+    user: { id: uuid() },
+}, "12345");
+window["oldToken"] = token;
 
 async function start(): Promise<void> {
     // The getTinyliciousContainer helper function facilitates loading our container code into a Container and
@@ -52,3 +80,4 @@ async function start(): Promise<void> {
 }
 
 start().catch((error) => console.error(error));
+/* eslint-enable dot-notation */
