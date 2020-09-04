@@ -171,10 +171,6 @@ export class DeltaManager
         return this.lastProcessedSequenceNumber;
     }
 
-    private get lastKnownSeqNumber() {
-        return this.lastObservedSeqNumber;
-    }
-
     public get minimumSequenceNumber(): number {
         return this.minSequenceNumber;
     }
@@ -752,7 +748,7 @@ export class DeltaManager
         this.emit(
             "connect",
             connection.details,
-            hasOpsBehindInfo ? this.lastKnownSeqNumber - this.lastSequenceNumber : undefined);
+            hasOpsBehindInfo ? this.lastObservedSeqNumber - this.lastSequenceNumber : undefined);
 
         this.processInitialMessages(
             initialMessages,
