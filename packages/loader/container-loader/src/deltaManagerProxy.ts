@@ -113,10 +113,6 @@ export class DeltaManagerProxy
         return this.deltaManager.clientDetails;
     }
 
-    public get version(): string {
-        return this.deltaManager.version;
-    }
-
     public get maxMessageSize(): number {
         return this.deltaManager.maxMessageSize;
     }

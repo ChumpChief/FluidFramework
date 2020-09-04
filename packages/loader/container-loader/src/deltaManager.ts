@@ -181,13 +181,6 @@ export class DeltaManager
             ?? DefaultChunkSize;
     }
 
-    public get version(): string {
-        if (this.connection === undefined) {
-            throw new Error("Cannot check version without a connection");
-        }
-        return this.connection.details.version;
-    }
-
     public get serviceConfiguration(): IServiceConfiguration | undefined {
         return this.connection?.details.serviceConfiguration;
     }

@@ -98,9 +98,6 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
     // Details of client
     readonly clientDetails: IClientDetails;
 
-    // Protocol version being used to communicate with the service
-    readonly version: string;
-
     // Max message size allowed to the delta manager
     readonly maxMessageSize: number;
 
