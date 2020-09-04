@@ -171,7 +171,7 @@ export class DeltaManager
         return this.lastProcessedSequenceNumber;
     }
 
-    public get lastKnownSeqNumber() {
+    private get lastKnownSeqNumber() {
         return this.lastObservedSeqNumber;
     }
 
