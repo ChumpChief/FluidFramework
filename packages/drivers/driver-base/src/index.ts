@@ -4,4 +4,4 @@
  */
 
 export * from "./documentDeltaConnection";
-export * from "./deltaFeed";
+export * from "./socketIODeltaFeed";

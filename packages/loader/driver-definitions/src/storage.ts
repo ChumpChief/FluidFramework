@@ -189,7 +189,7 @@ export interface IDeltaFeed extends IEventProvider<IDeltaFeedEvents> {
     /**
      * Submit a new message to the server
      */
-    submit(messages: IDocumentMessage): void;
+    submit(message: IDocumentMessage): void;
 
     /**
      * Submit a new signal to the server

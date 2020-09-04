@@ -18,9 +18,9 @@ const protocolVersions = ["^0.4.0", "^0.3.0", "^0.2.0", "^0.1.0"];
 const timeoutMs = 20000;
 
 /**
- * Represents a connection to a stream of delta updates
+ * Enables connecting to, reading from, and submitting to a feed of delta updates
  */
-export class DeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> implements IDeltaFeed {
+export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> implements IDeltaFeed {
     private readonly socket: SocketIOClient.Socket;
     /**
      * Contains information about the connection if document-connected, or undefined if not document-connected
