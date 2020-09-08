@@ -7,9 +7,15 @@ import { IDeltaFeedFollower, IDeltaFeedFollowerEvents } from "@fluidframework/co
 import { Deferred, TypedEventEmitter } from "@fluidframework/common-utils";
 import Deque from "double-ended-queue";
 import { IDeltaFeed, IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
+import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 
 // eslint-disable-next-line max-len
 export class DeltaFeedFollower<T> extends TypedEventEmitter<IDeltaFeedFollowerEvents<T>> implements IDeltaFeedFollower<T> {
+    // The message buffer that can be read from as desired.
+    private readonly sequentialMessages: ISequencedDocumentMessage[] = [];
+    // Messages that we've received from the future (ahead of the expected sequence number)
+    // The feed follower should go find out what the missing messages are so we can complete the sequence.
+    private readonly disjointMessages: ISequencedDocumentMessage[] = [];
     private readonly q = new Deque<T>();
 
     /**
@@ -57,7 +63,7 @@ export class DeltaFeedFollower<T> extends TypedEventEmitter<IDeltaFeedFollowerEv
         private readonly worker: (delta: T) => void,
     ) {
         super();
-        console.log(this.deltaFeed, this.deltaStorage);
+        console.log(this.deltaFeed, this.deltaStorage, this.sequentialMessages, this.disjointMessages);
     }
 
     public clear(): void {
