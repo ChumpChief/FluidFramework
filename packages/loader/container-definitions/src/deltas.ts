@@ -178,56 +178,10 @@ export interface IDeltaQueue<T> extends IEventProvider<IDeltaQueueEvents<T>> {
     systemResume(): void;
 }
 
-export interface IDeltaFeedFollowerEvents<T> extends IErrorEvent {
-    (event: "push" | "op", listener: (task: T) => void);
-    (event: "idle", listener: () => void);
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface IDeltaFeedFollowerEvents extends IErrorEvent {
 }
 
-export interface IDeltaFeedFollower<T> extends IEventProvider<IDeltaFeedFollowerEvents<T>> {
-    /**
-     * Flag indicating whether or not the queue was paused
-     */
-    paused: boolean;
-
-    /**
-     * The number of messages remaining in the queue
-     */
-    length: number;
-
-    /**
-     * Flag indicating whether or not the queue is idle
-     */
-    idle: boolean;
-
-    /**
-     * Pauses processing on the queue
-     * @returns A promise which resolves when processing has been paused.
-     */
-    pause(): Promise<void>;
-
-    /**
-     * Resumes processing on the queue
-     */
-    resume(): void;
-
-    /**
-     * Peeks at the next message in the queue
-     */
-    peek(): T | undefined;
-
-    /**
-     * Returns all the items in the queue as an array. Does not remove them from the queue.
-     */
-    toArray(): T[];
-
-    /**
-     * System level pause
-     * @returns A promise which resolves when processing has been paused.
-     */
-    systemPause(): Promise<void>;
-
-    /**
-     * System level resume
-     */
-    systemResume(): void;
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface IDeltaFeedFollower extends IEventProvider<IDeltaFeedFollowerEvents> {
 }

@@ -4,161 +4,23 @@
  */
 
 import { IDeltaFeedFollower, IDeltaFeedFollowerEvents } from "@fluidframework/container-definitions";
-import { Deferred, TypedEventEmitter } from "@fluidframework/common-utils";
-import Deque from "double-ended-queue";
+import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDeltaFeed, IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 
 // eslint-disable-next-line max-len
-export class DeltaFeedFollower<T> extends TypedEventEmitter<IDeltaFeedFollowerEvents<T>> implements IDeltaFeedFollower<T> {
+export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvents> implements IDeltaFeedFollower {
     // The message buffer that can be read from as desired.
     private readonly sequentialMessages: ISequencedDocumentMessage[] = [];
     // Messages that we've received from the future (ahead of the expected sequence number)
     // The feed follower should go find out what the missing messages are so we can complete the sequence.
     private readonly disjointMessages: ISequencedDocumentMessage[] = [];
-    private readonly q = new Deque<T>();
 
-    /**
-     * Tracks whether the system has requested the queue be paused.
-     */
-    private sysPause = true;
-
-    /**
-     * Tracks whether the user of the container has requested the queue be paused.
-     */
-    private userPause = false;
-
-    private error: any | undefined;
-
-    /**
-     * When processing is ongoing, holds a deferred that will resolve once processing stops.
-     * Undefined when not processing.
-     */
-    private processingDeferred: Deferred<void> | undefined;
-
-    /**
-     * @returns True if the queue is paused, false if not.
-     */
-    public get paused(): boolean {
-        // The queue can be paused by either the user or by the system (e.g. during snapshotting).  If either requests
-        // a pause, then the queue will pause.
-        return this.sysPause || this.userPause;
-    }
-
-    public get length(): number {
-        return this.q.length;
-    }
-
-    public get idle(): boolean {
-        return this.processingDeferred === undefined && this.q.length === 0;
-    }
-
-    /**
-     * @param worker - A callback to process a delta.
-     * @param logger - For logging telemetry.
-     */
     constructor(
         private readonly deltaFeed: IDeltaFeed,
         private readonly deltaStorage: IDocumentDeltaStorageService,
-        private readonly worker: (delta: T) => void,
     ) {
         super();
         console.log(this.deltaFeed, this.deltaStorage, this.sequentialMessages, this.disjointMessages);
-    }
-
-    public clear(): void {
-        this.q.clear();
-    }
-
-    public peek(): T | undefined {
-        return this.q.peekFront();
-    }
-
-    public toArray(): T[] {
-        return this.q.toArray();
-    }
-
-    public push(task: T) {
-        this.q.push(task);
-        this.emit("push", task);
-        this.ensureProcessing();
-    }
-
-    public async pause(): Promise<void> {
-        this.userPause = true;
-        // If called from within the processing loop, we are in the middle of processing an op. Return a promise
-        // that will resolve when processing has actually stopped.
-        if (this.processingDeferred !== undefined) {
-            return this.processingDeferred.promise;
-        }
-    }
-
-    public resume(): void {
-        this.userPause = false;
-        if (!this.paused) {
-            this.ensureProcessing();
-        }
-    }
-
-    public async systemPause(): Promise<void> {
-        this.sysPause = true;
-        // If called from within the processing loop, we are in the middle of processing an op. Return a promise
-        // that will resolve when processing has actually stopped.
-        if (this.processingDeferred !== undefined) {
-            return this.processingDeferred.promise;
-        }
-    }
-
-    public systemResume(): void {
-        this.sysPause = false;
-        if (!this.paused) {
-            this.ensureProcessing();
-        }
-    }
-
-    /**
-     * There are several actions that may need to kick off delta processing, so we want to guard against
-     * accidental reentrancy. ensureProcessing can be called safely to start the processing loop if it is
-     * not already started.
-     */
-    private ensureProcessing() {
-        if (this.processingDeferred === undefined) {
-            this.processingDeferred = new Deferred<void>();
-            // Use a resolved promise to start the processing on a separate stack.
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            Promise.resolve().then(() => {
-                this.processDeltas();
-                if (this.processingDeferred !== undefined) {
-                    this.processingDeferred.resolve();
-                    this.processingDeferred = undefined;
-                }
-            });
-        }
-    }
-
-    /**
-     * Executes the delta processing loop until a stop condition is reached.
-     */
-    private processDeltas() {
-        // For grouping to work we must process all local messages immediately and in the single turn.
-        // So loop over them until no messages to process, we have become paused, or hit an error.
-        while (!(this.q.length === 0 || this.paused || this.error !== undefined)) {
-            // Get the next message in the queue
-            const next = this.q.shift();
-            // Process the message.
-            try {
-                // We know next is defined since we did a length check just prior to shifting.
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                this.worker(next!);
-                this.emit("op", next);
-            } catch (error) {
-                this.error = error;
-                this.emit("error", error);
-            }
-        }
-
-        if (this.q.length === 0) {
-            this.emit("idle");
-        }
     }
 }
