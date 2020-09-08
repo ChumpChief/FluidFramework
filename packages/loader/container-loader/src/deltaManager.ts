@@ -673,9 +673,9 @@ export class DeltaManager
 
         connection.on("op", (documentId: string, messages: ISequencedDocumentMessage[]) => {
             if (messages instanceof Array) {
-                this.enqueueMessages(messages);
+                this.enqueueInboundMessages(messages);
             } else {
-                this.enqueueMessages([messages]);
+                this.enqueueInboundMessages([messages]);
             }
         });
 
@@ -827,7 +827,7 @@ export class DeltaManager
         }
     }
 
-    private enqueueMessages(
+    private enqueueInboundMessages(
         messages: ISequencedDocumentMessage[],
         telemetryEventSuffix: string = "OutOfOrderMessage",
     ): void {
@@ -952,7 +952,7 @@ export class DeltaManager
 
     private catchUp(messages: ISequencedDocumentMessage[]): void {
         // Apply current operations
-        this.enqueueMessages(messages);
+        this.enqueueInboundMessages(messages);
 
         // Then sort pending operations and attempt to apply them again.
         // This could be optimized to stop handling messages once we realize we need to fetch missing values.
@@ -961,7 +961,7 @@ export class DeltaManager
         if (this.handler !== undefined) {
             const pendingSorted = this.pending.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
             this.pending = [];
-            this.enqueueMessages(pendingSorted);
+            this.enqueueInboundMessages(pendingSorted);
         }
     }
 
