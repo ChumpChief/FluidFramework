@@ -827,10 +827,7 @@ export class DeltaManager
         }
     }
 
-    private enqueueInboundMessages(
-        messages: ISequencedDocumentMessage[],
-        telemetryEventSuffix: string = "OutOfOrderMessage",
-    ): void {
+    private enqueueInboundMessages(messages: ISequencedDocumentMessage[]): void {
         if (this.handler === undefined) {
             // We did not setup handler yet.
             // This happens when we connect to web socket faster than we get attributes for container
@@ -841,9 +838,6 @@ export class DeltaManager
             return;
         }
 
-        let duplicateStart: number | undefined;
-        let duplicateEnd: number | undefined;
-
         if (messages.length > 0) {
             this.updateLatestKnownOpSeqNumber(messages[messages.length - 1].sequenceNumber);
         }
@@ -851,12 +845,7 @@ export class DeltaManager
         for (const message of messages) {
             // Check that the messages are arriving in the expected order
             if (message.sequenceNumber <= this.lastQueuedSequenceNumber) {
-                if (duplicateStart === undefined || duplicateStart > message.sequenceNumber) {
-                    duplicateStart = message.sequenceNumber;
-                }
-                if (duplicateEnd === undefined || duplicateEnd < message.sequenceNumber) {
-                    duplicateEnd = message.sequenceNumber;
-                }
+                throw new Error("Out of order inbound messages");
             } else if (message.sequenceNumber !== this.lastQueuedSequenceNumber + 1) {
                 this.pending.push(message);
                 // eslint-disable-next-line @typescript-eslint/no-floating-promises
