@@ -66,6 +66,8 @@ export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> imple
             this.emit("nack", ...args);
         });
 
+        // Maybe strip off the documentId arg here?
+        // Also, this seems can be an array of ops - maybe unpack them and emit multiple single op events?
         this.socket.on("op", (...args: any[]) => {
             this.emit("op", ...args);
         });
