@@ -3,68 +3,61 @@
  * Licensed under the MIT License.
  */
 
-import assert from "assert";
 import { IDeltaFeedFollower, IDeltaFeedFollowerEvents } from "@fluidframework/container-definitions";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDeltaFeed, IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 
 export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvents> implements IDeltaFeedFollower {
-    // The op buffer that can be read from as desired.
+    // The op buffer that can be read from as desired.  Guaranteed to not include disjoint spans.
     private readonly sequentialOps: ISequencedDocumentMessage[] = [];
-    // Ops that we've received from the future (ahead of the expected sequence number)
-    // The feed follower should go find out what the missing ops are so we can complete the sequence.
-    private disjointOps: ISequencedDocumentMessage[] = [];
+    // The list of ops received via "op" events that have not yet been sequenced.  May include disjoint spans.
+    private incomingOps: ISequencedDocumentMessage[] = [];
     // To determine whether the next op we see is sequential or disjoint, we'll see if it's one more than
     // the latestProcessedOpSequenceNumber.
-    private latestProcessedOpSequenceNumber: number = 0;
+    private latestSequentialOpSequenceNumber: number = 0;
+    private sequencingPromise: Promise<void> | undefined;
 
     constructor(
-        private readonly deltaFeed: IDeltaFeed,
+        deltaFeed: IDeltaFeed,
         private readonly deltaStorage: IDocumentDeltaStorageService,
     ) {
         super();
-        console.log(this.deltaFeed, this.deltaStorage, this.sequentialOps, this.disjointOps);
-        // Consider pushing this down - can we start ignoring the documentId arg at the feed level?
+        // Consider pushing the param ignoring down - can we start ignoring the documentId arg at the feed level?
         // And unpacking the array
-        deltaFeed.on("op", (documentId, ops) => { this.processOps(ops); });
+        deltaFeed.on("op", (documentId, ops) => { this.handleIncomingOps(ops); });
     }
 
-    // Currently this is expecting to be called either in response to the op event, after retrieving missing ops from
-    // storage, or when reattempting the disjoint ops after processing those missing ops
-    private processOps(ops: ISequencedDocumentMessage[]) {
-        for (const op of ops) {
-            assert.strict(
-                op.sequenceNumber > this.latestProcessedOpSequenceNumber,
-                "Incoming op sequence numbers should always increase",
-            );
-            if (op.sequenceNumber === this.latestProcessedOpSequenceNumber + 1) {
-                this.sequentialOps.push(op);
-                this.latestProcessedOpSequenceNumber = op.sequenceNumber;
-            } else if (op.sequenceNumber >= this.latestProcessedOpSequenceNumber + 1) {
-                // this is wrong
-                this.disjointOps.push(op);
-                // go fetch the missing ops
-                this.fetchMissingOps(op.sequenceNumber);
-                // maybe proactively push the remaining ops into disjoint since they're all presumably later?
-            }
+    // This will just append the incoming ops to the incoming op queue and ensure we're sequencing.
+    private handleIncomingOps(ops: ISequencedDocumentMessage[]) {
+        this.incomingOps.concat(ops);
+        if (this.sequencingPromise === undefined) {
+            this.sequencingPromise = this.sequenceOps().catch((err) => { console.log(err); });
         }
     }
 
-    // If we see an op come in that is in the "future", we will try to get the ops we "missed" from storage.
-    // After getting them, we will process those ops first, and then the "future ops" (which at that point will
-    // hopefully be "present ops").
-    private async fetchMissingOps(to: number) {
-        const missingOps = await this.deltaStorage.get(this.latestProcessedOpSequenceNumber, to);
-        this.processOps(missingOps);
-        this.processDisjointOps();
-    }
+    // sequenceOps will run async until the incoming op queue is empty.  We'll hold the promise until it is done to
+    // avoid reentrancy.
+    private async sequenceOps() {
+        // Even if more ops come in while we are processing (i.e. while we are awaiting storage) the loop will still
+        // iterate over those newly added ops.
+        for (const incomingOp of this.incomingOps) {
+            if (incomingOp.sequenceNumber > this.latestSequentialOpSequenceNumber + 1) {
+                // Should handle if this fails or only gets some of the ops?
+                const missingOps = await this.deltaStorage.get(
+                    this.latestSequentialOpSequenceNumber,
+                    incomingOp.sequenceNumber,
+                );
+                this.sequentialOps.concat(missingOps);
+            }
 
-    // Empty the disjoint op buffer and run them through processing again.  If there is more disjointedness we might
-    // have to go through again.
-    private processDisjointOps() {
-        const disjointOps = this.disjointOps;
-        this.disjointOps = [];
-        this.processOps(disjointOps);
+            // Should handle if the incoming op is non-increasing (throw)?
+            this.sequentialOps.push(incomingOp);
+            this.latestSequentialOpSequenceNumber = incomingOp.sequenceNumber;
+        }
+
+        // Return to rest state
+        this.incomingOps = [];
+        this.sequencingPromise = undefined;
     }
 }
