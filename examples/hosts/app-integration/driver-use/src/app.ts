@@ -3,8 +3,11 @@
  * Licensed under the MIT License.
  */
 
+import { DeltaFeedFollower } from "@fluidframework/container-loader";
 import { SocketIODeltaFeed } from "@fluidframework/driver-base";
 import { getTinyliciousContainer } from "@fluidframework/get-tinylicious-container";
+import { IClient } from "@fluidframework/protocol-definitions";
+import { DocumentDeltaStorageService, TokenProvider } from "@fluidframework/routerlicious-driver";
 import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
 
@@ -29,10 +32,10 @@ if (location.hash.length === 0) {
 const documentId = location.hash.substring(1);
 document.title = documentId;
 
-const testFeed = new SocketIODeltaFeed(documentId, "tinylicious", "http://localhost:3000");
-window["testFeed"] = testFeed;
-// IClient
-const client = {
+const deltaFeed = new SocketIODeltaFeed(documentId, "tinylicious", "http://localhost:3000");
+window["testDeltaFeed"] = deltaFeed;
+
+const client: IClient = {
     details: {
         capabilities: { interactive: true },
     },
@@ -51,6 +54,13 @@ const token = jwt.sign({
     user: { id: uuid() },
 }, "12345");
 window["oldToken"] = token;
+
+const tokenProvider = new TokenProvider(token);
+const encodedDocId = encodeURIComponent(documentId);
+const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${encodedDocId}`;
+const deltaStorageService = new DocumentDeltaStorageService("tinylicious", tokenProvider, deltaStorageUrl);
+const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService);
+window["testDeltaFeedFollower"] = deltaFeedFollower;
 
 async function start(): Promise<void> {
     // The getTinyliciousContainer helper function facilitates loading our container code into a Container and
@@ -77,6 +87,11 @@ async function start(): Promise<void> {
     // Given an IDiceRoller, we can render the value and provide controls for users to roll it.
     const div = document.getElementById("content") as HTMLDivElement;
     renderDiceRoller(diceRoller, div);
+
+    // connect our test feed
+    deltaFeed.connect("tinylicious", documentId, token, client)
+        .then(() => console.log("Feed connected"))
+        .catch((error) => console.error(error));
 }
 
 start().catch((error) => console.error(error));

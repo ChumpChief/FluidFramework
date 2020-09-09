@@ -5,5 +5,6 @@
 
 export * from "./audience";
 export * from "./container";
+export * from "./deltaFeedFollower";
 export * from "./deltaManager";
 export * from "./networkUtils";

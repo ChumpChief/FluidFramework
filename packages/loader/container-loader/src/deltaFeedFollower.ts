@@ -32,7 +32,7 @@ export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvent
     private handleIncomingOps(ops: ISequencedDocumentMessage[]) {
         this.incomingOps.concat(ops);
         if (this.sequencingPromise === undefined) {
-            this.sequencingPromise = this.sequenceOps().catch((err) => { console.log(err); });
+            this.sequencingPromise = this.sequenceOps().catch((err) => { console.error(err); });
         }
     }
 
