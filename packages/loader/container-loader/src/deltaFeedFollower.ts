@@ -30,7 +30,7 @@ export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvent
 
     // This will just append the incoming ops to the incoming op queue and ensure we're sequencing.
     private handleIncomingOps(ops: ISequencedDocumentMessage[]) {
-        this.incomingOps.concat(ops);
+        this.incomingOps.push(...ops);
         if (this.sequencingPromise === undefined) {
             this.sequencingPromise = this.sequenceOps().catch((err) => { console.error(err); });
         }
@@ -48,7 +48,7 @@ export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvent
                     this.latestSequentialOpSequenceNumber,
                     incomingOp.sequenceNumber,
                 );
-                this.sequentialOps.concat(missingOps);
+                this.sequentialOps.push(...missingOps);
             }
 
             // Should handle if the incoming op is non-increasing (throw)?
