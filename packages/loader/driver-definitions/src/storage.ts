@@ -163,8 +163,8 @@ export interface IDeltaFeedEvents extends IErrorEvent {
     (event: "connected" | "disconnected", listener: () => void);
 
     // Protocol messages not handled at this layer, rebroadcast up to higher layers
-    (event: "nack", listener: (documentId: string, message: INack[]) => void);
-    (event: "op", listener: (documentId: string, messages: ISequencedDocumentMessage[]) => void);
+    (event: "nack", listener: (message: INack[]) => void);
+    (event: "op", listener: (message: ISequencedDocumentMessage) => void);
     (event: "signal", listener: (message: ISignalMessage) => void);
 }
 

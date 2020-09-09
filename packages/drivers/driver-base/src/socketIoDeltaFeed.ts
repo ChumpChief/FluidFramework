@@ -10,6 +10,9 @@ import {
     IConnect,
     IConnected,
     IDocumentMessage,
+    INack,
+    ISequencedDocumentMessage,
+    ISignalMessage,
 } from "@fluidframework/protocol-definitions";
 import io from "socket.io-client";
 
@@ -62,18 +65,18 @@ export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> imple
         });
 
         // Re-emit protocol messages, we don't handle them at this layer.
-        this.socket.on("nack", (...args: any[]) => {
-            this.emit("nack", ...args);
+        this.socket.on("nack", (docId: string, messages: INack[]) => {
+            this.emit("nack", ...messages);
         });
 
-        // Maybe strip off the documentId arg here?
-        // Also, this seems can be an array of ops - maybe unpack them and emit multiple single op events?
-        this.socket.on("op", (...args: any[]) => {
-            this.emit("op", ...args);
+        this.socket.on("op", (docId: string, messages: ISequencedDocumentMessage[]) => {
+            for (const message of messages) {
+                this.emit("op", message);
+            }
         });
 
-        this.socket.on("signal", (...args: any[]) => {
-            this.emit("signal", ...args);
+        this.socket.on("signal", (message: ISignalMessage) => {
+            this.emit("signal", message);
         });
     }
 

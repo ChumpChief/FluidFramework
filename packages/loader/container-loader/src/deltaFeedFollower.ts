@@ -18,19 +18,18 @@ export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvent
     private latestSequentialOpSequenceNumber: number = 0;
     private sequencingPromise: Promise<void> | undefined;
 
+    // TODO also needs to know the actual latest op number
     constructor(
         deltaFeed: IDeltaFeed,
         private readonly deltaStorage: IDocumentDeltaStorageService,
     ) {
         super();
-        // Consider pushing the param ignoring down - can we start ignoring the documentId arg at the feed level?
-        // And unpacking the array
-        deltaFeed.on("op", (documentId, ops) => { this.handleIncomingOps(ops); });
+        deltaFeed.on("op", (op: ISequencedDocumentMessage) => { this.handleIncomingOp(op); });
     }
 
     // This will just append the incoming ops to the incoming op queue and ensure we're sequencing.
-    private handleIncomingOps(ops: ISequencedDocumentMessage[]) {
-        this.incomingOps.push(...ops);
+    private handleIncomingOp(op: ISequencedDocumentMessage) {
+        this.incomingOps.push(op);
         if (this.sequencingPromise === undefined) {
             this.sequencingPromise = this.sequenceOps()
                 .then(() => { this.sequencingPromise = undefined; })
