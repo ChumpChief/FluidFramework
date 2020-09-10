@@ -204,7 +204,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private resumedOpProcessingAfterLoad = false;
-    private _loadedFromVersion: IVersion | undefined;
     private cachedAttachSummary: ISummaryTree | undefined;
     private attachInProgress = false;
 
@@ -212,10 +211,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get resolvedUrl(): IResolvedUrl | undefined {
         return this._resolvedUrl;
-    }
-
-    public get loadedFromVersion(): IVersion | undefined {
-        return this._loadedFromVersion;
     }
 
     /**
@@ -658,8 +653,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._attachState = AttachState.Attached;
 
         // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null
-        const maybeSnapshotTree = specifiedVersion === null ? undefined
-            : await this.fetchSnapshotTree(specifiedVersion);
+        const maybeSnapshotTree = await this.fetchSnapshotTree();
 
         // We want to start this process early, but we don't need the blob manager just yet so we don't await.
         const blobManagerP = this.loadBlobManager(this.storageService, maybeSnapshotTree);
@@ -1025,19 +1019,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     /**
-     * Get the most recent snapshot, or a specific version.
-     * @param specifiedVersion - The specific version of the snapshot to retrieve
-     * @returns The snapshot requested, or the latest snapshot if no version was specified
+     * Get the most recent snapshot.
+     * @returns The latest snapshot
      */
-    private async fetchSnapshotTree(specifiedVersion?: string): Promise<ISnapshotTree | undefined> {
-        const version = await this.getVersion(specifiedVersion ?? this.id);
-
-        if (version !== undefined) {
-            this._loadedFromVersion = version;
-            return await this.storageService.getSnapshotTree(version) ?? undefined;
-        }
-
-        return undefined;
+    private async fetchSnapshotTree(): Promise<ISnapshotTree | undefined> {
+        return this.storageService.getLatestSnapshot();
     }
 
     private async loadContext(snapshot?: ISnapshotTree) {

@@ -19,7 +19,6 @@ import {
     ITree,
     MessageType,
     ISummaryTree,
-    IVersion,
 } from "@fluidframework/protocol-definitions";
 import { IAudience } from "./audience";
 import { IBlobManager } from "./blobs";
@@ -102,8 +101,6 @@ export interface IContainerContext extends IMessageScheduler, IDisposable {
      * Indicates the attachment state of the container to a host service.
      */
     readonly attachState: AttachState;
-
-    getLoadedFromVersion(): IVersion | undefined;
 
     createSummary(): ISummaryTree;
 }

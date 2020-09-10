@@ -38,6 +38,7 @@ export interface IDocumentDeltaStorageService {
  * Interface to provide access to snapshots saved for a shared object
  */
 export interface IDocumentStorageService {
+    getLatestSnapshot(): Promise<ISnapshotTree>;
     /**
      * Returns the snapshot tree.
      */

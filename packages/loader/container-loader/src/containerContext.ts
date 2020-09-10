@@ -31,7 +31,6 @@ import {
     ITree,
     MessageType,
     ISummaryTree,
-    IVersion,
 } from "@fluidframework/protocol-definitions";
 import { BlobManager } from "./blobManager";
 import { Container } from "./container";
@@ -169,10 +168,6 @@ export class ContainerContext implements IContainerContext {
 
     public async snapshot(tagMessage: string = "", fullTree: boolean = false): Promise<ITree | null> {
         return this.runtime.snapshot(tagMessage, fullTree);
-    }
-
-    public getLoadedFromVersion(): IVersion | undefined {
-        return this.container.loadedFromVersion;
     }
 
     public get attachState(): AttachState {

@@ -19,6 +19,10 @@ import {
 export class DocumentStorageServiceProxy implements IDocumentStorageService {
     constructor(protected readonly internalStorageService: IDocumentStorageService) { }
 
+    public async getLatestSnapshot(): Promise<ISnapshotTree> {
+        return this.internalStorageService.getLatestSnapshot();
+    }
+
     public async getSnapshotTree(version: IVersion): Promise<ISnapshotTree | null> {
         return this.internalStorageService.getSnapshotTree(version);
     }

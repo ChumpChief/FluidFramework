@@ -650,7 +650,7 @@ export class ContainerRuntime extends EventEmitter
 
         this.latestSummaryAck = {
             proposalHandle: undefined,
-            ackHandle: this.context.getLoadedFromVersion()?.id,
+            ackHandle: undefined,
         };
         this.summaryTracker = new SummaryTracker(
             "", // fullPath - the root is unnamed

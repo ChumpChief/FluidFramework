@@ -31,18 +31,21 @@ export class DocumentStorageService implements IDocumentStorageService {
     constructor(public readonly id: string, public manager: gitStorage.GitManager) {
     }
 
+    public async getLatestSnapshot(): Promise<ISnapshotTree> {
+        const commits = await this.manager.getCommits(this.id, 1);
+        const latestCommit = commits[0];
+        const version = {
+            date: latestCommit.commit.author.date,
+            id: latestCommit.sha,
+            treeId: latestCommit.commit.tree.sha,
+        };
+        const tree = await this.manager.getTree(version.treeId);
+        const snapshotTree = buildHierarchy(tree, this.blobsShaCache);
+        return snapshotTree;
+    }
+
     public async getSnapshotTree(version: IVersion): Promise<ISnapshotTree | null> {
-        let requestVersion = version;
-        if (!requestVersion) {
-            const versions = await this.getVersions(this.id, 1);
-            if (versions.length === 0) {
-                return null;
-            }
-
-            requestVersion = versions[0];
-        }
-
-        const tree = await this.manager.getTree(requestVersion.treeId);
+        const tree = await this.manager.getTree(version.treeId);
         return buildHierarchy(tree, this.blobsShaCache);
     }
 
@@ -68,15 +71,8 @@ export class DocumentStorageService implements IDocumentStorageService {
     }
 
     public async uploadSummaryWithContext(summary: ISummaryTree, context: ISummaryContext): Promise<string> {
-        const snapshot = context.ackHandle
-            ? await this.getVersions(context.ackHandle, 1)
-                .then(async (versions) => {
-                    // Clear the cache as the getSnapshotTree call will fill the cache.
-                    this.blobsShaCache.clear();
-                    return this.getSnapshotTree(versions[0]);
-                })
-            : undefined;
-        return this.writeSummaryTree(summary, snapshot ?? undefined);
+        const snapshot = await this.getLatestSnapshot();
+        return this.writeSummaryTree(summary, snapshot);
     }
 
     public async createBlob(file: Buffer): Promise<ICreateBlobResponse> {
