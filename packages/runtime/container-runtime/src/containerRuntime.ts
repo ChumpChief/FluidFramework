@@ -451,14 +451,11 @@ export class ContainerRuntime extends EventEmitter
      * @param context - Context of the container.
      * @param registry - Mapping to the stores.
      * @param requestHandlers - Request handlers for the container runtime
-     * @param runtimeOptions - Additional options to be passed to the runtime
      */
     public static async load(
         context: IContainerContext,
         registryEntries: NamedFluidDataStoreRegistryEntries,
         requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
-        runtimeOptions?: IContainerRuntimeOptions,
-        containerScope: IFluidObject = {},
     ): Promise<ContainerRuntime> {
         // Back-compat: <= 0.18 loader
         if (context.deltaManager.lastSequenceNumber === undefined) {
@@ -479,8 +476,6 @@ export class ContainerRuntime extends EventEmitter
             context,
             registry,
             chunks,
-            runtimeOptions,
-            containerScope,
             requestHandler);
 
         // Create all internal stores in first load.
@@ -628,15 +623,17 @@ export class ContainerRuntime extends EventEmitter
     // on its creation). This is a superset of contexts.
     private readonly contextsDeferred = new Map<string, Deferred<FluidDataStoreContext>>();
 
+    private readonly runtimeOptions: IContainerRuntimeOptions = {
+        generateSummaries: true,
+        enableWorker: false,
+    };
+
+    private readonly containerScope: IFluidObject = {};
+
     private constructor(
         private readonly context: IContainerContext,
         private readonly registry: IFluidDataStoreRegistry,
         chunks: [string, string[]][],
-        private readonly runtimeOptions: IContainerRuntimeOptions = {
-            generateSummaries: true,
-            enableWorker: false,
-        },
-        private readonly containerScope: IFluidObject,
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ) {
         super();
