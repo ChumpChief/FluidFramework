@@ -42,7 +42,6 @@ import {
     readAndParse,
 } from "@fluidframework/driver-utils";
 import {
-    BlobTreeEntry,
     TreeTreeEntry,
 } from "@fluidframework/protocol-base";
 import {
@@ -108,27 +107,12 @@ import { DeltaScheduler } from "./deltaScheduler";
 import { SummaryCollection } from "./summaryCollection";
 import { PendingStateManager } from "./pendingStateManager";
 
-const chunksBlobName = ".chunks";
-
 export enum ContainerMessageType {
     // An op to be delivered to store
     FluidDataStoreOp = "component",
 
     // Creates a new store
     Attach = "attach",
-
-    // Chunked operation.
-    ChunkedOp = "chunkedOp",
-}
-
-export interface IChunkedOp {
-    chunkId: number;
-
-    totalChunks: number;
-
-    contents: string;
-
-    originalType: MessageType | ContainerMessageType;
 }
 
 export interface ContainerRuntimeMessage {
@@ -213,7 +197,6 @@ interface IRuntimeMessageMetadata {
 export function isRuntimeMessage(message: ISequencedDocumentMessage): boolean {
     switch (message.type) {
         case ContainerMessageType.FluidDataStoreOp:
-        case ContainerMessageType.ChunkedOp:
         case ContainerMessageType.Attach:
         case MessageType.Operation:
             return true;
@@ -459,16 +442,9 @@ export class ContainerRuntime extends EventEmitter
     ): Promise<ContainerRuntime> {
         const registry = new ContainerRuntimeDataStoreRegistry(registryEntries);
 
-        const chunkId = context.baseSnapshot?.blobs[chunksBlobName];
-        const chunks = chunkId
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            ? await readAndParse<[string, string[]][]>(context.storage!, chunkId)
-            : [];
-
         const runtime = new ContainerRuntime(
             context,
             registry,
-            chunks,
             requestHandler);
 
         // Create all internal stores in first load.
@@ -607,9 +583,6 @@ export class ContainerRuntime extends EventEmitter
     private readonly scheduleManager: ScheduleManager;
     private readonly pendingStateManager: PendingStateManager;
 
-    // Local copy of incomplete received chunks.
-    private readonly chunkMap: Map<string, string[]>;
-
     // Attached and loaded context proxies
     private readonly contexts = new Map<string, FluidDataStoreContext>();
     // List of pending contexts (for the case where a client knows a store will exist and is waiting
@@ -626,13 +599,11 @@ export class ContainerRuntime extends EventEmitter
     private constructor(
         private readonly context: IContainerContext,
         private readonly registry: IFluidDataStoreRegistry,
-        chunks: [string, string[]][],
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ) {
         super();
 
         this._connected = this.context.connected;
-        this.chunkMap = new Map<string, string[]>(chunks);
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
@@ -726,10 +697,6 @@ export class ContainerRuntime extends EventEmitter
         this.deltaSender = this.deltaManager;
 
         this.pendingStateManager = new PendingStateManager(this);
-
-        this.context.quorum.on("removeMember", (clientId: string) => {
-            this.clearPartialChunks(clientId);
-        });
 
         // We always create the summarizer in the case that we are asked to generate summaries. But this may
         // want to be on demand instead.
@@ -901,18 +868,7 @@ export class ContainerRuntime extends EventEmitter
             ));
         }
 
-        if (this.chunkMap.size > 0) {
-            root.entries.push(new BlobTreeEntry(chunksBlobName, JSON.stringify([...this.chunkMap])));
-        }
-
         return root;
-    }
-
-    protected serializeContainerBlobs(summaryTreeBuilder: SummaryTreeBuilder) {
-        if (this.chunkMap.size > 0) {
-            const content = JSON.stringify([...this.chunkMap]);
-            summaryTreeBuilder.addBlob(chunksBlobName, content);
-        }
     }
 
     public async requestSnapshot(tagMessage: string): Promise<void> {
@@ -978,17 +934,10 @@ export class ContainerRuntime extends EventEmitter
         try {
             message = unpackRuntimeMessage(message);
 
-            // Chunk processing must come first given that we will transform the message to the unchunked version
-            // once all pieces are available
-            message = this.processRemoteChunkedMessage(message);
-
             let localMessageMetadata: unknown;
             if (local) {
                 // Call the PendingStateManager to process local messages.
-                // Do not process local chunked ops until all pieces are available.
-                if (message.type !== ContainerMessageType.ChunkedOp) {
-                    localMessageMetadata = this.pendingStateManager.processPendingLocalMessage(message);
-                }
+                localMessageMetadata = this.pendingStateManager.processPendingLocalMessage(message);
 
                 // If there are no more pending messages after processing a local message,
                 // the document is no longer dirty.
@@ -1296,7 +1245,6 @@ export class ContainerRuntime extends EventEmitter
                 builder.addWithStats(key, contextSummary);
             }));
 
-        this.serializeContainerBlobs(builder);
         const summary = builder.getSummaryTree();
         return { ...summary, id: "" };
     }
@@ -1452,8 +1400,6 @@ export class ContainerRuntime extends EventEmitter
                 });
         } while (notBoundContextsLength !== this.notBoundContexts.size);
 
-        this.serializeContainerBlobs(builder);
-
         return builder.summary;
     }
 
@@ -1539,42 +1485,6 @@ export class ContainerRuntime extends EventEmitter
         }
     }
 
-    private processRemoteChunkedMessage(message: ISequencedDocumentMessage) {
-        if (message.type !== ContainerMessageType.ChunkedOp) {
-            return message;
-        }
-
-        const clientId = message.clientId;
-        const chunkedContent = message.contents as IChunkedOp;
-        this.addChunk(clientId, chunkedContent);
-        if (chunkedContent.chunkId === chunkedContent.totalChunks) {
-            const newMessage = { ...message };
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const serializedContent = this.chunkMap.get(clientId)!.join("");
-            newMessage.contents = JSON.parse(serializedContent);
-            newMessage.type = chunkedContent.originalType;
-            this.clearPartialChunks(clientId);
-            return newMessage;
-        }
-        return message;
-    }
-
-    private addChunk(clientId: string, chunkedContent: IChunkedOp) {
-        let map = this.chunkMap.get(clientId);
-        if (map === undefined) {
-            map = [];
-            this.chunkMap.set(clientId, map);
-        }
-        assert(chunkedContent.chunkId === map.length + 1); // 1-based indexing
-        map.push(chunkedContent.contents);
-    }
-
-    private clearPartialChunks(clientId: string) {
-        if (this.chunkMap.has(clientId)) {
-            this.chunkMap.delete(clientId);
-        }
-    }
-
     private updateDocumentDirtyState(dirty: boolean) {
         if (this.dirtyDocument === dirty) {
             return;
@@ -1604,9 +1514,6 @@ export class ContainerRuntime extends EventEmitter
         let clientSequenceNumber: number = -1;
 
         if (this.canSendOps()) {
-            const serializedContent = JSON.stringify(content);
-            const maxOpSize = this.context.deltaManager.maxMessageSize;
-
             // If in manual flush mode we will trigger a flush at the next turn break
             let batchBegin = false;
             if (this.flushMode === FlushMode.Manual && !this.needsFlush) {
@@ -1623,18 +1530,12 @@ export class ContainerRuntime extends EventEmitter
                 }
             }
 
-            // Note: Chunking will increase content beyond maxOpSize because we JSON'ing JSON payload -
-            // there will be a lot of escape characters that can make it up to 2x bigger!
-            // This is Ok, because DeltaManager.shouldSplit() will have 2 * maxMessageSize limit
-            if (serializedContent.length <= maxOpSize) {
-                clientSequenceNumber = this.submitRuntimeMessage(
-                    type,
-                    content,
-                    this._flushMode === FlushMode.Manual,
-                    batchBegin ? { batch: true } : undefined);
-            } else {
-                clientSequenceNumber = this.submitChunkedMessage(type, serializedContent, maxOpSize);
-            }
+            clientSequenceNumber = this.submitRuntimeMessage(
+                type,
+                content,
+                this._flushMode === FlushMode.Manual,
+                batchBegin ? { batch: true } : undefined,
+            );
         }
 
         // Let the PendingStateManager know that a message was submitted.
@@ -1642,27 +1543,6 @@ export class ContainerRuntime extends EventEmitter
         if (this.isContainerMessageDirtyable(type, content)) {
             this.updateDocumentDirtyState(true);
         }
-    }
-
-    private submitChunkedMessage(type: ContainerMessageType, content: string, maxOpSize: number): number {
-        const contentLength = content.length;
-        const chunkN = Math.floor((contentLength - 1) / maxOpSize) + 1;
-        let offset = 0;
-        let clientSequenceNumber: number = 0;
-        for (let i = 1; i <= chunkN; i = i + 1) {
-            const chunkedOp: IChunkedOp = {
-                chunkId: i,
-                contents: content.substr(offset, maxOpSize),
-                originalType: type,
-                totalChunks: chunkN,
-            };
-            offset += maxOpSize;
-            clientSequenceNumber = this.submitRuntimeMessage(
-                ContainerMessageType.ChunkedOp,
-                chunkedOp,
-                false);
-        }
-        return clientSequenceNumber;
     }
 
     private submitSystemMessage(
@@ -1721,8 +1601,6 @@ export class ContainerRuntime extends EventEmitter
             case ContainerMessageType.Attach:
                 this.submit(type, content, localOpMetadata);
                 break;
-            case ContainerMessageType.ChunkedOp:
-                throw new Error(`chunkedOp not expected here`);
             default:
                 unreachableCase(type, `Unknown ContainerMessageType: ${type}`);
         }
