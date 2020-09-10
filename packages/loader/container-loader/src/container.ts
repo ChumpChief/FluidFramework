@@ -146,8 +146,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             request,
             decodeURI(documentId),
         );
-        const version = request.headers?.[LoaderHeader.version];
-        await container.load(version);
+        await container.load();
         return container;
     }
 
@@ -621,13 +620,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     /**
      * Load container.
-     *
-     * @param specifiedVersion - one of the following
-     *   - null: use ops, no snapshots
-     *   - undefined - fetch latest snapshot
-     *   - otherwise, version sha to load snapshot
      */
-    private async load(specifiedVersion: string | null | undefined) {
+    private async load() {
         if (this._resolvedUrl === undefined) {
             throw new Error("Attempting to load without a resolved url");
         }
