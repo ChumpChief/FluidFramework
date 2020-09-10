@@ -249,7 +249,6 @@ export interface IFluidDataStoreContext extends EventEmitter {
      * Use containerRuntime instead of hostRuntime
      */
     readonly hostRuntime: IContainerRuntimeBase;
-    readonly snapshotFn: (message: string) => Promise<void>;
 
     /**
      * Ambient services provided with the context

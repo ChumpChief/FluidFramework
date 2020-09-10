@@ -45,7 +45,6 @@ import {
     QuorumProxy,
 } from "@fluidframework/protocol-base";
 import {
-    FileMode,
     IClient,
     IClientDetails,
     ICommittedProposal,
@@ -60,11 +59,7 @@ import {
     ISignalClient,
     ISignalMessage,
     ISnapshotTree,
-    ITree,
-    ITreeEntry,
-    IVersion,
     MessageType,
-    TreeEntry,
     ISummaryTree,
 } from "@fluidframework/protocol-definitions";
 import { Audience } from "./audience";
@@ -416,26 +411,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.context.request(path);
     }
 
-    public async snapshot(tagMessage: string, fullTree: boolean = false): Promise<void> {
-        // Only snapshot once a code quorum has been established
-        if (!this.protocolHandler.quorum.has("code")) {
-            return;
-        }
-
-        // Stop inbound message processing while we complete the snapshot
-        try {
-            if (this.deltaManager !== undefined) {
-                await this.deltaManager.inbound.systemPause();
-            }
-
-            await this.snapshotCore(tagMessage, fullTree);
-        } finally {
-            if (this.deltaManager !== undefined) {
-                this.deltaManager.inbound.systemResume();
-            }
-        }
-    }
-
     public setAutoReconnect(reconnect: boolean) {
         assert(this.resumedOpProcessingAfterLoad);
 
@@ -507,106 +482,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
 
         throw new Error("Url Resolver does not support creating urls");
-    }
-
-    private async snapshotCore(tagMessage: string, fullTree: boolean = false) {
-        // Snapshots base document state and currently running context
-        const root = this.snapshotBase();
-        const dataStoreEntries = await this.context.snapshot(tagMessage, fullTree);
-
-        // And then combine
-        if (dataStoreEntries !== null) {
-            root.entries.push(...dataStoreEntries.entries);
-        }
-
-        // Generate base snapshot message
-        const deltaDetails =
-            `${this._deltaManager.lastSequenceNumber}:${this._deltaManager.minimumSequenceNumber}`;
-        const message = `Commit @${deltaDetails} ${tagMessage}`;
-
-        // Pull in the prior version and snapshot tree to store against
-        const lastVersion = await this.getVersion(this.id);
-
-        const parents = lastVersion !== undefined ? [lastVersion.id] : [];
-
-        // Write the full snapshot
-        return this.storageService.write(root, parents, message, "");
-    }
-
-    private snapshotBase(): ITree {
-        const entries: ITreeEntry[] = [];
-
-        if (this.blobManager === undefined) {
-            throw new Error("Attempted to snapshot without a blobManager");
-        }
-
-        const blobMetaData = this.blobManager.getBlobMetadata();
-        entries.push({
-            mode: FileMode.File,
-            path: ".blobs",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(blobMetaData),
-                encoding: "utf-8",
-            },
-        });
-
-        const quorumSnapshot = this.protocolHandler.quorum.snapshot();
-        entries.push({
-            mode: FileMode.File,
-            path: "quorumMembers",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(quorumSnapshot.members),
-                encoding: "utf-8",
-            },
-        });
-        entries.push({
-            mode: FileMode.File,
-            path: "quorumProposals",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(quorumSnapshot.proposals),
-                encoding: "utf-8",
-            },
-        });
-        entries.push({
-            mode: FileMode.File,
-            path: "quorumValues",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(quorumSnapshot.values),
-                encoding: "utf-8",
-            },
-        });
-
-        // Save attributes for the document
-        const documentAttributes = {
-            minimumSequenceNumber: this._deltaManager.minimumSequenceNumber,
-            sequenceNumber: this._deltaManager.lastSequenceNumber,
-        };
-        entries.push({
-            mode: FileMode.File,
-            path: ".attributes",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(documentAttributes),
-                encoding: "utf-8",
-            },
-        });
-
-        // Output the tree
-        const root: ITree = {
-            entries,
-            id: null,
-        };
-
-        return root;
-    }
-
-    private async getVersion(version: string): Promise<IVersion | undefined> {
-        const versions = await this.storageService.getVersions(version, 1);
-        return versions[0];
     }
 
     private async connectToDeltaStream(args: IConnectionArgs = {}) {
@@ -1040,7 +915,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             loader,
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
-            async (message) => this.snapshot(message),
         );
 
         this.emit("contextChanged", codeDetails);
@@ -1070,7 +944,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             loader,
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
-            async (message) => this.snapshot(message),
         );
 
         this.emit("contextChanged", codeDetails);

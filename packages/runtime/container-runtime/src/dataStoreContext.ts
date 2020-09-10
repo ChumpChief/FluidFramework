@@ -131,10 +131,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         return this.connected ? ConnectionState.Connected : ConnectionState.Disconnected;
     }
 
-    public get snapshotFn(): (message: string) => Promise<void> {
-        return this._containerRuntime.snapshotFn;
-    }
-
     public get loader(): ILoader {
         return this._containerRuntime.loader;
     }

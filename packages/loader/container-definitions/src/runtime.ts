@@ -87,13 +87,10 @@ export interface IContainerContext extends IMessageScheduler, IDisposable {
     readonly baseSnapshot: ISnapshotTree | null;
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
-    readonly snapshotFn: (message: string) => Promise<void>;
     readonly quorum: IQuorum;
     readonly audience: IAudience | undefined;
     readonly loader: ILoader;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
-
-    requestSnapshot(tagMessage: string): Promise<void>;
 
     /**
      * Indicates the attachment state of the container to a host service.

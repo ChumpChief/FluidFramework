@@ -484,10 +484,6 @@ export class ContainerRuntime extends EventEmitter
         return this.context.storage!;
     }
 
-    public get snapshotFn(): (message: string) => Promise<void> {
-        return this.context.snapshotFn;
-    }
-
     public get reSubmitFn(): (type: ContainerMessageType, content: any, localOpMetadata: unknown) => void {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         return this.reSubmit;
@@ -861,10 +857,6 @@ export class ContainerRuntime extends EventEmitter
         }
 
         return root;
-    }
-
-    public async requestSnapshot(tagMessage: string): Promise<void> {
-        return this.context.requestSnapshot(tagMessage);
     }
 
     public setConnectionState(connected: boolean, clientId?: string) {
