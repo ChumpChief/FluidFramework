@@ -7,7 +7,12 @@ import { DeltaFeedFollower } from "@fluidframework/container-loader";
 import { SocketIODeltaFeed } from "@fluidframework/driver-base";
 import { getTinyliciousContainer } from "@fluidframework/get-tinylicious-container";
 import { IClient } from "@fluidframework/protocol-definitions";
-import { DocumentDeltaStorageService, TokenProvider } from "@fluidframework/routerlicious-driver";
+import {
+    DocumentDeltaStorageService,
+    DocumentStorageService,
+    TokenProvider,
+} from "@fluidframework/routerlicious-driver";
+import { GitManager, Historian, ICredentials } from "@fluidframework/server-services-client";
 import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
 
@@ -61,6 +66,22 @@ const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${encodedDocId
 const deltaStorageService = new DocumentDeltaStorageService("tinylicious", tokenProvider, deltaStorageUrl);
 const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService, 0);
 window["testDeltaFeedFollower"] = deltaFeedFollower;
+
+const credentials: ICredentials = {
+    password: token,
+    user: "tinylicious",
+};
+
+const storageUrl = `http://localhost:3000/repos/tinylicious`;
+const historian = new Historian(
+    storageUrl,
+    true, // historianApi
+    false, // disableCache
+    credentials);
+const gitManager = new GitManager(historian);
+
+const documentStorageService = new DocumentStorageService(documentId, gitManager);
+window["testDocumentStorageService"] = documentStorageService;
 
 async function start(): Promise<void> {
     // The getTinyliciousContainer helper function facilitates loading our container code into a Container and
