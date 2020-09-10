@@ -457,13 +457,6 @@ export class ContainerRuntime extends EventEmitter
         registryEntries: NamedFluidDataStoreRegistryEntries,
         requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ): Promise<ContainerRuntime> {
-        // Back-compat: <= 0.18 loader
-        if (context.deltaManager.lastSequenceNumber === undefined) {
-            Object.defineProperty(context.deltaManager, "lastSequenceNumber", {
-                get: () => (context.deltaManager as any).referenceSequenceNumber,
-            });
-        }
-
         const registry = new ContainerRuntimeDataStoreRegistry(registryEntries);
 
         const chunkId = context.baseSnapshot?.blobs[chunksBlobName];
