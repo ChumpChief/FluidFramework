@@ -17,7 +17,6 @@ import {
     ISignalClient,
     ISignalMessage,
     ISnapshotTree,
-    ISummaryHandle,
     ISummaryTree,
     ITokenClaims,
     ITree,
@@ -76,12 +75,6 @@ export interface IDocumentStorageService {
      * Returns the uploaded summary handle.
      */
     uploadSummaryWithContext(summary: ISummaryTree, context: ISummaryContext): Promise<string>;
-
-    /**
-     * Retrieves the commit that matches the packfile handle. If the packfile has already been committed and the
-     * server has deleted it this call may result in a broken promise.
-     */
-    downloadSummary(handle: ISummaryHandle): Promise<ISummaryTree>;
 }
 
 export interface IDocumentDeltaConnectionEvents extends IErrorEvent {

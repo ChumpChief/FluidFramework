@@ -13,7 +13,6 @@ import {
     FileMode,
     ICreateBlobResponse,
     ISnapshotTree,
-    ISummaryHandle,
     ISummaryTree,
     ITree,
     IVersion,
@@ -78,10 +77,6 @@ export class DocumentStorageService implements IDocumentStorageService {
                 })
             : undefined;
         return this.writeSummaryTree(summary, snapshot ?? undefined);
-    }
-
-    public async downloadSummary(handle: ISummaryHandle): Promise<ISummaryTree> {
-        throw new Error("NOT IMPLEMENTED!");
     }
 
     public async createBlob(file: Buffer): Promise<ICreateBlobResponse> {

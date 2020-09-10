@@ -11,7 +11,6 @@ import {
 import {
     ICreateBlobResponse,
     ISnapshotTree,
-    ISummaryHandle,
     ISummaryTree,
     ITree,
     IVersion,
@@ -38,10 +37,6 @@ export class DocumentStorageServiceProxy implements IDocumentStorageService {
 
     public async uploadSummaryWithContext(summary: ISummaryTree, context: ISummaryContext): Promise<string> {
         return this.internalStorageService.uploadSummaryWithContext(summary, context);
-    }
-
-    public async downloadSummary(handle: ISummaryHandle): Promise<ISummaryTree> {
-        return this.internalStorageService.downloadSummary(handle);
     }
 
     public async createBlob(file: Buffer): Promise<ICreateBlobResponse> {

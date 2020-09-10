@@ -237,7 +237,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get id(): string {
-        return this._id ?? "";
+        return this._documentId ?? "";
     }
 
     public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {
@@ -305,7 +305,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private _resolvedUrl?: IResolvedUrl | undefined,
         private _canReconnect: boolean = true,
         private originalRequest?: IRequest | undefined,
-        private _id?: string | undefined,
+        private _documentId?: string | undefined,
     ) {
         super();
         this._audience = new Audience();
@@ -391,7 +391,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 throw new Error("Unable to parse Url");
             }
             const [, docId] = parsedUrl.id.split("/");
-            this._id = decodeURI(docId);
+            this._documentId = decodeURI(docId);
 
             if (this._storageService === undefined) {
                 this._storageService = await this.getDocumentStorageService();
