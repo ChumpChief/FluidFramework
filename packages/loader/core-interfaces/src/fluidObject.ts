@@ -4,7 +4,6 @@
  */
 
 import {
-    IProvideFluidConfiguration,
     IProvideFluidLoadable,
     IProvideFluidRunnable,
 } from "./fluidLoadable";
@@ -19,7 +18,6 @@ export interface IFluidObject extends
         & IProvideFluidRunnable
         & IProvideFluidRouter
         & IProvideFluidHandleContext
-        & IProvideFluidConfiguration
         & IProvideFluidHandle
         & IProvideFluidSerializer>> {
 }

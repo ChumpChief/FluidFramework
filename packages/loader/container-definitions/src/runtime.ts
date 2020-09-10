@@ -5,7 +5,6 @@
 
 import { IDisposable } from "@fluidframework/common-definitions";
 import {
-    IFluidConfiguration,
     IRequest,
     IResponse,
 } from "@fluidframework/core-interfaces";
@@ -80,7 +79,6 @@ export interface IRuntime extends IDisposable {
 
 export interface IContainerContext extends IMessageScheduler, IDisposable {
     readonly existing: boolean | undefined;
-    readonly configuration: IFluidConfiguration;
     readonly clientId: string | undefined;
     readonly clientDetails: IClientDetails;
     readonly blobManager: IBlobManager | undefined;

@@ -5,7 +5,6 @@
 
 import assert from "assert";
 import {
-    IFluidConfiguration,
     IRequest,
     IResponse,
 } from "@fluidframework/core-interfaces";
@@ -96,14 +95,6 @@ export class ContainerContext implements IContainerContext {
 
     public get audience(): IAudience {
         return this.container.audience;
-    }
-
-    public get configuration(): IFluidConfiguration {
-        const config: Partial<IFluidConfiguration> = {
-            canReconnect: this.container.canReconnect,
-            scopes: this.container.scopes,
-        };
-        return config as IFluidConfiguration;
     }
 
     public get IMessageScheduler() {
