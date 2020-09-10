@@ -524,8 +524,6 @@ export class ContainerRuntime extends EventEmitter
 
     public readonly IFluidHandleContext: IFluidHandleContext;
 
-    // internal logger for ContainerRuntime
-    private readonly _logger: ITelemetryLogger;
     private readonly summaryManager: SummaryManager;
     private latestSummaryAck: ISummaryContext;
     // back-compat: summarizerNode - remove all summary trackers
@@ -607,8 +605,6 @@ export class ContainerRuntime extends EventEmitter
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
-        this._logger = ChildLogger.create(undefined, "ContainerRuntime");
-
         this.latestSummaryAck = {
             proposalHandle: undefined,
             ackHandle: undefined,
@@ -625,7 +621,7 @@ export class ContainerRuntime extends EventEmitter
         const enableSummarizerNode = this.runtimeOptions.enableSummarizerNode
             ?? (typeof localStorage === "object" && localStorage?.fluidDisableSummarizerNode ? false : true);
         const summarizerNode = SummarizerNode.createRoot(
-            this._logger,
+            ChildLogger.create(undefined, "ContainerRuntime"),
             // Summarize function to call when summarize is called
             async (fullTree: boolean) => this.summarizeInternal(fullTree),
             // Latest change sequence number, no changes since summary applied yet
@@ -717,7 +713,7 @@ export class ContainerRuntime extends EventEmitter
             context,
             this.runtimeOptions.generateSummaries !== false,
             !!this.runtimeOptions.enableWorker,
-            this._logger,
+            ChildLogger.create(undefined, "ContainerRuntime"),
             (summarizer) => { this.nextSummarizerP = summarizer; },
             undefined,
             false,
