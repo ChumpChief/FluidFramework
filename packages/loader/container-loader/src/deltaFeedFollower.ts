@@ -15,15 +15,16 @@ export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvent
     private incomingOps: ISequencedDocumentMessage[] = [];
     // To determine whether the next op we see is sequential or disjoint, we'll see if it's one more than
     // the latestProcessedOpSequenceNumber.
-    private latestSequentialOpSequenceNumber: number = 0;
+    private latestSequentialOpSequenceNumber: number;
     private sequencingPromise: Promise<void> | undefined;
 
-    // TODO also needs to know the actual latest op number
     constructor(
         deltaFeed: IDeltaFeed,
         private readonly deltaStorage: IDocumentDeltaStorageService,
+        startAfterSequenceNumber: number,
     ) {
         super();
+        this.latestSequentialOpSequenceNumber = startAfterSequenceNumber;
         deltaFeed.on("op", (op: ISequencedDocumentMessage) => { this.handleIncomingOp(op); });
     }
 

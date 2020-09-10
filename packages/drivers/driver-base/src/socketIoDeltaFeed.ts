@@ -66,6 +66,7 @@ export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> imple
 
         // Re-emit protocol messages, we don't handle them at this layer.
         this.socket.on("nack", (docId: string, messages: INack[]) => {
+            // TODO - Should this also emit individual nack events?  Or is that just extra noise?
             this.emit("nack", ...messages);
         });
 

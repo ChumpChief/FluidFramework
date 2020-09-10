@@ -59,7 +59,7 @@ const tokenProvider = new TokenProvider(token);
 const encodedDocId = encodeURIComponent(documentId);
 const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${encodedDocId}`;
 const deltaStorageService = new DocumentDeltaStorageService("tinylicious", tokenProvider, deltaStorageUrl);
-const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService);
+const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService, 0);
 window["testDeltaFeedFollower"] = deltaFeedFollower;
 
 async function start(): Promise<void> {
