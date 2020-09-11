@@ -29,9 +29,7 @@ import { renderDiceRoller } from "./view";
 // we'll choose to use the current timestamp.  We'll also choose to interpret the URL hash as an existing document's
 // ID to load from, so the URL for a document load will look something like http://localhost:8080/#1596520748752.
 // These policy choices are arbitrary for demo purposes, and can be changed however you'd like.
-let createNew = false;
 if (location.hash.length === 0) {
-    createNew = true;
     location.hash = Date.now().toString();
 }
 const documentId = location.hash.substring(1);
@@ -64,7 +62,7 @@ const connectDeltaFeed = () => {
     deltaFeed.connect("tinylicious", documentId, token, client)
         .then(() => console.log("Feed connected"))
         .catch((error) => console.error(error));
-}
+};
 window["connectDeltaFeed"] = connectDeltaFeed;
 
 const tokenProvider = new TokenProvider(token);
@@ -96,7 +94,7 @@ async function start(): Promise<void> {
     // production service, but ultimately we'll still be getting a reference to a Container object.  The helper
     // function takes the ID of the document we're creating or loading, the container code to load into it, and a
     // flag to specify whether we're creating a new document or loading an existing one.
-    const container = await getTinyliciousContainer(documentId, DiceRollerContainerRuntimeFactory, createNew);
+    const container = await getTinyliciousContainer(documentId, DiceRollerContainerRuntimeFactory);
 
     // Since we're using a ContainerRuntimeFactoryWithDefaultDataStore, our dice roller is available at the URL "/".
     const url = "/";

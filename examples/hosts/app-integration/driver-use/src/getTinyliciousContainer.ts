@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+import { initializeContainerCode } from "@fluidframework/base-host";
 import { IRequest } from "@fluidframework/core-interfaces";
 import {
     IRuntimeFactory,
@@ -77,7 +78,6 @@ class InsecureTinyliciousUrlResolver implements IUrlResolver {
 export async function getTinyliciousContainer(
     documentId: string,
     containerRuntimeFactory: IRuntimeFactory,
-    createNew: boolean,
 ): Promise<Container> {
     const documentServiceFactory = new RouterliciousDocumentServiceFactory();
 
@@ -97,22 +97,16 @@ export async function getTinyliciousContainer(
         new Map(),
     );
 
-    let container: Container;
+    const container = await loader.resolve({ url: documentId });
 
-    if (createNew) {
-        // We're not actually using the code proposal (our code loader always loads the same module regardless of the
-        // proposal), but the Container will only give us a NullRuntime if there's no proposal.  So we'll use a fake
-        // proposal.
-        container = await loader.createDetachedContainer({ package: "", config: {} });
-        await container.attach({ url: documentId });
-    } else {
-        // The InsecureTinyliciousUrlResolver expects the url of the request to be the documentId.
-        container = await loader.resolve({ url: documentId });
-        // If we didn't create the container properly, then it won't function correctly.  So we'll throw if we got a
-        // new container here, where we expect this to be loading an existing container.
-        if (!container.existing) {
-            throw new Error("Attempted to load a non-existing container");
-        }
+    // We're not actually using the code proposal here, but the Container will only give us a NullRuntime if there's
+    // no proposal.  So we make a fake proposal, using initializeContainerCode to ensure it only happens once.
+    await initializeContainerCode(container, { package: "", config: {} });
+
+    // If we're loading from ops, the context might be in the middle of reloading.  Check for that case and wait
+    // for the contextChanged event to avoid returning before that reload completes.
+    if (container.hasNullRuntime()) {
+        await new Promise<void>((resolve) => container.once("contextChanged", () => resolve()));
     }
 
     return container;
