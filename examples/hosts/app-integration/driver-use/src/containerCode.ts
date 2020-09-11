@@ -9,8 +9,8 @@ import {
 } from "@fluidframework/container-runtime";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
 import {
-    deprecated_innerRequestHandler,
-} from "@fluidframework/request-handler";
+    IRequest,
+} from "@fluidframework/core-interfaces";
 import {
     IFluidDataStoreRegistry,
     IProvideFluidDataStoreRegistry,
@@ -42,41 +42,22 @@ export class DiceRollerContainerRuntimeFactory implements
         const runtime = await ContainerRuntime.load(
             context,
             this.registryEntries,
-            deprecated_innerRequestHandler,
+            async (request: IRequest, containerRuntime: IContainerRuntime) =>
+                containerRuntime.IFluidHandleContext.resolveHandle(request),
         );
 
         if (!runtime.existing) {
-            // If it's the first time through.
-            await this.containerInitializingFirstTime(runtime);
+            const router = await runtime.createRootDataStore(
+                DiceRollerInstantiationFactory.type,
+                defaultDataStoreId,
+            );
+            // We need to request the data store before attaching to ensure it
+            // runs through its entire instantiation flow.
+            await router.request({ url: "/" });
         }
-
-        // This always gets called at the end of initialize on first time or from existing.
-        await this.containerHasInitialized(runtime);
 
         return runtime;
     }
-
-    /**
-     * Subclasses may override containerInitializingFirstTime to perform any setup steps at the time the container
-     * is created. This likely includes creating any initial data stores that are expected to be there at the outset.
-     * @param runtime - The container runtime for the container being initialized
-     */
-    private async containerInitializingFirstTime(runtime: IContainerRuntime) {
-        const router = await runtime.createRootDataStore(
-            DiceRollerInstantiationFactory.type,
-            defaultDataStoreId,
-        );
-        // We need to request the data store before attaching to ensure it
-        // runs through its entire instantiation flow.
-        await router.request({ url: "/" });
-    }
-
-    /**
-     * Subclasses may override containerHasInitialized to perform any steps after the container has initialized.
-     * This likely includes loading any data stores that are expected to be there at the outset.
-     * @param runtime - The container runtime for the container being initialized
-     */
-    private async containerHasInitialized(runtime: IContainerRuntime) { }
 }
 
 /**
