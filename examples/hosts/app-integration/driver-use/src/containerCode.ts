@@ -22,28 +22,21 @@ import {
 import { DiceRollerInstantiationFactory } from "./dataObject";
 import { defaultRouteRequestHandler } from "./requestHandlers";
 
-/**
- * BaseContainerRuntimeFactory produces container runtimes with a given data store and service registry, as well as
- * given request handlers.  It can be subclassed to implement a first-time initialization procedure for the containers
- * it creates.
- */
-export class BaseContainerRuntimeFactory implements
+const defaultDataStoreId = "default";
+
+export class DiceRollerContainerRuntimeFactory implements
     IProvideFluidDataStoreRegistry,
     IRuntimeFactory {
     public get IFluidDataStoreRegistry() { return this.registry; }
     public get IRuntimeFactory() { return this; }
-    private readonly registry: IFluidDataStoreRegistry;
-
-    /**
-     * @param registryEntries - The data store registry for containers produced
-     * @param requestHandlers - Request handlers for containers produced
-     */
-    constructor(
-        private readonly registryEntries: NamedFluidDataStoreRegistryEntries,
-        private readonly requestHandlers: RuntimeRequestHandler[] = [],
-    ) {
-        this.registry = new FluidDataStoreRegistry(registryEntries);
-    }
+    private readonly registryEntries: NamedFluidDataStoreRegistryEntries = new Map([
+        DiceRollerInstantiationFactory.registryEntry,
+    ]);
+    private readonly registry: IFluidDataStoreRegistry = new FluidDataStoreRegistry(this.registryEntries);
+    private readonly requestHandlers: RuntimeRequestHandler[] = [
+        defaultRouteRequestHandler(defaultDataStoreId),
+        deprecated_innerRequestHandler,
+    ];
 
     /**
      * {@inheritDoc @fluidframework/container-definitions#IRuntimeFactory.instantiateRuntime}
@@ -80,43 +73,7 @@ export class BaseContainerRuntimeFactory implements
      * is created. This likely includes creating any initial data stores that are expected to be there at the outset.
      * @param runtime - The container runtime for the container being initialized
      */
-    protected async containerInitializingFirstTime(runtime: IContainerRuntime) { }
-
-    /**
-     * Subclasses may override containerHasInitialized to perform any steps after the container has initialized.
-     * This likely includes loading any data stores that are expected to be there at the outset.
-     * @param runtime - The container runtime for the container being initialized
-     */
-    protected async containerHasInitialized(runtime: IContainerRuntime) { }
-}
-
-const defaultDataStoreId = "default";
-
-/**
- * A ContainerRuntimeFactory that initializes Containers with a single default data store, which can be requested from
- * the container with an empty URL.
- *
- * This factory should be exposed as fluidExport off the entry point to your module.
- */
-class DiceRollerContainerRuntimeFactory extends BaseContainerRuntimeFactory {
-    public static readonly defaultDataStoreId = defaultDataStoreId;
-
-    constructor() {
-        super(
-            new Map([
-                DiceRollerInstantiationFactory.registryEntry,
-            ]),
-            [
-                defaultRouteRequestHandler(defaultDataStoreId),
-                deprecated_innerRequestHandler,
-            ],
-        );
-    }
-
-    /**
-     * {@inheritDoc BaseContainerRuntimeFactory.containerInitializingFirstTime}
-     */
-    protected async containerInitializingFirstTime(runtime: IContainerRuntime) {
+    private async containerInitializingFirstTime(runtime: IContainerRuntime) {
         const router = await runtime.createRootDataStore(
             DiceRollerInstantiationFactory.type,
             defaultDataStoreId,
@@ -125,6 +82,13 @@ class DiceRollerContainerRuntimeFactory extends BaseContainerRuntimeFactory {
         // runs through its entire instantiation flow.
         await router.request({ url: "/" });
     }
+
+    /**
+     * Subclasses may override containerHasInitialized to perform any steps after the container has initialized.
+     * This likely includes loading any data stores that are expected to be there at the outset.
+     * @param runtime - The container runtime for the container being initialized
+     */
+    private async containerHasInitialized(runtime: IContainerRuntime) { }
 }
 
 /**
