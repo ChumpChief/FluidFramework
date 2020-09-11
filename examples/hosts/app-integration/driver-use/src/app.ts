@@ -13,12 +13,15 @@ import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
 
 import { DiceRollerContainerRuntimeFactory } from "./containerCode";
+import { ContainerRuntime } from "./containerRuntime";
 import { IDiceRoller } from "./dataObject";
 import { DeltaFeedFollower } from "./deltaFeedFollower";
 import { DocumentDeltaStorageService } from "./deltaStorageService";
 import { getTinyliciousContainer } from "./getTinyliciousContainer";
 import { SocketIODeltaFeed } from "./socketIoDeltaFeed";
 import { renderDiceRoller } from "./view";
+
+console.log(ContainerRuntime);
 
 /* eslint-disable dot-notation */
 
