@@ -60,6 +60,13 @@ const token = jwt.sign({
 }, "12345");
 window["oldToken"] = token;
 
+const connectDeltaFeed = () => {
+    deltaFeed.connect("tinylicious", documentId, token, client)
+        .then(() => console.log("Feed connected"))
+        .catch((error) => console.error(error));
+}
+window["connectDeltaFeed"] = connectDeltaFeed;
+
 const tokenProvider = new TokenProvider(token);
 const encodedDocId = encodeURIComponent(documentId);
 const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${encodedDocId}`;
@@ -108,11 +115,6 @@ async function start(): Promise<void> {
     // Given an IDiceRoller, we can render the value and provide controls for users to roll it.
     const div = document.getElementById("content") as HTMLDivElement;
     renderDiceRoller(diceRoller, div);
-
-    // connect our test feed
-    deltaFeed.connect("tinylicious", documentId, token, client)
-        .then(() => console.log("Feed connected"))
-        .catch((error) => console.error(error));
 }
 
 start().catch((error) => console.error(error));
