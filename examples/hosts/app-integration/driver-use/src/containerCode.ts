@@ -6,21 +6,20 @@
 import { IContainerContext, IRuntime, IRuntimeFactory } from "@fluidframework/container-definitions";
 import {
     FluidDataStoreRegistry,
-    ContainerRuntime,
 } from "@fluidframework/container-runtime";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
 import {
-    buildRuntimeRequestHandler,
     deprecated_innerRequestHandler,
-    RuntimeRequestHandler,
 } from "@fluidframework/request-handler";
 import {
     IFluidDataStoreRegistry,
     IProvideFluidDataStoreRegistry,
     NamedFluidDataStoreRegistryEntries,
 } from "@fluidframework/runtime-definitions";
+import {
+    ContainerRuntime,
+} from "./containerRuntime";
 import { DiceRollerInstantiationFactory } from "./dataObject";
-import { defaultRouteRequestHandler } from "./requestHandlers";
 
 const defaultDataStoreId = "default";
 
@@ -33,10 +32,6 @@ export class DiceRollerContainerRuntimeFactory implements
         DiceRollerInstantiationFactory.registryEntry,
     ]);
     private readonly registry: IFluidDataStoreRegistry = new FluidDataStoreRegistry(this.registryEntries);
-    private readonly requestHandlers: RuntimeRequestHandler[] = [
-        defaultRouteRequestHandler(defaultDataStoreId),
-        deprecated_innerRequestHandler,
-    ];
 
     /**
      * {@inheritDoc @fluidframework/container-definitions#IRuntimeFactory.instantiateRuntime}
@@ -44,18 +39,11 @@ export class DiceRollerContainerRuntimeFactory implements
     public async instantiateRuntime(
         context: IContainerContext,
     ): Promise<IRuntime> {
-        // Create a scope object that passes through everything except for IFluidDependencySynthesizer
-        // which we will replace with the new one we just created.
-        const scope: any = context.scope;
-
         const runtime = await ContainerRuntime.load(
             context,
             this.registryEntries,
-            buildRuntimeRequestHandler(
-                ...this.requestHandlers,
-                deprecated_innerRequestHandler),
-            undefined,
-            scope);
+            deprecated_innerRequestHandler,
+        );
 
         if (!runtime.existing) {
             // If it's the first time through.
