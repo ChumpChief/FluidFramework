@@ -196,9 +196,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         return PerformanceEvent.timedExecAsync(container.logger, { eventName: "Load" }, async (event) => {
             return new Promise<Container>((res, rej) => {
-                const version = request.headers?.[LoaderHeader.version];
-                const pause = request.headers?.[LoaderHeader.pause];
-
                 const onClosed = (err?: ICriticalContainerError) => {
                     // Depending where error happens, we can be attempting to connect to web socket
                     // and continuously retrying (consider offline mode)
@@ -209,7 +206,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 };
                 container.on("closed", onClosed);
 
-                container.load(version, pause === true)
+                container.load()
                     .finally(() => {
                         container.removeListener("closed", onClosed);
                     })
@@ -275,7 +272,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private manualReconnectInProgress = false;
     private readonly connectionTransitionTimes: number[] = [];
     private messageCountAfterDisconnection: number = 0;
-    private _loadedFromVersion: IVersion | undefined;
     private readonly _resolvedUrl: IResolvedUrl | undefined;
 
     private lastVisible: number | undefined;
@@ -289,7 +285,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get loadedFromVersion(): IVersion | undefined {
-        return this._loadedFromVersion;
+        return undefined;
     }
 
     /**
@@ -828,13 +824,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      *   - otherwise, version sha to load snapshot
      * @param pause - start the container in a paused state
      */
-    private async load(specifiedVersion: string | null | undefined, pause: boolean) {
+    private async load() {
         if (this._resolvedUrl === undefined) {
             throw new Error("Attempting to load without a resolved url");
         }
         this.service = await this.serviceFactory.createDocumentService(this._resolvedUrl, this.subLogger);
-
-        let startConnectionP: Promise<IConnectionDetails> | undefined;
 
         // Ideally we always connect as "read" by default.
         // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.
@@ -849,17 +843,14 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-        if (!pause) {
-            startConnectionP = this.connectToDeltaStream(connectionArgs);
-            startConnectionP.catch((error) => { });
-        }
+        const startConnectionP = this.connectToDeltaStream(connectionArgs);
+        startConnectionP.catch((error) => { });
 
         this._storageService = await this.getDocumentStorageService();
         this._attachState = AttachState.Attached;
 
         // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null
-        const maybeSnapshotTree = specifiedVersion === null ? undefined
-            : await this.fetchSnapshotTree(specifiedVersion);
+        const maybeSnapshotTree = undefined;
 
         const blobManagerP = this.loadBlobManager(this.storageService, maybeSnapshotTree);
 
@@ -882,9 +873,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this._parentBranch = attributes.branch !== this.id ? attributes.branch : null;
             loadDetailsP = Promise.resolve();
         } else {
-            if (startConnectionP === undefined) {
-                startConnectionP = this.connectToDeltaStream(connectionArgs);
-            }
             // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
             loadDetailsP = startConnectionP.then((details) => {
                 this._existing = details.existing;
@@ -901,9 +889,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Propagate current connection state through the system.
         this.propagateConnectionState();
 
-        if (!pause) {
-            this.resume();
-        }
+        this.resume();
 
         // Internal context is fully loaded at this point
         this.loaded = true;
@@ -911,7 +897,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return {
             existing: this._existing,
             sequenceNumber: attributes.sequenceNumber,
-            version: maybeSnapshotTree?.id ?? undefined,
+            version: undefined,
         };
     }
 
@@ -1362,25 +1348,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             const local = this._clientId === message.clientId;
             this.context.processSignal(message, local);
         }
-    }
-
-    /**
-     * Get the most recent snapshot, or a specific version.
-     * @param specifiedVersion - The specific version of the snapshot to retrieve
-     * @returns The snapshot requested, or the latest snapshot if no version was specified
-     */
-    private async fetchSnapshotTree(specifiedVersion?: string): Promise<ISnapshotTree | undefined> {
-        const version = await this.getVersion(specifiedVersion ?? this.id);
-
-        if (version !== undefined) {
-            this._loadedFromVersion = version;
-            return await this.storageService.getSnapshotTree(version) ?? undefined;
-        } else if (specifiedVersion !== undefined) {
-            // We should have a defined version to load from if specified version requested
-            this.logger.sendErrorEvent({ eventName: "NoVersionFoundWhenSpecified", specifiedVersion });
-        }
-
-        return undefined;
     }
 
     private async loadContext(
