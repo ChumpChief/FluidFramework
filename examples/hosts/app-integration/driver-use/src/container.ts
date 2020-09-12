@@ -532,38 +532,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
     }
 
-    public setAutoReconnect(reconnect: boolean) {
-        assert(this.resumedOpProcessingAfterLoad);
-
-        if (reconnect && this.closed) {
-            throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
-        }
-
-        this._deltaManager.setAutomaticReconnect(reconnect);
-
-        this.logger.sendTelemetryEvent({
-            eventName: reconnect ? "AutoReconnectEnabled" : "AutoReconnectDisabled",
-            connectionMode: this._deltaManager.connectionMode,
-            connectionState: ConnectionState[this.connectionState],
-        });
-
-        if (reconnect) {
-            if (this._connectionState === ConnectionState.Disconnected) {
-                // Only track this as a manual reconnection if we are truly the ones kicking it off.
-                this.manualReconnectInProgress = true;
-            }
-
-            // Ensure connection to web socket
-            this.connectToDeltaStream({ reason: "autoReconnect" }).catch((error) => {
-                // All errors are reported through events ("error" / "disconnected") and telemetry in DeltaManager
-                // So there shouldn't be a need to record error here.
-                // But we have number of cases where reconnects do not happen, and no errors are recorded, so
-                // adding this log point for easier diagnostics
-                this.logger.sendTelemetryEvent({ eventName: "setAutoReconnectError" }, error);
-            });
-        }
-    }
-
     public resume() {
         this.resumeInternal();
     }
