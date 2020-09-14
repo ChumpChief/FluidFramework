@@ -87,6 +87,13 @@ const gitManager = new GitManager(historian);
 const documentStorageService = new DocumentStorageService(documentId, gitManager);
 window["testDocumentStorageService"] = documentStorageService;
 
+const connectTestFeed = () => {
+    deltaFeed.connect("tinylicious", documentId, token, client)
+        .then(() => console.log("Feed connected"))
+        .catch((error) => console.error(error));
+}
+window["connectTestFeed"] = connectTestFeed;
+
 async function start(): Promise<void> {
     // The getTinyliciousContainer helper function facilitates loading our container code into a Container and
     // connecting to a locally-running test service called Tinylicious.  This will look different when moving to a
