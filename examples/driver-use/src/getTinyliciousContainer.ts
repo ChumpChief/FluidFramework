@@ -17,8 +17,6 @@ import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicio
 import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
 
-import { initializeContainerCode } from "./initializeContainerCode";
-
 /**
  * InsecureTinyliciousUrlResolver knows how to get the URLs to the service (in this case Tinylicious) to use
  * for a given request.  This particular implementation has a goal to avoid imposing requirements on the app's
@@ -92,16 +90,6 @@ export async function getTinyliciousContainer(
         containerRuntimeFactory,
         resolved,
     );
-
-    // We're not actually using the code proposal here, but the Container will only give us a NullRuntime if there's
-    // no proposal.  So we make a fake proposal, using initializeContainerCode to ensure it only happens once.
-    await initializeContainerCode(container, { package: "no-dynamic-package", config: {} });
-
-    // If we're loading from ops, the context might be in the middle of reloading.  Check for that case and wait
-    // for the contextChanged event to avoid returning before that reload completes.
-    if (container.hasNullRuntime()) {
-        await new Promise<void>((resolve) => container.once("contextChanged", () => resolve()));
-    }
 
     return container;
 }
