@@ -5,8 +5,6 @@
 
 import { strict as assert } from "assert";
 import { EventEmitter } from "events";
-// eslint-disable-next-line import/no-internal-modules
-import merge from "lodash/merge";
 import uuid from "uuid";
 import {
     ITelemetryBaseLogger,
@@ -24,7 +22,6 @@ import {
     IGenericBlob,
     ILoader,
     IRuntimeFactory,
-    LoaderHeader,
     IRuntimeState,
     ICriticalContainerError,
     ContainerWarning,
@@ -167,7 +164,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         documentId: string,
         serviceFactory: IDocumentServiceFactory,
         codeLoader: ICodeLoader,
-        request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
         urlResolver: IUrlResolver,
     ): Promise<Container> {
@@ -175,7 +171,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             codeLoader,
             serviceFactory,
             urlResolver,
-            request,
             decodeURI(documentId),
             resolvedUrl,
         );
@@ -204,7 +199,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private _clientId: string | undefined;
     private readonly _id: string | undefined;
-    private readonly originalRequest: IRequest | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
     private service: IDocumentService | undefined;
@@ -343,7 +337,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private readonly codeLoader: ICodeLoader,
         private readonly serviceFactory: IDocumentServiceFactory,
         private readonly urlResolver: IUrlResolver,
-        originalRequest: IRequest,
         documentId: string,
         resolvedUrl: IFluidResolvedUrl,
         logger?: ITelemetryBaseLogger,
@@ -351,8 +344,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         super();
         this._audience = new Audience();
 
-        // Initialize from config
-        this.originalRequest = originalRequest;
         this._id = documentId;
         this._resolvedUrl = resolvedUrl;
         this._canReconnect = true;
@@ -999,13 +990,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             scopes: [],
             user: { id: "" },
         };
-
-        // Client info from headers overrides client info from loader options
-        const headerClientDetails = this.originalRequest?.headers?.[LoaderHeader.clientDetails];
-
-        if (headerClientDetails !== undefined) {
-            merge(client.details, headerClientDetails);
-        }
 
         return client;
     }
