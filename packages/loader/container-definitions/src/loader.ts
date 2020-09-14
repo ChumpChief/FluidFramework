@@ -11,7 +11,6 @@ import {
     ISequencedDocumentMessage,
     ISnapshotTree,
 } from "@fluidframework/protocol-definitions";
-import { IResolvedUrl } from "@fluidframework/driver-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
 import { ICriticalContainerError, ContainerWarning } from "./error";
@@ -105,11 +104,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
     getQuorum(): IQuorum;
 
     /**
-     * Represents the resolved url to the Container
-     */
-    resolvedUrl: IResolvedUrl | undefined;
-
-    /**
      * Indicates the attachment state of the container to a host service.
      */
     readonly attachState: AttachState;
@@ -118,14 +112,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
      * Extract the snapshot from the detached container.
      */
     serialize(): string;
-
-    /**
-     * Get an absolute url for a provided container-relative request url.
-     * If the container is not attached, this will return undefined.
-     *
-     * @param relativeUrl - A container-relative request URL
-     */
-    getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
 
     /**
      * Issue a request against the container for a resource.

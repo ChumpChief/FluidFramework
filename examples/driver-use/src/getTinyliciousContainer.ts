@@ -94,7 +94,6 @@ export async function getTinyliciousContainer(
         documentServiceFactory,
         codeLoader,
         resolved,
-        urlResolver,
     );
 
     // We're not actually using the code proposal here, but the Container will only give us a NullRuntime if there's

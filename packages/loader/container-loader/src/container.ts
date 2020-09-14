@@ -38,7 +38,6 @@ import {
     IDocumentService,
     IDocumentStorageService,
     IFluidResolvedUrl,
-    IUrlResolver,
     IDocumentServiceFactory,
     IResolvedUrl,
 } from "@fluidframework/driver-definitions";
@@ -165,12 +164,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         serviceFactory: IDocumentServiceFactory,
         codeLoader: ICodeLoader,
         resolvedUrl: IFluidResolvedUrl,
-        urlResolver: IUrlResolver,
     ): Promise<Container> {
         const container = new Container(
             codeLoader,
             serviceFactory,
-            urlResolver,
             decodeURI(documentId),
             resolvedUrl,
         );
@@ -224,15 +221,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private resumedOpProcessingAfterLoad = false;
     private _loadedFromVersion: IVersion | undefined;
-    private readonly _resolvedUrl: IResolvedUrl | undefined;
+    private readonly _resolvedUrl: IResolvedUrl;
 
     private _closed = false;
 
     public get IFluidRouter(): IFluidRouter { return this; }
-
-    public get resolvedUrl(): IResolvedUrl | undefined {
-        return this._resolvedUrl;
-    }
 
     public get loadedFromVersion(): IVersion | undefined {
         return this._loadedFromVersion;
@@ -336,7 +329,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     constructor(
         private readonly codeLoader: ICodeLoader,
         private readonly serviceFactory: IDocumentServiceFactory,
-        private readonly urlResolver: IUrlResolver,
         documentId: string,
         resolvedUrl: IFluidResolvedUrl,
         logger?: ITelemetryBaseLogger,
@@ -533,41 +525,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.context.hasNullRuntime();
     }
 
-    public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        if (this.resolvedUrl === undefined) {
-            return undefined;
-        }
-
-        // TODO: Remove support for legacy requestUrl in 0.20
-        const legacyResolver = this.urlResolver as {
-            requestUrl?(resolvedUrl: IResolvedUrl, request: IRequest): Promise<IResponse>;
-
-            getAbsoluteUrl?(
-                resolvedUrl: IResolvedUrl,
-                relativeUrl: string,
-            ): Promise<string>;
-        };
-
-        if (legacyResolver.getAbsoluteUrl !== undefined) {
-            return this.urlResolver.getAbsoluteUrl(
-                this.resolvedUrl,
-                relativeUrl);
-        }
-
-        if (legacyResolver.requestUrl !== undefined) {
-            const response = await legacyResolver.requestUrl(
-                this.resolvedUrl,
-                { url: relativeUrl });
-
-            if (response.status === 200) {
-                return response.value as string;
-            }
-            throw new Error(response.value);
-        }
-
-        throw new Error("Url Resolver does not support creating urls");
-    }
-
     private async reloadContextCore(): Promise<void> {
         await Promise.all([
             this.deltaManager.inbound.systemPause(),
@@ -732,9 +689,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @param pause - start the container in a paused state
      */
     private async load() {
-        if (this._resolvedUrl === undefined) {
-            throw new Error("Attempting to load without a resolved url");
-        }
         this.service = await this.serviceFactory.createDocumentService(this._resolvedUrl, this.subLogger);
 
         // Ideally we always connect as "read" by default.

@@ -281,7 +281,7 @@ export class ContainerContext implements IContainerContext {
     }
 
     public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        return this.container.getAbsoluteUrl(relativeUrl);
+        throw new Error("getAbsoluteUrl not implemented");
     }
 
     private async load() {
