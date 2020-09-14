@@ -85,7 +85,7 @@ export async function getContainer(
         urlResolver,
         documentServiceFactory,
         codeLoader,
-        { blockUpdateMarkers: true },
+        {},
         {},
         new Map(),
     );
