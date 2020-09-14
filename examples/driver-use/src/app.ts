@@ -5,8 +5,12 @@
 
 import { DiceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
+import { DeltaFeedFollower } from "./deltaFeedFollower";
 import { getTinyliciousContainer } from "./getTinyliciousContainer";
+import { SocketIODeltaFeed } from "./socketIoDeltaFeed";
 import { renderDiceRoller } from "./view";
+
+console.log(SocketIODeltaFeed, DeltaFeedFollower);
 
 // In interacting with the service, we need to be explicit about whether we're creating a new document vs. loading
 // an existing one.  We also need to provide the unique ID for the document we are creating or loading from.
