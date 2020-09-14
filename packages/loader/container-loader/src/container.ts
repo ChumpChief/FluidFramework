@@ -94,13 +94,6 @@ import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
 
 const PackageNotFactoryError = "Code package does not implement IRuntimeFactory";
 
-export interface IContainerConfig {
-    resolvedUrl?: IResolvedUrl;
-    canReconnect?: boolean;
-    originalRequest?: IRequest;
-    id?: string;
-}
-
 export enum ConnectionState {
     /**
      * The document is no longer connected to the delta server
@@ -177,22 +170,16 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
         urlResolver: IUrlResolver,
-        logger?: ITelemetryBaseLogger,
     ): Promise<Container> {
         const container = new Container(
             codeLoader,
             serviceFactory,
             urlResolver,
-            {
-                originalRequest: request,
-                id: decodeURI(documentId),
-                resolvedUrl,
-                canReconnect: !(request.headers?.[LoaderHeader.reconnect] === false),
-            },
-            logger,
+            request,
+            decodeURI(documentId),
+            resolvedUrl,
         );
-        const version = request.headers?.[LoaderHeader.version];
-        await container.load(version);
+        await container.load();
         return container;
     }
 
@@ -356,19 +343,19 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private readonly codeLoader: ICodeLoader,
         private readonly serviceFactory: IDocumentServiceFactory,
         private readonly urlResolver: IUrlResolver,
-        config: IContainerConfig,
-        logger: ITelemetryBaseLogger | undefined,
+        originalRequest: IRequest,
+        documentId: string,
+        resolvedUrl: IFluidResolvedUrl,
+        logger?: ITelemetryBaseLogger,
     ) {
         super();
         this._audience = new Audience();
 
         // Initialize from config
-        this.originalRequest = config.originalRequest;
-        this._id = config.id;
-        this._resolvedUrl = config.resolvedUrl;
-        if (config.canReconnect !== undefined) {
-            this._canReconnect = config.canReconnect;
-        }
+        this.originalRequest = originalRequest;
+        this._id = documentId;
+        this._resolvedUrl = resolvedUrl;
+        this._canReconnect = true;
 
         // Create logger for data stores to use
         const type = this.client.details.type;
@@ -753,7 +740,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      *   - otherwise, version sha to load snapshot
      * @param pause - start the container in a paused state
      */
-    private async load(specifiedVersion: string | null | undefined) {
+    private async load() {
         if (this._resolvedUrl === undefined) {
             throw new Error("Attempting to load without a resolved url");
         }
@@ -779,8 +766,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._attachState = AttachState.Attached;
 
         // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null
-        const maybeSnapshotTree = specifiedVersion === null ? undefined
-            : await this.fetchSnapshotTree(specifiedVersion);
+        const maybeSnapshotTree = await this.fetchSnapshotTree(undefined);
 
         const blobManagerP = this.loadBlobManager(this.storageService, maybeSnapshotTree);
 
