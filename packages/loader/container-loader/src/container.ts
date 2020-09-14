@@ -4,6 +4,7 @@
  */
 
 import { strict as assert } from "assert";
+import { EventEmitter } from "events";
 // eslint-disable-next-line import/no-internal-modules
 import merge from "lodash/merge";
 import uuid from "uuid";
@@ -86,13 +87,14 @@ import {
     TreeEntry,
     ISummaryTree,
 } from "@fluidframework/protocol-definitions";
+
 import { Audience } from "./audience";
 import { BlobManager } from "./blobManager";
 import { ContainerContext } from "./containerContext";
 import { debug } from "./debug";
 import { IConnectionArgs, DeltaManager, ReconnectMode } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
-import { Loader, RelativeLoader } from "./loader";
+import { Loader } from "./loader";
 import { NullChaincode } from "./nullRuntime";
 import { pkgVersion } from "./packageVersion";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
@@ -131,6 +133,44 @@ export type DetachedContainerSource = {
     snapshot: ISnapshotTree,
     create: false,
 };
+
+class LocalLoader extends EventEmitter implements ILoader {
+    /**
+     * BaseRequest is the original request that triggered the load. This URL is used in case credentials need
+     * to be fetched again.
+     */
+    constructor(
+        private readonly container: Container,
+    ) {
+        super();
+    }
+
+    public get IFluidRouter() { return this; }
+
+    public async resolve(request: IRequest): Promise<IContainer> {
+        if (request.url.startsWith("/")) {
+            return this.container;
+        }
+
+        throw new Error("Resolved non-container-relative url");
+    }
+
+    public async request(request: IRequest): Promise<IResponse> {
+        if (request.url.startsWith("/")) {
+            return this.container.request(request);
+        }
+
+        throw new Error("Requested non-container-relative url");
+    }
+
+    public async createDetachedContainer(source: IFluidCodeDetails): Promise<Container> {
+        throw new Error("Local loader should not create a detached container");
+    }
+
+    public async rehydrateDetachedContainerFromSnapshot(snapshot: ISnapshotTree): Promise<IContainer> {
+        throw new Error("Not implemented");
+    }
+}
 
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
     public static version = "^0.1.0";
@@ -394,7 +434,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         public readonly options: any,
         private readonly scope: IFluidObject,
         private readonly codeLoader: ICodeLoader,
-        private readonly loader: ILoader,
+        loader: ILoader,
         private readonly serviceFactory: IDocumentServiceFactory,
         private readonly urlResolver: IUrlResolver,
         config: IContainerConfig,
@@ -1554,7 +1594,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
         // are set. Global requests will still go directly to the loader
-        const loader = new RelativeLoader(this.loader, () => this.originalRequest);
+        const loader = new LocalLoader(this);
 
         this._context = await ContainerContext.createOrLoad(
             this,
@@ -1576,7 +1616,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             previousRuntimeState,
         );
 
-        loader.resolveContainer(this);
         this.emit("contextChanged", this.pkg);
     }
 
@@ -1592,7 +1631,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
         // are set. Global requests will still go to this loader
-        const loader = new RelativeLoader(this.loader, () => this.originalRequest);
+        const loader = new LocalLoader(this);
 
         this._context = await ContainerContext.createOrLoad(
             this,
@@ -1614,7 +1653,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             {},
         );
 
-        loader.resolveContainer(this);
         this.emit("contextChanged", this.pkg);
     }
 
