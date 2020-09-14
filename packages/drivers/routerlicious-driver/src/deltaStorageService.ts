@@ -3,10 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { strict as assert } from "assert";
 import querystring from "querystring";
 import { fromUtf8ToBase64 } from "@fluidframework/common-utils";
-import { IDeltaStorageService, IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
+import { IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
 import * as api from "@fluidframework/protocol-definitions";
 import Axios from "axios";
 import { TokenProvider } from "./tokens";
@@ -17,62 +16,25 @@ import { TokenProvider } from "./tokens";
 export class DocumentDeltaStorageService implements IDocumentDeltaStorageService {
     constructor(
         private readonly tenantId: string,
-        private readonly id: string,
         private readonly tokenProvider: api.ITokenProvider,
-        private readonly storageService: IDeltaStorageService) {
-    }
+        private readonly url: string,
+    ) { }
 
     public async get(from?: number, to?: number): Promise<api.ISequencedDocumentMessage[]> {
-        return this.storageService.get(this.tenantId, this.id, this.tokenProvider, from, to);
-    }
-}
-
-/**
- * Provides access to the underlying delta storage on the server for routerlicious driver.
- */
-export class DeltaStorageService implements IDeltaStorageService {
-    constructor(private readonly url: string) {
-    }
-
-    public async get(
-        tenantId: string,
-        id: string,
-        tokenProvider: api.ITokenProvider,
-        from?: number,
-        to?: number): Promise<api.ISequencedDocumentMessage[]> {
         const query = querystring.stringify({ from, to });
 
         let headers: { Authorization: string } | null = null;
 
-        const token = (tokenProvider as TokenProvider).token;
+        const token = (this.tokenProvider as TokenProvider).token;
 
         if (token) {
             headers = {
-                Authorization: `Basic ${fromUtf8ToBase64(`${tenantId}:${token}`)}`,
+                Authorization: `Basic ${fromUtf8ToBase64(`${this.tenantId}:${token}`)}`,
             };
         }
 
-        const opPromise = Axios.get<api.ISequencedDocumentMessage[]>(
-            `${this.url}?${query}`, { headers });
+        const opData = await Axios.get<api.ISequencedDocumentMessage[]>(`${this.url}?${query}`, { headers });
 
-        const contentPromise = Axios.get<any[]>(
-            `${this.url}/content?${query}`, { headers });
-
-        const [opData, contentData] = await Promise.all([opPromise, contentPromise]);
-
-        const contents = contentData.data;
-        const ops = opData.data;
-        let contentIndex = 0;
-        for (const op of ops) {
-            if (op.contents === undefined) {
-                assert.ok(contentIndex < contents.length, "Delta content not found");
-                const content = contents[contentIndex];
-                assert.equal(op.sequenceNumber, content.sequenceNumber, "Invalid delta content order");
-                op.contents = content.op.contents;
-                ++contentIndex;
-            }
-        }
-
-        return ops;
+        return opData.data;
     }
 }

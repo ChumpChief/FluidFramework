@@ -44,14 +44,11 @@ import {
     IUrlResolver,
     IDocumentServiceFactory,
     IResolvedUrl,
-    CreateNewHeader,
 } from "@fluidframework/driver-definitions";
 import {
     BlobCacheStorageService,
     buildSnapshotTree,
     readAndParse,
-    ensureFluidResolvedUrl,
-    combineAppAndProtocolSummary,
     readAndParseFromBlobs,
 } from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
@@ -93,7 +90,7 @@ import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { NullChaincode } from "./nullRuntime";
 import { pkgVersion } from "./packageVersion";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
-import { parseUrl, convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
+import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
 
 const PackageNotFactoryError = "Code package does not implement IRuntimeFactory";
 
@@ -204,7 +201,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public subLogger: TelemetryLogger;
-    private _canReconnect: boolean = true;
+    private readonly _canReconnect: boolean = true;
     private readonly logger: ITelemetryLogger;
 
     private pendingClientId: string | undefined;
@@ -223,8 +220,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private blobsCacheStorageService: IDocumentStorageService | undefined;
 
     private _clientId: string | undefined;
-    private _id: string | undefined;
-    private originalRequest: IRequest | undefined;
+    private readonly _id: string | undefined;
+    private readonly originalRequest: IRequest | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
     private service: IDocumentService | undefined;
@@ -250,9 +247,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private resumedOpProcessingAfterLoad = false;
     private _loadedFromVersion: IVersion | undefined;
-    private _resolvedUrl: IResolvedUrl | undefined;
-    private cachedAttachSummary: ISummaryTree | undefined;
-    private attachInProgress = false;
+    private readonly _resolvedUrl: IResolvedUrl | undefined;
 
     private _closed = false;
 
@@ -462,101 +457,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const protocolSummary = this.protocolHandler.captureSummary();
         const snapshotTree = convertProtocolAndAppSummaryToSnapshotTree(protocolSummary, appSummary);
         return JSON.stringify(snapshotTree);
-    }
-
-    public async attach(request: IRequest): Promise<void> {
-        assert(this.loaded);
-
-        // If container is already attached or attach is in progress, return.
-        if (this._attachState === AttachState.Attached || this.attachInProgress) {
-            return;
-        }
-
-        this.attachInProgress = true;
-        try {
-            assert.strictEqual(this.deltaManager.inbound.length, 0, "Inbound queue should be empty when attaching");
-            // Only take a summary if the container is in detached state, otherwise we could have local changes.
-            // In failed attach call, we would already have a summary cached.
-            if (this._attachState === AttachState.Detached) {
-                // 0.24 back-compat attachingBeforeSummary
-                if (this.context.runtimeVersion === undefined || this.context.runtimeVersion < "0.25") {
-                    this._attachState = AttachState.Attaching;
-                    this.emit("attaching");
-                }
-                // Get the document state post attach - possibly can just call attach but we need to change the
-                // semantics around what the attach means as far as async code goes.
-                const appSummary: ISummaryTree = this.context.createSummary();
-                if (this.protocolHandler === undefined) {
-                    throw new Error("Protocol Handler is undefined");
-                }
-                const protocolSummary = this.protocolHandler.captureSummary();
-                this.cachedAttachSummary = combineAppAndProtocolSummary(appSummary, protocolSummary);
-
-                // Set the state as attaching as we are starting the process of attaching container.
-                // This should be fired after taking the summary because it is the place where we are
-                // starting to attach the container to storage.
-                // Also, this should only be fired in detached container.
-                if (this.context.runtimeVersion !== undefined && this.context.runtimeVersion >= "0.25") {
-                    this._attachState = AttachState.Attaching;
-                    this.emit("attaching");
-                }
-            }
-            assert(this.cachedAttachSummary,
-                "Summary should be there either by this attach call or previous attach call!!");
-
-            if (request.headers?.[CreateNewHeader.createNew] === undefined) {
-                request.headers = {
-                    ...request.headers,
-                    [CreateNewHeader.createNew]: {},
-                };
-            }
-
-            const createNewResolvedUrl = await this.urlResolver.resolve(request);
-            ensureFluidResolvedUrl(createNewResolvedUrl);
-            // Actually go and create the resolved document
-            if (this.service === undefined) {
-                this.service = await this.serviceFactory.createContainer(
-                    this.cachedAttachSummary,
-                    createNewResolvedUrl,
-                    this.subLogger,
-                );
-            }
-            const resolvedUrl = this.service.resolvedUrl;
-            ensureFluidResolvedUrl(resolvedUrl);
-            this._resolvedUrl = resolvedUrl;
-            const url = await this.getAbsoluteUrl("");
-            assert(url !== undefined, "Container url undefined");
-            this.originalRequest = { url };
-            this._canReconnect = !(request.headers?.[LoaderHeader.reconnect] === false);
-            const parsedUrl = parseUrl(resolvedUrl.url);
-            if (parsedUrl === undefined) {
-                throw new Error("Unable to parse Url");
-            }
-            const [, docId] = parsedUrl.id.split("/");
-            this._id = decodeURI(docId);
-
-            if (this._storageService === undefined) {
-                this._storageService = await this.getDocumentStorageService();
-            }
-
-            // This we can probably just pass the storage service to the blob manager - although ideally
-            // there just isn't a blob manager
-            if (this.blobManager === undefined) {
-                this.blobManager = await this.loadBlobManager(this.storageService, undefined);
-            }
-            this._attachState = AttachState.Attached;
-            this.emit("attached");
-            this.cachedAttachSummary = undefined;
-            this._parentBranch = this._id;
-
-            // Propagate current connection state through the system.
-            const connected = this.connectionState === ConnectionState.Connected;
-            assert(!connected || this._deltaManager.connectionMode === "read", "Unexpected connection state");
-            this.propagateConnectionState();
-            this.resumeInternal({ fetchOpsFromStorage: false, reason: "createDetached" });
-        } finally {
-            this.attachInProgress = false;
-        }
     }
 
     public async request(path: IRequest): Promise<IResponse> {

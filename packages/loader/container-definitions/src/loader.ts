@@ -115,14 +115,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
     readonly attachState: AttachState;
 
     /**
-     * Attaches the Container to the Container specified by the given Request.
-     *
-     * TODO - in the case of failure options should give a retry policy. Or some continuation function
-     * that allows attachment to a secondary document.
-     */
-    attach(request: IRequest): Promise<void>;
-
-    /**
      * Extract the snapshot from the detached container.
      */
     serialize(): string;

@@ -3,6 +3,16 @@
  * Licensed under the MIT License.
  */
 
+import { IClient } from "@fluidframework/protocol-definitions";
+import {
+    DocumentDeltaStorageService,
+    DocumentStorageService,
+    TokenProvider,
+} from "@fluidframework/routerlicious-driver";
+import { GitManager, Historian, ICredentials } from "@fluidframework/server-services-client";
+import jwt from "jsonwebtoken";
+import { v4 as uuid } from "uuid";
+
 import { DiceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
 import { DeltaFeedFollower } from "./deltaFeedFollower";
@@ -10,7 +20,7 @@ import { getTinyliciousContainer } from "./getTinyliciousContainer";
 import { SocketIODeltaFeed } from "./socketIoDeltaFeed";
 import { renderDiceRoller } from "./view";
 
-console.log(SocketIODeltaFeed, DeltaFeedFollower);
+/* eslint-disable dot-notation */
 
 // In interacting with the service, we need to be explicit about whether we're creating a new document vs. loading
 // an existing one.  We also need to provide the unique ID for the document we are creating or loading from.
@@ -26,6 +36,56 @@ if (location.hash.length === 0) {
 }
 const documentId = location.hash.substring(1);
 document.title = documentId;
+
+const deltaFeed = new SocketIODeltaFeed(documentId, "tinylicious", "http://localhost:3000");
+window["testDeltaFeed"] = deltaFeed;
+
+const client: IClient = {
+    details: {
+        capabilities: { interactive: true },
+    },
+    mode: "write",
+    permission: [],
+    scopes: [],
+    user: { id: "" },
+};
+window["oldClient"] = client;
+
+// ITokenClaims
+const token = jwt.sign({
+    documentId,
+    scopes: ["doc:read", "doc:write", "summary:write"],
+    tenantId: "tinylicious",
+    user: { id: uuid() },
+}, "12345");
+window["oldToken"] = token;
+
+const tokenProvider = new TokenProvider(token);
+const encodedDocId = encodeURIComponent(documentId);
+const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${encodedDocId}`;
+const deltaStorageService = new DocumentDeltaStorageService(
+    "tinylicious",
+    tokenProvider,
+    deltaStorageUrl,
+);
+const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService, 0);
+window["testDeltaFeedFollower"] = deltaFeedFollower;
+
+const credentials: ICredentials = {
+    password: token,
+    user: "tinylicious",
+};
+
+const storageUrl = `http://localhost:3000/repos/tinylicious`;
+const historian = new Historian(
+    storageUrl,
+    true, // historianApi
+    false, // disableCache
+    credentials);
+const gitManager = new GitManager(historian);
+
+const documentStorageService = new DocumentStorageService(documentId, gitManager);
+window["testDocumentStorageService"] = documentStorageService;
 
 async function start(): Promise<void> {
     // The getTinyliciousContainer helper function facilitates loading our container code into a Container and
@@ -55,3 +115,5 @@ async function start(): Promise<void> {
 }
 
 start().catch((error) => console.error(error));
+
+/* eslint-enable dot-notation */

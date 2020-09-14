@@ -11,8 +11,7 @@ import {
     IResolvedUrl,
 } from "@fluidframework/driver-definitions";
 import { ITelemetryBaseLogger } from "@fluidframework/common-definitions";
-import { IErrorTrackingService, ISummaryTree } from "@fluidframework/protocol-definitions";
-import { ICredentials, IGitCache } from "@fluidframework/server-services-client";
+import { ISummaryTree } from "@fluidframework/protocol-definitions";
 import {
     ensureFluidResolvedUrl,
     getDocAttributesFromProtocolSummary,
@@ -20,8 +19,6 @@ import {
 } from "@fluidframework/driver-utils";
 import Axios from "axios";
 import { DocumentService } from "./documentService";
-import { DocumentService2 } from "./documentService2";
-import { DefaultErrorTracking } from "./errorTracking";
 import { TokenProvider } from "./tokens";
 
 /**
@@ -30,15 +27,6 @@ import { TokenProvider } from "./tokens";
  */
 export class RouterliciousDocumentServiceFactory implements IDocumentServiceFactory {
     public readonly protocolName = "fluid:";
-    constructor(
-        private readonly useDocumentService2: boolean = false,
-        private readonly errorTracking: IErrorTrackingService = new DefaultErrorTracking(),
-        private readonly disableCache: boolean = false,
-        private readonly historianApi: boolean = true,
-        private readonly gitCache: IGitCache | undefined = undefined,
-        private readonly credentials?: ICredentials,
-    ) {
-    }
 
     public async createContainer(
         createNewSummary: ISummaryTree,
@@ -105,33 +93,13 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
 
         const tokenProvider = new TokenProvider(jwtToken);
 
-        if (this.useDocumentService2) {
-            return new DocumentService2(
-                fluidResolvedUrl,
-                ordererUrl,
-                deltaStorageUrl,
-                storageUrl,
-                this.errorTracking,
-                this.disableCache,
-                this.historianApi,
-                this.credentials,
-                tokenProvider,
-                tenantId,
-                documentId);
-        } else {
-            return new DocumentService(
-                fluidResolvedUrl,
-                ordererUrl,
-                deltaStorageUrl,
-                storageUrl,
-                this.errorTracking,
-                this.disableCache,
-                this.historianApi,
-                this.credentials,
-                this.gitCache,
-                tokenProvider,
-                tenantId,
-                documentId);
-        }
+        return new DocumentService(
+            ordererUrl,
+            deltaStorageUrl,
+            storageUrl,
+            tokenProvider,
+            tenantId,
+            documentId,
+        );
     }
 }

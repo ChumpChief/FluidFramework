@@ -10,7 +10,6 @@ import {
     IContentMessage,
     ICreateBlobResponse,
     IDocumentMessage,
-    IErrorTrackingService,
     INack,
     ISequencedDocumentMessage,
     IServiceConfiguration,
@@ -222,9 +221,6 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
 }
 
 export interface IDocumentService {
-
-    resolvedUrl: IResolvedUrl;
-
     /**
      * Access to storage associated with the document...
      */
@@ -239,17 +235,6 @@ export interface IDocumentService {
      * Subscribes to the document delta stream
      */
     connectToDeltaStream(client: IClient): Promise<IDocumentDeltaConnection>;
-
-    /**
-     * Creates a branch of the document with the given ID. Returns the new ID.
-     */
-    branch(): Promise<string>;
-
-    /**
-     * Returns the error tracking service
-     */
-    getErrorTrackingService(): IErrorTrackingService | null;
-
 }
 
 export interface IDocumentServiceFactory {
