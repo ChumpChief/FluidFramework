@@ -7,10 +7,9 @@ import { IRequest } from "@fluidframework/core-interfaces";
 import {
     IRuntimeFactory,
 } from "@fluidframework/container-definitions";
-import { Container, Loader } from "@fluidframework/container-loader";
+import { Container } from "@fluidframework/container-loader";
 import {
     IFluidResolvedUrl,
-    IResolvedUrl,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
 import { ITokenClaims } from "@fluidframework/protocol-definitions";
@@ -27,7 +26,7 @@ import { initializeContainerCode } from "./initializeContainerCode";
  * documentId/containerRelativePathing
  */
 class InsecureTinyliciousUrlResolver implements IUrlResolver {
-    public async resolve(request: IRequest): Promise<IResolvedUrl> {
+    public async resolve(request: IRequest): Promise<IFluidResolvedUrl> {
         const documentId = request.url.split("/")[0];
         const encodedDocId = encodeURIComponent(documentId);
 
@@ -88,16 +87,18 @@ export async function getTinyliciousContainer(
     const module = { fluidExport: containerRuntimeFactory };
     const codeLoader = { load: async () => module };
 
-    const loader = new Loader(
-        urlResolver,
+    const request = { url: documentId };
+    const resolved = await urlResolver.resolve(request);
+    const container = await Container.load(
+        documentId,
         documentServiceFactory,
         codeLoader,
         {},
         {},
-        new Map(),
+        request,
+        resolved,
+        urlResolver,
     );
-
-    const container = await loader.resolve({ url: documentId });
 
     // We're not actually using the code proposal here, but the Container will only give us a NullRuntime if there's
     // no proposal.  So we make a fake proposal, using initializeContainerCode to ensure it only happens once.

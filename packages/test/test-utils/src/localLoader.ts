@@ -4,45 +4,12 @@
  */
 
 import {
-    ICodeLoader,
     IContainer,
     ILoader,
     IFluidCodeDetails,
-    IFluidModule,
-    IProxyLoaderFactory,
-    IProvideRuntimeFactory,
 } from "@fluidframework/container-definitions";
-import { Loader } from "@fluidframework/container-loader";
 import { IUrlResolver } from "@fluidframework/driver-definitions";
-import { LocalDocumentServiceFactory, LocalResolver } from "@fluidframework/local-driver";
-import { ILocalDeltaConnectionServer } from "@fluidframework/server-local-server";
-import { IProvideFluidDataStoreFactory } from "@fluidframework/runtime-definitions";
-import { LocalCodeLoader } from "./localCodeLoader";
-
-/**
- * Creates a loader with the given package entries and a delta connection server.
- * @param packageEntries - A list of code details to Fluid entry points.
- * @param deltaConnectionServer - The delta connection server to use as the server.
- */
-export function createLocalLoader(
-    packageEntries: Iterable<[
-        IFluidCodeDetails,
-        Partial<IProvideRuntimeFactory & IProvideFluidDataStoreFactory & IFluidModule>
-    ]>,
-    deltaConnectionServer: ILocalDeltaConnectionServer,
-    urlResolver: IUrlResolver,
-): ILoader {
-    const documentServiceFactory = new LocalDocumentServiceFactory(deltaConnectionServer);
-    const codeLoader: ICodeLoader = new LocalCodeLoader(packageEntries);
-
-    return new Loader(
-        urlResolver,
-        documentServiceFactory,
-        codeLoader,
-        {},
-        {},
-        new Map<string, IProxyLoaderFactory>());
-}
+import { LocalResolver } from "@fluidframework/local-driver";
 
 /**
  * Creates a detached Container and attaches it.

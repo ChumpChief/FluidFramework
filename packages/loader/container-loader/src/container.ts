@@ -94,7 +94,6 @@ import { ContainerContext } from "./containerContext";
 import { debug } from "./debug";
 import { IConnectionArgs, DeltaManager, ReconnectMode } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
-import { Loader } from "./loader";
 import { NullChaincode } from "./nullRuntime";
 import { pkgVersion } from "./packageVersion";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
@@ -184,7 +183,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         codeLoader: ICodeLoader,
         options: any,
         scope: IFluidObject,
-        loader: ILoader,
         request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
         urlResolver: IUrlResolver,
@@ -195,7 +193,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             options,
             scope,
             codeLoader,
-            loader,
             serviceFactory,
             urlResolver,
             {
@@ -235,35 +232,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                         });
             });
         });
-    }
-
-    public static async create(
-        codeLoader: ICodeLoader,
-        options: any,
-        scope: IFluidObject,
-        loader: Loader,
-        source: DetachedContainerSource,
-        serviceFactory: IDocumentServiceFactory,
-        urlResolver: IUrlResolver,
-        logger?: ITelemetryBaseLogger,
-    ): Promise<Container> {
-        const container = new Container(
-            options,
-            scope,
-            codeLoader,
-            loader,
-            serviceFactory,
-            urlResolver,
-            {},
-            logger);
-
-        if (source.create) {
-            await container.createDetached(source.codeDetails);
-        } else {
-            await container.rehydrateDetachedFromSnapshot(source.snapshot);
-        }
-
-        return container;
     }
 
     public subLogger: TelemetryLogger;
@@ -434,7 +402,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         public readonly options: any,
         private readonly scope: IFluidObject,
         private readonly codeLoader: ICodeLoader,
-        loader: ILoader,
         private readonly serviceFactory: IDocumentServiceFactory,
         private readonly urlResolver: IUrlResolver,
         config: IContainerConfig,
@@ -1055,67 +1022,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         };
     }
 
-    private async createDetached(source: IFluidCodeDetails) {
-        const attributes: IDocumentAttributes = {
-            branch: "",
-            sequenceNumber: 0,
-            term: 1,
-            minimumSequenceNumber: 0,
-        };
-
-        // Seed the base quorum to be an empty list with a code quorum set
-        const committedCodeProposal: ICommittedProposal = {
-            key: "code",
-            value: source,
-            approvalSequenceNumber: 0,
-            commitSequenceNumber: 0,
-            sequenceNumber: 0,
-        };
-
-        const members: [string, ISequencedClient][] = [];
-        const proposals: [number, ISequencedProposal, string[]][] = [];
-        const values: [string, ICommittedProposal][] = [["code", committedCodeProposal]];
-
-        this.attachDeltaManagerOpHandler(attributes);
-
-        // We know this is create detached flow without snapshot.
-        this._existing = false;
-
-        // Need to just seed the source data in the code quorum. Quorum itself is empty
-        this._protocolHandler = this.initializeProtocolState(
-            attributes,
-            members,
-            proposals,
-            values);
-
-        // The load context - given we seeded the quorum - will be great
-        await this.createDetachedContext(attributes);
-
-        this.propagateConnectionState();
-
-        this.loaded = true;
-    }
-
-    private async rehydrateDetachedFromSnapshot(snapshotTree: ISnapshotTree) {
-        const attributes = await this.getDocumentAttributes(undefined, snapshotTree);
-        assert.strictEqual(attributes.sequenceNumber, 0, "Seq number in detached container should be 0!!");
-        this.attachDeltaManagerOpHandler(attributes);
-
-        // We know this is create detached flow with snapshot.
-        this._existing = true;
-
-        // ...load in the existing quorum
-        // Initialize the protocol handler
-        this._protocolHandler =
-            await this.loadAndInitializeProtocolState(attributes, undefined, snapshotTree);
-
-        await this.createDetachedContext(attributes, snapshotTree);
-
-        this.loaded = true;
-
-        this.propagateConnectionState();
-    }
-
     private async getDocumentStorageService(): Promise<IDocumentStorageService> {
         if (this.service === undefined) {
             throw new Error("Not attached");
@@ -1614,43 +1520,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (error?: ICriticalContainerError) => this.close(error),
             Container.version,
             previousRuntimeState,
-        );
-
-        this.emit("contextChanged", this.pkg);
-    }
-
-    /**
-     * Creates a new, unattached container context
-     */
-    private async createDetachedContext(attributes: IDocumentAttributes, snapshot?: ISnapshotTree) {
-        this.pkg = this.getCodeDetailsFromQuorum();
-        if (this.pkg === undefined) {
-            throw new Error("pkg should be provided in create flow!!");
-        }
-        const runtimeFactory = await this.loadRuntimeFactory(this.pkg);
-
-        // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
-        // are set. Global requests will still go to this loader
-        const loader = new LocalLoader(this);
-
-        this._context = await ContainerContext.createOrLoad(
-            this,
-            this.scope,
-            this.codeLoader,
-            runtimeFactory,
-            snapshot,
-            attributes,
-            this.blobManager,
-            new DeltaManagerProxy(this._deltaManager),
-            new QuorumProxy(this.protocolHandler.quorum),
-            loader,
-            (warning: ContainerWarning) => this.raiseContainerWarning(warning),
-            (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
-            (message) => this.submitSignal(message),
-            async (message) => this.snapshot(message),
-            (error?: ICriticalContainerError) => this.close(error),
-            Container.version,
-            {},
         );
 
         this.emit("contextChanged", this.pkg);
