@@ -38,7 +38,6 @@ import {
 import {
     ChildLogger,
     raiseConnectedEvent,
-    PerformanceEvent,
 } from "@fluidframework/telemetry-utils";
 import { IDocumentStorageService, ISummaryContext } from "@fluidframework/driver-definitions";
 import {
@@ -2040,26 +2039,15 @@ export class ContainerRuntime extends EventEmitter
 
         if (this.summarizerNode.enabled) {
             const getSnapshot = async () => {
-                const perfEvent = PerformanceEvent.start(this.logger, {
-                    eventName: "RefreshLatestSummaryGetSnapshot",
-                    hasVersion: !!version, // expected in this case
-                });
                 const stats: { getVersionDuration?: number; getSnapshotDuration?: number } = {};
-                let snapshot: ISnapshotTree | undefined;
-                try {
-                    const trace = Trace.start();
+                const trace = Trace.start();
 
-                    const versionToUse = version ?? await this.getVersionFromStorage(ackHandle);
-                    stats.getVersionDuration = trace.trace().duration;
+                const versionToUse = version ?? await this.getVersionFromStorage(ackHandle);
+                stats.getVersionDuration = trace.trace().duration;
 
-                    snapshot = await this.getSnapshotFromStorage(versionToUse);
-                    stats.getSnapshotDuration = trace.trace().duration;
-                } catch (error) {
-                    perfEvent.cancel(stats, error);
-                    throw error;
-                }
+                const snapshot = await this.getSnapshotFromStorage(versionToUse);
+                stats.getSnapshotDuration = trace.trace().duration;
 
-                perfEvent.end(stats);
                 return snapshot;
             };
 

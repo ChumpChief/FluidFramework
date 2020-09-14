@@ -31,11 +31,9 @@ import {
     IThrottlingWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
-import { performanceNow } from "@fluidframework/common-utils";
 import {
     ChildLogger,
     EventEmitterWithErrorHandling,
-    PerformanceEvent,
     raiseConnectedEvent,
     TelemetryLogger,
 } from "@fluidframework/telemetry-utils";
@@ -52,8 +50,6 @@ import {
     BlobCacheStorageService,
     buildSnapshotTree,
     readAndParse,
-    OnlineStatus,
-    isOnline,
     ensureFluidResolvedUrl,
     combineAppAndProtocolSummary,
     readAndParseFromBlobs,
@@ -92,7 +88,7 @@ import { Audience } from "./audience";
 import { BlobManager } from "./blobManager";
 import { ContainerContext } from "./containerContext";
 import { debug } from "./debug";
-import { IConnectionArgs, DeltaManager, ReconnectMode } from "./deltaManager";
+import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { NullChaincode } from "./nullRuntime";
 import { pkgVersion } from "./packageVersion";
@@ -253,16 +249,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private resumedOpProcessingAfterLoad = false;
-    private firstConnection = true;
-    private manualReconnectInProgress = false;
-    private readonly connectionTransitionTimes: number[] = [];
-    private messageCountAfterDisconnection: number = 0;
     private _loadedFromVersion: IVersion | undefined;
     private _resolvedUrl: IResolvedUrl | undefined;
     private cachedAttachSummary: ISummaryTree | undefined;
     private attachInProgress = false;
-
-    private lastVisible: number | undefined;
 
     private _closed = false;
 
@@ -415,19 +405,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.logger = ChildLogger.create(this.subLogger, "Container");
 
         this._deltaManager = this.createDeltaManager();
-
-        // keep track of last time page was visible for telemetry
-        if (typeof document === "object" && document !== null) {
-            this.lastVisible = document.hidden ? performanceNow() : undefined;
-            document.addEventListener("visibilitychange", () => {
-                if (document.hidden) {
-                    this.lastVisible = performanceNow();
-                } else {
-                    // settimeout so this will hopefully fire after disconnect event if being hidden caused it
-                    setTimeout(() => this.lastVisible = undefined, 0);
-                }
-            });
-        }
     }
 
     /**
@@ -583,9 +560,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public async request(path: IRequest): Promise<IResponse> {
-        return PerformanceEvent.timedExecAsync(this.logger, { eventName: "Request" }, async () => {
-            return this.context.request(path);
-        });
+        return this.context.request(path);
     }
 
     public async snapshot(tagMessage: string, fullTree: boolean = false): Promise<void> {
@@ -636,19 +611,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         });
 
         if (reconnect) {
-            if (this._connectionState === ConnectionState.Disconnected) {
-                // Only track this as a manual reconnection if we are truly the ones kicking it off.
-                this.manualReconnectInProgress = true;
-            }
-
             // Ensure connection to web socket
-            this.connectToDeltaStream({ reason: "autoReconnect" }).catch((error) => {
-                // All errors are reported through events ("error" / "disconnected") and telemetry in DeltaManager
-                // So there shouldn't be a need to record error here.
-                // But we have number of cases where reconnects do not happen, and no errors are recorded, so
-                // adding this log point for easier diagnostics
-                this.logger.sendTelemetryEvent({ eventName: "setAutoReconnectError" }, error);
-            });
+            this.connectToDeltaStream({ reason: "autoReconnect" }).catch((error) => { });
         }
     }
 
@@ -683,11 +647,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @param error - an error to raise
      */
     public raiseContainerWarning(warning: ContainerWarning) {
-        // Some "warning" events come from outside the container and are logged
-        // elsewhere (e.g. summarizing container). We shouldn't log these here.
-        if ((warning as any).logged !== true) {
-            this.logContainerError(warning);
-        }
         this.emit("warning", warning);
     }
 
@@ -882,15 +841,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return versions[0];
     }
 
-    private recordConnectStartTime() {
-        if (this.connectionTransitionTimes[ConnectionState.Disconnected] === undefined) {
-            this.connectionTransitionTimes[ConnectionState.Disconnected] = performanceNow();
-        }
-    }
-
     private async connectToDeltaStream(args: IConnectionArgs = {}) {
-        this.recordConnectStartTime();
-
         // All agents need "write" access, including summarizer.
         if (!this.canReconnect || !this.client.details.capabilities.interactive) {
             args.mode = "write";
@@ -1149,9 +1100,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Loads the runtime factory for the provided package
      */
     private async loadRuntimeFactory(pkg: IFluidCodeDetails): Promise<IRuntimeFactory> {
-        const fluidModule = await PerformanceEvent.timedExecAsync(this.logger, { eventName: "CodeLoad" },
-            async () => this.codeLoader.load(pkg),
-        );
+        const fluidModule = await this.codeLoader.load(pkg);
 
         const factory = fluidModule.fluidExport.IRuntimeFactory;
         if (factory === undefined) {
@@ -1192,7 +1141,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         );
 
         deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {
-            const oldState = this._connectionState;
             this._connectionState = ConnectionState.Connecting;
 
             // Stash the clientID to detect when transitioning from connecting (socket.io channel open) to connected
@@ -1204,13 +1152,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.pendingClientId = details.clientId;
 
             this.emit("connect", opsBehind);
-
-            // Report telemetry after we set client id!
-            this.logConnectionStateChangeTelemetry(
-                ConnectionState.Connecting,
-                oldState,
-                "websocket established",
-                opsBehind);
 
             if (deltaManager.connectionMode === "read") {
                 this.setConnectionState(
@@ -1227,7 +1168,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         });
 
         deltaManager.on("disconnect", (reason: string) => {
-            this.manualReconnectInProgress = false;
             this.setConnectionState(ConnectionState.Disconnected, reason);
         });
 
@@ -1271,60 +1211,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             });
     }
 
-    private logConnectionStateChangeTelemetry(
-        value: ConnectionState,
-        oldState: ConnectionState,
-        reason: string,
-        opsBehind?: number) {
-        // Log actual event
-        const time = performanceNow();
-        this.connectionTransitionTimes[value] = time;
-        const duration = time - this.connectionTransitionTimes[oldState];
-
-        let durationFromDisconnected: number | undefined;
-        let connectionMode: string | undefined;
-        let connectionInitiationReason: string | undefined;
-        let autoReconnect: ReconnectMode | undefined;
-        if (value === ConnectionState.Disconnected) {
-            autoReconnect = this._deltaManager.reconnectMode;
-        } else {
-            connectionMode = this._deltaManager.connectionMode;
-            if (value === ConnectionState.Connected) {
-                durationFromDisconnected = time - this.connectionTransitionTimes[ConnectionState.Disconnected];
-                durationFromDisconnected = TelemetryLogger.formatTick(durationFromDisconnected);
-            }
-            if (this.firstConnection) {
-                connectionInitiationReason = "InitialConnect";
-            } else if (this.manualReconnectInProgress) {
-                connectionInitiationReason = "ManualReconnect";
-            } else {
-                connectionInitiationReason = "AutoReconnect";
-            }
-        }
-
-        this.logger.sendPerformanceEvent({
-            eventName: `ConnectionStateChange_${ConnectionState[value]}`,
-            from: ConnectionState[oldState],
-            duration,
-            durationFromDisconnected,
-            reason,
-            connectionInitiationReason,
-            socketDocumentId: this._deltaManager.socketDocumentId,
-            pendingClientId: this.pendingClientId,
-            clientId: this.clientId,
-            connectionMode,
-            autoReconnect,
-            opsBehind,
-            online: OnlineStatus[isOnline()],
-            lastVisible: this.lastVisible !== undefined ? performanceNow() - this.lastVisible : undefined,
-        });
-
-        if (value === ConnectionState.Connected) {
-            this.firstConnection = false;
-            this.manualReconnectInProgress = false;
-        }
-    }
-
     private setConnectionState(
         value: ConnectionState,
         reason: string) {
@@ -1335,7 +1221,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             return;
         }
 
-        const oldState = this._connectionState;
         this._connectionState = value;
 
         if (value === ConnectionState.Connected) {
@@ -1349,29 +1234,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         if (this.loaded) {
             this.propagateConnectionState();
         }
-
-        // Report telemetry after we set client id!
-        this.logConnectionStateChangeTelemetry(value, oldState, reason);
     }
 
     private propagateConnectionState() {
-        const logOpsOnReconnect: boolean =
-            this._connectionState === ConnectionState.Connected &&
-            !this.firstConnection &&
-            this._deltaManager.connectionMode === "write";
-        if (logOpsOnReconnect) {
-            this.messageCountAfterDisconnection = 0;
-        }
-
         const state = this._connectionState === ConnectionState.Connected;
         this.context.setConnectionState(state, this.clientId);
         this.protocolHandler.quorum.setConnectionState(state, this.clientId);
         raiseConnectedEvent(this.logger, this, state, this.clientId);
-
-        if (logOpsOnReconnect) {
-            this.logger.sendTelemetryEvent(
-                { eventName: "OpsSentOnReconnect", count: this.messageCountAfterDisconnection });
-        }
     }
 
     private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
@@ -1390,11 +1259,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private submitMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
         if (this.connectionState !== ConnectionState.Connected) {
-            this.logger.sendErrorEvent({ eventName: "SubmitMessageWithNoConnection", type });
             return -1;
         }
 
-        this.messageCountAfterDisconnection += 1;
         return this._deltaManager.submit(type, contents, batch, metadata);
     }
 
@@ -1487,11 +1354,5 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         );
 
         this.emit("contextChanged", this.pkg);
-    }
-
-    // Please avoid calling it directly.
-    // raiseContainerWarning() is the right flow for most cases
-    private logContainerError(warning: ContainerWarning) {
-        this.logger.sendErrorEvent({ eventName: "ContainerWarning" }, warning);
     }
 }
