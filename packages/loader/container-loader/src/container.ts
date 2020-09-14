@@ -178,7 +178,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Load container.
      */
     public static async load(
-        id: string,
+        documentId: string,
         serviceFactory: IDocumentServiceFactory,
         codeLoader: ICodeLoader,
         options: any,
@@ -188,7 +188,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         urlResolver: IUrlResolver,
         logger?: ITelemetryBaseLogger,
     ): Promise<Container> {
-        const [, docId] = id.split("/");
         const container = new Container(
             options,
             scope,
@@ -197,41 +196,15 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             urlResolver,
             {
                 originalRequest: request,
-                id: decodeURI(docId),
+                id: decodeURI(documentId),
                 resolvedUrl,
                 canReconnect: !(request.headers?.[LoaderHeader.reconnect] === false),
             },
-            logger);
-
-        return PerformanceEvent.timedExecAsync(container.logger, { eventName: "Load" }, async (event) => {
-            return new Promise<Container>((res, rej) => {
-                const version = request.headers?.[LoaderHeader.version];
-                const pause = request.headers?.[LoaderHeader.pause];
-
-                const onClosed = (err?: ICriticalContainerError) => {
-                    // Depending where error happens, we can be attempting to connect to web socket
-                    // and continuously retrying (consider offline mode)
-                    // Host has no container to close, so it's prudent to do it here
-                    const error = err ?? CreateContainerError("Container closed without an error");
-                    container.close(error);
-                    rej(error);
-                };
-                container.on("closed", onClosed);
-
-                container.load(version, pause === true)
-                    .finally(() => {
-                        container.removeListener("closed", onClosed);
-                    })
-                    .then((props) => {
-                        event.end(props);
-                        res(container);
-                    },
-                        (error) => {
-                            const err = CreateContainerError(error);
-                            onClosed(err);
-                        });
-            });
-        });
+            logger,
+        );
+        const version = request.headers?.[LoaderHeader.version];
+        await container.load(version);
+        return container;
     }
 
     public subLogger: TelemetryLogger;
@@ -935,13 +908,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      *   - otherwise, version sha to load snapshot
      * @param pause - start the container in a paused state
      */
-    private async load(specifiedVersion: string | null | undefined, pause: boolean) {
+    private async load(specifiedVersion: string | null | undefined) {
         if (this._resolvedUrl === undefined) {
             throw new Error("Attempting to load without a resolved url");
         }
         this.service = await this.serviceFactory.createDocumentService(this._resolvedUrl, this.subLogger);
-
-        let startConnectionP: Promise<IConnectionDetails> | undefined;
 
         // Ideally we always connect as "read" by default.
         // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.
@@ -956,10 +927,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-        if (!pause) {
-            startConnectionP = this.connectToDeltaStream(connectionArgs);
-            startConnectionP.catch((error) => { });
-        }
+        const startConnectionP = this.connectToDeltaStream(connectionArgs);
+        startConnectionP.catch((error) => { });
 
         this._storageService = await this.getDocumentStorageService();
         this._attachState = AttachState.Attached;
@@ -989,9 +958,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this._parentBranch = attributes.branch !== this.id ? attributes.branch : null;
             loadDetailsP = Promise.resolve();
         } else {
-            if (startConnectionP === undefined) {
-                startConnectionP = this.connectToDeltaStream(connectionArgs);
-            }
             // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
             loadDetailsP = startConnectionP.then((details) => {
                 this._existing = details.existing;
@@ -1008,9 +974,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Propagate current connection state through the system.
         this.propagateConnectionState();
 
-        if (!pause) {
-            this.resume();
-        }
+        this.resume();
 
         // Internal context is fully loaded at this point
         this.loaded = true;
