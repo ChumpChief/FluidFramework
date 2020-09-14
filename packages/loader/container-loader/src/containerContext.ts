@@ -138,7 +138,7 @@ export class ContainerContext implements IContainerContext {
     }
 
     public get options(): any {
-        return this.container.options;
+        return {};
     }
 
     public get configuration(): IFluidConfiguration {

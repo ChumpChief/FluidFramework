@@ -91,7 +91,7 @@ const connectTestFeed = () => {
     deltaFeed.connect("tinylicious", documentId, token, client)
         .then(() => console.log("Feed connected"))
         .catch((error) => console.error(error));
-}
+};
 window["connectTestFeed"] = connectTestFeed;
 
 async function start(): Promise<void> {

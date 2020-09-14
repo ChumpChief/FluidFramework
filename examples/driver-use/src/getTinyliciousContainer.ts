@@ -93,8 +93,6 @@ export async function getTinyliciousContainer(
         documentId,
         documentServiceFactory,
         codeLoader,
-        {},
-        {},
         request,
         resolved,
         urlResolver,

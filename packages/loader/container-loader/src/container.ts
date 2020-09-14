@@ -12,7 +12,7 @@ import {
     ITelemetryBaseLogger,
     ITelemetryLogger,
 } from "@fluidframework/common-definitions";
-import { IFluidObject, IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
+import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IAudience,
     ICodeLoader,
@@ -174,16 +174,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         documentId: string,
         serviceFactory: IDocumentServiceFactory,
         codeLoader: ICodeLoader,
-        options: any,
-        scope: IFluidObject,
         request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
         urlResolver: IUrlResolver,
         logger?: ITelemetryBaseLogger,
     ): Promise<Container> {
         const container = new Container(
-            options,
-            scope,
             codeLoader,
             serviceFactory,
             urlResolver,
@@ -357,8 +353,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     constructor(
-        public readonly options: any,
-        private readonly scope: IFluidObject,
         private readonly codeLoader: ICodeLoader,
         private readonly serviceFactory: IDocumentServiceFactory,
         private readonly urlResolver: IUrlResolver,
@@ -1010,17 +1004,15 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private get client(): IClient {
-        const client: IClient = this.options?.client !== undefined
-            ? (this.options.client as IClient)
-            : {
-                details: {
-                    capabilities: { interactive: true },
-                },
-                mode: "read", // default reconnection mode on lost connection / connection error
-                permission: [],
-                scopes: [],
-                user: { id: "" },
-            };
+        const client: IClient = {
+            details: {
+                capabilities: { interactive: true },
+            },
+            mode: "read", // default reconnection mode on lost connection / connection error
+            permission: [],
+            scopes: [],
+            user: { id: "" },
+        };
 
         // Client info from headers overrides client info from loader options
         const headerClientDetails = this.originalRequest?.headers?.[LoaderHeader.clientDetails];
@@ -1235,7 +1227,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this._context = await ContainerContext.createOrLoad(
             this,
-            this.scope,
+            {},
             this.codeLoader,
             chaincode,
             snapshot,
