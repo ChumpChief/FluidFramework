@@ -13,7 +13,6 @@ import {
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    ICodeLoader,
     IConnectionDetails,
     IContainer,
     IContainerEvents,
@@ -27,6 +26,7 @@ import {
     ContainerWarning,
     IThrottlingWarning,
     AttachState,
+    IFluidModule,
 } from "@fluidframework/container-definitions";
 import {
     ChildLogger,
@@ -162,11 +162,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async load(
         documentId: string,
         serviceFactory: IDocumentServiceFactory,
-        codeLoader: ICodeLoader,
+        module: IFluidModule,
         resolvedUrl: IFluidResolvedUrl,
     ): Promise<Container> {
         const container = new Container(
-            codeLoader,
+            module,
             serviceFactory,
             decodeURI(documentId),
             resolvedUrl,
@@ -327,7 +327,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     constructor(
-        private readonly codeLoader: ICodeLoader,
+        private readonly module: IFluidModule,
         private readonly serviceFactory: IDocumentServiceFactory,
         documentId: string,
         resolvedUrl: IFluidResolvedUrl,
@@ -925,9 +925,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Loads the runtime factory for the provided package
      */
     private async loadRuntimeFactory(pkg: IFluidCodeDetails): Promise<IRuntimeFactory> {
-        const fluidModule = await this.codeLoader.load(pkg);
-
-        const factory = fluidModule.fluidExport.IRuntimeFactory;
+        const factory = this.module.fluidExport.IRuntimeFactory;
         if (factory === undefined) {
             throw new Error(PackageNotFactoryError);
         }
@@ -1152,7 +1150,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context = await ContainerContext.createOrLoad(
             this,
             {},
-            this.codeLoader,
             chaincode,
             snapshot,
             attributes,

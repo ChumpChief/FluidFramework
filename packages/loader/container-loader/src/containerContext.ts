@@ -13,7 +13,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    ICodeLoader,
     IContainerContext,
     IDeltaManager,
     ILoader,
@@ -48,7 +47,6 @@ export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
         scope: IFluidObject,
-        codeLoader: ICodeLoader,
         runtimeFactory: IRuntimeFactory,
         baseSnapshot: ISnapshotTree | undefined,
         attributes: IDocumentAttributes,
@@ -67,7 +65,6 @@ export class ContainerContext implements IContainerContext {
         const context = new ContainerContext(
             container,
             scope,
-            codeLoader,
             runtimeFactory,
             baseSnapshot,
             attributes,
@@ -174,7 +171,6 @@ export class ContainerContext implements IContainerContext {
     constructor(
         private readonly container: Container,
         public readonly scope: IFluidObject,
-        public readonly codeLoader: ICodeLoader,
         public readonly runtimeFactory: IRuntimeFactory,
         private readonly _baseSnapshot: ISnapshotTree | undefined,
         private readonly attributes: IDocumentAttributes,
