@@ -18,10 +18,6 @@ import {
 } from "@fluidframework/runtime-definitions";
 import { IChannelFactory } from "@fluidframework/datastore-definitions";
 import { requestFluidObject } from "@fluidframework/runtime-utils";
-import {
-    FluidObjectSymbolProvider,
-    DependencyContainer,
-} from "@fluidframework/synthesize";
 
 import {
     IDataObjectProps,
@@ -120,7 +116,6 @@ export class PureDataObjectFactory<TObj extends PureDataObject<P, S>, P, S>
         public readonly type: string,
         private readonly ctor: new (props: IDataObjectProps<P>) => TObj,
         sharedObjects: readonly IChannelFactory[],
-        private readonly optionalProviders: FluidObjectSymbolProvider<P>,
         registryEntries?: NamedFluidDataStoreRegistryEntries,
         private readonly onDemandInstantiation = true,
     ) {
@@ -202,10 +197,8 @@ export class PureDataObjectFactory<TObj extends PureDataObject<P, S>, P, S>
         context: IFluidDataStoreContext,
         props?: S,
     ): Promise<TObj> {
-        const dependencyContainer = new DependencyContainer(context.scope.IFluidDependencySynthesizer);
-        const providers = dependencyContainer.synthesize<P>(this.optionalProviders, {});
         // Create a new instance of our data store
-        const instance = new this.ctor({ runtime, context, providers });
+        const instance = new this.ctor({ runtime, context });
         await instance.initializeInternal(props);
         return instance;
     }

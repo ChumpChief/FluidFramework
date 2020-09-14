@@ -5,7 +5,6 @@
 
 import { NamedFluidDataStoreRegistryEntries } from "@fluidframework/runtime-definitions";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
-import { DependencyContainerRegistry } from "@fluidframework/synthesize";
 import {
     RuntimeRequestHandler,
     deprecated_innerRequestHandler,
@@ -27,12 +26,10 @@ export class ContainerRuntimeFactoryWithDefaultDataStore extends BaseContainerRu
     constructor(
         private readonly defaultDataStoreName: string,
         registryEntries: NamedFluidDataStoreRegistryEntries,
-        providerEntries: DependencyContainerRegistry = [],
         requestHandlers: RuntimeRequestHandler[] = [],
     ) {
         super(
             registryEntries,
-            providerEntries,
             [
                 ...requestHandlers,
                 defaultRouteRequestHandler(defaultDataStoreId),

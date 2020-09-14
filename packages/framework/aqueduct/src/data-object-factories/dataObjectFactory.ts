@@ -13,7 +13,6 @@ import {
     NamedFluidDataStoreRegistryEntries,
 } from "@fluidframework/runtime-definitions";
 import { IChannelFactory } from "@fluidframework/datastore-definitions";
-import { FluidObjectSymbolProvider } from "@fluidframework/synthesize";
 
 import { DataObject, IDataObjectProps } from "../data-objects";
 import { PureDataObjectFactory } from "./pureDataObjectFactory";
@@ -33,7 +32,6 @@ export class DataObjectFactory<TObj extends DataObject<P, S>, P, S> extends Pure
         type: string,
         ctor: new (props: IDataObjectProps<P>) => TObj,
         sharedObjects: readonly IChannelFactory[] = [],
-        optionalProviders: FluidObjectSymbolProvider<P>,
         registryEntries?: NamedFluidDataStoreRegistryEntries,
         onDemandInstantiation = true,
     ) {
@@ -54,7 +52,6 @@ export class DataObjectFactory<TObj extends DataObject<P, S>, P, S> extends Pure
             type,
             ctor,
             mergedObjects,
-            optionalProviders,
             registryEntries,
             onDemandInstantiation,
         );
