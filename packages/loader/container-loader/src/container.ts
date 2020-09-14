@@ -26,7 +26,6 @@ import {
     ContainerWarning,
     IThrottlingWarning,
     AttachState,
-    IFluidModule,
 } from "@fluidframework/container-definitions";
 import {
     ChildLogger,
@@ -83,12 +82,9 @@ import { ContainerContext } from "./containerContext";
 import { debug } from "./debug";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
-import { NullChaincode } from "./nullRuntime";
 import { pkgVersion } from "./packageVersion";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
-
-const PackageNotFactoryError = "Code package does not implement IRuntimeFactory";
 
 export enum ConnectionState {
     /**
@@ -162,11 +158,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async load(
         documentId: string,
         serviceFactory: IDocumentServiceFactory,
-        module: IFluidModule,
+        containerRuntimeFactory: IRuntimeFactory,
         resolvedUrl: IFluidResolvedUrl,
     ): Promise<Container> {
         const container = new Container(
-            module,
+            containerRuntimeFactory,
             serviceFactory,
             decodeURI(documentId),
             resolvedUrl,
@@ -327,7 +323,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     constructor(
-        private readonly module: IFluidModule,
+        private readonly containerRuntimeFactory: IRuntimeFactory,
         private readonly serviceFactory: IDocumentServiceFactory,
         documentId: string,
         resolvedUrl: IFluidResolvedUrl,
@@ -921,17 +917,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return pkg;
     }
 
-    /**
-     * Loads the runtime factory for the provided package
-     */
-    private async loadRuntimeFactory(pkg: IFluidCodeDetails): Promise<IRuntimeFactory> {
-        const factory = this.module.fluidExport.IRuntimeFactory;
-        if (factory === undefined) {
-            throw new Error(PackageNotFactoryError);
-        }
-        return factory;
-    }
-
     private get client(): IClient {
         const client: IClient = {
             details: {
@@ -1141,7 +1126,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         previousRuntimeState: IRuntimeState = {},
     ) {
         this.pkg = this.getCodeDetailsFromQuorum();
-        const chaincode = this.pkg !== undefined ? await this.loadRuntimeFactory(this.pkg) : new NullChaincode();
 
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
         // are set. Global requests will still go directly to the loader
@@ -1150,7 +1134,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context = await ContainerContext.createOrLoad(
             this,
             {},
-            chaincode,
+            this.containerRuntimeFactory,
             snapshot,
             attributes,
             this.blobManager,

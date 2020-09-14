@@ -84,14 +84,12 @@ export async function getTinyliciousContainer(
 
     const urlResolver = new InsecureTinyliciousUrlResolver();
 
-    const module = { fluidExport: containerRuntimeFactory };
-
     const request = { url: documentId };
     const resolved = await urlResolver.resolve(request);
     const container = await Container.load(
         documentId,
         documentServiceFactory,
-        module,
+        containerRuntimeFactory,
         resolved,
     );
 
