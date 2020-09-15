@@ -11,7 +11,6 @@ import {
     IResponse,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -310,10 +309,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         }
 
         this.channel?.processSignal(message, local);
-    }
-
-    public getAudience(): IAudience {
-        return this._containerRuntime.getAudience();
     }
 
     /**

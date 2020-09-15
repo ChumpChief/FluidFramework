@@ -7,7 +7,6 @@ import {
     IFluidRouter,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -79,11 +78,6 @@ export interface IContainerRuntime extends
      * it results in container corruption - loading this file after that will always result in error.
      */
     createRootDataStore(pkg: string | string[], rootDataStoreId: string): Promise<IFluidRouter>;
-
-    /**
-     * Returns the current audience.
-     */
-    getAudience(): IAudience;
 
     /**
      * Get an absolute url for a provided container-relative request.

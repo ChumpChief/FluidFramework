@@ -11,7 +11,6 @@ import {
     IProvideFluidSerializer,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -214,11 +213,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
     readonly hostRuntime: IContainerRuntimeBase;
 
     on(event: "leader" | "notleader" | "attaching" | "attached", listener: () => void): this;
-
-    /**
-     * Returns the current audience.
-     */
-    getAudience(): IAudience;
 
     /**
      * Submits the message to be sent to other clients.

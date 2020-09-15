@@ -12,7 +12,6 @@ import {
     IResponse,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -85,7 +84,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             context.id,
             context.existing,
             context.options,
-            context.getAudience(),
             sharedObjectRegistry,
         );
 
@@ -151,7 +149,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         public readonly id: string,
         public existing: boolean,
         public readonly options: any,
-        private readonly audience: IAudience,
         private readonly sharedObjectRegistry: ISharedObjectRegistry,
     ) {
         super();
@@ -378,10 +375,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         }
 
         raiseConnectedEvent(this, connected, clientId);
-    }
-
-    public getAudience(): IAudience {
-        return this.audience;
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {

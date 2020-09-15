@@ -13,7 +13,6 @@ import {
     IResponse,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     IContainerContext,
     IRuntime,
     AttachState,
@@ -464,11 +463,6 @@ export class ContainerRuntime extends EventEmitter
         const deferred = new Deferred<FluidDataStoreContext>();
         this.contextsDeferred.set(id, deferred);
         this.contexts.set(id, context);
-    }
-
-    public getAudience(): IAudience {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        return this.context.audience!;
     }
 
     public on(event: string | symbol, listener: (...args: any[]) => void): this {

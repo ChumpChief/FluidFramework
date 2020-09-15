@@ -11,7 +11,6 @@ import {
     IFluidRouter,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -82,11 +81,6 @@ export interface IFluidDataStoreRuntime extends
      * @param content - Content of the signal.
      */
     submitSignal(type: string, content: any): void;
-
-    /**
-     * Returns the current audience.
-     */
-    getAudience(): IAudience;
 
     /**
      * Resolves when a local data store is attached.

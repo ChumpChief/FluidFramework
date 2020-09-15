@@ -16,7 +16,6 @@ import {
     ITree,
     MessageType,
 } from "@fluidframework/protocol-definitions";
-import { IAudience } from "./audience";
 
 // Represents the attachment state of the entity.
 export enum AttachState {
@@ -94,7 +93,6 @@ export interface IContainerContext extends IDisposable {
     readonly connected: boolean;
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
-    readonly audience: IAudience | undefined;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
 
     /**
