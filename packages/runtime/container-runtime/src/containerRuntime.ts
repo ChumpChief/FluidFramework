@@ -44,7 +44,6 @@ import {
     ConnectionState,
     IClientDetails,
     IDocumentMessage,
-    IHelpMessage,
     IQuorum,
     ISequencedDocumentMessage,
     ISignalMessage,
@@ -81,7 +80,6 @@ import {
 import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { debug } from "./debug";
-import { analyzeTasks } from "./taskAnalyzer";
 import { DeltaScheduler } from "./deltaScheduler";
 import { PendingStateManager } from "./pendingStateManager";
 import { pkgVersion } from "./packageVersion";
@@ -461,11 +459,6 @@ export class ContainerRuntime extends EventEmitter
     private readonly notBoundContexts = new Set<string>();
     // 0.24 back-compat attachingBeforeSummary
     private readonly attachOpFiredForDataStore = new Set<string>();
-
-    private tasks: string[] = [];
-
-    // Back-compat: version decides between loading document and chaincode.
-    private version: string | undefined;
 
     private _flushMode = FlushMode.Automatic;
     private needsFlush = false;
@@ -911,20 +904,6 @@ export class ContainerRuntime extends EventEmitter
         this.context.raiseContainerWarning(warning);
     }
 
-    /**
-     * Notifies this object to register tasks to be performed.
-     * @param tasks - List of tasks.
-     * @param version - Version of the Fluid package.
-     */
-    public registerTasks(tasks: string[], version?: string) {
-        this.verifyNotClosed();
-        this.tasks = tasks;
-        this.version = version;
-        if (this.leader) {
-            this.runTaskAnalyzer();
-        }
-    }
-
     public on(event: string | symbol, listener: (...args: any[]) => void): this {
         return super.on(event, listener);
     }
@@ -1188,23 +1167,6 @@ export class ContainerRuntime extends EventEmitter
         return clientSequenceNumber;
     }
 
-    private submitSystemMessage(
-        type: MessageType,
-        contents: any) {
-        this.verifyNotClosed();
-        assert(this.connected);
-
-        // System message should not be sent in the middle of the batch.
-        // That said, we can preserve existing behavior by not flushing existing buffer.
-        // That might be not what caller hopes to get, but we can look deeper if telemetry tells us it's a problem.
-        const middleOfBatch = this.flushMode === FlushMode.Manual && this.needsFlush;
-
-        return this.context.submitFn(
-            type,
-            contents,
-            middleOfBatch);
-    }
-
     private submitRuntimeMessage(
         type: ContainerMessageType,
         contents: any,
@@ -1280,12 +1242,6 @@ export class ContainerRuntime extends EventEmitter
             }).catch((err) => {
                 this.closeFn(CreateContainerError(err));
             });
-
-            this.context.quorum.on("removeMember", (clientId: string) => {
-                if (this.leader) {
-                    this.runTaskAnalyzer();
-                }
-            });
         }
     }
 
@@ -1311,44 +1267,6 @@ export class ContainerRuntime extends EventEmitter
 
         for (const [, context] of this.contexts) {
             context.updateLeader(this.leader);
-        }
-
-        if (this.leader) {
-            this.runTaskAnalyzer();
-        }
-    }
-
-    /**
-     * On a client joining/departure, decide whether this client is the new leader.
-     * If so, calculate if there are any unhandled tasks for browsers and remote agents.
-     * Emit local help message for this browser and submits a remote help message for agents.
-     */
-    private runTaskAnalyzer() {
-        // Analyze the current state and ask for local and remote help separately.
-        // If called for detached container, the clientId would not be assigned and it is disconnected. In this
-        // case, all tasks are run by the detached container. Called only if a leader. If we have a clientId,
-        // then we should be connected as leadership is lost on losing connection.
-        const helpTasks = this.clientId === undefined ?
-            { browser: this.tasks, robot: [] } :
-            analyzeTasks(this.clientId, this.getQuorum().getMembers(), this.tasks);
-
-        if (helpTasks && (helpTasks.browser.length > 0 || helpTasks.robot.length > 0)) {
-            if (helpTasks.browser.length > 0) {
-                const localHelpMessage: IHelpMessage = {
-                    tasks: helpTasks.browser,
-                    version: this.version,   // Back-compat
-                };
-                debug(`Requesting local help for ${helpTasks.browser}`);
-                this.emit("localHelp", localHelpMessage);
-            }
-            if (helpTasks.robot.length > 0) {
-                const remoteHelpMessage: IHelpMessage = {
-                    tasks: helpTasks.robot,
-                    version: this.version,   // Back-compat
-                };
-                debug(`Requesting remote help for ${helpTasks.robot}`);
-                this.submitSystemMessage(MessageType.RemoteHelp, remoteHelpMessage);
-            }
         }
     }
 }
