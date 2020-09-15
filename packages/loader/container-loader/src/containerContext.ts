@@ -139,7 +139,7 @@ export class ContainerContext implements IContainerContext {
     }
 
     public get attachState(): AttachState {
-        return this.container.attachState;
+        return AttachState.Attached;
     }
 
     public setConnectionState(connected: boolean, clientId?: string) {

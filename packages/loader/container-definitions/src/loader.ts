@@ -12,7 +12,6 @@ import {
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
 import { ICriticalContainerError, ContainerWarning } from "./error";
-import { AttachState } from "./runtime";
 
 /**
  * Events emitted by the Container "upwards" to the Loader and Host
@@ -46,11 +45,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
      * Also contains a map of key-value pairs that must be agreed upon by all clients before being accepted.
      */
     getQuorum(): IQuorum;
-
-    /**
-     * Indicates the attachment state of the container to a host service.
-     */
-    readonly attachState: AttachState;
 
     /**
      * Issue a request against the container for a resource.

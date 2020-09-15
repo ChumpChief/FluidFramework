@@ -13,7 +13,6 @@ import {
     IDeltaManager,
     IRuntimeFactory,
     ICriticalContainerError,
-    AttachState,
 } from "@fluidframework/container-definitions";
 import {
     EventEmitterWithErrorHandling,
@@ -90,7 +89,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private pendingClientId: string | undefined;
     private loaded = false;
-    private _attachState = AttachState.Detached;
 
     private _clientId: string | undefined;
     private readonly _documentId: string | undefined;
@@ -245,10 +243,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.removeAllListeners();
     }
 
-    public get attachState(): AttachState {
-        return this._attachState;
-    }
-
     public async request(path: IRequest): Promise<IResponse> {
         return this.context.request(path);
     }
@@ -327,8 +321,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
         const startConnectionP = this.connectToDeltaStream(connectionArgs);
         startConnectionP.catch((error) => { });
-
-        this._attachState = AttachState.Attached;
 
         const attributes = await this.getDocumentAttributes();
 
