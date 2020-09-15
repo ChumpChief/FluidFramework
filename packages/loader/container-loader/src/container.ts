@@ -37,7 +37,6 @@ import {
     ISequencedClient,
     ISequencedDocumentMessage,
     ISequencedProposal,
-    IServiceConfiguration,
     ISignalClient,
     ISignalMessage,
     MessageType,
@@ -157,14 +156,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get canReconnect(): boolean {
         return true;
-    }
-
-    /**
-     * Service configuration details. If running in offline mode will be undefined otherwise will contain service
-     * configuration details returned as part of the initial connection.
-     */
-    public get serviceConfiguration(): IServiceConfiguration | undefined {
-        return this._deltaManager.serviceConfiguration;
     }
 
     /**

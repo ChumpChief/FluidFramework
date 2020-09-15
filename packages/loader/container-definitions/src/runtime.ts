@@ -11,7 +11,6 @@ import {
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ITree,
     MessageType,
 } from "@fluidframework/protocol-definitions";
@@ -87,7 +86,6 @@ export interface IContainerContext extends IDisposable {
     readonly connected: boolean;
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
-    readonly serviceConfiguration: IServiceConfiguration | undefined;
 
     /**
      * Get an absolute url for a provided container-relative request.

@@ -14,7 +14,6 @@ import {
     IConnected,
     IDocumentMessage,
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ISignalClient,
     ISignalMessage,
     ITokenClaims,
@@ -176,13 +175,6 @@ export class DocumentDeltaConnection
      */
     public get version(): string {
         return this.details.version;
-    }
-
-    /**
-     * Configuration details provided by the service
-     */
-    public get serviceConfiguration(): IServiceConfiguration {
-        return this.details.serviceConfiguration;
     }
 
     /**

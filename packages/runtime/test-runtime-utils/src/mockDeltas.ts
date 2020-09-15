@@ -8,7 +8,6 @@ import {
     IClientDetails,
     IDocumentMessage,
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ISignalMessage,
     MessageType,
 } from "@fluidframework/protocol-definitions";
@@ -107,10 +106,6 @@ export class MockDeltaManager extends EventEmitter
 
     public get maxMessageSize(): number {
         return 0;
-    }
-
-    public get serviceConfiguration(): IServiceConfiguration {
-        return undefined;
     }
 
     public get active(): boolean {

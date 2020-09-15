@@ -9,24 +9,11 @@ import {
     IDocumentMessage,
     INack,
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ISignalClient,
     ISignalMessage,
     ITokenClaims,
 } from "@fluidframework/protocol-definitions";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
-
-// This is coppied from alfred.  Probably should clean this up.
-const DefaultServiceConfiguration: IServiceConfiguration = {
-    blockSize: 64436,
-    maxMessageSize: 16 * 1024,
-    summary: {
-        idleTime: 5000,
-        maxOps: 1000,
-        maxTime: 5000 * 12,
-        maxAckWaitTime: 600000,
-    },
-};
 
 /**
  * Mock Document Delta Connection for testing
@@ -50,7 +37,6 @@ export class MockDocumentDeltaConnection
     public initialMessages: ISequencedDocumentMessage[] = [];
     public initialSignals: ISignalMessage[] = [];
     public initialClients: ISignalClient[] = [];
-    public readonly serviceConfiguration = DefaultServiceConfiguration;
 
     constructor(
         public readonly clientId: string,

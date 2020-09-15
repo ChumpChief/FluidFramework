@@ -11,7 +11,6 @@ import {
     IDocumentMessage,
     INack,
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ISignalClient,
     ISignalMessage,
     ISnapshotTree,
@@ -152,11 +151,6 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
      * Prior clients already connected.
      */
     initialClients: ISignalClient[];
-
-    /**
-     * Configuration details provided by the service
-     */
-    serviceConfiguration: IServiceConfiguration;
 
     /**
      * Last known sequence number to ordering service at the time of connection

@@ -30,7 +30,6 @@ import {
     INack,
     INackContent,
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ISignalMessage,
     ITrace,
     MessageType,
@@ -214,10 +213,6 @@ export class DeltaManager
             throw new Error("Cannot check version without a connection");
         }
         return this.connection.details.version;
-    }
-
-    public get serviceConfiguration(): IServiceConfiguration | undefined {
-        return this.connection?.details.serviceConfiguration;
     }
 
     public get scopes(): string[] | undefined {

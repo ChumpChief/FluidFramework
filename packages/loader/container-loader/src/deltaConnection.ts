@@ -69,7 +69,6 @@ export class DeltaConnection
             get initialSignals() { return connection.initialSignals; },
             maxMessageSize: connection.maxMessageSize,
             mode: connection.mode,
-            serviceConfiguration: connection.serviceConfiguration,
             version: connection.version,
         };
 

@@ -15,7 +15,6 @@ import {
     IClientDetails,
     IDocumentMessage,
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ISignalMessage,
     MessageType,
 } from "@fluidframework/protocol-definitions";
@@ -119,10 +118,6 @@ export class DeltaManagerProxy
 
     public get version(): string {
         return this.deltaManager.version;
-    }
-
-    public get serviceConfiguration(): IServiceConfiguration | undefined {
-        return this.deltaManager.serviceConfiguration;
     }
 
     public get active(): boolean {

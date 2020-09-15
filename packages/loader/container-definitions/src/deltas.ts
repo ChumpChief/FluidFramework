@@ -10,7 +10,6 @@ import {
     IDocumentMessage,
     IProcessMessageResult,
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ISignalClient,
     ISignalMessage,
     ITokenClaims,
@@ -30,7 +29,6 @@ export interface IConnectionDetails {
     initialMessages: ISequencedDocumentMessage[];
     initialSignals: ISignalMessage[];
     maxMessageSize: number;
-    serviceConfiguration: IServiceConfiguration;
     /**
      * Last known sequence number to ordering service at the time of connection
      * It may lap actual last sequence number (quite a bit, if container  is very active).
@@ -124,9 +122,6 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
 
     /** Protocol version being used to communicate with the service */
     readonly version: string;
-
-    /** Service configuration provided by the service. */
-    readonly serviceConfiguration: IServiceConfiguration | undefined;
 
     /** Flag to indicate whether the client can write or not. */
     readonly active: boolean;
