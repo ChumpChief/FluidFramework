@@ -6,7 +6,7 @@
 import {
     IDocumentDeltaConnection,
     IDocumentDeltaStorageService,
-    IDocumentService,
+    IDocumentDeltaService,
     IDocumentStorageService,
     IResolvedUrl,
 } from "@fluidframework/driver-definitions";
@@ -23,7 +23,7 @@ import { MockDocumentDeltaConnection } from "./mockDocumentDeltaConnection";
 /**
  * Mock Document Service for testing
  */
-export class MockDocumentService implements IDocumentService {
+export class MockDocumentService implements IDocumentDeltaService {
     public get deltaStorageMessages() { return this._deltaStorageMessages; }
 
     private nextClientId: number = 0;

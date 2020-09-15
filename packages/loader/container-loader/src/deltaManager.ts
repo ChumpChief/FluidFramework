@@ -19,7 +19,7 @@ import { performanceNow, TypedEventEmitter } from "@fluidframework/common-utils"
 import { PerformanceEvent, TelemetryLogger } from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
-    IDocumentService,
+    IDocumentDeltaService,
 } from "@fluidframework/driver-definitions";
 import { isSystemType, isSystemMessage } from "@fluidframework/protocol-base";
 import {
@@ -326,7 +326,7 @@ export class DeltaManager
     }
 
     constructor(
-        private readonly documentService: IDocumentService,
+        private readonly documentService: IDocumentDeltaService,
         private readonly deltaStorageService: IDocumentDeltaStorageService,
         private client: IClient,
         private readonly logger: ITelemetryLogger,

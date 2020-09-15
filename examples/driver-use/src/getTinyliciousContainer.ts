@@ -10,7 +10,7 @@ import { Container } from "@fluidframework/container-loader";
 import { ITokenClaims } from "@fluidframework/protocol-definitions";
 import {
     DocumentDeltaStorageService,
-    DocumentService,
+    DocumentDeltaService,
     DocumentStorageService,
 } from "@fluidframework/routerlicious-driver";
 import jwt from "jsonwebtoken";
@@ -41,7 +41,7 @@ export async function getTinyliciousContainer(
 
     const jwtToken = jwt.sign(claims, "12345");
 
-    const documentService = new DocumentService(
+    const deltaService = new DocumentDeltaService(
         ordererUrl,
         jwtToken,
         tenantId,
@@ -53,7 +53,7 @@ export async function getTinyliciousContainer(
 
     const container = await Container.load(
         documentId,
-        documentService,
+        deltaService,
         deltaStorageService,
         storageService,
         containerRuntimeFactory,

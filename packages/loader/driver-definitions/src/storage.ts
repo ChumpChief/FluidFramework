@@ -206,7 +206,7 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
     removeAllListeners(): void;
 }
 
-export interface IDocumentService {
+export interface IDocumentDeltaService {
     /**
      * Subscribes to the document delta stream
      */

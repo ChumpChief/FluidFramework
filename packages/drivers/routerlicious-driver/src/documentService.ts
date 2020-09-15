@@ -11,7 +11,7 @@ import { IClient } from "@fluidframework/protocol-definitions";
  * The DocumentService manages the Socket.IO connection and manages routing requests to connected
  * clients
  */
-export class DocumentService implements api.IDocumentService {
+export class DocumentDeltaService implements api.IDocumentDeltaService {
     constructor(
         private readonly ordererUrl: string,
         private readonly token: string,

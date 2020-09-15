@@ -34,7 +34,7 @@ import {
 } from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
-    IDocumentService,
+    IDocumentDeltaService,
     IDocumentStorageService,
 } from "@fluidframework/driver-definitions";
 import {
@@ -153,7 +153,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public static async load(
         documentId: string,
-        documentService: IDocumentService,
+        documentService: IDocumentDeltaService,
         deltaStorageService: IDocumentDeltaStorageService,
         storageService: IDocumentStorageService,
         containerRuntimeFactory: IRuntimeFactory,
@@ -306,7 +306,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     constructor(
         private readonly containerRuntimeFactory: IRuntimeFactory,
-        private readonly documentService: IDocumentService,
+        private readonly deltaService: IDocumentDeltaService,
         private readonly deltaStorageService: IDocumentDeltaStorageService,
         private readonly storageService: IDocumentStorageService,
         documentId: string,
@@ -873,7 +873,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private createDeltaManager() {
         const deltaManager = new DeltaManager(
-            this.documentService,
+            this.deltaService,
             this.deltaStorageService,
             this.client,
             ChildLogger.create(this.subLogger, "DeltaManager"),
