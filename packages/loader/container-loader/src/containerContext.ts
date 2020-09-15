@@ -39,7 +39,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { BlobManager } from "./blobManager";
 import { Container } from "./container";
-import { NullRuntime } from "./nullRuntime";
 
 export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
@@ -237,10 +236,6 @@ export class ContainerContext implements IContainerContext {
 
     public registerTasks(tasks: string[]): any {
         return;
-    }
-
-    public hasNullRuntime() {
-        return this.runtime instanceof NullRuntime;
     }
 
     public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {

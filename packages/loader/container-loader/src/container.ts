@@ -365,10 +365,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.emit("warning", warning);
     }
 
-    public hasNullRuntime() {
-        return this.context.hasNullRuntime();
-    }
-
     private async getVersion(version: string): Promise<IVersion | undefined> {
         const versions = await this.storageService.getVersions(version, 1);
         return versions[0];
