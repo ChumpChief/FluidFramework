@@ -11,7 +11,6 @@ import {
     IContainer,
     IContainerEvents,
     IDeltaManager,
-    IFluidCodeDetails,
     IRuntimeFactory,
     ICriticalContainerError,
     AttachState,
@@ -43,7 +42,6 @@ import {
     IServiceConfiguration,
     ISignalClient,
     ISignalMessage,
-    ISnapshotTree,
     MessageType,
 } from "@fluidframework/protocol-definitions";
 
@@ -67,14 +65,6 @@ export enum ConnectionState {
      */
     Connected,
 }
-
-export type DetachedContainerSource = {
-    codeDetails: IFluidCodeDetails,
-    create: true,
-} | {
-    snapshot: ISnapshotTree,
-    create: false,
-};
 
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
     /**
