@@ -7,7 +7,6 @@ import { IEventProvider, IErrorEvent } from "@fluidframework/common-definitions"
 import {
     ConnectionMode,
     IClient,
-    IContentMessage,
     ICreateBlobResponse,
     IDocumentMessage,
     INack,
@@ -104,7 +103,6 @@ export interface IDocumentDeltaConnectionEvents extends IErrorEvent {
     (event: "nack", listener: (documentId: string, message: INack[]) => void);
     (event: "disconnect", listener: (reason: any) => void);
     (event: "op", listener: (documentId: string, messages: ISequencedDocumentMessage[]) => void);
-    (event: "op-content", listener: (message: IContentMessage) => void);
     (event: "signal", listener: (message: ISignalMessage) => void);
     (event: "pong", listener: (latency: number) => void);
 }
@@ -149,11 +147,6 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
      * Messages sent during the connection
      */
     initialMessages: ISequencedDocumentMessage[];
-
-    /**
-     * Messages sent during the connection
-     */
-    initialContents: IContentMessage[];
 
     /**
      * Signals sent during the connection
