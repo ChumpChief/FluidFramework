@@ -124,10 +124,6 @@ export class DeltaConnection
         this.connection.submit(messages);
     }
 
-    public async submitAsync(messages: IDocumentMessage[]): Promise<void> {
-        return this.connection.submitAsync(messages);
-    }
-
     public submitSignal(message: any): void {
         return this.connection.submitSignal(message);
     }

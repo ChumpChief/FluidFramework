@@ -69,9 +69,7 @@ export class MockDocumentDeltaConnection
             this.submitHandler(messages);
         }
     }
-    public async submitAsync(message: IDocumentMessage[]): Promise<void> {
-        this.submit(message);
-    }
+
     public submitSignal(message: any): void {
         if (this.submitSignalHandler !== undefined) {
             this.submitSignalHandler(message);

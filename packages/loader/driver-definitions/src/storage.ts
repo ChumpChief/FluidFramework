@@ -185,12 +185,6 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
     submit(messages: IDocumentMessage[]): void;
 
     /**
-     * Async version of the regular submit function.
-     */
-    // TODO why the need for two of these?
-    submitAsync(message: IDocumentMessage[]): Promise<void>;
-
-    /**
      * Submit a new signal to the server
      */
     submitSignal(message: any): void;
