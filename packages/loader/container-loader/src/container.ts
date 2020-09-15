@@ -47,7 +47,6 @@ import {
     QuorumProxy,
 } from "@fluidframework/protocol-base";
 import {
-    FileMode,
     IClient,
     IClientDetails,
     ICommittedProposal,
@@ -62,18 +61,14 @@ import {
     ISignalClient,
     ISignalMessage,
     ISnapshotTree,
-    ITree,
-    ITreeEntry,
     IVersion,
     MessageType,
-    TreeEntry,
     ISummaryTree,
 } from "@fluidframework/protocol-definitions";
 
 import { Audience } from "./audience";
 import { BlobManager } from "./blobManager";
 import { ContainerContext } from "./containerContext";
-import { debug } from "./debug";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { pkgVersion } from "./packageVersion";
@@ -378,34 +373,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.context.request(path);
     }
 
-    public async snapshot(tagMessage: string, fullTree: boolean = false): Promise<void> {
-        // TODO: Issue-2171 Support for Branch Snapshots
-        if (tagMessage.includes("ReplayTool Snapshot") === false && this.parentBranch !== null) {
-            // The below debug ruins the chrome debugging session
-            // Tracked (https://bugs.chromium.org/p/chromium/issues/detail?id=659515)
-            debug(`Skipping snapshot due to being branch of ${this.parentBranch}`);
-            return;
-        }
-
-        // Only snapshot once a code quorum has been established
-        if (!this.protocolHandler.quorum.has("code") && !this.protocolHandler.quorum.has("code2")) {
-            return;
-        }
-
-        // Stop inbound message processing while we complete the snapshot
-        try {
-            if (this.deltaManager !== undefined) {
-                await this.deltaManager.inbound.systemPause();
-            }
-
-            await this.snapshotCore(tagMessage, fullTree);
-        } finally {
-            if (this.deltaManager !== undefined) {
-                this.deltaManager.inbound.systemResume();
-            }
-        }
-    }
-
     public setAutoReconnect(reconnect: boolean) {
         assert(this.resumedOpProcessingAfterLoad);
 
@@ -507,103 +474,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this.deltaManager.inbound.systemResume();
         this.deltaManager.inboundSignal.systemResume();
-    }
-
-    private async snapshotCore(tagMessage: string, fullTree: boolean = false) {
-        // Snapshots base document state and currently running context
-        const root = this.snapshotBase();
-        const dataStoreEntries = await this.context.snapshot(tagMessage, fullTree);
-
-        // And then combine
-        if (dataStoreEntries !== null) {
-            root.entries.push(...dataStoreEntries.entries);
-        }
-
-        // Generate base snapshot message
-        const deltaDetails =
-            `${this._deltaManager.lastSequenceNumber}:${this._deltaManager.minimumSequenceNumber}`;
-        const message = `Commit @${deltaDetails} ${tagMessage}`;
-
-        // Pull in the prior version and snapshot tree to store against
-        const lastVersion = await this.getVersion(this.id);
-
-        const parents = lastVersion !== undefined ? [lastVersion.id] : [];
-
-        // Write the full snapshot
-        return this.storageService.write(root, parents, message, "");
-    }
-
-    private snapshotBase(): ITree {
-        const entries: ITreeEntry[] = [];
-
-        if (this.blobManager === undefined) {
-            throw new Error("Attempted to snapshot without a blobManager");
-        }
-
-        const blobMetaData = this.blobManager.getBlobMetadata();
-        entries.push({
-            mode: FileMode.File,
-            path: ".blobs",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(blobMetaData),
-                encoding: "utf-8",
-            },
-        });
-
-        const quorumSnapshot = this.protocolHandler.quorum.snapshot();
-        entries.push({
-            mode: FileMode.File,
-            path: "quorumMembers",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(quorumSnapshot.members),
-                encoding: "utf-8",
-            },
-        });
-        entries.push({
-            mode: FileMode.File,
-            path: "quorumProposals",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(quorumSnapshot.proposals),
-                encoding: "utf-8",
-            },
-        });
-        entries.push({
-            mode: FileMode.File,
-            path: "quorumValues",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(quorumSnapshot.values),
-                encoding: "utf-8",
-            },
-        });
-
-        // Save attributes for the document
-        const documentAttributes = {
-            branch: this.id,
-            minimumSequenceNumber: this._deltaManager.minimumSequenceNumber,
-            sequenceNumber: this._deltaManager.lastSequenceNumber,
-            term: this._deltaManager.referenceTerm,
-        };
-        entries.push({
-            mode: FileMode.File,
-            path: ".attributes",
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(documentAttributes),
-                encoding: "utf-8",
-            },
-        });
-
-        // Output the tree
-        const root: ITree = {
-            entries,
-            id: null,
-        };
-
-        return root;
     }
 
     private async getVersion(version: string): Promise<IVersion | undefined> {
@@ -1041,7 +911,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (warning: ContainerWarning) => this.raiseContainerWarning(warning),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
-            async (message) => this.snapshot(message),
             (error?: ICriticalContainerError) => this.close(error),
             Container.version,
             previousRuntimeState,

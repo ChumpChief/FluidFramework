@@ -131,7 +131,6 @@ export interface IContainerContext extends IDisposable {
     readonly baseSnapshot: ISnapshotTree | undefined;
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
-    readonly snapshotFn: (message: string) => Promise<void>;
     readonly closeFn: (error?: ICriticalContainerError) => void;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly quorum: IQuorum;
@@ -143,7 +142,6 @@ export interface IContainerContext extends IDisposable {
     readonly previousRuntimeState: IRuntimeState;
 
     raiseContainerWarning(warning: ContainerWarning): void;
-    requestSnapshot(tagMessage: string): Promise<void>;
     reloadContext(): Promise<void>;
 
     /**

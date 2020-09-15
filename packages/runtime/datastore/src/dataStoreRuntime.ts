@@ -103,7 +103,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             context.deltaManager,
             context.getQuorum(),
             context.getAudience(),
-            context.snapshotFn,
             sharedObjectRegistry,
             logger);
 
@@ -186,7 +185,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         private readonly quorum: IQuorum,
         private readonly audience: IAudience,
-        private readonly snapshotFn: (message: string) => Promise<void>,
         private readonly sharedObjectRegistry: ISharedObjectRegistry,
         public readonly logger: ITelemetryLogger,
     ) {
@@ -430,12 +428,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
 
     public getAudience(): IAudience {
         return this.audience;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/promise-function-async
-    public snapshot(message: string): Promise<void> {
-        this.verifyNotClosed();
-        return this.snapshotFn(message);
     }
 
     public async uploadBlob(file: IGenericBlob): Promise<IGenericBlob> {

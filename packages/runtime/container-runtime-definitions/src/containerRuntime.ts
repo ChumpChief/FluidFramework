@@ -61,7 +61,6 @@ export interface IContainerRuntime extends
     readonly branch: string;
     readonly loader: ILoader;
     readonly flushMode: FlushMode;
-    readonly snapshotFn: (message: string) => Promise<void>;
     /**
      * Indicates the attachment state of the container to a host service.
      */

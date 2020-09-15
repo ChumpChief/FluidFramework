@@ -259,7 +259,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
      * Use containerRuntime instead of hostRuntime
      */
     readonly hostRuntime: IContainerRuntimeBase;
-    readonly snapshotFn: (message: string) => Promise<void>;
 
     readonly summaryTracker: ISummaryTracker;
 
