@@ -14,7 +14,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IFluidTokenProvider,
     IContainerContext,
     IDeltaManager,
     IDeltaSender,
@@ -257,13 +256,6 @@ export class ContainerRuntime extends EventEmitter
         registryEntries: NamedFluidDataStoreRegistryEntries,
         requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ): Promise<ContainerRuntime> {
-        // Back-compat: <= 0.18 loader
-        if (context.deltaManager.lastSequenceNumber === undefined) {
-            Object.defineProperty(context.deltaManager, "lastSequenceNumber", {
-                get: () => (context.deltaManager as any).referenceSequenceNumber,
-            });
-        }
-
         const registry = new ContainerRuntimeDataStoreRegistry(registryEntries);
 
         const chunks = [];
@@ -441,16 +433,6 @@ export class ContainerRuntime extends EventEmitter
 
         this.emit("dispose");
         this.removeAllListeners();
-    }
-
-    public get IFluidTokenProvider() {
-        if (this.options && this.options.intelligence) {
-            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-            return {
-                intelligence: this.options.intelligence,
-            } as IFluidTokenProvider;
-        }
-        return undefined;
     }
 
     public get IFluidConfiguration() {
