@@ -10,13 +10,9 @@ import {
     IFluidDataStoreRegistry,
     FluidDataStoreRegistryEntry,
     NamedFluidDataStoreRegistryEntries,
-    SummarizeInternalFn,
-    CreateChildSummarizerNodeFn,
-    CreateSummarizerNodeSource,
 } from "@fluidframework/runtime-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import { MockFluidDataStoreRuntime } from "@fluidframework/test-runtime-utils";
-import { SummarizerNode } from "@fluidframework/runtime-utils";
 import { LocalFluidDataStoreContext } from "../dataStoreContext";
 import { ContainerRuntime } from "../containerRuntime";
 
@@ -42,7 +38,6 @@ describe("Data Store Creation Tests", () => {
         const dataStoreAName = "dataStoreA";
         const dataStoreBName = "dataStoreB";
         const dataStoreCName = "dataStoreC";
-        let getCreateSummarizerNodeFn: (id: string) => CreateChildSummarizerNodeFn;
 
         // Helper function that creates a FluidDataStoreRegistryEntry with the registry entries
         // provided to it.
@@ -93,16 +88,6 @@ describe("Data Store Creation Tests", () => {
                 notifyDataStoreInstantiated: (c) => { },
                 on: (event, listener) => { },
             } as ContainerRuntime;
-            const summarizerNode = SummarizerNode.createRoot(
-                (() => { }) as unknown as SummarizeInternalFn,
-                0,
-                0,
-                true);
-            getCreateSummarizerNodeFn = (id: string) => (si: SummarizeInternalFn) => summarizerNode.createChild(
-                si,
-                id,
-                { type: CreateSummarizerNodeSource.Local },
-            );
         });
 
         it("Valid global dataStore", async () => {
@@ -114,7 +99,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName],
                 containerRuntime,
                 storage,
-                getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
 
@@ -136,7 +120,6 @@ describe("Data Store Creation Tests", () => {
                 [dataStoreAName],
                 containerRuntime,
                 storage,
-                getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
 
@@ -158,7 +141,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName],
                 containerRuntime,
                 storage,
-                getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
 
@@ -180,7 +162,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreBName],
                 containerRuntime,
                 storage,
-                getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
 
@@ -202,7 +183,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreBName],
                 containerRuntime,
                 storage,
-                getCreateSummarizerNodeFn(dataStoreBId),
                 attachCb,
                 undefined);
 
@@ -221,7 +201,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreCName],
                 containerRuntime,
                 storage,
-                getCreateSummarizerNodeFn(dataStoreCId),
                 attachCb,
                 undefined);
 
@@ -243,7 +222,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, "fake"],
                 containerRuntime,
                 storage,
-                getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
 
@@ -265,7 +243,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreBName, "fake"],
                 containerRuntime,
                 storage,
-                getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
 
@@ -287,7 +264,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreBName, dataStoreCName],
                 containerRuntime,
                 storage,
-                getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
 

@@ -11,7 +11,6 @@ import {
     ITree,
 } from "@fluidframework/protocol-definitions";
 import { IChannel } from "@fluidframework/datastore-definitions";
-import { ISummarizeResult } from "@fluidframework/runtime-definitions";
 import { ChannelDeltaConnection } from "./channelDeltaConnection";
 import { ChannelStorageService } from "./channelStorageService";
 
@@ -24,8 +23,6 @@ export interface IChannelContext {
 
     /** @deprecated in 0.22 summarizerNode */
     snapshot(fullTree?: boolean): Promise<ITree>;
-
-    summarize(fullTree?: boolean): Promise<ISummarizeResult>;
 
     reSubmit(content: any, localOpMetadata: unknown): void;
 }

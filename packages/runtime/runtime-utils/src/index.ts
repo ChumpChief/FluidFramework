@@ -5,7 +5,6 @@
 
 export * from "./dataStoreHandleContextUtils";
 export * from "./serializer";
-export * from "./summarizerNode";
 export * from "./summaryUtils";
 export * from "./utils";
 export * from "./objectstoragepartition";

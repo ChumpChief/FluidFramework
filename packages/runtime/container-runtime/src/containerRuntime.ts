@@ -71,19 +71,12 @@ import {
     ISignalEnvelop,
     NamedFluidDataStoreRegistryEntries,
     ISummaryStats,
-    ISummarizeInternalResult,
-    SummarizeInternalFn,
-    CreateChildSummarizerNodeFn,
-    CreateChildSummarizerNodeParam,
-    CreateSummarizerNodeSource,
     IAgentScheduler,
     ITaskManager,
 } from "@fluidframework/runtime-definitions";
 import {
     FluidSerializer,
     SummaryTreeBuilder,
-    SummarizerNode,
-    convertToSummaryTree,
     RequestParser,
     requestFluidObject,
 } from "@fluidframework/runtime-utils";
@@ -93,7 +86,6 @@ import {
     LocalFluidDataStoreContext,
     LocalDetachedFluidDataStoreContext,
     RemotedFluidDataStoreContext,
-    createAttributesBlob,
     currentSnapshotFormatVersion,
     IFluidDataStoreAttributes,
 } from "./dataStoreContext";
@@ -101,7 +93,7 @@ import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { debug } from "./debug";
 import { ISummarizerRuntime, Summarizer } from "./summarizer";
-import { SummaryManager, summarizerClientType } from "./summaryManager";
+import { SummaryManager } from "./summaryManager";
 import { analyzeTasks } from "./taskAnalyzer";
 import { DeltaScheduler } from "./deltaScheduler";
 import { SummaryCollection } from "./summaryCollection";
@@ -183,12 +175,6 @@ export interface IContainerRuntimeOptions {
 
     // Delay before first attempt to spawn summarizing container
     initialSummarizerDelayMs?: number;
-
-    // Flag to enable summarizing with new SummarizerNode strategy.
-    // Enabling this feature will allow data stores that fail to summarize to
-    // try to still summarize based on previous successful summary + ops since.
-    // Enabled by default.
-    enableSummarizerNode?: boolean;
 }
 
 interface IRuntimeMessageMetadata {
@@ -549,13 +535,6 @@ export class ContainerRuntime extends EventEmitter
     public readonly previousState: IPreviousState;
     private readonly summaryManager: SummaryManager;
 
-    private readonly summarizerNode: {
-        readonly referenceSequenceNumber: number;
-        readonly getCreateChildFn: (
-            id: string,
-            createParam: CreateChildSummarizerNodeParam,
-        ) => CreateChildSummarizerNodeFn;
-    } & ({ readonly enabled: true; readonly node: SummarizerNode } | { readonly enabled: false });
     private readonly notBoundContexts = new Set<string>();
     // 0.24 back-compat attachingBeforeSummary
     private readonly attachOpFiredForDataStore = new Set<string>();
@@ -622,48 +601,6 @@ export class ContainerRuntime extends EventEmitter
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
-        const loadedFromSequenceNumber = this.deltaManager.initialSequenceNumber;
-        const isSummarizerClient = this.clientDetails.type === summarizerClientType;
-        // Use runtimeOptions if provided, otherwise check localStorage, defaulting to true/enabled.
-        const enableSummarizerNode = this.runtimeOptions.enableSummarizerNode
-            ?? (typeof localStorage === "object" && localStorage?.fluidDisableSummarizerNode ? false : true);
-        const summarizerNode = SummarizerNode.createRoot(
-            // Summarize function to call when summarize is called
-            async (fullTree: boolean) => this.summarizeInternal(fullTree),
-            // Latest change sequence number, no changes since summary applied yet
-            loadedFromSequenceNumber,
-            // Summary reference sequence number, undefined if no summary yet
-            context.baseSnapshot ? loadedFromSequenceNumber : undefined,
-            // Disable calls to summarize if not summarizer client, or if runtimeOption is disabled
-            !isSummarizerClient || !enableSummarizerNode,
-            {
-                // Must set to false to prevent sending summary handle which would be pointing to
-                // a summary with an older protocol state.
-                canReuseHandle: false,
-                // Must set to true to throw on any data stores failure that was too severe to be handled.
-                // We also are not decoding the base summaries at the root.
-                throwOnFailure: true,
-            },
-        );
-
-        const getCreateChildFn = (id: string, createParam: CreateChildSummarizerNodeParam) =>
-            (summarizeInternal: SummarizeInternalFn) =>
-                summarizerNode.createChild(summarizeInternal, id, createParam);
-        if (enableSummarizerNode) {
-            this.summarizerNode = {
-                enabled: true,
-                node: summarizerNode,
-                get referenceSequenceNumber() { return this.node.referenceSequenceNumber; },
-                getCreateChildFn,
-            };
-        } else {
-            this.summarizerNode = {
-                enabled: false,
-                get referenceSequenceNumber() { return summarizerNode.referenceSequenceNumber; },
-                getCreateChildFn,
-            };
-        }
-
         // Extract stores stored inside the snapshot
         const fluidDataStores = new Map<string, ISnapshotTree | string>();
 
@@ -687,7 +624,7 @@ export class ContainerRuntime extends EventEmitter
                     typeof value === "string" ? value : Promise.resolve(value),
                     this,
                     this.storage,
-                    this.summarizerNode.getCreateChildFn(key, { type: CreateSummarizerNodeSource.FromSummary }));
+                );
             } else {
                 let pkgFromSnapshot: string[];
                 if (typeof context.baseSnapshot !== "object") {
@@ -712,7 +649,6 @@ export class ContainerRuntime extends EventEmitter
                     pkgFromSnapshot,
                     this,
                     this.storage,
-                    this.summarizerNode.getCreateChildFn(key, { type: CreateSummarizerNodeSource.FromSummary }),
                     (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
                     snapshotTree);
             }
@@ -1139,7 +1075,6 @@ export class ContainerRuntime extends EventEmitter
             id,
             this,
             this.storage,
-            this.summarizerNode.getCreateChildFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
             undefined,
         );
@@ -1162,7 +1097,6 @@ export class ContainerRuntime extends EventEmitter
             pkg,
             this,
             this.storage,
-            this.summarizerNode.getCreateChildFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
             undefined,
         );
@@ -1265,27 +1199,6 @@ export class ContainerRuntime extends EventEmitter
         return this.context.submitSignalFn(envelope);
     }
 
-    private async summarizeInternal(fullTree: boolean): Promise<ISummarizeInternalResult> {
-        const builder = new SummaryTreeBuilder();
-
-        // Iterate over each store and ask it to snapshot
-        await Promise.all(Array.from(this.contexts)
-            .filter(([_, value]) => {
-                // Summarizer works only with clients with no local changes!
-                assert(value.attachState !== AttachState.Attaching);
-                return value.attachState === AttachState.Attached;
-            }).map(async ([key, value]) => {
-                const contextSummary = this.summarizerNode.enabled
-                    ? await value.summarize(fullTree)
-                    : convertToSummaryTree(await value.snapshot(fullTree), fullTree);
-                builder.addWithStats(key, contextSummary);
-            }));
-
-        this.serializeContainerBlobs(builder);
-        const summary = builder.getSummaryTree();
-        return { ...summary, id: "" };
-    }
-
     private processAttachMessage(message: ISequencedDocumentMessage, local: boolean, localMessageMetadata: unknown) {
         const attachMessage = message.contents as InboundAttachMessage;
         // The local object has already been attached
@@ -1313,17 +1226,8 @@ export class ContainerRuntime extends EventEmitter
             snapshotTreeP,
             this,
             new BlobCacheStorageService(this.storage, flatBlobsP),
-            this.summarizerNode.getCreateChildFn(
-                attachMessage.id,
-                {
-                    type: CreateSummarizerNodeSource.FromAttach,
-                    sequenceNumber: message.sequenceNumber,
-                    snapshot: attachMessage.snapshot ?? {
-                        id: null,
-                        entries: [createAttributesBlob(pkg)],
-                    },
-                }),
-            pkg);
+            pkg,
+        );
 
         // If a non-local operation then go and create the object, otherwise mark it as officially attached.
         assert(!this.contexts.has(attachMessage.id), "Store attached with existing ID");

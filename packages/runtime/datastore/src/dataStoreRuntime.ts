@@ -44,11 +44,9 @@ import {
     IFluidDataStoreChannel,
     IEnvelope,
     IInboundSignalMessage,
-    ISummaryTreeWithStats,
-    CreateSummarizerNodeSource,
     IFluidDataStoreContextType,
 } from "@fluidframework/runtime-definitions";
-import { generateHandleContextPath, SummaryTreeBuilder } from "@fluidframework/runtime-utils";
+import { generateHandleContextPath } from "@fluidframework/runtime-utils";
 import {
     IChannel,
     IFluidDataStoreRuntime,
@@ -216,10 +214,7 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                         this.sharedObjectRegistry,
                         undefined /* extraBlobs */,
                         dataStoreContext.branch,
-                        this.dataStoreContext.getCreateChildSummarizerNodeFn(
-                            path,
-                            { type: CreateSummarizerNodeSource.FromSummary },
-                        ));
+                    );
                 }
                 const deferred = new Deferred<IChannelContext>();
                 deferred.resolve(channelContext);
@@ -475,14 +470,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                         this.sharedObjectRegistry,
                         flatBlobsP,
                         origin,
-                        this.dataStoreContext.getCreateChildSummarizerNodeFn(
-                            id,
-                            {
-                                type: CreateSummarizerNodeSource.FromAttach,
-                                sequenceNumber: message.sequenceNumber,
-                                snapshot: attachMessage.snapshot,
-                            },
-                        ),
                         attachMessage.type);
 
                     this.contexts.set(id, remoteChannelContext);
@@ -543,26 +530,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             }));
 
         return entries;
-    }
-
-    public async summarize(fullTree = false): Promise<ISummaryTreeWithStats> {
-        const builder = new SummaryTreeBuilder();
-
-        // Iterate over each data store and ask it to snapshot
-        await Promise.all(Array.from(this.contexts)
-            .filter(([key, _]) => {
-                const isAttached = this.isChannelAttached(key);
-                // We are not expecting local dds! Summary may not capture local state.
-                assert(isAttached, "Not expecting detached channels during summarize");
-                // If the object is registered - and we have received the sequenced op creating the object
-                // (i.e. it has a base mapping) - then we go ahead and snapshot
-                return isAttached;
-            }).map(async ([key, value]) => {
-                const channelSummary = await value.summarize(fullTree);
-                builder.addWithStats(key, channelSummary);
-            }));
-
-        return builder.getSummaryTree();
     }
 
     public getAttachSnapshot(): ITreeEntry[] {
@@ -689,8 +656,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
     }
 
     private setChannelDirty(address: string): void {
-        this.verifyNotClosed();
-        this.dataStoreContext.setChannelDirty(address);
     }
 
     private processChannelOp(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {

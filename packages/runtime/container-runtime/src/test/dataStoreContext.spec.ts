@@ -12,12 +12,8 @@ import {
     IFluidDataStoreContext,
     IFluidDataStoreFactory,
     IFluidDataStoreRegistry,
-    SummarizeInternalFn,
-    CreateChildSummarizerNodeFn,
-    CreateSummarizerNodeSource,
 } from "@fluidframework/runtime-definitions";
 import { MockFluidDataStoreRuntime } from "@fluidframework/test-runtime-utils";
-import { SummarizerNode } from "@fluidframework/runtime-utils";
 import { IsoBuffer } from "@fluidframework/common-utils";
 import {
     IFluidDataStoreAttributes,
@@ -28,19 +24,6 @@ import { ContainerRuntime } from "../containerRuntime";
 
 describe("Data Store Context Tests", () => {
     const dataStoreId = "Test1";
-    let createSummarizerNodeFn: CreateChildSummarizerNodeFn;
-    beforeEach(async () => {
-        const summarizerNode = SummarizerNode.createRoot(
-            (() => undefined) as unknown as SummarizeInternalFn,
-            0,
-            0,
-            true);
-        createSummarizerNodeFn = (summarizeInternal: SummarizeInternalFn) => summarizerNode.createChild(
-            summarizeInternal,
-            dataStoreId,
-            { type: CreateSummarizerNodeSource.Local },
-        );
-    });
 
     describe("LocalFluidDataStoreContext Initialization", () => {
         let localDataStoreContext: LocalFluidDataStoreContext;
@@ -71,7 +54,6 @@ describe("Data Store Context Tests", () => {
                 ["TestDataStore1"],
                 containerRuntime,
                 storage,
-                createSummarizerNodeFn,
                 attachCb,
                 undefined);
 
@@ -101,7 +83,6 @@ describe("Data Store Context Tests", () => {
                 ["TestComp", "SubComp"],
                 containerRuntime,
                 storage,
-                createSummarizerNodeFn,
                 attachCb,
                 undefined);
 
@@ -131,7 +112,6 @@ describe("Data Store Context Tests", () => {
                 ["TestComp", "SubComp"],
                 containerRuntime,
                 storage,
-                createSummarizerNodeFn,
                 attachCb,
                 undefined);
 
@@ -195,7 +175,6 @@ describe("Data Store Context Tests", () => {
                 Promise.resolve(snapshotTree),
                 containerRuntime,
                 new BlobCacheStorageService(storage as IDocumentStorageService, Promise.resolve(blobCache)),
-                createSummarizerNodeFn,
             );
             const snapshot = await remotedDataStoreContext.snapshot(true);
             const blob = snapshot.entries[0].value as IBlob;
@@ -226,7 +205,6 @@ describe("Data Store Context Tests", () => {
                 Promise.resolve(snapshotTree),
                 containerRuntime,
                 new BlobCacheStorageService(storage as IDocumentStorageService, Promise.resolve(blobCache)),
-                createSummarizerNodeFn,
             );
             const snapshot = await remotedDataStoreContext.snapshot(true);
             const blob = snapshot.entries[0].value as IBlob;
