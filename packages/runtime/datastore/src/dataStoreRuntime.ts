@@ -216,10 +216,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                         this.sharedObjectRegistry,
                         undefined /* extraBlobs */,
                         dataStoreContext.branch,
-                        this.dataStoreContext.summaryTracker.createOrGetChild(
-                            path,
-                            this.deltaManager.lastSequenceNumber,
-                        ),
                         this.dataStoreContext.getCreateChildSummarizerNodeFn(
                             path,
                             { type: CreateSummarizerNodeSource.FromSummary },
@@ -479,10 +475,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                         this.sharedObjectRegistry,
                         flatBlobsP,
                         origin,
-                        this.dataStoreContext.summaryTracker.createOrGetChild(
-                            id,
-                            message.sequenceNumber,
-                        ),
                         this.dataStoreContext.getCreateChildSummarizerNodeFn(
                             id,
                             {

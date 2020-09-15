@@ -20,7 +20,6 @@ import {
 } from "@fluidframework/datastore-definitions";
 import {
     IFluidDataStoreContext,
-    ISummaryTracker,
     ISummarizeResult,
     ISummarizerNode,
     CreateChildSummarizerNodeFn,
@@ -54,7 +53,6 @@ export class RemoteChannelContext implements IChannelContext {
         private readonly registry: ISharedObjectRegistry,
         extraBlobs: Promise<Map<string, string>> | undefined,
         private readonly branch: string,
-        private readonly summaryTracker: ISummaryTracker,
         createSummarizerNode: CreateChildSummarizerNodeFn,
         private readonly attachMessageType?: string,
     ) {
@@ -89,7 +87,6 @@ export class RemoteChannelContext implements IChannelContext {
     }
 
     public processOp(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void {
-        this.summaryTracker.updateLatestSequenceNumber(message.sequenceNumber);
         this.summarizerNode.invalidate(message.sequenceNumber);
 
         if (this.isLoaded) {
@@ -108,13 +105,6 @@ export class RemoteChannelContext implements IChannelContext {
     }
 
     public async snapshot(fullTree: boolean = false): Promise<ITree> {
-        if (!fullTree) {
-            const id = await this.summaryTracker.getId();
-            if (id !== undefined) {
-                return { id, entries: [] };
-            }
-        }
-
         const channel = await this.getChannel();
         return snapshotChannel(channel);
     }

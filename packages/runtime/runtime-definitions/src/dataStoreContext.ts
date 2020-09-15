@@ -257,8 +257,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
      */
     readonly hostRuntime: IContainerRuntimeBase;
 
-    readonly summaryTracker: ISummaryTracker;
-
     on(event: "leader" | "notleader" | "attaching" | "attached", listener: () => void): this;
 
     /**

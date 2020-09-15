@@ -81,7 +81,6 @@ import {
 } from "@fluidframework/runtime-definitions";
 import {
     FluidSerializer,
-    SummaryTracker,
     SummaryTreeBuilder,
     SummarizerNode,
     convertToSummaryTree,
@@ -549,8 +548,6 @@ export class ContainerRuntime extends EventEmitter
 
     public readonly previousState: IPreviousState;
     private readonly summaryManager: SummaryManager;
-    // back-compat: summarizerNode - remove all summary trackers
-    private readonly summaryTracker: SummaryTracker;
 
     private readonly summarizerNode: {
         readonly referenceSequenceNumber: number;
@@ -625,12 +622,6 @@ export class ContainerRuntime extends EventEmitter
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
-        this.summaryTracker = new SummaryTracker(
-            "", // fullPath - the root is unnamed
-            this.deltaManager.initialSequenceNumber, // referenceSequenceNumber - last acked summary ref seq number
-            this.deltaManager.initialSequenceNumber, // latestSequenceNumber - latest sequence number seen
-        );
-
         const loadedFromSequenceNumber = this.deltaManager.initialSequenceNumber;
         const isSummarizerClient = this.clientDetails.type === summarizerClientType;
         // Use runtimeOptions if provided, otherwise check localStorage, defaulting to true/enabled.
@@ -696,7 +687,6 @@ export class ContainerRuntime extends EventEmitter
                     typeof value === "string" ? value : Promise.resolve(value),
                     this,
                     this.storage,
-                    this.summaryTracker.createOrGetChild(key, this.summaryTracker.referenceSequenceNumber),
                     this.summarizerNode.getCreateChildFn(key, { type: CreateSummarizerNodeSource.FromSummary }));
             } else {
                 let pkgFromSnapshot: string[];
@@ -722,7 +712,6 @@ export class ContainerRuntime extends EventEmitter
                     pkgFromSnapshot,
                     this,
                     this.storage,
-                    this.summaryTracker.createOrGetChild(key, this.deltaManager.lastSequenceNumber),
                     this.summarizerNode.getCreateChildFn(key, { type: CreateSummarizerNodeSource.FromSummary }),
                     (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
                     snapshotTree);
@@ -1150,7 +1139,6 @@ export class ContainerRuntime extends EventEmitter
             id,
             this,
             this.storage,
-            this.summaryTracker.createOrGetChild(id, this.deltaManager.lastSequenceNumber),
             this.summarizerNode.getCreateChildFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
             undefined,
@@ -1174,7 +1162,6 @@ export class ContainerRuntime extends EventEmitter
             pkg,
             this,
             this.storage,
-            this.summaryTracker.createOrGetChild(id, this.deltaManager.lastSequenceNumber),
             this.summarizerNode.getCreateChildFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
             undefined,
@@ -1326,7 +1313,6 @@ export class ContainerRuntime extends EventEmitter
             snapshotTreeP,
             this,
             new BlobCacheStorageService(this.storage, flatBlobsP),
-            this.summaryTracker.createOrGetChild(attachMessage.id, message.sequenceNumber),
             this.summarizerNode.getCreateChildFn(
                 attachMessage.id,
                 {

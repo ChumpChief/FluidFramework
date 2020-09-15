@@ -16,7 +16,7 @@ import {
 } from "@fluidframework/runtime-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import { MockFluidDataStoreRuntime } from "@fluidframework/test-runtime-utils";
-import { SummaryTracker, SummarizerNode } from "@fluidframework/runtime-utils";
+import { SummarizerNode } from "@fluidframework/runtime-utils";
 import { LocalFluidDataStoreContext } from "../dataStoreContext";
 import { ContainerRuntime } from "../containerRuntime";
 
@@ -42,7 +42,6 @@ describe("Data Store Creation Tests", () => {
         const dataStoreAName = "dataStoreA";
         const dataStoreBName = "dataStoreB";
         const dataStoreCName = "dataStoreC";
-        let summaryTracker: SummaryTracker;
         let getCreateSummarizerNodeFn: (id: string) => CreateChildSummarizerNodeFn;
 
         // Helper function that creates a FluidDataStoreRegistryEntry with the registry entries
@@ -94,7 +93,6 @@ describe("Data Store Creation Tests", () => {
                 notifyDataStoreInstantiated: (c) => { },
                 on: (event, listener) => { },
             } as ContainerRuntime;
-            summaryTracker = new SummaryTracker("", 0, 0);
             const summarizerNode = SummarizerNode.createRoot(
                 (() => { }) as unknown as SummarizeInternalFn,
                 0,
@@ -116,7 +114,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName],
                 containerRuntime,
                 storage,
-                summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
@@ -139,7 +136,6 @@ describe("Data Store Creation Tests", () => {
                 [dataStoreAName],
                 containerRuntime,
                 storage,
-                summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
@@ -162,7 +158,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName],
                 containerRuntime,
                 storage,
-                summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
@@ -185,7 +180,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreBName],
                 containerRuntime,
                 storage,
-                summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
@@ -208,7 +202,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreBName],
                 containerRuntime,
                 storage,
-                summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreBId),
                 attachCb,
                 undefined);
@@ -228,7 +221,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreCName],
                 containerRuntime,
                 storage,
-                summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreCId),
                 attachCb,
                 undefined);
@@ -251,7 +243,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, "fake"],
                 containerRuntime,
                 storage,
-                summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
@@ -274,7 +265,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreBName, "fake"],
                 containerRuntime,
                 storage,
-                summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
@@ -297,7 +287,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreBName, dataStoreCName],
                 containerRuntime,
                 storage,
-                summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
                 undefined);
