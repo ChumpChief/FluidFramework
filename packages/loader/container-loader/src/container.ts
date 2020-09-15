@@ -60,7 +60,6 @@ import {
     ISnapshotTree,
     IVersion,
     MessageType,
-    ISummaryTree,
 } from "@fluidframework/protocol-definitions";
 
 import { Audience } from "./audience";
@@ -68,7 +67,6 @@ import { BlobManager } from "./blobManager";
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
-import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
 
 export enum ConnectionState {
     /**
@@ -332,15 +330,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get attachState(): AttachState {
         return this._attachState;
-    }
-
-    public serialize(): string {
-        assert.strictEqual(this.attachState, AttachState.Detached, "Should only be called in detached container");
-
-        const appSummary: ISummaryTree = this.context.createSummary();
-        const protocolSummary = this.protocolHandler.captureSummary();
-        const snapshotTree = convertProtocolAndAppSummaryToSnapshotTree(protocolSummary, appSummary);
-        return JSON.stringify(snapshotTree);
     }
 
     public async request(path: IRequest): Promise<IResponse> {
