@@ -29,13 +29,12 @@ import {
 import { IContainerRuntime, IContainerRuntimeDirtyable } from "@fluidframework/container-runtime-definitions";
 import {
     Deferred,
-    Trace,
     unreachableCase,
 } from "@fluidframework/common-utils";
 import {
     raiseConnectedEvent,
 } from "@fluidframework/telemetry-utils";
-import { IDocumentStorageService, ISummaryContext } from "@fluidframework/driver-definitions";
+import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     BlobCacheStorageService,
     buildSnapshotTree,
@@ -56,11 +55,8 @@ import {
     ISequencedDocumentMessage,
     ISignalMessage,
     ISnapshotTree,
-    ISummaryConfiguration,
-    ISummaryContent,
     ITree,
     MessageType,
-    IVersion,
 } from "@fluidframework/protocol-definitions";
 import {
     FlushMode,
@@ -74,7 +70,6 @@ import {
     IInboundSignalMessage,
     ISignalEnvelop,
     NamedFluidDataStoreRegistryEntries,
-    ISummaryTreeWithStats,
     ISummaryStats,
     ISummarizeInternalResult,
     SummarizeInternalFn,
@@ -175,21 +170,6 @@ export interface ISubmittedSummaryData extends IGeneratedSummaryData, IUploadedS
 }
 
 export type GenerateSummaryData = IUnsubmittedSummaryData | ISubmittedSummaryData;
-
-// Consider idle 5s of no activity. And snapshot if a minute has gone by with no snapshot.
-const IdleDetectionTime = 5000;
-
-const DefaultSummaryConfiguration: ISummaryConfiguration = {
-    idleTime: IdleDetectionTime,
-
-    maxTime: IdleDetectionTime * 12,
-
-    // Snapshot if 1000 ops received since last snapshot.
-    maxOps: 1000,
-
-    // Wait 10 minutes for summary ack
-    maxAckWaitTime: 600000,
-};
 
 /**
  * Options for container runtime.
@@ -569,7 +549,6 @@ export class ContainerRuntime extends EventEmitter
 
     public readonly previousState: IPreviousState;
     private readonly summaryManager: SummaryManager;
-    private latestSummaryAck: ISummaryContext;
     // back-compat: summarizerNode - remove all summary trackers
     private readonly summaryTracker: SummaryTracker;
 
@@ -610,19 +589,12 @@ export class ContainerRuntime extends EventEmitter
         return this.summaryManager.summarizer;
     }
 
-    private get summaryConfiguration() {
-        return this.context.serviceConfiguration
-            ? { ...DefaultSummaryConfiguration, ...this.context.serviceConfiguration.summary }
-            : DefaultSummaryConfiguration;
-    }
-
     private _disposed = false;
     public get disposed() { return this._disposed; }
 
     // Stores tracked by the Domain
     private readonly pendingAttach = new Map<string, IAttachMessage>();
     private dirtyDocument = false;
-    private readonly summarizer: Summarizer;
     private readonly deltaSender: IDeltaSender | undefined;
     private readonly scheduleManager: ScheduleManager;
     private readonly pendingStateManager: PendingStateManager;
@@ -653,10 +625,6 @@ export class ContainerRuntime extends EventEmitter
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
-        this.latestSummaryAck = {
-            proposalHandle: undefined,
-            ackHandle: this.context.getLoadedFromVersion()?.id,
-        };
         this.summaryTracker = new SummaryTracker(
             "", // fullPath - the root is unnamed
             this.deltaManager.initialSequenceNumber, // referenceSequenceNumber - last acked summary ref seq number
@@ -781,19 +749,6 @@ export class ContainerRuntime extends EventEmitter
             this.previousState = this.context.previousRuntimeState.state as IPreviousState;
         }
 
-        // We always create the summarizer in the case that we are asked to generate summaries. But this may
-        // want to be on demand instead.
-        // Don't use optimizations when generating summaries with a document loaded using snapshots.
-        // This will ensure we correctly convert old documents.
-        this.summarizer = new Summarizer(
-            "/_summarizer",
-            this,
-            () => this.summaryConfiguration,
-            async (full: boolean, safe: boolean) => this.generateSummary(full, safe),
-            async (propHandle, ackHandle, refSeq) => this.refreshLatestSummaryAck(propHandle, ackHandle, refSeq),
-            this.IFluidHandleContext,
-            this.previousState.summaryCollection);
-
         // Create the SummaryManager and mark the initial state
         this.summaryManager = new SummaryManager(
             context,
@@ -841,7 +796,6 @@ export class ContainerRuntime extends EventEmitter
         this._disposed = true;
 
         this.summaryManager.dispose();
-        this.summarizer.dispose();
 
         // close/stop all store contexts
         for (const [, contextD] of this.contextsDeferred) {
@@ -1324,15 +1278,6 @@ export class ContainerRuntime extends EventEmitter
         return this.context.submitSignalFn(envelope);
     }
 
-    /**
-     * Returns a summary of the runtime at the current sequence number.
-     */
-    private async summarize(fullTree = false): Promise<ISummaryTreeWithStats> {
-        return this.summarizerNode.enabled
-            ? await this.summarizerNode.node.summarize(fullTree) as ISummaryTreeWithStats
-            : await this.summarizeInternal(fullTree ?? false) as ISummaryTreeWithStats;
-    }
-
     private async summarizeInternal(fullTree: boolean): Promise<ISummarizeInternalResult> {
         const builder = new SummaryTreeBuilder();
 
@@ -1491,99 +1436,6 @@ export class ContainerRuntime extends EventEmitter
             return undefined;
         }
         return this.context.getAbsoluteUrl(relativeUrl);
-    }
-
-    private async generateSummary(
-        fullTree: boolean = false,
-        safe: boolean = false,
-    ): Promise<GenerateSummaryData | undefined> {
-        const summaryRefSeqNum = this.deltaManager.lastSequenceNumber;
-        const message =
-            `Summary @${summaryRefSeqNum}:${this.deltaManager.minimumSequenceNumber}`;
-
-        if (this.summarizerNode.enabled) {
-            this.summarizerNode.node.startSummary(summaryRefSeqNum);
-        }
-        try {
-            await this.scheduleManager.pause();
-
-            const attemptData: IUnsubmittedSummaryData = {
-                referenceSequenceNumber: summaryRefSeqNum,
-                submitted: false,
-            };
-
-            if (!this.connected) {
-                // If summarizer loses connection it will never reconnect
-                return attemptData;
-            }
-
-            const trace = Trace.start();
-            const treeWithStats = await this.summarize(fullTree || safe);
-
-            const generateData: IGeneratedSummaryData = {
-                summaryStats: treeWithStats.stats,
-                generateDuration: trace.trace().duration,
-            };
-
-            if (!this.connected) {
-                return { ...attemptData, ...generateData };
-            }
-
-            const handle = await this.storage.uploadSummaryWithContext(
-                treeWithStats.summary,
-                this.latestSummaryAck);
-
-            // safe mode refreshes the latest summary ack
-            if (safe) {
-                const version = await this.getVersionFromStorage(this.id);
-                await this.refreshLatestSummaryAck(
-                    undefined,
-                    version.id,
-                    this.summaryTracker.referenceSequenceNumber,
-                    version,
-                );
-            }
-
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const parent = this.latestSummaryAck.ackHandle!;
-            const summaryMessage: ISummaryContent = {
-                handle,
-                head: parent,
-                message,
-                parents: parent ? [parent] : [],
-            };
-            const uploadData: IUploadedSummaryData = {
-                handle,
-                uploadDuration: trace.trace().duration,
-            };
-
-            if (!this.connected) {
-                return { ...attemptData, ...generateData, ...uploadData };
-            }
-
-            const clientSequenceNumber =
-                this.submitSystemMessage(MessageType.Summarize, summaryMessage);
-
-            if (this.summarizerNode.enabled) {
-                this.summarizerNode.node.completeSummary(handle);
-            }
-
-            return {
-                ...attemptData,
-                ...generateData,
-                ...uploadData,
-                submitted: true,
-                clientSequenceNumber,
-                submitOpDuration: trace.trace().duration,
-            };
-        } finally {
-            // Cleanup wip summary in case of failure
-            if (this.summarizerNode.enabled) {
-                this.summarizerNode.node.clearSummary();
-            }
-            // Restart the delta manager
-            this.scheduleManager.resume();
-        }
     }
 
     private processRemoteChunkedMessage(message: ISequencedDocumentMessage) {
@@ -1874,54 +1726,5 @@ export class ContainerRuntime extends EventEmitter
                 this.submitSystemMessage(MessageType.RemoteHelp, remoteHelpMessage);
             }
         }
-    }
-
-    private async refreshLatestSummaryAck(
-        proposalHandle: string | undefined,
-        ackHandle: string,
-        trackerRefSeqNum: number, // back-compat summarizerNode - remove when fully enabled
-        version?: IVersion,
-    ) {
-        if (trackerRefSeqNum < this.summaryTracker.referenceSequenceNumber) {
-            return;
-        }
-
-        this.latestSummaryAck = { proposalHandle, ackHandle };
-
-        // back-compat summarizerNode - remove all summary trackers when fully enabled
-        this.summaryTracker.refreshLatestSummary(trackerRefSeqNum);
-
-        if (this.summarizerNode.enabled) {
-            const getSnapshot = async () => {
-                const stats: { getVersionDuration?: number; getSnapshotDuration?: number } = {};
-                const trace = Trace.start();
-
-                const versionToUse = version ?? await this.getVersionFromStorage(ackHandle);
-                stats.getVersionDuration = trace.trace().duration;
-
-                const snapshot = await this.getSnapshotFromStorage(versionToUse);
-                stats.getSnapshotDuration = trace.trace().duration;
-
-                return snapshot;
-            };
-
-            await this.summarizerNode.node.refreshLatestSummary(
-                proposalHandle,
-                getSnapshot,
-                async <T>(id: string) => readAndParse<T>(this.storage, id),
-            );
-        }
-    }
-
-    private async getVersionFromStorage(versionId: string): Promise<IVersion> {
-        const versions = await this.storage.getVersions(versionId, 1);
-        assert(versions && versions[0], "Failed to get version from storage");
-        return versions[0];
-    }
-
-    private async getSnapshotFromStorage(version: IVersion): Promise<ISnapshotTree> {
-        const snapshot = await this.storage.getSnapshotTree(version);
-        assert(snapshot, "Failed to get snapshot from storage");
-        return snapshot;
     }
 }
