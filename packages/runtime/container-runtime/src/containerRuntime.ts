@@ -22,7 +22,6 @@ import {
     IDeltaSender,
     ILoader,
     IRuntime,
-    IRuntimeState,
     ContainerWarning,
     ICriticalContainerError,
     AttachState,
@@ -59,7 +58,6 @@ import {
     ISnapshotTree,
     ISummaryConfiguration,
     ISummaryContent,
-    ISummaryTree,
     ITree,
     MessageType,
     IVersion,
@@ -85,7 +83,6 @@ import {
     CreateSummarizerNodeSource,
     IAgentScheduler,
     ITaskManager,
-    ISummarizeResult,
 } from "@fluidframework/runtime-definitions";
 import {
     FluidSerializer,
@@ -116,7 +113,6 @@ import { DeltaScheduler } from "./deltaScheduler";
 import { SummaryCollection } from "./summaryCollection";
 import { PendingStateManager } from "./pendingStateManager";
 import { pkgVersion } from "./packageVersion";
-import { convertSnapshotToSummaryTree } from "./utils";
 
 const chunksBlobName = ".chunks";
 
@@ -877,13 +873,6 @@ export class ContainerRuntime extends EventEmitter
      * @param request - Request made to the handler.
      */
     public async request(request: IRequest): Promise<IResponse> {
-        if (request.url === "_summarizer" || request.url === "/_summarizer") {
-            return {
-                status: 200,
-                mimeType: "fluid/object",
-                value: this.summarizer,
-            };
-        }
         if (this.requestHandler !== undefined) {
             return this.requestHandler(request, this);
         }
@@ -971,22 +960,6 @@ export class ContainerRuntime extends EventEmitter
             const content = JSON.stringify([...this.chunkMap]);
             summaryTreeBuilder.addBlob(chunksBlobName, content);
         }
-    }
-
-    public async stop(): Promise<IRuntimeState> {
-        this.verifyNotClosed();
-
-        const snapshot = await this.snapshot("", true);
-        const state: IPreviousState = {
-            reload: true,
-            summaryCollection: this.summarizer.summaryCollection,
-            nextSummarizerP: this.nextSummarizerP,
-            nextSummarizerD: this.nextSummarizerD,
-        };
-
-        this.dispose();
-
-        return { snapshot, state };
     }
 
     // Back-compat: <= 0.17
@@ -1508,46 +1481,6 @@ export class ContainerRuntime extends EventEmitter
                 context.emit(eventName);
             }
         }
-    }
-
-    public createSummary(): ISummaryTree {
-        const builder = new SummaryTreeBuilder();
-
-        // Attaching graph of some stores can cause other stores to get bound too.
-        // So keep taking summary until no new stores get bound.
-        let notBoundContextsLength: number;
-        do {
-            const builderTree = builder.summary.tree;
-            notBoundContextsLength = this.notBoundContexts.size;
-            // Iterate over each data store and ask it to snapshot
-            Array.from(this.contexts)
-                .filter(([key, _]) =>
-                    // Take summary of bounded data stores only, make sure we haven't summarized them already
-                    // and no attach op has been fired for that data store because for loader versions <= 0.24
-                    // we set attach state as "attaching" before taking createNew summary.
-                    !(this.notBoundContexts.has(key)
-                        || builderTree[key]
-                        || this.attachOpFiredForDataStore.has(key)),
-                )
-                .map(([key, value]) => {
-                    let dataStoreSummary: ISummarizeResult;
-                    if (value.isLoaded) {
-                        const snapshot = value.generateAttachMessage().snapshot;
-                        dataStoreSummary = convertToSummaryTree(snapshot, true);
-                    } else {
-                        // If this data store is not yet loaded, then there should be no changes in the snapshot from
-                        // which it was created as it is detached container. So just use the previous snapshot.
-                        assert(this.context.baseSnapshot,
-                            "BaseSnapshot should be there as detached container loaded from snapshot");
-                        dataStoreSummary = convertSnapshotToSummaryTree(this.context.baseSnapshot.trees[key]);
-                    }
-                    builder.addWithStats(key, dataStoreSummary);
-                });
-        } while (notBoundContextsLength !== this.notBoundContexts.size);
-
-        this.serializeContainerBlobs(builder);
-
-        return builder.summary;
     }
 
     public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {

@@ -18,7 +18,6 @@ import {
     ISnapshotTree,
     ITree,
     MessageType,
-    ISummaryTree,
     IVersion,
     IDocumentMessage,
 } from "@fluidframework/protocol-definitions";
@@ -72,15 +71,6 @@ export interface IRuntime extends IDisposable {
     setConnectionState(connected: boolean, clientId?: string);
 
     /**
-     * @deprecated in 0.14 async stop()
-     * Use snapshot to get a snapshot for an IRuntimeState as needed, followed by dispose
-     *
-     * Stops the runtime. Once stopped no more messages will be delivered and the context passed to the runtime
-     * on creation will no longer be active
-     */
-    stop(): Promise<IRuntimeState>;
-
-    /**
      * Processes the given op (message)
      */
     process(message: ISequencedDocumentMessage, local: boolean, context: any);
@@ -89,8 +79,6 @@ export interface IRuntime extends IDisposable {
      * Processes the given signal
      */
     processSignal(message: any, local: boolean);
-
-    createSummary(): ISummaryTree;
 
     /**
      * Propagate the container state when container is attaching or attached.
@@ -149,8 +137,6 @@ export interface IContainerContext extends IDisposable {
     readonly attachState: AttachState;
 
     getLoadedFromVersion(): IVersion | undefined;
-
-    createSummary(): ISummaryTree;
 }
 
 export const IRuntimeFactory: keyof IProvideRuntimeFactory = "IRuntimeFactory";
