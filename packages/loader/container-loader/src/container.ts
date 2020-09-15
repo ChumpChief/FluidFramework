@@ -13,7 +13,6 @@ import {
     IContainerEvents,
     IDeltaManager,
     IFluidCodeDetails,
-    IGenericBlob,
     ILoader,
     IRuntimeFactory,
     IRuntimeState,
@@ -31,10 +30,6 @@ import {
     IDocumentDeltaService,
     IDocumentStorageService,
 } from "@fluidframework/driver-definitions";
-import {
-    readAndParse,
-    readAndParseFromBlobs,
-} from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
 import {
     isSystemMessage,
@@ -44,7 +39,6 @@ import {
 import {
     IClient,
     IClientDetails,
-    ICommittedProposal,
     IDocumentAttributes,
     IDocumentMessage,
     IProcessMessageResult,
@@ -56,7 +50,6 @@ import {
     ISignalClient,
     ISignalMessage,
     ISnapshotTree,
-    IVersion,
     MessageType,
 } from "@fluidframework/protocol-definitions";
 
@@ -173,15 +166,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private resumedOpProcessingAfterLoad = false;
-    private _loadedFromVersion: IVersion | undefined;
 
     private _closed = false;
 
     public get IFluidRouter(): IFluidRouter { return this; }
-
-    public get loadedFromVersion(): IVersion | undefined {
-        return this._loadedFromVersion;
-    }
 
     /**
      * {@inheritDoc DeltaManager.readonly}
@@ -365,11 +353,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.emit("warning", warning);
     }
 
-    private async getVersion(version: string): Promise<IVersion | undefined> {
-        const versions = await this.storageService.getVersions(version, 1);
-        return versions[0];
-    }
-
     private async connectToDeltaStream(args: IConnectionArgs = {}) {
         // All agents need "write" access, including summarizer.
         if (!this.canReconnect || !this.client.details.capabilities.interactive) {
@@ -407,12 +390,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this._attachState = AttachState.Attached;
 
-        // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null
-        const maybeSnapshotTree = await this.fetchSnapshotTree(undefined);
+        const blobManagerP = this.loadBlobManager(this.storageService);
 
-        const blobManagerP = this.loadBlobManager(this.storageService, maybeSnapshotTree);
-
-        const attributes = await this.getDocumentAttributes(this.storageService, maybeSnapshotTree);
+        const attributes = await this.getDocumentAttributes();
 
         // Attach op handlers to start processing ops
         this.attachDeltaManagerOpHandler(attributes);
@@ -420,21 +400,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // ...load in the existing quorum
         // Initialize the protocol handler
         const protocolHandlerP =
-            this.loadAndInitializeProtocolState(attributes, this.storageService, maybeSnapshotTree);
+            this.loadAndInitializeProtocolState(attributes, this.storageService);
 
-        let loadDetailsP: Promise<void>;
-
-        // Initialize document details - if loading a snapshot use that - otherwise we need to wait on
-        // the initial details
-        if (maybeSnapshotTree !== undefined) {
-            this._existing = true;
-            loadDetailsP = Promise.resolve();
-        } else {
-            // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
-            loadDetailsP = startConnectionP.then((details) => {
-                this._existing = details.existing;
-            });
-        }
+        // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
+        const loadDetailsP = startConnectionP.then((details) => {
+            this._existing = details.existing;
+        });
 
         // LoadContext directly requires blobManager and protocolHandler to be ready, and eventually calls
         // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
@@ -453,65 +424,26 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return {
             existing: this._existing,
             sequenceNumber: attributes.sequenceNumber,
-            version: maybeSnapshotTree?.id ?? undefined,
+            version: undefined,
         };
     }
 
-    private async getDocumentAttributes(
-        storage: IDocumentStorageService | undefined,
-        tree: ISnapshotTree | undefined,
-    ): Promise<IDocumentAttributes> {
-        if (tree === undefined) {
-            return {
-                branch: this.id,
-                minimumSequenceNumber: 0,
-                sequenceNumber: 0,
-                term: 1,
-            };
-        }
-
-        // Back-compat: old docs would have ".attributes" instead of "attributes"
-        const attributesHash = ".protocol" in tree.trees
-            ? tree.trees[".protocol"].blobs.attributes
-            : tree.blobs[".attributes"];
-
-        const attributes = storage !== undefined ? await readAndParse<IDocumentAttributes>(storage, attributesHash)
-            : readAndParseFromBlobs<IDocumentAttributes>(tree.trees[".protocol"].blobs, attributesHash);
-
-        // Back-compat for older summaries with no term
-        if (attributes.term === undefined) {
-            attributes.term = 1;
-        }
-
-        return attributes;
+    private async getDocumentAttributes(): Promise<IDocumentAttributes> {
+        return {
+            branch: this.id,
+            minimumSequenceNumber: 0,
+            sequenceNumber: 0,
+            term: 1,
+        };
     }
 
     private async loadAndInitializeProtocolState(
         attributes: IDocumentAttributes,
         storage: IDocumentStorageService | undefined,
-        snapshot: ISnapshotTree | undefined,
     ): Promise<ProtocolOpHandler> {
-        let members: [string, ISequencedClient][] = [];
-        let proposals: [number, ISequencedProposal, string[]][] = [];
-        let values: [string, any][] = [];
-
-        if (snapshot !== undefined) {
-            const baseTree = ".protocol" in snapshot.trees ? snapshot.trees[".protocol"] : snapshot;
-            if (storage !== undefined) {
-                [members, proposals, values] = await Promise.all([
-                    readAndParse<[string, ISequencedClient][]>(storage, baseTree.blobs.quorumMembers),
-                    readAndParse<[number, ISequencedProposal, string[]][]>(storage, baseTree.blobs.quorumProposals),
-                    readAndParse<[string, ICommittedProposal][]>(storage, baseTree.blobs.quorumValues),
-                ]);
-            } else {
-                members = readAndParseFromBlobs<[string, ISequencedClient][]>(snapshot.trees[".protocol"].blobs,
-                    baseTree.blobs.quorumMembers);
-                proposals = readAndParseFromBlobs<[number, ISequencedProposal, string[]][]>(
-                    snapshot.trees[".protocol"].blobs, baseTree.blobs.quorumProposals);
-                values = readAndParseFromBlobs<[string, ICommittedProposal][]>(snapshot.trees[".protocol"].blobs,
-                    baseTree.blobs.quorumValues);
-            }
-        }
+        const members: [string, ISequencedClient][] = [];
+        const proposals: [number, ISequencedProposal, string[]][] = [];
+        const values: [string, any][] = [];
 
         return this.initializeProtocolState(
             attributes,
@@ -559,15 +491,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private async loadBlobManager(
         storage: IDocumentStorageService,
-        tree: ISnapshotTree | undefined,
     ): Promise<BlobManager> {
-        const blobHash = tree?.blobs[".blobs"];
-        const blobs: IGenericBlob[] = blobHash !== undefined
-            ? await readAndParse<IGenericBlob[]>(storage, blobHash)
-            : [];
-
         const blobManager = new BlobManager(storage);
-        blobManager.loadBlobMetadata(blobs);
+        blobManager.loadBlobMetadata([]);
 
         return blobManager;
     }
@@ -752,22 +678,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             const local = this._clientId === message.clientId;
             this.context.processSignal(message, local);
         }
-    }
-
-    /**
-     * Get the most recent snapshot, or a specific version.
-     * @param specifiedVersion - The specific version of the snapshot to retrieve
-     * @returns The snapshot requested, or the latest snapshot if no version was specified
-     */
-    private async fetchSnapshotTree(specifiedVersion?: string): Promise<ISnapshotTree | undefined> {
-        const version = await this.getVersion(specifiedVersion ?? this.id);
-
-        if (version !== undefined) {
-            this._loadedFromVersion = version;
-            return await this.storageService.getSnapshotTree(version) ?? undefined;
-        }
-
-        return undefined;
     }
 
     private async loadContext(

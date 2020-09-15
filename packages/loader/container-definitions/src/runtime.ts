@@ -17,7 +17,6 @@ import {
     IServiceConfiguration,
     ITree,
     MessageType,
-    IVersion,
     IDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IAudience } from "./audience";
@@ -128,8 +127,6 @@ export interface IContainerContext extends IDisposable {
      * Indicates the attachment state of the container to a host service.
      */
     readonly attachState: AttachState;
-
-    getLoadedFromVersion(): IVersion | undefined;
 }
 
 export const IRuntimeFactory: keyof IProvideRuntimeFactory = "IRuntimeFactory";

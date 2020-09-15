@@ -32,7 +32,6 @@ import {
     IServiceConfiguration,
     ISignalMessage,
     MessageType,
-    IVersion,
 } from "@fluidframework/protocol-definitions";
 import { BlobManager } from "./blobManager";
 import { Container } from "./container";
@@ -178,10 +177,6 @@ export class ContainerContext implements IContainerContext {
         this.runtime.dispose(error);
         this.quorum.dispose();
         this.deltaManager.dispose();
-    }
-
-    public getLoadedFromVersion(): IVersion | undefined {
-        return this.container.loadedFromVersion;
     }
 
     public get attachState(): AttachState {
