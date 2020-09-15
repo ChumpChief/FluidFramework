@@ -121,14 +121,6 @@ class LocalLoader extends EventEmitter implements ILoader {
 
         throw new Error("Requested non-container-relative url");
     }
-
-    public async createDetachedContainer(source: IFluidCodeDetails): Promise<Container> {
-        throw new Error("Local loader should not create a detached container");
-    }
-
-    public async rehydrateDetachedContainerFromSnapshot(snapshot: ISnapshotTree): Promise<IContainer> {
-        throw new Error("Not implemented");
-    }
 }
 
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {

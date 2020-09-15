@@ -9,54 +9,11 @@ import {
     IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
-    ISnapshotTree,
 } from "@fluidframework/protocol-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
 import { ICriticalContainerError, ContainerWarning } from "./error";
-import { IFluidCodeDetails, IFluidPackage } from "./fluidPackage";
 import { AttachState } from "./runtime";
-
-/**
-* The interface returned from a IFluidCodeResolver which represents IFluidCodeDetails
- * that have been resolved and are ready to load
- */
-export interface IResolvedFluidCodeDetails extends IFluidCodeDetails {
-    /**
-     * A resolved version of the Fluid package. All Fluid browser file entries should be absolute urls.
-     */
-    resolvedPackage: IFluidPackage;
-    /**
-     * If not undefined, this id will be used to cache the entry point for the code package
-     */
-    resolvedPackageCacheId: string | undefined;
-}
-
-/**
- * Fluid code resolvers take a Fluid code details, and resolve the
- * full Fluid package including absolute urls for the browser file entries.
- * The Fluid code resolver is coupled to a specific cdn and knows how to resolve
- * the code detail for loading from that cdn. This include resolving to the most recent
- * version of package that supports the provided code details.
- */
-export interface IFluidCodeResolver {
-    /**
-     * Resolves a Fluid code details into a form that can be loaded
-     * @param details - The Fluid code details to resolve
-     * @returns - A IResolvedFluidCodeDetails where the
-     *            resolvedPackage's Fluid file entries are absolute urls, and
-     *            an optional resolvedPackageCacheId if the loaded package should be
-     *            cached.
-     */
-    resolveCodeDetails(details: IFluidCodeDetails): Promise<IResolvedFluidCodeDetails>;
-}
-
-/**
- * Code AllowListing Interface
- */
-export interface ICodeAllowList {
-    testSource(source: IResolvedFluidCodeDetails): Promise<boolean>;
-}
 
 /**
  * Events emitted by the Container "upwards" to the Loader and Host
@@ -115,18 +72,6 @@ export interface ILoader extends IFluidRouter {
      * a request against the server found from the resolve step.
      */
     resolve(request: IRequest): Promise<IContainer>;
-
-    /**
-     * Creates a new container using the specified chaincode but in an unattached state. While unattached all
-     * updates will only be local until the user explicitly attaches the container to a service provider.
-     */
-    createDetachedContainer(codeDetails: IFluidCodeDetails): Promise<IContainer>;
-
-    /**
-     * Creates a new container using the specified snapshot but in an unattached state. While unattached all
-     * updates will only be local until the user explicitly attaches the container to a service provider.
-     */
-    rehydrateDetachedContainerFromSnapshot(snapshot: ISnapshotTree): Promise<IContainer>;
 }
 
 /**
