@@ -16,7 +16,6 @@ import {
     IAudience,
     IGenericBlob,
     ContainerWarning,
-    ILoader,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -375,7 +374,6 @@ export class MockFluidDataStoreRuntime extends EventEmitter
     public readonly connected = true;
     public readonly leader: boolean;
     public deltaManager = new MockDeltaManager();
-    public readonly loader: ILoader;
     public readonly logger: ITelemetryLogger = DebugLogger.create("fluid:MockFluidDataStoreRuntime");
     private readonly activeDeferred = new Deferred<void>();
     public readonly quorum = new MockQuorum();

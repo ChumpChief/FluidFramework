@@ -5,7 +5,6 @@
 
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
-    IClientDetails,
     IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
@@ -58,67 +57,4 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
      * @param request - The request to be issued against the container
      */
     request(request: IRequest): Promise<IResponse>;
-}
-
-/**
- * The Host's view of the Loader, used for loading Containers
- */
-export interface ILoader extends IFluidRouter {
-    /**
-     * Resolves the resource specified by the URL + headers contained in the request object
-     * to the underlying container that will resolve the request.
-     *
-     * An analogy for this is resolve is a DNS resolve of a Fluid container. Request then executes
-     * a request against the server found from the resolve step.
-     */
-    resolve(request: IRequest): Promise<IContainer>;
-}
-
-/**
- * Accepted header keys for requests coming to the Loader
- */
-export enum LoaderHeader {
-    /**
-     * Use cache for this container. If true, we will load a container from cache if one with the same id/version exists
-     * or create a new container and cache it if it does not. If false, always load a new container and don't cache it.
-     * Currently only used to opt-out of caching, as it will default to true but will be false (even if specified as
-     * true) if the reconnect header is false or the pause header is true, since these containers should not be cached.
-     */
-    cache = "fluid-cache",
-
-    clientDetails = "fluid-client-details",
-    executionContext = "execution-context",
-
-    /**
-     * Start the container in a paused, unconnected state. Defaults to false
-     */
-    pause = "pause",
-    reconnect = "fluid-reconnect",
-    sequenceNumber = "fluid-sequence-number",
-
-    /**
-     * One of the following:
-     * null or "null": use ops, no snapshots
-     * undefined: fetch latest snapshot
-     * otherwise, version sha to load snapshot
-     */
-    version = "version",
-}
-
-/**
- * Set of Request Headers that the Loader understands and may inspect or modify
- */
-export interface ILoaderHeader {
-    [LoaderHeader.cache]: boolean;
-    [LoaderHeader.clientDetails]: IClientDetails;
-    [LoaderHeader.pause]: boolean;
-    [LoaderHeader.executionContext]: string;
-    [LoaderHeader.sequenceNumber]: number;
-    [LoaderHeader.reconnect]: boolean;
-    [LoaderHeader.version]: string | undefined | null;
-}
-
-declare module "@fluidframework/core-interfaces" {
-    // eslint-disable-next-line @typescript-eslint/no-empty-interface
-    export interface IRequestHeader extends Partial<ILoaderHeader> { }
 }
