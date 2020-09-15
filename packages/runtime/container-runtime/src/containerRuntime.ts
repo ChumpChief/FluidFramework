@@ -23,7 +23,6 @@ import {
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
 import {
     Deferred,
-    unreachableCase,
 } from "@fluidframework/common-utils";
 import {
     raiseConnectedEvent,
@@ -406,7 +405,9 @@ export class ContainerRuntime extends EventEmitter
         for (const [, contextD] of this.contextsDeferred) {
             contextD.promise.then((context) => {
                 context.dispose();
-            }).catch((contextError) => { });
+            }).catch((contextError) => {
+                console.log(contextError);
+            });
         }
 
         this.emit("dispose");
@@ -951,7 +952,7 @@ export class ContainerRuntime extends EventEmitter
                 this.submit(type, content, localOpMetadata);
                 break;
             default:
-                unreachableCase(type, `Unknown ContainerMessageType: ${type}`);
+                throw new Error(`Unknown ContainerMessageType: ${type}`);
         }
     }
 
