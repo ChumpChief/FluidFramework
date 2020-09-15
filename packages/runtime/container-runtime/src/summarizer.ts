@@ -30,7 +30,7 @@ import {
     ISummaryConfiguration,
     MessageType,
 } from "@fluidframework/protocol-definitions";
-import { GenerateSummaryData, IPreviousState } from "./containerRuntime";
+import { GenerateSummaryData } from "./containerRuntime";
 import { IConnectableRuntime, RunWhileConnectedCoordinator } from "./runWhileConnectedCoordinator";
 import { IClientSummaryWatcher, SummaryCollection } from "./summaryCollection";
 import { SummarizerHandle } from "./summarizerHandle";
@@ -93,8 +93,6 @@ export interface ISummarizer
 
 export interface ISummarizerRuntime extends IConnectableRuntime {
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-    readonly previousState: IPreviousState;
-    readonly summarizerClientId: string | undefined;
     nextSummarizerD?: Deferred<Summarizer>;
     closeFn(): void;
     on(event: "batchEnd", listener: (error: any, op: ISequencedDocumentMessage) => void): this;
@@ -587,7 +585,6 @@ export class Summarizer extends EventEmitter implements ISummarizer {
         private readonly runtime: ISummarizerRuntime,
         private readonly configurationGetter: () => ISummaryConfiguration,
         // eslint-disable-next-line max-len
-        private readonly generateSummaryCore: (full: boolean, safe: boolean) => Promise<GenerateSummaryData | undefined>,
         private readonly refreshLatestAck: (
             proposalHandle: string,
             ackHandle: string,
@@ -609,7 +606,6 @@ export class Summarizer extends EventEmitter implements ISummarizer {
         this.runtime.deltaManager.inbound.on("op",
             (op) => this.summaryCollection.handleOp(op));
 
-        this.runtime.previousState.nextSummarizerD?.resolve(this);
         this.innerHandle = new SummarizerHandle(this, this.url, handleContext);
     }
 
@@ -686,25 +682,6 @@ export class Summarizer extends EventEmitter implements ISummarizer {
                 eventName: "NotStarted",
                 reason: "CannotWrite",
                 onBehalfOf,
-            });
-            return;
-        }
-
-        if (this.runtime.summarizerClientId !== this.onBehalfOfClientId
-            && this.runtime.summarizerClientId !== this.runtime.clientId) {
-            // Verify that this client's computed summarizer matches the client this was spawned
-            // on behalf of.  If not, fallback on the following logic before stopping:
-            // If we are not oldest client in quorum, another client will take over as summarizer.
-            // We want to make sure we at least try to summarize in case server is rejecting ops,
-            // so if we are the oldest client, we will still go through and try to summarize at least once.
-            // We also don't want to end up with two summarizer clients running at the same time,
-            // so we bypass running altogether if this client isn't the oldest.
-            this.logger.sendTelemetryEvent({
-                eventName: "NotStarted",
-                reason: "DifferentComputedSummarizer",
-                computedSummarizer: this.runtime.summarizerClientId,
-                onBehalfOf,
-                clientId: this.runtime.clientId,
             });
             return;
         }
@@ -789,14 +766,7 @@ export class Summarizer extends EventEmitter implements ISummarizer {
     }
 
     private async generateSummary(full: boolean, safe: boolean): Promise<GenerateSummaryData | undefined> {
-        if (this.onBehalfOfClientId !== this.runtime.summarizerClientId
-            && this.runtime.clientId !== this.runtime.summarizerClientId) {
-            // We are no longer the summarizer; a different client is, so we should stop ourself
-            this.stop("parentNoLongerSummarizer");
-            return undefined;
-        }
-
-        return this.generateSummaryCore(full, safe);
+        return undefined;
     }
 
     private async handleSummaryAcks() {

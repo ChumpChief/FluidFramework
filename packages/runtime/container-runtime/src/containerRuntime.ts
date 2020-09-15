@@ -93,10 +93,8 @@ import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { debug } from "./debug";
 import { ISummarizerRuntime, Summarizer } from "./summarizer";
-import { SummaryManager } from "./summaryManager";
 import { analyzeTasks } from "./taskAnalyzer";
 import { DeltaScheduler } from "./deltaScheduler";
-import { SummaryCollection } from "./summaryCollection";
 import { PendingStateManager } from "./pendingStateManager";
 import { pkgVersion } from "./packageVersion";
 
@@ -126,16 +124,6 @@ export interface IChunkedOp {
 export interface ContainerRuntimeMessage {
     contents: any;
     type: ContainerMessageType;
-}
-
-export interface IPreviousState {
-    summaryCollection?: SummaryCollection,
-    reload?: boolean,
-
-    // only one (or zero) of these will be defined. the summarizing Summarizer will resolve the deferred promise, and
-    // the SummaryManager that spawned it will have that deferred's promise
-    nextSummarizerP?: Promise<Summarizer>,
-    nextSummarizerD?: Deferred<Summarizer>,
 }
 
 export interface IGeneratedSummaryData {
@@ -443,7 +431,6 @@ export class ContainerRuntime extends EventEmitter
             context,
             registry,
             chunks,
-            runtimeOptions,
             requestHandler);
 
         // Create all internal data stores if not already existing on storage or loaded a detached
@@ -532,9 +519,6 @@ export class ContainerRuntime extends EventEmitter
 
     public readonly IFluidHandleContext: IFluidHandleContext;
 
-    public readonly previousState: IPreviousState;
-    private readonly summaryManager: SummaryManager;
-
     private readonly notBoundContexts = new Set<string>();
     // 0.24 back-compat attachingBeforeSummary
     private readonly attachOpFiredForDataStore = new Set<string>();
@@ -561,10 +545,6 @@ export class ContainerRuntime extends EventEmitter
         return this._leader;
     }
 
-    public get summarizerClientId(): string | undefined {
-        return this.summaryManager.summarizer;
-    }
-
     private _disposed = false;
     public get disposed() { return this._disposed; }
 
@@ -588,10 +568,6 @@ export class ContainerRuntime extends EventEmitter
         private readonly context: IContainerContext,
         private readonly registry: IFluidDataStoreRegistry,
         chunks: [string, string[]][],
-        private readonly runtimeOptions: IContainerRuntimeOptions = {
-            generateSummaries: true,
-            enableWorker: false,
-        },
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ) {
         super();
@@ -668,27 +644,6 @@ export class ContainerRuntime extends EventEmitter
             this.clearPartialChunks(clientId);
         });
 
-        if (this.context.previousRuntimeState === undefined || this.context.previousRuntimeState.state === undefined) {
-            this.previousState = {};
-        } else {
-            this.previousState = this.context.previousRuntimeState.state as IPreviousState;
-        }
-
-        // Create the SummaryManager and mark the initial state
-        this.summaryManager = new SummaryManager(
-            context,
-            this.runtimeOptions.generateSummaries !== false,
-            !!this.runtimeOptions.enableWorker,
-            (summarizer) => { this.nextSummarizerP = summarizer; },
-            this.previousState.nextSummarizerP,
-            !!this.previousState.reload,
-            this.runtimeOptions.initialSummarizerDelayMs);
-
-        if (this.connected) {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            this.summaryManager.setConnected(this.context.clientId!);
-        }
-
         this.deltaManager.on("readonly", (readonly: boolean) => {
             // we accumulate ops while being in read-only state.
             // once user gets write permissions and we have active connection, flush all pending ops.
@@ -719,8 +674,6 @@ export class ContainerRuntime extends EventEmitter
             return;
         }
         this._disposed = true;
-
-        this.summaryManager.dispose();
 
         // close/stop all store contexts
         for (const [, contextD] of this.contextsDeferred) {
@@ -873,13 +826,6 @@ export class ContainerRuntime extends EventEmitter
         }
 
         raiseConnectedEvent(this, connected, clientId);
-
-        if (connected) {
-            assert(clientId);
-            this.summaryManager.setConnected(clientId);
-        } else {
-            this.summaryManager.setDisconnected();
-        }
     }
 
     public process(messageArg: ISequencedDocumentMessage, local: boolean) {
