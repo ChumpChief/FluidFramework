@@ -8,7 +8,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IBlobManager,
     IDeltaManager,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -50,7 +49,6 @@ export interface IContainerRuntime extends
     readonly clientDetails: IClientDetails;
     readonly connected: boolean;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-    readonly blobManager: IBlobManager;
     readonly storage: IDocumentStorageService;
     readonly flushMode: FlushMode;
     /**

@@ -49,7 +49,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 
 import { Audience } from "./audience";
-import { BlobManager } from "./blobManager";
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
@@ -104,7 +103,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private pendingClientId: string | undefined;
     private loaded = false;
     private _attachState = AttachState.Detached;
-    private blobManager: BlobManager | undefined;
 
     private _clientId: string | undefined;
     private readonly _documentId: string | undefined;
@@ -344,8 +342,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this._attachState = AttachState.Attached;
 
-        const blobManagerP = this.loadBlobManager(this.storageService);
-
         const attributes = await this.getDocumentAttributes();
 
         // Attach op handlers to start processing ops
@@ -363,7 +359,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // LoadContext directly requires blobManager and protocolHandler to be ready, and eventually calls
         // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
-        [this.blobManager, this._protocolHandler] = await Promise.all([blobManagerP, protocolHandlerP, loadDetailsP]);
+        [this._protocolHandler] = await Promise.all([protocolHandlerP, loadDetailsP]);
 
         await this.loadContext();
 
@@ -441,15 +437,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         });
 
         return protocol;
-    }
-
-    private async loadBlobManager(
-        storage: IDocumentStorageService,
-    ): Promise<BlobManager> {
-        const blobManager = new BlobManager(storage);
-        blobManager.loadBlobMetadata([]);
-
-        return blobManager;
     }
 
     private get client(): IClient {
@@ -634,7 +621,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context = await ContainerContext.createOrLoad(
             this,
             this.containerRuntimeFactory,
-            this.blobManager,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),

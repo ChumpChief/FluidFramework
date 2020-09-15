@@ -13,9 +13,7 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IBlobManager,
     IDeltaManager,
-    IGenericBlob,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -91,7 +89,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             context.id,
             context.existing,
             context.options,
-            context.blobManager,
             context.deltaManager,
             context.getQuorum(),
             context.getAudience(),
@@ -164,7 +161,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         public readonly id: string,
         public existing: boolean,
         public readonly options: any,
-        private readonly blobManager: IBlobManager,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         private readonly quorum: IQuorum,
         private readonly audience: IAudience,
@@ -402,23 +398,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
 
     public getAudience(): IAudience {
         return this.audience;
-    }
-
-    public async uploadBlob(file: IGenericBlob): Promise<IGenericBlob> {
-        this.verifyNotClosed();
-
-        const blob = await this.blobManager.createBlob(file);
-        file.id = blob.id;
-        file.url = blob.url;
-
-        return file;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/promise-function-async
-    public getBlob(blobId: string): Promise<IGenericBlob | undefined> {
-        this.verifyNotClosed();
-
-        return this.blobManager.getBlob(blobId);
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {

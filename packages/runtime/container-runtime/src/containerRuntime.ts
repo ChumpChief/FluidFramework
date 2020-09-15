@@ -14,7 +14,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IBlobManager,
     IFluidTokenProvider,
     IContainerContext,
     IDeltaManager,
@@ -385,11 +384,6 @@ export class ContainerRuntime extends EventEmitter
 
     public get clientDetails(): IClientDetails {
         return this.context.clientDetails;
-    }
-
-    public get blobManager(): IBlobManager {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        return this.context.blobManager!;
     }
 
     public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {

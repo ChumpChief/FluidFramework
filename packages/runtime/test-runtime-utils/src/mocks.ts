@@ -14,7 +14,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IGenericBlob,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -451,14 +450,6 @@ export class MockFluidDataStoreRuntime extends EventEmitter
     }
 
     public async close(): Promise<void> {
-        return null;
-    }
-
-    public async uploadBlob(file: IGenericBlob): Promise<IGenericBlob> {
-        return null;
-    }
-
-    public async getBlob(blobId: string): Promise<IGenericBlob> {
         return null;
     }
 

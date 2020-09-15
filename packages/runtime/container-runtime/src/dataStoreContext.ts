@@ -12,7 +12,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IBlobManager,
     IDeltaManager,
     BindState,
     AttachState,
@@ -103,10 +102,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
 
     public get clientId(): string | undefined {
         return this._containerRuntime.clientId;
-    }
-
-    public get blobManager(): IBlobManager {
-        return this._containerRuntime.blobManager;
     }
 
     public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {

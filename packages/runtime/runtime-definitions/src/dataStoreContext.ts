@@ -12,7 +12,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IBlobManager,
     IDeltaManager,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -234,7 +233,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
     readonly clientId: string | undefined;
     readonly connected: boolean;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-    readonly blobManager: IBlobManager;
     readonly storage: IDocumentStorageService;
     readonly baseSnapshot: ISnapshotTree | undefined;
     /**

@@ -28,14 +28,12 @@ import {
     ISignalMessage,
     MessageType,
 } from "@fluidframework/protocol-definitions";
-import { BlobManager } from "./blobManager";
 import { Container } from "./container";
 
 export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
         runtimeFactory: IRuntimeFactory,
-        blobManager: BlobManager | undefined,
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         quorum: IQuorum,
         submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
@@ -44,7 +42,6 @@ export class ContainerContext implements IContainerContext {
         const context = new ContainerContext(
             container,
             runtimeFactory,
-            blobManager,
             deltaManager,
             quorum,
             submitFn,
@@ -124,7 +121,6 @@ export class ContainerContext implements IContainerContext {
     constructor(
         private readonly container: Container,
         public readonly runtimeFactory: IRuntimeFactory,
-        public readonly blobManager: BlobManager | undefined,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         public readonly quorum: IQuorum,
         public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,

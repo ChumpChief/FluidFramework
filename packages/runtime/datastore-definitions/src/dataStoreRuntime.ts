@@ -13,7 +13,6 @@ import {
 import {
     IAudience,
     IDeltaManager,
-    IGenericBlob,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -82,25 +81,12 @@ export interface IFluidDataStoreRuntime extends
      */
     bindChannel(channel: IChannel): void;
 
-    // Blob related calls
-    /**
-     * Api to upload a blob of data.
-     * @param file - blob to be uploaded.
-     */
-    uploadBlob(file: IGenericBlob): Promise<IGenericBlob>;
-
     /**
      * Submits the signal to be sent to other clients.
      * @param type - Type of the signal.
      * @param content - Content of the signal.
      */
     submitSignal(type: string, content: any): void;
-
-    /**
-     * Api to get the blob for a particular id.
-     * @param blobId - ID of the required blob.
-     */
-    getBlob(blobId: string): Promise<IGenericBlob | undefined>;
 
     /**
      * Returns the current quorum.
