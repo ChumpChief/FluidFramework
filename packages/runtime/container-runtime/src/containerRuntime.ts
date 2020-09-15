@@ -32,7 +32,6 @@ import {
 } from "@fluidframework/driver-utils";
 import {
     ConnectionState,
-    IClientDetails,
     ISequencedDocumentMessage,
     ISignalMessage,
     ISnapshotTree,
@@ -157,10 +156,6 @@ export class ContainerRuntime extends EventEmitter
 
     public get clientId(): string | undefined {
         return this.context.clientId;
-    }
-
-    public get clientDetails(): IClientDetails {
-        return this.context.clientDetails;
     }
 
     public get storage(): IDocumentStorageService {

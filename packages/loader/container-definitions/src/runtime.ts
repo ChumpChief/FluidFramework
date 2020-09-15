@@ -11,7 +11,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    IClientDetails,
     ISequencedDocumentMessage,
     IServiceConfiguration,
     ITree,
@@ -91,7 +90,6 @@ export interface IContainerContext extends IDisposable {
     readonly options: any;
     readonly configuration: IFluidConfiguration;
     readonly clientId: string | undefined;
-    readonly clientDetails: IClientDetails;
     readonly storage: IDocumentStorageService | undefined | null;
     readonly connected: boolean;
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;

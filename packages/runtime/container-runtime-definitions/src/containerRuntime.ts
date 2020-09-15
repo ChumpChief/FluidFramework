@@ -12,7 +12,6 @@ import {
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    IClientDetails,
     IHelpMessage,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
@@ -42,7 +41,6 @@ export interface IContainerRuntime extends
     readonly existing: boolean;
     readonly options: any;
     readonly clientId: string | undefined;
-    readonly clientDetails: IClientDetails;
     readonly connected: boolean;
     readonly storage: IDocumentStorageService;
     /**

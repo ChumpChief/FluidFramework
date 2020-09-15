@@ -16,7 +16,6 @@ import {
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    IClientDetails,
     ConnectionState,
     ISequencedDocumentMessage,
     ISnapshotTree,
@@ -37,8 +36,6 @@ export interface IContainerRuntimeBase extends
     IProvideFluidSerializer,
     /* TODO: Used by spaces. we should switch to IoC to provide the global registry */
     IProvideFluidDataStoreRegistry {
-    readonly clientDetails: IClientDetails;
-
     /**
      * Submits a container runtime level signal to be sent to other clients.
      * @param type - Type of the signal.

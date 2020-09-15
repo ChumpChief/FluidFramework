@@ -26,7 +26,6 @@ import {
 import { buildSnapshotTree, readAndParseFromBlobs } from "@fluidframework/driver-utils";
 import { TreeTreeEntry } from "@fluidframework/protocol-base";
 import {
-    IClientDetails,
     ISequencedDocumentMessage,
     ITreeEntry,
     ITree,
@@ -101,10 +100,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
 
     public get clientId(): string | undefined {
         return this.dataStoreContext.clientId;
-    }
-
-    public get clientDetails(): IClientDetails {
-        return this.dataStoreContext.containerRuntime.clientDetails;
     }
 
     public get isAttached(): boolean {
