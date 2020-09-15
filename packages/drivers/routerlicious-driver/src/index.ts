@@ -8,4 +8,3 @@ export * from "./deltaStorageService";
 export * from "./documentService";
 export * from "./documentStorageService";
 export * from "./nullBlobStorageService";
-export * from "./documentServiceFactory";

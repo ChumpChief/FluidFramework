@@ -8,7 +8,7 @@ import {
 } from "@fluidframework/container-definitions";
 import { Container } from "@fluidframework/container-loader";
 import { ITokenClaims } from "@fluidframework/protocol-definitions";
-import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicious-driver";
+import { DocumentService } from "@fluidframework/routerlicious-driver";
 import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
 
@@ -22,8 +22,6 @@ export async function getTinyliciousContainer(
     containerRuntimeFactory: IRuntimeFactory,
     createNew: boolean,
 ): Promise<Container> {
-    const documentServiceFactory = new RouterliciousDocumentServiceFactory();
-
     const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${documentId}`;
     const storageUrl = `http://localhost:3000/repos/tinylicious`;
     const ordererUrl = "http://localhost:3000";
@@ -39,13 +37,13 @@ export async function getTinyliciousContainer(
 
     const jwtToken = jwt.sign(claims, "12345");
 
-    const documentService = await documentServiceFactory.createDocumentService(
-        storageUrl,
+    const documentService = new DocumentService(
         ordererUrl,
         deltaStorageUrl,
+        storageUrl,
+        jwtToken,
         tenantId,
         documentId,
-        jwtToken,
     );
 
     const container = await Container.load(

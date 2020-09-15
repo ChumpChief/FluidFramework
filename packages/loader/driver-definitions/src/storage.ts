@@ -236,25 +236,6 @@ export interface IDocumentService {
     connectToDeltaStream(client: IClient): Promise<IDocumentDeltaConnection>;
 }
 
-export interface IDocumentServiceFactory {
-    /**
-     * Name of the protocol used by factory
-     */
-    protocolName: string;
-
-    /**
-     * Returns an instance of IDocumentService
-     */
-    createDocumentService(
-        storageUrl: string,
-        ordererUrl: string,
-        deltaStorageUrl: string,
-        tenantId: string,
-        documentId: string,
-        jwtToken: string,
-    ): Promise<IDocumentService>;
-}
-
 /**
  * Context for uploading a summary to storage.
  * Indicates the previously acked summary.
