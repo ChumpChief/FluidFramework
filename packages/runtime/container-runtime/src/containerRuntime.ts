@@ -38,8 +38,6 @@ import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     BlobCacheStorageService,
     buildSnapshotTree,
-    readAndParse,
-    readAndParseFromBlobs,
 } from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
 import {
@@ -79,8 +77,6 @@ import {
     LocalFluidDataStoreContext,
     LocalDetachedFluidDataStoreContext,
     RemotedFluidDataStoreContext,
-    currentSnapshotFormatVersion,
-    IFluidDataStoreAttributes,
 } from "./dataStoreContext";
 import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
@@ -89,8 +85,6 @@ import { analyzeTasks } from "./taskAnalyzer";
 import { DeltaScheduler } from "./deltaScheduler";
 import { PendingStateManager } from "./pendingStateManager";
 import { pkgVersion } from "./packageVersion";
-
-const chunksBlobName = ".chunks";
 
 export enum ContainerMessageType {
     // An op to be delivered to store
@@ -374,10 +368,7 @@ export class ContainerRuntime extends EventEmitter
 
         const registry = new ContainerRuntimeDataStoreRegistry(registryEntries);
 
-        const chunkId = context.baseSnapshot?.blobs[chunksBlobName];
-        const chunks = context.baseSnapshot && chunkId ? context.storage ?
-            await readAndParse<[string, string[]][]>(context.storage, chunkId) :
-            readAndParseFromBlobs<[string, string[]][]>(context.baseSnapshot.blobs, chunkId) : [];
+        const chunks = [];
 
         const runtime = new ContainerRuntime(
             context,
@@ -529,54 +520,14 @@ export class ContainerRuntime extends EventEmitter
         // Extract stores stored inside the snapshot
         const fluidDataStores = new Map<string, ISnapshotTree | string>();
 
-        if (typeof context.baseSnapshot === "object") {
-            const baseSnapshot = context.baseSnapshot;
-            Object.keys(baseSnapshot.trees).forEach((value) => {
-                if (value !== ".protocol" && value !== ".logTail" && value !== ".serviceProtocol") {
-                    const tree = baseSnapshot.trees[value];
-                    fluidDataStores.set(value, tree);
-                }
-            });
-        }
-
         // Create a context for each of them
         for (const [key, value] of fluidDataStores) {
-            let dataStoreContext: FluidDataStoreContext;
-            // If we have a detached container, then create local data store contexts.
-            if (this.attachState !== AttachState.Detached) {
-                dataStoreContext = new RemotedFluidDataStoreContext(
-                    key,
-                    typeof value === "string" ? value : Promise.resolve(value),
-                    this,
-                    this.storage,
-                );
-            } else {
-                let pkgFromSnapshot: string[];
-                if (typeof context.baseSnapshot !== "object") {
-                    throw new Error("Snapshot should be there to load from!!");
-                }
-                const snapshotTree = value as ISnapshotTree;
-                // Need to rip through snapshot.
-                const { pkg, snapshotFormatVersion } = readAndParseFromBlobs<IFluidDataStoreAttributes>(
-                    snapshotTree.blobs,
-                    snapshotTree.blobs[".component"]);
-                // Use the snapshotFormatVersion to determine how the pkg is encoded in the snapshot.
-                // For snapshotFormatVersion = "0.1", pkg is jsonified, otherwise it is just a string.
-                // However the feature of loading a detached container from snapshot, is added when the
-                // snapshotFormatVersion is "0.1", so we don't expect it to be anything else.
-                if (snapshotFormatVersion === currentSnapshotFormatVersion) {
-                    pkgFromSnapshot = JSON.parse(pkg) as string[];
-                } else {
-                    throw new Error(`Invalid snapshot format version ${snapshotFormatVersion}`);
-                }
-                dataStoreContext = new LocalFluidDataStoreContext(
-                    key,
-                    pkgFromSnapshot,
-                    this,
-                    this.storage,
-                    (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
-                    snapshotTree);
-            }
+            const dataStoreContext = new RemotedFluidDataStoreContext(
+                key,
+                typeof value === "string" ? value : Promise.resolve(value),
+                this,
+                this.storage,
+            );
             this.setNewContext(key, dataStoreContext);
         }
 

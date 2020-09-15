@@ -31,7 +31,6 @@ import {
     ISequencedDocumentMessage,
     IServiceConfiguration,
     ISignalMessage,
-    ISnapshotTree,
     MessageType,
     IVersion,
 } from "@fluidframework/protocol-definitions";
@@ -42,7 +41,6 @@ export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
         runtimeFactory: IRuntimeFactory,
-        baseSnapshot: ISnapshotTree | undefined,
         attributes: IDocumentAttributes,
         blobManager: BlobManager | undefined,
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
@@ -58,7 +56,6 @@ export class ContainerContext implements IContainerContext {
         const context = new ContainerContext(
             container,
             runtimeFactory,
-            baseSnapshot,
             attributes,
             blobManager,
             deltaManager,
@@ -127,10 +124,6 @@ export class ContainerContext implements IContainerContext {
         return config as IFluidConfiguration;
     }
 
-    public get baseSnapshot() {
-        return this._baseSnapshot;
-    }
-
     public get storage(): IDocumentStorageService | undefined | null {
         return this.container.storage;
     }
@@ -152,7 +145,6 @@ export class ContainerContext implements IContainerContext {
     constructor(
         private readonly container: Container,
         public readonly runtimeFactory: IRuntimeFactory,
-        private readonly _baseSnapshot: ISnapshotTree | undefined,
         private readonly attributes: IDocumentAttributes,
         public readonly blobManager: BlobManager | undefined,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
