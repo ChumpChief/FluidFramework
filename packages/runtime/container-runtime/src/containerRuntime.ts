@@ -105,21 +105,8 @@ export function unpackRuntimeMessage(message: ISequencedDocumentMessage) {
             message.contents = innerContents.contents;
         }
         assert(isRuntimeMessage(message));
-    } else {
-        // Legacy format, but it's already "unpacked",
-        // i.e. message.type is actually ContainerMessageType.
-        // Nothing to do in such case.
     }
     return message;
-}
-
-// Wraps the provided list of packages and augments with some system level services.
-class ContainerRuntimeDataStoreRegistry extends FluidDataStoreRegistry {
-    constructor(namedEntries: NamedFluidDataStoreRegistryEntries) {
-        super([
-            ...namedEntries,
-        ]);
-    }
 }
 
 /**
@@ -146,7 +133,7 @@ export class ContainerRuntime extends EventEmitter
         registryEntries: NamedFluidDataStoreRegistryEntries,
         requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ): Promise<ContainerRuntime> {
-        const registry = new ContainerRuntimeDataStoreRegistry(registryEntries);
+        const registry = new FluidDataStoreRegistry(registryEntries);
 
         const runtime = new ContainerRuntime(
             context,
