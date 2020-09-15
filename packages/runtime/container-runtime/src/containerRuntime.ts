@@ -241,10 +241,6 @@ export class ContainerRuntime extends EventEmitter
         this.removeAllListeners();
     }
 
-    public get IFluidConfiguration() {
-        return this.context.configuration;
-    }
-
     /**
      * Notifies this object about the request made to the container.
      * @param request - Request made to the handler.

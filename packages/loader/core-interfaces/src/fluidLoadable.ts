@@ -30,14 +30,3 @@ export interface IFluidRunnable {
     run(...args: any[]): Promise<void>;
     stop(reason?: string): void;
 }
-
-export const IFluidConfiguration: keyof IProvideFluidConfiguration = "IFluidConfiguration";
-
-export interface IProvideFluidConfiguration {
-    readonly IFluidConfiguration: IFluidConfiguration;
-}
-
-export interface IFluidConfiguration extends IProvideFluidConfiguration {
-    canReconnect: boolean;
-    scopes: string[];
-}
