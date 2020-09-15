@@ -149,7 +149,7 @@ export class ContainerRuntime extends EventEmitter
         return this.context.clientId;
     }
 
-    public get storage(): IDocumentStorageService {
+    private get storage(): IDocumentStorageService {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return this.context.storage!;
     }

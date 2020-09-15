@@ -249,7 +249,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.resumeInternal();
     }
 
-    protected resumeInternal(args: IConnectionArgs = {}) {
+    private resumeInternal(args: IConnectionArgs = {}) {
         if (this.closed) {
             throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
         }

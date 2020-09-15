@@ -9,7 +9,6 @@ import {
 import {
     AttachState,
 } from "@fluidframework/container-definitions";
-import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     IHelpMessage,
     ISequencedDocumentMessage,
@@ -40,7 +39,6 @@ export interface IContainerRuntime extends
     readonly existing: boolean;
     readonly clientId: string | undefined;
     readonly connected: boolean;
-    readonly storage: IDocumentStorageService;
     /**
      * Indicates the attachment state of the container to a host service.
      */
