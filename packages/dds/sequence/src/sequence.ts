@@ -121,7 +121,7 @@ export abstract class SharedSegmentSequence<T extends MergeTree.ISegment>
     private messagesSinceMSNChange: ISequencedDocumentMessage[] = [];
     private readonly intervalMapKernel: MapKernel;
     constructor(
-        private readonly dataStoreRuntime: IFluidDataStoreRuntime,
+        dataStoreRuntime: IFluidDataStoreRuntime,
         public id: string,
         attributes: IChannelAttributes,
         public readonly segmentFromSpec: (spec: MergeTree.IJSONSegment) => MergeTree.ISegment,
@@ -131,7 +131,7 @@ export abstract class SharedSegmentSequence<T extends MergeTree.ISegment>
         this.client = new MergeTree.Client(
             segmentFromSpec,
             ChildLogger.create(this.logger, "SharedSegmentSequence.MergeTreeClient"),
-            dataStoreRuntime.options);
+        );
 
         super.on("newListener", (event) => {
             switch (event) {
@@ -514,11 +514,9 @@ export abstract class SharedSegmentSequence<T extends MergeTree.ISegment>
                 .catch((error) => {
                     this.loadFinished(error);
                 });
-            if (this.dataStoreRuntime.options?.sequenceInitializeFromHeaderOnly !== true) {
-                // if we not doing parital load, await the catch up ops,
-                // and the finalization of the load
-                await loadCatchUpOps;
-            }
+            // if we not doing parital load, await the catch up ops,
+            // and the finalization of the load
+            await loadCatchUpOps;
         } catch (error) {
             this.loadFinished(error);
         }
@@ -591,29 +589,25 @@ export abstract class SharedSegmentSequence<T extends MergeTree.ISegment>
         }
         const needsTransformation = message.referenceSequenceNumber !== message.sequenceNumber - 1;
         let stashMessage = message;
-        if (this.runtime.options?.newMergeTreeSnapshotFormat !== true) {
-            if (needsTransformation) {
-                stashMessage = cloneDeep(message);
-                stashMessage.referenceSequenceNumber = message.sequenceNumber - 1;
-                this.on("sequenceDelta", transfromOps);
-            }
+        if (needsTransformation) {
+            stashMessage = cloneDeep(message);
+            stashMessage.referenceSequenceNumber = message.sequenceNumber - 1;
+            this.on("sequenceDelta", transfromOps);
         }
 
         this.client.applyMsg(message);
 
-        if (this.runtime.options?.newMergeTreeSnapshotFormat !== true) {
-            if (needsTransformation) {
-                this.removeListener("sequenceDelta", transfromOps);
-                stashMessage.contents = ops.length !== 1 ? MergeTree.createGroupOp(...ops) : ops[0];
-            }
+        if (needsTransformation) {
+            this.removeListener("sequenceDelta", transfromOps);
+            stashMessage.contents = ops.length !== 1 ? MergeTree.createGroupOp(...ops) : ops[0];
+        }
 
-            this.messagesSinceMSNChange.push(stashMessage);
+        this.messagesSinceMSNChange.push(stashMessage);
 
-            // Do GC every once in a while...
-            if (this.messagesSinceMSNChange.length > 20
-                && this.messagesSinceMSNChange[20].sequenceNumber < message.minimumSequenceNumber) {
-                this.processMinSequenceNumberChanged(message.minimumSequenceNumber);
-            }
+        // Do GC every once in a while...
+        if (this.messagesSinceMSNChange.length > 20
+            && this.messagesSinceMSNChange[20].sequenceNumber < message.minimumSequenceNumber) {
+            this.processMinSequenceNumberChanged(message.minimumSequenceNumber);
         }
     }
 

@@ -40,8 +40,7 @@ export class SnapshotLoader {
         // Override branch by default which is derived from document id,
         // as document id isn't stable for spo
         // which leads to branch id being in correct
-        const branch = this.runtime.options && this.runtime.options.enableBranching
-            ? branchId : this.runtime.documentId;
+        const branch = this.runtime.documentId;
         const headerLoadedP =
             services.read(SnapshotLegacy.header).then((header) => {
                 assert(header);

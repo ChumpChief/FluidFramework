@@ -145,10 +145,6 @@ export class ContainerRuntime extends EventEmitter
         return this.context.existing!;
     }
 
-    public get options(): any {
-        return this.context.options;
-    }
-
     public get clientId(): string | undefined {
         return this.context.clientId;
     }

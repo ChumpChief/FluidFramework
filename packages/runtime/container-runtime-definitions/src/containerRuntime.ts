@@ -38,7 +38,6 @@ export interface IContainerRuntime extends
     IContainerRuntimeBase {
     readonly id: string;
     readonly existing: boolean;
-    readonly options: any;
     readonly clientId: string | undefined;
     readonly connected: boolean;
     readonly storage: IDocumentStorageService;

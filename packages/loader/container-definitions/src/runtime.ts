@@ -83,7 +83,6 @@ export interface IRuntime extends IDisposable {
 export interface IContainerContext extends IDisposable {
     readonly id: string;
     readonly existing: boolean | undefined;
-    readonly options: any;
     readonly configuration: IFluidConfiguration;
     readonly clientId: string | undefined;
     readonly storage: IDocumentStorageService | undefined | null;

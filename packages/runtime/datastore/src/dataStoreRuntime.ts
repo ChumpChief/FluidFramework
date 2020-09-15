@@ -83,7 +83,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             context.documentId,
             context.id,
             context.existing,
-            context.options,
             sharedObjectRegistry,
         );
 
@@ -148,7 +147,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         public readonly documentId: string,
         public readonly id: string,
         public existing: boolean,
-        public readonly options: any,
         private readonly sharedObjectRegistry: ISharedObjectRegistry,
     ) {
         super();

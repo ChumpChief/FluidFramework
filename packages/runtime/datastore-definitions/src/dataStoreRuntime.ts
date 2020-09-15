@@ -34,8 +34,6 @@ export interface IFluidDataStoreRuntime extends
 
     readonly IFluidHandleContext: IFluidHandleContext;
 
-    readonly options: any;
-
     readonly clientId: string | undefined;
 
     readonly documentId: string;
