@@ -14,19 +14,8 @@ import {
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
 import { ICriticalContainerError, ContainerWarning } from "./error";
-import { IFluidModule } from "./fluidModule";
 import { IFluidCodeDetails, IFluidPackage } from "./fluidPackage";
 import { AttachState } from "./runtime";
-
-/**
- * Code loading interface
- */
-export interface ICodeLoader {
-    /**
-     * Loads the package specified by IPackage and returns a promise to its entry point exports.
-     */
-    load(source: IFluidCodeDetails): Promise<IFluidModule>;
-}
 
 /**
 * The interface returned from a IFluidCodeResolver which represents IFluidCodeDetails

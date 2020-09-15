@@ -4,7 +4,6 @@
  */
 
 export * from "./interfaces";
-export * from "./localCodeLoader";
 export * from "./opProcessingController";
 export * from "./testContainerRuntimeFactory";
 export * from "./testFluidObject";
