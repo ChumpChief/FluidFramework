@@ -6,7 +6,6 @@
 import { DocumentDeltaConnection } from "@fluidframework/driver-base";
 import * as api from "@fluidframework/driver-definitions";
 import { IClient } from "@fluidframework/protocol-definitions";
-import io from "socket.io-client";
 import { DocumentDeltaStorageService } from "./deltaStorageService";
 import { DocumentStorageService } from "./documentStorageService";
 
@@ -53,7 +52,6 @@ export class DocumentService implements api.IDocumentService {
             this.tenantId,
             this.documentId,
             this.token,
-            io,
             client,
             this.ordererUrl);
     }

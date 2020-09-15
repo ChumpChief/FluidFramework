@@ -20,6 +20,7 @@ import {
     ISignalMessage,
     ITokenClaims,
 } from "@fluidframework/protocol-definitions";
+import io from "socket.io-client";
 import { debug } from "./debug";
 
 const protocolVersions = ["^0.4.0", "^0.3.0", "^0.2.0", "^0.1.0"];
@@ -69,7 +70,6 @@ export class DocumentDeltaConnection
         tenantId: string,
         id: string,
         token: string | null,
-        io: SocketIOClientStatic,
         client: IClient,
         url: string,
         timeoutMs: number = 20000): Promise<IDocumentDeltaConnection> {
