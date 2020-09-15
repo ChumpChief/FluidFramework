@@ -178,11 +178,7 @@ export class ContainerRuntime extends EventEmitter
     }
 
     public get attachState(): AttachState {
-        if (this.context.attachState !== undefined) {
-            return this.context.attachState;
-        }
-        // 0.21 back-compat isAttached
-        return (this.context as any).isAttached() ? AttachState.Attached : AttachState.Detached;
+        return AttachState.Attached;
     }
 
     public readonly IFluidSerializer: IFluidSerializer = new FluidSerializer();

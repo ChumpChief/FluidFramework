@@ -106,11 +106,6 @@ export interface IContainerContext extends IDisposable {
      * TODO: Optional for backwards compatibility. Make non-optional in version 0.19
      */
     getAbsoluteUrl?(relativeUrl: string): Promise<string | undefined>;
-
-    /**
-     * Indicates the attachment state of the container to a host service.
-     */
-    readonly attachState: AttachState;
 }
 
 export const IRuntimeFactory: keyof IProvideRuntimeFactory = "IRuntimeFactory";

@@ -14,7 +14,6 @@ import {
     IContainerContext,
     IRuntime,
     IRuntimeFactory,
-    AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
@@ -116,18 +115,7 @@ export class ContainerContext implements IContainerContext {
         public readonly runtimeFactory: IRuntimeFactory,
         public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
-    ) {
-        this.attachListener();
-    }
-
-    private attachListener() {
-        this.container.once("attaching", () => {
-            this._runtime?.setAttachState?.(AttachState.Attaching);
-        });
-        this.container.once("attached", () => {
-            this._runtime?.setAttachState?.(AttachState.Attached);
-        });
-    }
+    ) { }
 
     public dispose(error?: Error): void {
         if (this._disposed) {
@@ -136,10 +124,6 @@ export class ContainerContext implements IContainerContext {
         this._disposed = true;
 
         this.runtime.dispose(error);
-    }
-
-    public get attachState(): AttachState {
-        return AttachState.Attached;
     }
 
     public setConnectionState(connected: boolean, clientId?: string) {
