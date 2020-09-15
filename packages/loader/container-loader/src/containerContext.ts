@@ -97,10 +97,6 @@ export class ContainerContext implements IContainerContext {
         return this.attributes.branch;
     }
 
-    public get parentBranch(): string | null {
-        return this.container.parentBranch;
-    }
-
     // Back-compat: supporting <= 0.16 data stores
     public get connectionState(): ConnectionState {
         return this.connected ? ConnectionState.Connected : ConnectionState.Disconnected;

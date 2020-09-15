@@ -107,10 +107,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         return this.pkg;
     }
 
-    public get parentBranch(): string | null {
-        return this._containerRuntime.parentBranch;
-    }
-
     public get options(): any {
         return this._containerRuntime.options;
     }

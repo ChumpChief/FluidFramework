@@ -158,7 +158,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private readonly _documentId: string | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
-    private _parentBranch: string | null = null;
     private _connectionState = ConnectionState.Disconnected;
     private readonly _audience: Audience;
 
@@ -270,13 +269,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public get audience(): IAudience {
         return this._audience;
-    }
-
-    /**
-     * Returns the parent branch for this document
-     */
-    public get parentBranch(): string | null {
-        return this._parentBranch;
     }
 
     constructor(
@@ -494,13 +486,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // the initial details
         if (maybeSnapshotTree !== undefined) {
             this._existing = true;
-            this._parentBranch = attributes.branch !== this.id ? attributes.branch : null;
             loadDetailsP = Promise.resolve();
         } else {
             // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
             loadDetailsP = startConnectionP.then((details) => {
                 this._existing = details.existing;
-                this._parentBranch = details.parentBranch;
             });
         }
 
@@ -581,13 +571,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
         }
 
-        const protocolHandler = this.initializeProtocolState(
+        return this.initializeProtocolState(
             attributes,
             members,
             proposals,
-            values);
-
-        return protocolHandler;
+            values,
+        );
     }
 
     private initializeProtocolState(
