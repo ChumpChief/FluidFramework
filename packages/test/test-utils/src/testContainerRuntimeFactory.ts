@@ -5,7 +5,7 @@
 
 import { defaultRouteRequestHandler } from "@fluidframework/aqueduct";
 import { IContainerContext, IRuntime, IRuntimeFactory } from "@fluidframework/container-definitions";
-import { ContainerRuntime, IContainerRuntimeOptions } from "@fluidframework/container-runtime";
+import { ContainerRuntime } from "@fluidframework/container-runtime";
 import { deprecated_innerRequestHandler, RuntimeRequestHandlerBuilder } from "@fluidframework/request-handler";
 import { IFluidDataStoreFactory } from "@fluidframework/runtime-definitions";
 
@@ -18,7 +18,6 @@ export class TestContainerRuntimeFactory implements IRuntimeFactory {
     constructor(
         public type: string,
         public dataStoreFactory: IFluidDataStoreFactory,
-        public runtimeOptions: IContainerRuntimeOptions,
     ) { }
 
     public async instantiateRuntime(context: IContainerContext): Promise<IRuntime> {
@@ -34,7 +33,6 @@ export class TestContainerRuntimeFactory implements IRuntimeFactory {
                 [this.type, Promise.resolve(this.dataStoreFactory)],
             ],
             async (req, rt) => builder.handleRequest(req, rt),
-            this.runtimeOptions,
         );
 
         if (!runtime.existing) {

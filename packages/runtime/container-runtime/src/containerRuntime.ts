@@ -92,7 +92,6 @@ import {
 import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { debug } from "./debug";
-import { ISummarizerRuntime, Summarizer } from "./summarizer";
 import { analyzeTasks } from "./taskAnalyzer";
 import { DeltaScheduler } from "./deltaScheduler";
 import { PendingStateManager } from "./pendingStateManager";
@@ -149,21 +148,6 @@ export interface ISubmittedSummaryData extends IGeneratedSummaryData, IUploadedS
 }
 
 export type GenerateSummaryData = IUnsubmittedSummaryData | ISubmittedSummaryData;
-
-/**
- * Options for container runtime.
- */
-export interface IContainerRuntimeOptions {
-    // Flag that will generate summaries if connected to a service that supports them.
-    // This defaults to true and must be explicitly set to false to disable.
-    generateSummaries?: boolean;
-
-    // Experimental flag that will execute tasks in web worker if connected to a service that supports them.
-    enableWorker?: boolean;
-
-    // Delay before first attempt to spawn summarizing container
-    initialSummarizerDelayMs?: number;
-}
 
 interface IRuntimeMessageMetadata {
     batch?: boolean;
@@ -392,7 +376,7 @@ class ContainerRuntimeDataStoreRegistry extends FluidDataStoreRegistry {
  * It will define the store level mappings.
  */
 export class ContainerRuntime extends EventEmitter
-    implements IContainerRuntime, IContainerRuntimeDirtyable, IRuntime, ISummarizerRuntime {
+    implements IContainerRuntime, IContainerRuntimeDirtyable, IRuntime {
     public get IContainerRuntime() { return this; }
     public get IContainerRuntimeDirtyable() { return this; }
     public get IFluidRouter() { return this; }
@@ -411,7 +395,6 @@ export class ContainerRuntime extends EventEmitter
         context: IContainerContext,
         registryEntries: NamedFluidDataStoreRegistryEntries,
         requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
-        runtimeOptions?: IContainerRuntimeOptions,
     ): Promise<ContainerRuntime> {
         // Back-compat: <= 0.18 loader
         if (context.deltaManager.lastSequenceNumber === undefined) {
@@ -511,9 +494,6 @@ export class ContainerRuntime extends EventEmitter
         // 0.21 back-compat isAttached
         return (this.context as any).isAttached() ? AttachState.Attached : AttachState.Detached;
     }
-
-    public nextSummarizerP?: Promise<Summarizer>;
-    public nextSummarizerD?: Deferred<Summarizer>;
 
     public readonly IFluidSerializer: IFluidSerializer = new FluidSerializer();
 

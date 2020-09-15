@@ -57,8 +57,8 @@ export class BaseContainerRuntimeFactory implements
             this.registryEntries,
             buildRuntimeRequestHandler(
                 ...this.requestHandlers,
-                deprecated_innerRequestHandler),
-            undefined,
+                deprecated_innerRequestHandler,
+            ),
         );
 
         if (!runtime.existing) {
