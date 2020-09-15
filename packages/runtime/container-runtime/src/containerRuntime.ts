@@ -70,13 +70,11 @@ import {
     IInboundSignalMessage,
     ISignalEnvelop,
     NamedFluidDataStoreRegistryEntries,
-    ISummaryStats,
     IAgentScheduler,
     ITaskManager,
 } from "@fluidframework/runtime-definitions";
 import {
     FluidSerializer,
-    SummaryTreeBuilder,
     RequestParser,
     requestFluidObject,
 } from "@fluidframework/runtime-utils";
@@ -124,30 +122,6 @@ export interface ContainerRuntimeMessage {
     contents: any;
     type: ContainerMessageType;
 }
-
-export interface IGeneratedSummaryData {
-    readonly summaryStats: ISummaryStats;
-    readonly generateDuration?: number;
-}
-
-export interface IUploadedSummaryData {
-    readonly handle: string;
-    readonly uploadDuration?: number;
-}
-
-export interface IUnsubmittedSummaryData extends Partial<IGeneratedSummaryData>, Partial<IUploadedSummaryData> {
-    readonly referenceSequenceNumber: number;
-    readonly submitted: false;
-}
-
-export interface ISubmittedSummaryData extends IGeneratedSummaryData, IUploadedSummaryData {
-    readonly referenceSequenceNumber: number;
-    readonly submitted: true;
-    readonly clientSequenceNumber: number;
-    readonly submitOpDuration?: number;
-}
-
-export type GenerateSummaryData = IUnsubmittedSummaryData | ISubmittedSummaryData;
 
 interface IRuntimeMessageMetadata {
     batch?: boolean;
@@ -765,13 +739,6 @@ export class ContainerRuntime extends EventEmitter
         }
 
         return root;
-    }
-
-    protected serializeContainerBlobs(summaryTreeBuilder: SummaryTreeBuilder) {
-        if (this.chunkMap.size > 0) {
-            const content = JSON.stringify([...this.chunkMap]);
-            summaryTreeBuilder.addBlob(chunksBlobName, content);
-        }
     }
 
     // Back-compat: <= 0.17
