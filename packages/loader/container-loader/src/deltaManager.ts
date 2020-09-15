@@ -175,7 +175,6 @@ export class DeltaManager
     private lastSubmittedClientId: string | undefined;
 
     private handler: IDeltaHandlerStrategy | undefined;
-    private deltaStorageP: Promise<IDocumentDeltaStorageService> | undefined;
 
     private readonly contentCache = new ContentCache(DefaultContentBufferSize);
 
@@ -334,6 +333,7 @@ export class DeltaManager
 
     constructor(
         private readonly documentService: IDocumentService,
+        private readonly deltaStorageService: IDocumentDeltaStorageService,
         private client: IClient,
         private readonly logger: ITelemetryLogger,
         reconnectAllowed: boolean,
@@ -656,7 +656,6 @@ export class DeltaManager
         });
 
         let requests = 0;
-        let deltaStorage: IDocumentDeltaStorageService | undefined;
 
         while (!this.closed) {
             const maxFetchTo = from + MaxBatchDeltas;
@@ -668,19 +667,11 @@ export class DeltaManager
             let retryAfter: number | undefined;
 
             try {
-                // Connect to the delta storage endpoint
-                if (deltaStorage === undefined) {
-                    if (this.deltaStorageP === undefined) {
-                        this.deltaStorageP = this.documentService.connectToDeltaStorage();
-                    }
-                    deltaStorage = await this.deltaStorageP;
-                }
-
                 requests++;
 
                 // Issue async request for deltas - limit the number fetched to MaxBatchDeltas
                 canRetry = true;
-                const deltasP = deltaStorage.get(from, fetchTo);
+                const deltasP = this.deltaStorageService.get(from, fetchTo);
 
                 // Return previously fetched deltas, for processing while we are waiting for new request.
                 if (deltas.length > 0) {

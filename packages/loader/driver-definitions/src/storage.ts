@@ -221,11 +221,6 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
 
 export interface IDocumentService {
     /**
-     * Access to delta storage associated with the document
-     */
-    connectToDeltaStorage(): Promise<IDocumentDeltaStorageService>;
-
-    /**
      * Subscribes to the document delta stream
      */
     connectToDeltaStream(client: IClient): Promise<IDocumentDeltaConnection>;
