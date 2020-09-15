@@ -125,9 +125,6 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
     /** Protocol version being used to communicate with the service */
     readonly version: string;
 
-    /** Max message size allowed to the delta manager */
-    readonly maxMessageSize: number;
-
     /** Service configuration provided by the service. */
     readonly serviceConfiguration: IServiceConfiguration | undefined;
 

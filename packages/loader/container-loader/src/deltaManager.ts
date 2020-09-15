@@ -51,7 +51,6 @@ const InitialReconnectDelaySeconds = 1;
 const MissingFetchDelaySeconds = 0.1;
 const MaxFetchDelaySeconds = 10;
 const MaxBatchDeltas = 2000;
-const DefaultChunkSize = 16 * 1024;
 
 // This can be anything other than null
 const ImmediateNoOpResponse = "";
@@ -208,12 +207,6 @@ export class DeltaManager
 
     public get minimumSequenceNumber(): number {
         return this.minSequenceNumber;
-    }
-
-    public get maxMessageSize(): number {
-        return this.connection?.details.serviceConfiguration?.maxMessageSize
-            ?? this.connection?.details.maxMessageSize
-            ?? DefaultChunkSize;
     }
 
     public get version(): string {

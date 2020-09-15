@@ -121,10 +121,6 @@ export class DeltaManagerProxy
         return this.deltaManager.version;
     }
 
-    public get maxMessageSize(): number {
-        return this.deltaManager.maxMessageSize;
-    }
-
     public get serviceConfiguration(): IServiceConfiguration | undefined {
         return this.deltaManager.serviceConfiguration;
     }
