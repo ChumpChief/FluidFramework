@@ -21,7 +21,6 @@ import {
     IDeltaSender,
     IRuntime,
     ContainerWarning,
-    ICriticalContainerError,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
@@ -406,10 +405,6 @@ export class ContainerRuntime extends EventEmitter
     public get reSubmitFn(): (type: ContainerMessageType, content: any, localOpMetadata: unknown) => void {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         return this.reSubmit;
-    }
-
-    public get closeFn(): (error?: ICriticalContainerError) => void {
-        return this.context.closeFn;
     }
 
     public get flushMode(): FlushMode {

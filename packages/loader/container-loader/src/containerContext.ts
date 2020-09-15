@@ -15,7 +15,6 @@ import {
     IDeltaManager,
     IRuntime,
     IRuntimeFactory,
-    ICriticalContainerError,
     ContainerWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -43,8 +42,6 @@ export class ContainerContext implements IContainerContext {
         raiseContainerWarning: (warning: ContainerWarning) => void,
         submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         submitSignalFn: (contents: any) => void,
-        closeFn: (error?: ICriticalContainerError) => void,
-        version: string,
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
             container,
@@ -55,8 +52,6 @@ export class ContainerContext implements IContainerContext {
             raiseContainerWarning,
             submitFn,
             submitSignalFn,
-            closeFn,
-            version,
         );
         await context.load();
         return context;
@@ -138,8 +133,6 @@ export class ContainerContext implements IContainerContext {
         public readonly raiseContainerWarning: (warning: ContainerWarning) => void,
         public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
-        public readonly closeFn: (error?: ICriticalContainerError) => void,
-        public readonly version: string,
     ) {
         this.attachListener();
     }

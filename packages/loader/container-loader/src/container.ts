@@ -82,8 +82,6 @@ export type DetachedContainerSource = {
 };
 
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
-    public static version = "^0.1.0";
-
     /**
      * Load container.
      */
@@ -657,8 +655,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (warning: ContainerWarning) => this.raiseContainerWarning(warning),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
-            (error?: ICriticalContainerError) => this.close(error),
-            Container.version,
         );
     }
 }

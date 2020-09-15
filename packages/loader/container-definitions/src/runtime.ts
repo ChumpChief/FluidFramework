@@ -22,7 +22,7 @@ import {
 import { IAudience } from "./audience";
 import { IBlobManager } from "./blobs";
 import { IDeltaManager } from "./deltas";
-import { ICriticalContainerError, ContainerWarning } from "./error";
+import { ContainerWarning } from "./error";
 
 // Represents the attachment state of the entity.
 export enum AttachState {
@@ -102,12 +102,10 @@ export interface IContainerContext extends IDisposable {
     readonly connected: boolean;
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
-    readonly closeFn: (error?: ICriticalContainerError) => void;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly quorum: IQuorum;
     readonly audience: IAudience | undefined;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
-    readonly version: string;
 
     raiseContainerWarning(warning: ContainerWarning): void;
 
