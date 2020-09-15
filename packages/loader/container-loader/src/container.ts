@@ -50,7 +50,6 @@ import {
 import { Audience } from "./audience";
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
-import { DeltaManagerProxy } from "./deltaManagerProxy";
 
 export enum ConnectionState {
     /**
@@ -620,7 +619,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context = await ContainerContext.createOrLoad(
             this,
             this.containerRuntimeFactory,
-            new DeltaManagerProxy(this._deltaManager),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
         );

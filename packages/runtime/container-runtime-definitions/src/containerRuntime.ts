@@ -8,13 +8,11 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IDeltaManager,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     IClientDetails,
-    IDocumentMessage,
     IHelpMessage,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
@@ -46,7 +44,6 @@ export interface IContainerRuntime extends
     readonly clientId: string | undefined;
     readonly clientDetails: IClientDetails;
     readonly connected: boolean;
-    readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly storage: IDocumentStorageService;
     /**
      * Indicates the attachment state of the container to a host service.

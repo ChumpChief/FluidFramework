@@ -29,10 +29,10 @@ import { MergeTreeDeltaCallback } from "./mergeTreeDeltaCallback";
 import * as OpBuilder from "./opBuilder";
 import * as ops from "./ops";
 import * as Properties from "./properties";
-import { SnapshotLegacy } from "./snapshotlegacy";
+// import { SnapshotLegacy } from "./snapshotlegacy";
 import { SnapshotLoader } from "./snapshotLoader";
 import { MergeTreeTextHelper } from "./textSegment";
-import { SnapshotV1 } from "./snapshotV1";
+// import { SnapshotV1 } from "./snapshotV1";
 import {
     IMergeTreeClientSequenceArgs,
     IMergeTreeDeltaOpArgs,
@@ -899,40 +899,41 @@ export class Client {
     // TODO: Remove `catchUpMsgs` once new snapshot format is adopted as default.
     //       (See https://github.com/microsoft/FluidFramework/issues/84)
     public snapshot(runtime: IFluidDataStoreRuntime, handle: IFluidHandle, catchUpMsgs: ISequencedDocumentMessage[]) {
-        const deltaManager = runtime.deltaManager;
-        const minSeq = deltaManager.minimumSequenceNumber;
+        // TODO Breaking this since it requires deltaManager
+        // const deltaManager = runtime.deltaManager;
+        // const minSeq = deltaManager.minimumSequenceNumber;
 
-        // Catch up to latest MSN, if we have not had a chance to do it.
-        // Required for case where FluidDataStoreRuntime.attachChannel()
-        // generates snapshot right after loading data store.
+        // // Catch up to latest MSN, if we have not had a chance to do it.
+        // // Required for case where FluidDataStoreRuntime.attachChannel()
+        // // generates snapshot right after loading data store.
 
-        this.updateSeqNumbers(minSeq, deltaManager.lastSequenceNumber);
+        // this.updateSeqNumbers(minSeq, deltaManager.lastSequenceNumber);
 
-        // One of the snapshots (from SPO) I observed to have chunk.chunkSequenceNumber > minSeq!
-        // Not sure why - need to catch it sooner
-        assert.equal(this.getCollabWindow().minSeq, minSeq);
+        // // One of the snapshots (from SPO) I observed to have chunk.chunkSequenceNumber > minSeq!
+        // // Not sure why - need to catch it sooner
+        // assert.equal(this.getCollabWindow().minSeq, minSeq);
 
-        // TODO: Remove options flag once new snapshot format is adopted as default.
-        //       (See https://github.com/microsoft/FluidFramework/issues/84)
-        if (this.mergeTree.options?.newMergeTreeSnapshotFormat === true) {
-            assert(
-                catchUpMsgs === undefined || catchUpMsgs.length === 0,
-                "New format should not emit catchup ops");
-            const snap = new SnapshotV1(this.mergeTree, this.logger);
-            snap.extractSync();
-            return snap.emit(
-                runtime.IFluidSerializer,
-                runtime.IFluidHandleContext,
-                handle);
-        } else {
-            const snap = new SnapshotLegacy(this.mergeTree, this.logger);
-            snap.extractSync();
-            return snap.emit(
-                catchUpMsgs,
-                runtime.IFluidSerializer,
-                runtime.IFluidHandleContext,
-                handle);
-        }
+        // // TODO: Remove options flag once new snapshot format is adopted as default.
+        // //       (See https://github.com/microsoft/FluidFramework/issues/84)
+        // if (this.mergeTree.options?.newMergeTreeSnapshotFormat === true) {
+        //     assert(
+        //         catchUpMsgs === undefined || catchUpMsgs.length === 0,
+        //         "New format should not emit catchup ops");
+        //     const snap = new SnapshotV1(this.mergeTree, this.logger);
+        //     snap.extractSync();
+        //     return snap.emit(
+        //         runtime.IFluidSerializer,
+        //         runtime.IFluidHandleContext,
+        //         handle);
+        // } else {
+        //     const snap = new SnapshotLegacy(this.mergeTree, this.logger);
+        //     snap.extractSync();
+        //     return snap.emit(
+        //         catchUpMsgs,
+        //         runtime.IFluidSerializer,
+        //         runtime.IFluidHandleContext,
+        //         handle);
+        // }
     }
 
     public async load(

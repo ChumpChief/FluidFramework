@@ -543,10 +543,6 @@ export class DeltaManager
     }
 
     public submit(type: MessageType, contents: any, batch = false, metadata?: any): number {
-        // TODO need to fail if gets too large
-        // const serializedContent = JSON.stringify(this.messageBuffer);
-        // const maxOpSize = this.context.deltaManager.maxMessageSize;
-
         if (this.readonly) {
             this.close(CreateContainerError("Op is sent in read-only document state"));
             return -1;

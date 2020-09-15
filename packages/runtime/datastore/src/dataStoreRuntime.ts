@@ -13,7 +13,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IDeltaManager,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -28,7 +27,6 @@ import { buildSnapshotTree, readAndParseFromBlobs } from "@fluidframework/driver
 import { TreeTreeEntry } from "@fluidframework/protocol-base";
 import {
     IClientDetails,
-    IDocumentMessage,
     ISequencedDocumentMessage,
     ITreeEntry,
     ITree,
@@ -88,7 +86,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             context.id,
             context.existing,
             context.options,
-            context.deltaManager,
             context.getAudience(),
             sharedObjectRegistry,
         );
@@ -159,7 +156,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         public readonly id: string,
         public existing: boolean,
         public readonly options: any,
-        public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         private readonly audience: IAudience,
         private readonly sharedObjectRegistry: ISharedObjectRegistry,
     ) {

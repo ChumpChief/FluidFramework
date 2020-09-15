@@ -134,27 +134,29 @@ export class ConsensusRegisterCollection<T>
      * @returns Promise<true> if write was non-concurrent
      */
     public async write(key: string, value: T): Promise<boolean> {
-        const serializedValue = this.stringify(value);
+        return true;
+        // TODO Breaking this since it requires deltamanager
+        // const serializedValue = this.stringify(value);
 
-        if (!this.isAttached()) {
-            // JSON-roundtrip value for local writes to match the behavior of going through the wire
-            this.processInboundWrite(key, this.parse(serializedValue), 0, 0, true);
-            return true;
-        }
+        // if (!this.isAttached()) {
+        //     // JSON-roundtrip value for local writes to match the behavior of going through the wire
+        //     this.processInboundWrite(key, this.parse(serializedValue), 0, 0, true);
+        //     return true;
+        // }
 
-        const message: IRegisterOperation = {
-            key,
-            type: "write",
-            serializedValue,
-            refSeq: this.runtime.deltaManager.lastSequenceNumber,
-        };
+        // const message: IRegisterOperation = {
+        //     key,
+        //     type: "write",
+        //     serializedValue,
+        //     refSeq: this.runtime.deltaManager.lastSequenceNumber,
+        // };
 
-        return this.newAckBasedPromise<boolean>((resolve) => {
-            // Send the resolve function as the localOpMetadata. This will be provided back to us when the
-            // op is ack'd.
-            this.submitLocalMessage(message, resolve);
-            // If we fail due to runtime being disposed, it's better to return false then unhandled exception.
-        }).catch((error) => false);
+        // return this.newAckBasedPromise<boolean>((resolve) => {
+        //     // Send the resolve function as the localOpMetadata. This will be provided back to us when the
+        //     // op is ack'd.
+        //     this.submitLocalMessage(message, resolve);
+        //     // If we fail due to runtime being disposed, it's better to return false then unhandled exception.
+        // }).catch((error) => false);
     }
 
     /**

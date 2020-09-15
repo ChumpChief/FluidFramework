@@ -16,10 +16,8 @@ import {
     IServiceConfiguration,
     ITree,
     MessageType,
-    IDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IAudience } from "./audience";
-import { IDeltaManager } from "./deltas";
 
 // Represents the attachment state of the entity.
 export enum AttachState {
@@ -98,7 +96,6 @@ export interface IContainerContext extends IDisposable {
     readonly connected: boolean;
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
-    readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly audience: IAudience | undefined;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
 

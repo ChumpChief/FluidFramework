@@ -425,12 +425,13 @@ export abstract class SharedSegmentSequence<T extends MergeTree.ISegment>
                         encoding: "utf-8",
                     },
                 },
-                {
-                    mode: FileMode.Directory,
-                    path: contentPath,
-                    type: TreeEntry.Tree,
-                    value: this.snapshotMergeTree(),
-                },
+                // TODO Breaking this since it relies on deltamanager
+                // {
+                //     mode: FileMode.Directory,
+                //     path: contentPath,
+                //     type: TreeEntry.Tree,
+                //     value: this.snapshotMergeTree(),
+                // },
 
             ],
             // eslint-disable-next-line no-null/no-null
@@ -563,18 +564,19 @@ export abstract class SharedSegmentSequence<T extends MergeTree.ISegment>
         this.loadFinished();
     }
 
-    private snapshotMergeTree(): ITree {
-        // Are we fully loaded? If not, things will go south
-        assert(this.loadedDeferred.isCompleted, "Snapshot called when not fully loaded");
-        assert(this.runtime.deltaManager, "DeltaManager does not exit");
-        const minSeq = this.runtime.deltaManager.minimumSequenceNumber;
+    // TODO breaking this since it relies on deltamanager
+    // private snapshotMergeTree(): ITree {
+    //     // Are we fully loaded? If not, things will go south
+    //     assert(this.loadedDeferred.isCompleted, "Snapshot called when not fully loaded");
+    //     assert(this.runtime.deltaManager, "DeltaManager does not exit");
+    //     const minSeq = this.runtime.deltaManager.minimumSequenceNumber;
 
-        this.processMinSequenceNumberChanged(minSeq);
+    //     this.processMinSequenceNumberChanged(minSeq);
 
-        this.messagesSinceMSNChange.forEach((m) => m.minimumSequenceNumber = minSeq);
+    //     this.messagesSinceMSNChange.forEach((m) => m.minimumSequenceNumber = minSeq);
 
-        return this.client.snapshot(this.runtime, this.handle, this.messagesSinceMSNChange);
-    }
+    //     return this.client.snapshot(this.runtime, this.handle, this.messagesSinceMSNChange);
+    // }
 
     private processMergeTreeMsg(
         rawMessage: ISequencedDocumentMessage) {

@@ -12,7 +12,6 @@ import {
 import {
     IAudience,
     IContainerContext,
-    IDeltaManager,
     IRuntime,
     IRuntimeFactory,
     AttachState,
@@ -21,7 +20,6 @@ import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     ConnectionState,
     IClientDetails,
-    IDocumentMessage,
     ISequencedDocumentMessage,
     IServiceConfiguration,
     ISignalMessage,
@@ -33,14 +31,12 @@ export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
         runtimeFactory: IRuntimeFactory,
-        deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         submitSignalFn: (contents: any) => void,
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
             container,
             runtimeFactory,
-            deltaManager,
             submitFn,
             submitSignalFn,
         );
@@ -118,7 +114,6 @@ export class ContainerContext implements IContainerContext {
     constructor(
         private readonly container: Container,
         public readonly runtimeFactory: IRuntimeFactory,
-        public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
     ) {
@@ -141,7 +136,6 @@ export class ContainerContext implements IContainerContext {
         this._disposed = true;
 
         this.runtime.dispose(error);
-        this.deltaManager.dispose();
     }
 
     public get attachState(): AttachState {

@@ -12,14 +12,12 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IDeltaManager,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     IClientDetails,
     ConnectionState,
-    IDocumentMessage,
     ISequencedDocumentMessage,
     ISnapshotTree,
     ITreeEntry,
@@ -204,7 +202,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
     readonly options: any;
     readonly clientId: string | undefined;
     readonly connected: boolean;
-    readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly storage: IDocumentStorageService;
     readonly baseSnapshot: ISnapshotTree | undefined;
     /**

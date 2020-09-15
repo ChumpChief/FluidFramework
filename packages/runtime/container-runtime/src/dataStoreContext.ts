@@ -12,7 +12,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IDeltaManager,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -21,7 +20,6 @@ import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import { readAndParse } from "@fluidframework/driver-utils";
 import { BlobTreeEntry } from "@fluidframework/protocol-base";
 import {
-    IDocumentMessage,
     ISequencedDocumentMessage,
     ISnapshotTree,
     ITree,
@@ -101,10 +99,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
 
     public get clientId(): string | undefined {
         return this._containerRuntime.clientId;
-    }
-
-    public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {
-        return this._containerRuntime.deltaManager;
     }
 
     public get connected(): boolean {

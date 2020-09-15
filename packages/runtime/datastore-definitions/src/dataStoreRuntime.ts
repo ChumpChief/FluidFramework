@@ -12,11 +12,9 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IDeltaManager,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
-    IDocumentMessage,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IInboundSignalMessage, IProvideFluidDataStoreRegistry } from "@fluidframework/runtime-definitions";
@@ -38,8 +36,6 @@ export interface IFluidDataStoreRuntime extends
     readonly IFluidHandleContext: IFluidHandleContext;
 
     readonly options: any;
-
-    readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
 
     readonly clientId: string | undefined;
 

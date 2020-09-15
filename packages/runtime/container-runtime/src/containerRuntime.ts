@@ -15,7 +15,6 @@ import {
 import {
     IAudience,
     IContainerContext,
-    IDeltaManager,
     IRuntime,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -34,7 +33,6 @@ import {
 import {
     ConnectionState,
     IClientDetails,
-    IDocumentMessage,
     ISequencedDocumentMessage,
     ISignalMessage,
     ISnapshotTree,
@@ -165,10 +163,6 @@ export class ContainerRuntime extends EventEmitter
         return this.context.clientDetails;
     }
 
-    public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {
-        return this.context.deltaManager;
-    }
-
     public get storage(): IDocumentStorageService {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return this.context.storage!;
@@ -244,30 +238,6 @@ export class ContainerRuntime extends EventEmitter
         }
 
         this.pendingStateManager = new PendingStateManager(this);
-
-        this.deltaManager.on("readonly", (readonly: boolean) => {
-            // we accumulate ops while being in read-only state.
-            // once user gets write permissions and we have active connection, flush all pending ops.
-            assert(readonly === this.deltaManager.readonly, "inconsistent readonly property/event state");
-
-            // We need to be very careful with when we (re)send pending ops, to ensure that we only send ops
-            // when we either never send an op, or attempted to send it but we know for sure it was not
-            // sequenced by server and will never be sequenced (i.e. was lost)
-            // For loss of connection, we wait for our own "join" op and use it a a barrier to know all the
-            // ops that maid it from previous connection, before switching clientId and raising "connected" event
-            // But with read-only permissions, if we transition between read-only and r/w states while on same
-            // connection, then we have no good signal to tell us when it's safe to send ops we accumulated while
-            // being in read-only state.
-            // For that reason, we support getting to read-only state only when disconnected. This ensures that we
-            // can reply on same safety mechanism and resend ops only when we establish new connection.
-            // This is applicable for read-only permissions (event is raised before connection is properly registered),
-            // but it's an extra requirement for Container.forceReadonly() API
-            assert(!readonly || !this.connected, "Unsafe to transition to read-only state!");
-
-            if (this.canSendOps()) {
-                this.pendingStateManager.replayPendingStates();
-            }
-        });
     }
 
     public dispose(): void {
@@ -479,7 +449,7 @@ export class ContainerRuntime extends EventEmitter
     }
 
     private canSendOps() {
-        return this.connected && !this.deltaManager.readonly;
+        return true;
     }
 
     private _createFluidDataStoreContext(pkg: string[], id) {

@@ -19,7 +19,7 @@ import {
     MergeTreeMaintenanceType,
 } from "@fluidframework/merge-tree";
 import { IFluidHandle } from "@fluidframework/core-interfaces";
-import { FileMode, TreeEntry, ITree } from "@fluidframework/protocol-definitions";
+import { ITree } from "@fluidframework/protocol-definitions";
 import { ObjectStoragePartition } from "@fluidframework/runtime-utils";
 import { HandleTable, Handle, isHandleValid } from "./handletable";
 import { serializeBlob, deserializeBlob } from "./serialization";
@@ -256,12 +256,13 @@ export class PermutationVector extends Client {
     public snapshot(runtime: IFluidDataStoreRuntime, handle: IFluidHandle): ITree {
         return {
             entries: [
-                {
-                    mode: FileMode.Directory,
-                    path: SnapshotPath.segments,
-                    type: TreeEntry.Tree,
-                    value: super.snapshot(runtime, handle, /* catchUpMsgs: */[]),
-                },
+                // TODO breaking this since it relies on deltamanager
+                // {
+                //     mode: FileMode.Directory,
+                //     path: SnapshotPath.segments,
+                //     type: TreeEntry.Tree,
+                //     value: super.snapshot(runtime, handle, /* catchUpMsgs: */[]),
+                // },
                 serializeBlob(runtime, handle, SnapshotPath.handleTable, this.handleTable.snapshot()),
             ],
             id: null,   // eslint-disable-line no-null/no-null
