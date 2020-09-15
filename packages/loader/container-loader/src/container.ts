@@ -32,8 +32,6 @@ import {
     IDocumentStorageService,
 } from "@fluidframework/driver-definitions";
 import {
-    BlobCacheStorageService,
-    buildSnapshotTree,
     readAndParse,
     readAndParseFromBlobs,
 } from "@fluidframework/driver-utils";
@@ -151,8 +149,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private loaded = false;
     private _attachState = AttachState.Detached;
     private blobManager: BlobManager | undefined;
-
-    private blobsCacheStorageService: IDocumentStorageService | undefined;
 
     private _clientId: string | undefined;
     private readonly _documentId: string | undefined;
@@ -357,7 +353,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get storage(): IDocumentStorageService {
-        return this.blobsCacheStorageService ?? this.storageService;
+        return this.storageService;
     }
 
     /**
@@ -369,58 +365,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.emit("warning", warning);
     }
 
-    public async reloadContext(): Promise<void> {
-        return this.reloadContextCore().catch((error) => {
-            this.close(CreateContainerError(error));
-            throw error;
-        });
-    }
-
     public hasNullRuntime() {
         return this.context.hasNullRuntime();
-    }
-
-    private async reloadContextCore(): Promise<void> {
-        await Promise.all([
-            this.deltaManager.inbound.systemPause(),
-            this.deltaManager.inboundSignal.systemPause()]);
-
-        const previousContextState = await this.context.snapshotRuntimeState();
-        this.context.dispose();
-
-        let snapshot: ISnapshotTree | undefined;
-        const blobs = new Map();
-        if (previousContextState.snapshot !== undefined) {
-            snapshot = await buildSnapshotTree(previousContextState.snapshot.entries, blobs);
-
-            /**
-             * Should be removed / updated after issue #2914 is fixed.
-             * There are currently two scenarios where this is called:
-             * 1. When a new code proposal is accepted - This should be set to true before `this.loadContext` is
-             * called which creates and loads the ContainerRuntime. This is because for "read" mode clients this
-             * flag is false which causes ContainerRuntime to create the internal compoents again.
-             * 2. When the first client connects in "write" mode - This happens when a clent does not create the
-             * Container in detached mode. In this case, when the code proposal is accepted, we come here and we
-             * need to create the internal data stores in ContainerRuntime.
-             * Once we move to using detached container everywhere, this can move outside this block.
-             */
-            this._existing = true;
-        }
-
-        if (blobs.size > 0) {
-            this.blobsCacheStorageService = new BlobCacheStorageService(this.storageService, Promise.resolve(blobs));
-        }
-        const attributes: IDocumentAttributes = {
-            branch: this.id,
-            minimumSequenceNumber: this._deltaManager.minimumSequenceNumber,
-            sequenceNumber: this._deltaManager.lastSequenceNumber,
-            term: this._deltaManager.referenceTerm,
-        };
-
-        await this.loadContext(attributes, snapshot, previousContextState);
-
-        this.deltaManager.inbound.systemResume();
-        this.deltaManager.inboundSignal.systemResume();
     }
 
     private async getVersion(version: string): Promise<IVersion | undefined> {

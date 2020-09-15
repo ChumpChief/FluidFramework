@@ -140,7 +140,6 @@ export interface IContainerContext extends IDisposable {
     readonly previousRuntimeState: IRuntimeState;
 
     raiseContainerWarning(warning: ContainerWarning): void;
-    reloadContext(): Promise<void>;
 
     /**
      * Get an absolute url for a provided container-relative request.

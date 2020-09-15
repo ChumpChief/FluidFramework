@@ -249,10 +249,6 @@ export class ContainerContext implements IContainerContext {
         return;
     }
 
-    public async reloadContext(): Promise<void> {
-        return this.container.reloadContext();
-    }
-
     public hasNullRuntime() {
         return this.runtime instanceof NullRuntime;
     }
