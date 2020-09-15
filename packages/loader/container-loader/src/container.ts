@@ -36,9 +36,6 @@ import {
 import {
     IDocumentService,
     IDocumentStorageService,
-    IFluidResolvedUrl,
-    IDocumentServiceFactory,
-    IResolvedUrl,
 } from "@fluidframework/driver-definitions";
 import {
     BlobCacheStorageService,
@@ -157,15 +154,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public static async load(
         documentId: string,
-        serviceFactory: IDocumentServiceFactory,
+        documentService: IDocumentService,
         containerRuntimeFactory: IRuntimeFactory,
-        resolvedUrl: IFluidResolvedUrl,
     ): Promise<Container> {
         const container = new Container(
             containerRuntimeFactory,
-            serviceFactory,
+            documentService,
             decodeURI(documentId),
-            resolvedUrl,
         );
         await container.load();
         return container;
@@ -194,7 +189,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private readonly _id: string | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
-    private service: IDocumentService | undefined;
     private _parentBranch: string | null = null;
     private _connectionState = ConnectionState.Disconnected;
     private readonly _audience: Audience;
@@ -217,7 +211,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private resumedOpProcessingAfterLoad = false;
     private _loadedFromVersion: IVersion | undefined;
-    private readonly _resolvedUrl: IResolvedUrl;
 
     private _closed = false;
 
@@ -324,16 +317,14 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     constructor(
         private readonly containerRuntimeFactory: IRuntimeFactory,
-        private readonly serviceFactory: IDocumentServiceFactory,
+        private readonly documentService: IDocumentService,
         documentId: string,
-        resolvedUrl: IFluidResolvedUrl,
         logger?: ITelemetryBaseLogger,
     ) {
         super();
         this._audience = new Audience();
 
         this._id = documentId;
-        this._resolvedUrl = resolvedUrl;
         this._canReconnect = true;
 
         // Create logger for data stores to use
@@ -685,8 +676,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @param pause - start the container in a paused state
      */
     private async load() {
-        this.service = await this.serviceFactory.createDocumentService(this._resolvedUrl, this.subLogger);
-
         // Ideally we always connect as "read" by default.
         // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.
         // We should not rely on it by (one of them will address the issue, but we need to address both)
@@ -759,10 +748,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async getDocumentStorageService(): Promise<IDocumentStorageService> {
-        if (this.service === undefined) {
-            throw new Error("Not attached");
-        }
-        const storageService = await this.service.connectToStorage();
+        const storageService = await this.documentService.connectToStorage();
         return new PrefetchDocumentStorageService(storageService);
     }
 
@@ -933,7 +919,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private createDeltaManager() {
         const deltaManager = new DeltaManager(
-            () => this.service,
+            () => this.documentService,
             this.client,
             ChildLogger.create(this.subLogger, "DeltaManager"),
             this.canReconnect,

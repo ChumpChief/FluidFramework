@@ -84,11 +84,12 @@ export async function getTinyliciousContainer(
 
     const request = { url: documentId };
     const resolved = await urlResolver.resolve(request);
+    const documentService = await documentServiceFactory.createDocumentService(resolved);
+
     const container = await Container.load(
         documentId,
-        documentServiceFactory,
+        documentService,
         containerRuntimeFactory,
-        resolved,
     );
 
     return container;
