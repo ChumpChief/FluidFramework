@@ -159,19 +159,10 @@ export class SnapshotLoader {
     }
 
     private async loadBody(chunk1: MergeTreeChunkV1, services: IChannelStorageService): Promise<void> {
-        this.runtime.logger.shipAssert(
-            chunk1.length <= chunk1.headerMetadata.totalLength,
-            { eventName: "Mismatch in totalLength" });
-
-        this.runtime.logger.shipAssert(
-            chunk1.segmentCount <= chunk1.headerMetadata.totalSegmentCount,
-            { eventName: "Mismatch in totalSegmentCount" });
-
         if (chunk1.segmentCount === chunk1.headerMetadata.totalSegmentCount) {
             return;
         }
         const segs: ISegment[] = [];
-        let lengthSofar = chunk1.length;
         for (let chunkIndex = 1; chunkIndex < chunk1.headerMetadata.orderedChunkMetadata.length; chunkIndex++) {
             const chunk = await SnapshotV1.loadChunk(
                 services,
@@ -180,17 +171,9 @@ export class SnapshotLoader {
                 this.mergeTree.options,
                 this.runtime.IFluidSerializer,
                 this.runtime.IFluidHandleContext);
-            lengthSofar += chunk.length;
             // Deserialize each chunk segment and append it to the end of the MergeTree.
             segs.push(...chunk.segments.map(this.specToSegment));
         }
-        this.runtime.logger.shipAssert(
-            lengthSofar === chunk1.headerMetadata.totalLength,
-            { eventName: "Mismatch in totalLength" });
-
-        this.runtime.logger.shipAssert(
-            chunk1.segmentCount + segs.length === chunk1.headerMetadata.totalSegmentCount,
-            { eventName: "Mismatch in totalSegmentCount" });
 
         // Helper to insert segments at the end of the MergeTree.
         const mergeTree = this.mergeTree;

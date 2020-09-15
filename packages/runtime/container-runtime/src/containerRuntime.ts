@@ -6,7 +6,6 @@
 import { strict as assert } from "assert";
 import { EventEmitter } from "events";
 import { TaskManagerFactory } from "@fluidframework/agent-scheduler";
-import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
     IFluidRouter,
     IFluidHandleContext,
@@ -35,7 +34,6 @@ import {
     unreachableCase,
 } from "@fluidframework/common-utils";
 import {
-    ChildLogger,
     raiseConnectedEvent,
 } from "@fluidframework/telemetry-utils";
 import { IDocumentStorageService, ISummaryContext } from "@fluidframework/driver-definitions";
@@ -115,7 +113,6 @@ import { ISummarizerRuntime, Summarizer } from "./summarizer";
 import { SummaryManager, summarizerClientType } from "./summaryManager";
 import { analyzeTasks } from "./taskAnalyzer";
 import { DeltaScheduler } from "./deltaScheduler";
-import { ReportOpPerfTelemetry } from "./connectionTelemetry";
 import { SummaryCollection } from "./summaryCollection";
 import { PendingStateManager } from "./pendingStateManager";
 import { pkgVersion } from "./packageVersion";
@@ -268,11 +265,9 @@ export class ScheduleManager {
     constructor(
         private readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         private readonly emitter: EventEmitter,
-        private readonly logger: ITelemetryLogger,
     ) {
         this.deltaScheduler = new DeltaScheduler(
             this.deltaManager,
-            ChildLogger.create(this.logger, "DeltaScheduler"),
         );
 
         // Listen for delta manager sends and add batch metadata to messages
@@ -322,12 +317,6 @@ export class ScheduleManager {
             if (this.batchClientId) {
                 this.emitter.emit("batchEnd", "Did not receive real batchEnd message", undefined);
                 this.deltaScheduler.batchEnd();
-
-                this.logger.sendTelemetryEvent({
-                    eventName: "BatchEndNotReceived",
-                    clientId: this.batchClientId,
-                    sequenceNumber: message.sequenceNumber,
-                });
             }
 
             // This could be the beginning of a new batch or an individual message.
@@ -586,10 +575,6 @@ export class ContainerRuntime extends EventEmitter
 
     public readonly IFluidHandleContext: IFluidHandleContext;
 
-    // internal logger for ContainerRuntime
-    private readonly _logger: ITelemetryLogger;
-    // publicly visible logger, to be used by stores, summarize, etc.
-    public readonly logger: ITelemetryLogger;
     public readonly previousState: IPreviousState;
     private readonly summaryManager: SummaryManager;
     private latestSummaryAck: ISummaryContext;
@@ -676,12 +661,6 @@ export class ContainerRuntime extends EventEmitter
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
-        this.logger = ChildLogger.create(context.logger, undefined, {
-            runtimeVersion: pkgVersion,
-        });
-
-        this._logger = ChildLogger.create(this.logger, "ContainerRuntime");
-
         this.latestSummaryAck = {
             proposalHandle: undefined,
             ackHandle: this.context.getLoadedFromVersion()?.id,
@@ -698,7 +677,6 @@ export class ContainerRuntime extends EventEmitter
         const enableSummarizerNode = this.runtimeOptions.enableSummarizerNode
             ?? (typeof localStorage === "object" && localStorage?.fluidDisableSummarizerNode ? false : true);
         const summarizerNode = SummarizerNode.createRoot(
-            this.logger,
             // Summarize function to call when summarize is called
             async (fullTree: boolean) => this.summarizeInternal(fullTree),
             // Latest change sequence number, no changes since summary applied yet
@@ -795,7 +773,6 @@ export class ContainerRuntime extends EventEmitter
         this.scheduleManager = new ScheduleManager(
             context.deltaManager,
             this,
-            ChildLogger.create(this.logger, "ScheduleManager"),
         );
 
         this.deltaSender = this.deltaManager;
@@ -830,7 +807,6 @@ export class ContainerRuntime extends EventEmitter
             context,
             this.runtimeOptions.generateSummaries !== false,
             !!this.runtimeOptions.enableWorker,
-            this.logger,
             (summarizer) => { this.nextSummarizerP = summarizer; },
             this.previousState.nextSummarizerP,
             !!this.previousState.reload,
@@ -864,8 +840,6 @@ export class ContainerRuntime extends EventEmitter
                 this.pendingStateManager.replayPendingStates();
             }
         });
-
-        ReportOpPerfTelemetry(this.context.clientId, this.deltaManager, this.logger);
     }
 
     public dispose(): void {
@@ -878,16 +852,10 @@ export class ContainerRuntime extends EventEmitter
         this.summarizer.dispose();
 
         // close/stop all store contexts
-        for (const [fluidDataStoreId, contextD] of this.contextsDeferred) {
+        for (const [, contextD] of this.contextsDeferred) {
             contextD.promise.then((context) => {
                 context.dispose();
-            }).catch((contextError) => {
-                this._logger.sendErrorEvent({
-                    eventName: "FluidDataStoreContextDisposeError",
-                    fluidDataStoreId,
-                },
-                    contextError);
-            });
+            }).catch((contextError) => { });
         }
 
         this.emit("dispose");
@@ -1050,16 +1018,10 @@ export class ContainerRuntime extends EventEmitter
             this.pendingStateManager.replayPendingStates();
         }
 
-        for (const [fluidDataStore, context] of this.contexts) {
+        for (const [, context] of this.contexts) {
             try {
                 context.setConnectionState(connected, clientId);
-            } catch (error) {
-                this._logger.sendErrorEvent({
-                    eventName: "ChangeConnectionStateError",
-                    clientId,
-                    fluidDataStore,
-                }, error);
-            }
+            } catch (error) { }
         }
 
         raiseConnectedEvent(this, connected, clientId);
@@ -1152,10 +1114,6 @@ export class ContainerRuntime extends EventEmitter
         if (!context) {
             // Attach message may not have been processed yet
             assert(!local);
-            this._logger.sendTelemetryEvent({
-                eventName: "SignalFluidDataStoreNotFound",
-                fluidDataStoreId: envelope.address,
-            });
             return;
         }
 
@@ -1616,10 +1574,6 @@ export class ContainerRuntime extends EventEmitter
 
         // TODO: Issue-2171 Support for Branch Snapshots
         if (this.parentBranch) {
-            this._logger.sendTelemetryEvent({
-                eventName: "SkipGenerateSummaryParentBranch",
-                parentBranch: this.parentBranch,
-            });
             return;
         }
 
@@ -1844,9 +1798,6 @@ export class ContainerRuntime extends EventEmitter
         // That said, we can preserve existing behavior by not flushing existing buffer.
         // That might be not what caller hopes to get, but we can look deeper if telemetry tells us it's a problem.
         const middleOfBatch = this.flushMode === FlushMode.Manual && this.needsFlush;
-        if (middleOfBatch) {
-            this._logger.sendErrorEvent({ eventName: "submitSystemMessageError", type });
-        }
 
         return this.context.submitFn(
             type,

@@ -5,7 +5,6 @@
 
 import { strict as assert } from "assert";
 import { EventEmitter } from "events";
-import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
     IFluidHandle,
     IFluidHandleContext,
@@ -27,7 +26,6 @@ import {
     unreachableCase,
 } from "@fluidframework/common-utils";
 import {
-    ChildLogger,
     raiseConnectedEvent,
 } from "@fluidframework/telemetry-utils";
 import { buildSnapshotTree, readAndParseFromBlobs } from "@fluidframework/driver-utils";
@@ -91,7 +89,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         context: IFluidDataStoreContext,
         sharedObjectRegistry: ISharedObjectRegistry,
     ): FluidDataStoreRuntime {
-        const logger = ChildLogger.create(context.containerRuntime.logger, undefined, { dataStoreId: uuid() });
         const runtime = new FluidDataStoreRuntime(
             context as IFluidDataStoreContextType,
             context.documentId,
@@ -104,7 +101,7 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             context.getQuorum(),
             context.getAudience(),
             sharedObjectRegistry,
-            logger);
+        );
 
         return runtime;
     }
@@ -186,7 +183,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         private readonly quorum: IQuorum,
         private readonly audience: IAudience,
         private readonly sharedObjectRegistry: ISharedObjectRegistry,
-        public readonly logger: ITelemetryLogger,
     ) {
         super();
 

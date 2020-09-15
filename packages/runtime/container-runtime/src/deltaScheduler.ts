@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import { performanceNow } from "@fluidframework/common-utils";
 import { IDeltaManager } from "@fluidframework/container-definitions";
 import {
@@ -51,7 +50,6 @@ export class DeltaScheduler {
 
     constructor(
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
-        private readonly logger: ITelemetryLogger,
     ) {
         this.deltaManager = deltaManager;
         this.deltaManager.inbound.on("idle", () => { this.inboundQueueIdle(); });
@@ -111,13 +109,6 @@ export class DeltaScheduler {
             // telemetry log object.
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             this.schedulingLog.totalProcessingTime += performanceNow() - this.processingStartTime!;
-
-            this.logger.sendTelemetryEvent({
-                eventName: "InboundOpsProcessingTime",
-                numberOfOps: this.schedulingLog.numberOfOps,
-                numberOfTurns: this.schedulingLog.numberOfTurns,
-                processingTime: this.schedulingLog.totalProcessingTime,
-            });
 
             this.schedulingLog = undefined;
         }

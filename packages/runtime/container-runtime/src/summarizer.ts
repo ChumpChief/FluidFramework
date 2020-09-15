@@ -92,7 +92,6 @@ export interface ISummarizer
 }
 
 export interface ISummarizerRuntime extends IConnectableRuntime {
-    readonly logger: ITelemetryLogger;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly previousState: IPreviousState;
     readonly summarizerClientId: string | undefined;
@@ -598,7 +597,7 @@ export class Summarizer extends EventEmitter implements ISummarizer {
         summaryCollection?: SummaryCollection,
     ) {
         super();
-        this.logger = ChildLogger.create(this.runtime.logger, "Summarizer");
+        this.logger = ChildLogger.create(undefined, "Summarizer");
         this.runCoordinator = new RunWhileConnectedCoordinator(runtime);
         if (summaryCollection) {
             // summarize immediately because we just went through context reload

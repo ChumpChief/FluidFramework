@@ -5,7 +5,6 @@
 
 import { strict as assert } from "assert";
 import { EventEmitter } from "events";
-import uuid from "uuid";
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IAudience,
@@ -24,10 +23,8 @@ import {
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
-    ChildLogger,
     EventEmitterWithErrorHandling,
     raiseConnectedEvent,
-    TelemetryLogger,
 } from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
@@ -71,7 +68,6 @@ import { BlobManager } from "./blobManager";
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
-import { pkgVersion } from "./packageVersion";
 import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
 
 export enum ConnectionState {
@@ -160,8 +156,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         await container.load();
         return container;
     }
-
-    public subLogger: TelemetryLogger;
 
     private pendingClientId: string | undefined;
     private loaded = false;
@@ -306,26 +300,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._audience = new Audience();
 
         this._documentId = documentId;
-
-        // Create logger for data stores to use
-        const type = this.client.details.type;
-        const interactive = this.client.details.capabilities.interactive;
-        const clientType =
-            `${interactive ? "interactive" : "noninteractive"}${type !== undefined && type !== "" ? `/${type}` : ""}`;
-        // Need to use the property getter for docId because for detached flow we don't have the docId initially.
-        // We assign the id later so property getter is used.
-        this.subLogger = ChildLogger.create(
-            undefined,
-            undefined,
-            {
-                clientType, // Differentiating summarizer container from main container
-                loaderVersion: pkgVersion,
-                containerId: uuid(),
-            },
-            {
-                docId: () => this.id,
-                containerAttachState: () => this._attachState,
-            });
 
         this._deltaManager = this.createDeltaManager();
     }
@@ -651,12 +625,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             values,
             (key, value) => this.submitMessage(MessageType.Propose, { key, value }),
             (sequenceNumber) => this.submitMessage(MessageType.Reject, sequenceNumber));
-
-        const protocolLogger = ChildLogger.create(this.subLogger, "ProtocolHandler");
-
-        protocol.quorum.on("error", (error) => {
-            protocolLogger.sendErrorEvent(error);
-        });
 
         // Track membership changes and update connection state accordingly
         protocol.quorum.on("addMember", (clientId, details) => {

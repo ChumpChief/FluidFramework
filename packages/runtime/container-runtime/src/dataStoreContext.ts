@@ -229,11 +229,7 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         if (this.channelDeferred) {
             this.channelDeferred.promise.then((runtime) => {
                 runtime.dispose();
-            }).catch((error) => {
-                this._containerRuntime.logger.sendErrorEvent(
-                    { eventName: "ChannelDisposeError", fluidDataStoreId: this.id },
-                    error);
-            });
+            }).catch((error) => { });
         }
     }
 

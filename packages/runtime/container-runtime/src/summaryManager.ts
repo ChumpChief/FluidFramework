@@ -167,7 +167,6 @@ export class SummaryManager extends EventEmitter implements IDisposable {
         private readonly context: IContainerContext,
         private readonly summariesEnabled: boolean,
         private readonly enableWorker: boolean,
-        parentLogger: ITelemetryLogger,
         private readonly setNextSummarizer: (summarizer: Promise<Summarizer>) => void,
         private nextSummarizerP?: Promise<Summarizer>,
         immediateSummary: boolean = false,
@@ -176,7 +175,7 @@ export class SummaryManager extends EventEmitter implements IDisposable {
         super();
 
         this.logger = ChildLogger.create(
-            parentLogger,
+            undefined,
             "SummaryManager",
             undefined,
             { clientId: () => this.latestClientId });

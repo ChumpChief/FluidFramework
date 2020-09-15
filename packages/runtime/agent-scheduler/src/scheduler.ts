@@ -247,9 +247,7 @@ class AgentScheduler extends EventEmitter implements IAgentScheduler {
         if (!this.runtime.IFluidHandleContext.isAttached) {
             this.runtime.waitAttached().then(() => {
                 this.clearRunningTasks();
-            }).catch((error) => {
-                this.sendErrorEvent("AgentScheduler_clearRunningTasks", error);
-            });
+            }).catch((error) => { });
         }
 
         this.runtime.on("disconnected", () => {
@@ -263,14 +261,9 @@ class AgentScheduler extends EventEmitter implements IAgentScheduler {
         assert(!this.runningTasks.has(key), "task is already running");
         this.runningTasks.add(key);
         const worker = this.locallyRunnableTasks.get(key);
-        if (worker === undefined) {
-            this.sendErrorEvent("AgentScheduler_UnwantedChange", undefined, key);
-        }
-        else {
+        if (worker !== undefined) {
             this.emit("picked", key);
-            worker().catch((error) => {
-                this.sendErrorEvent("AgentScheduler_FailedWork", error, key);
-            });
+            worker().catch((error) => { });
         }
     }
 
@@ -338,9 +331,7 @@ class AgentScheduler extends EventEmitter implements IAgentScheduler {
 
         tasks.push(this.clearTasks(clearCandidates));
 
-        Promise.all(tasks).catch((error) => {
-            this.sendErrorEvent("AgentScheduler_InitError", error);
-        });
+        Promise.all(tasks).catch((error) => { });
     }
 
     private clearRunningTasks() {
@@ -356,10 +347,6 @@ class AgentScheduler extends EventEmitter implements IAgentScheduler {
         for (const task of tasks) {
             this.emit("lost", task);
         }
-    }
-
-    private sendErrorEvent(eventName: string, error: any, key?: string) {
-        this.runtime.logger.sendErrorEvent({ eventName, key }, error);
     }
 }
 

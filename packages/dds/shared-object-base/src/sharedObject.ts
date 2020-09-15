@@ -95,8 +95,7 @@ export abstract class SharedObject<TEvent extends ISharedObjectEvents = ISharedO
         // Runtime could be null since some package hasn't turn on strictNullChecks yet
         // We should remove the null check once that is done
         this.logger = ChildLogger.create(
-            // eslint-disable-next-line no-null/no-null
-            runtime !== null ? runtime.logger : undefined, undefined, { sharedObjectId: uuid() });
+            undefined, undefined, { sharedObjectId: uuid() });
 
         this.attachListeners();
     }

@@ -5,7 +5,6 @@
 
 import { strict as assert } from "assert";
 import { EventEmitter } from "events";
-import { DebugLogger } from "@fluidframework/telemetry-utils";
 import {
     IDocumentMessage,
     ISequencedDocumentMessage,
@@ -31,7 +30,6 @@ describe("Runtime", () => {
                     scheduleManager = new ScheduleManager(
                         deltaManager,
                         emitter,
-                        DebugLogger.create("fluid:testScheduleManager"),
                     );
 
                     emitter.on("batchBegin", () => {

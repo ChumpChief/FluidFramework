@@ -4,7 +4,6 @@
  */
 
 import { strict as assert } from "assert";
-import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
     IFluidConfiguration,
     IRequest,
@@ -77,8 +76,6 @@ export class ContainerContext implements IContainerContext {
         await context.load();
         return context;
     }
-
-    public readonly logger: ITelemetryLogger;
 
     public get id(): string {
         return this.container.id;
@@ -179,7 +176,6 @@ export class ContainerContext implements IContainerContext {
         public readonly version: string,
         public readonly previousRuntimeState: IRuntimeState,
     ) {
-        this.logger = container.subLogger;
         this.attachListener();
     }
 

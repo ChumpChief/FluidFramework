@@ -27,7 +27,6 @@ describe("snapshot", () => {
 
         const client2 = new TestClient(undefined);
         const runtime: Partial<IFluidDataStoreRuntime> = {
-            logger: client2.logger,
             clientId: "1",
         };
         await client2.load(runtime as IFluidDataStoreRuntime, services);
@@ -56,7 +55,6 @@ describe("snapshot", () => {
             const snapshotTree = snapshot.emit([]);
             const services = new MockStorage(snapshotTree);
             const runtime: Partial<IFluidDataStoreRuntime> = {
-                logger: client2.logger,
                 clientId: (i + 1).toString(),
             };
             await client2.load(runtime as IFluidDataStoreRuntime, services);

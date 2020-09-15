@@ -64,7 +64,6 @@ export class TestClient extends Client {
         const { catchupOpsP } = await client2.load(
             // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
             {
-                logger: client2.logger,
                 clientId: newLongClientId,
             } as IFluidDataStoreRuntime,
             services);

@@ -19,13 +19,11 @@ import {
     ISnapshotTree,
     IDocumentAttributes,
 } from "@fluidframework/protocol-definitions";
-import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import { unreachableCase } from "@fluidframework/common-utils";
 import { mergeStats, SummaryTreeBuilder, convertToSummaryTree, calculateStats } from "./summaryUtils";
 
 const baseSummaryTreeKey = "_baseSummary";
 const outstandingOpsBlobKey = "_outstandingOps";
-const maxDecodeDepth = 100;
 
 /** Reads a blob from storage and parses it from JSON. */
 export type ReadAndParseBlob = <T>(id: string) => Promise<T>;
@@ -124,18 +122,12 @@ interface IDecodedSummary {
  * their base path when necessary.
  * @param snapshot - snapshot tree to decode
  */
-function decodeSummary(snapshot: ISnapshotTree, logger: Pick<ITelemetryLogger, "sendTelemetryEvent">): IDecodedSummary {
+function decodeSummary(snapshot: ISnapshotTree): IDecodedSummary {
     let baseSummary = snapshot;
     const pathParts: string[] = [];
     const opsBlobs: string[] = [];
 
     for (let i = 0; ; i++) {
-        if (i > maxDecodeDepth) {
-            logger.sendTelemetryEvent({
-                eventName: "DecodeSummaryMaxDepth",
-                maxDecodeDepth,
-            });
-        }
         const outstandingOpsBlob = baseSummary.blobs[outstandingOpsBlobKey];
         const newBaseSummary = baseSummary.trees[baseSummaryTreeKey];
         if (outstandingOpsBlob === undefined && newBaseSummary === undefined) {
@@ -472,7 +464,7 @@ export class SummarizerNode implements ISummarizerNode {
     ): void {
         this.refreshLatestSummaryCore(referenceSequenceNumber);
 
-        const { baseSummary, pathParts } = decodeSummary(snapshotTree, this.logger);
+        const { baseSummary, pathParts } = decodeSummary(snapshotTree);
 
         this.latestSummary = new SummaryNode({
             referenceSequenceNumber,
@@ -520,7 +512,7 @@ export class SummarizerNode implements ISummarizerNode {
         snapshot: ISnapshotTree,
         readAndParseBlob: ReadAndParseBlob,
     ): Promise<{ baseSummary: ISnapshotTree, outstandingOps: ISequencedDocumentMessage[] }> {
-        const decodedSummary = decodeSummary(snapshot, this.logger);
+        const decodedSummary = decodeSummary(snapshot);
         const outstandingOps = await decodedSummary.getOutstandingOps(readAndParseBlob);
 
         if (outstandingOps.length > 0) {
@@ -585,7 +577,6 @@ export class SummarizerNode implements ISummarizerNode {
     private readonly canReuseHandle: boolean;
     private readonly throwOnError: boolean;
     private constructor(
-        private readonly logger: ITelemetryLogger,
         private readonly summarizeInternalFn: (fullTree: boolean) => Promise<ISummarizeInternalResult>,
         private readonly disabled: boolean,
         config: ISummarizerNodeConfig,
@@ -600,7 +591,6 @@ export class SummarizerNode implements ISummarizerNode {
     }
 
     public static createRoot(
-        logger: ITelemetryLogger,
         /** Summarize function */
         summarizeInternalFn: (fullTree: boolean) => Promise<ISummarizeInternalResult>,
         /** Sequence number of latest change to new node/subtree */
@@ -620,7 +610,6 @@ export class SummarizerNode implements ISummarizerNode {
             localPath: EscapedPath.create(""), // root hard-coded to ""
         });
         return new SummarizerNode(
-            logger,
             summarizeInternalFn,
             disabled,
             config,
@@ -666,7 +655,6 @@ export class SummarizerNode implements ISummarizerNode {
                     };
                 }
                 child = new SummarizerNode(
-                    this.logger,
                     summarizeInternalFn,
                     this.disabled,
                     config,
@@ -709,7 +697,6 @@ export class SummarizerNode implements ISummarizerNode {
                     };
                 }
                 child = new SummarizerNode(
-                    this.logger,
                     summarizeInternalFn,
                     this.disabled || createParam.type === CreateSummarizerNodeSource.Local,
                     config,

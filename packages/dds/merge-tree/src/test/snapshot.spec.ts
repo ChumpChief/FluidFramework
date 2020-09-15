@@ -16,7 +16,6 @@ async function loadSnapshot(tree: ITree) {
     const services = new MockStorage(tree);
     const client2 = new TestClient(undefined);
     const runtime: Partial<IFluidDataStoreRuntime> = {
-        logger: client2.logger,
         clientId: "1",
     };
 

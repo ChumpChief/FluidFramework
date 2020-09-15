@@ -9,7 +9,7 @@ import {
     IRequest,
     IResponse,
 } from "@fluidframework/core-interfaces";
-import { ISharedDirectory, MapFactory, SharedDirectory } from "@fluidframework/map";
+import { ISharedDirectory, SharedDirectory } from "@fluidframework/map";
 import { ITaskManager } from "@fluidframework/runtime-definitions";
 import { v4 as uuid } from "uuid";
 import { IEvent } from "@fluidframework/common-definitions";
@@ -80,10 +80,6 @@ export abstract class DataObject<P extends IFluidObject = object, S = undefined,
      * In future blobs would be implemented as first class citizen, using blob storage APIs
      */
     protected async writeBlob(blob: string): Promise<IFluidHandle<string>> {
-        this.runtime.logger.sendTelemetryEvent({
-            eventName: "WriteBlob",
-            size: blob.length,
-        });
         const path = `${this.bigBlobs}${uuid()}`;
         this.root.set(path, blob);
         return new BlobHandle(path, this.root, this.runtime.IFluidHandleContext);
@@ -104,17 +100,6 @@ export abstract class DataObject<P extends IFluidObject = object, S = undefined,
         } else {
             // data store has a root directory so we just need to set it before calling initializingFromExisting
             this.internalRoot = await this.runtime.getChannel(this.rootDirectoryId) as ISharedDirectory;
-
-            // This will actually be an ISharedMap if the channel was previously created by the older version of
-            // DataObject which used a SharedMap.  Since SharedMap and SharedDirectory are compatible unless
-            // SharedDirectory-only commands are used on SharedMap, this will mostly just work for compatibility.
-            if (this.internalRoot.attributes.type === MapFactory.Type) {
-                this.runtime.logger.send({
-                    category: "generic",
-                    eventName: "MapDataObject",
-                    message: "Legacy document, SharedMap is masquerading as SharedDirectory in DataObject",
-                });
-            }
         }
 
         await super.initializeInternal(props);
