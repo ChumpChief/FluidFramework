@@ -65,7 +65,6 @@ import {
 } from "./dataStoreContext";
 import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
-import { DeltaScheduler } from "./deltaScheduler";
 import { PendingStateManager } from "./pendingStateManager";
 import { pkgVersion } from "./packageVersion";
 
@@ -80,10 +79,6 @@ export enum ContainerMessageType {
 export interface ContainerRuntimeMessage {
     contents: any;
     type: ContainerMessageType;
-}
-
-interface IRuntimeMessageMetadata {
-    batch?: boolean;
 }
 
 export function isRuntimeMessage(message: ISequencedDocumentMessage): boolean {
@@ -116,70 +111,6 @@ export function unpackRuntimeMessage(message: ISequencedDocumentMessage) {
         // Nothing to do in such case.
     }
     return message;
-}
-
-export class ScheduleManager {
-    private readonly deltaScheduler: DeltaScheduler;
-    private batchClientId: string | undefined;
-
-    constructor(
-        private readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
-        private readonly emitter: EventEmitter,
-    ) {
-        this.deltaScheduler = new DeltaScheduler(
-            this.deltaManager,
-        );
-    }
-
-    public beginOperation(message: ISequencedDocumentMessage) {
-        if (this.batchClientId !== message.clientId) {
-            // As a back stop for any bugs marking the end of a batch - if the client ID flipped, we
-            // consider the previous batch over.
-            if (this.batchClientId) {
-                this.emitter.emit("batchEnd", "Did not receive real batchEnd message", undefined);
-                this.deltaScheduler.batchEnd();
-            }
-
-            // This could be the beginning of a new batch or an individual message.
-            this.emitter.emit("batchBegin", message);
-            this.deltaScheduler.batchBegin();
-
-            const batch = (message?.metadata as IRuntimeMessageMetadata)?.batch;
-            if (batch) {
-                this.batchClientId = message.clientId;
-            } else {
-                this.batchClientId = undefined;
-            }
-        }
-    }
-
-    public endOperation(error: any | undefined, message: ISequencedDocumentMessage) {
-        if (error) {
-            this.batchClientId = undefined;
-            this.emitter.emit("batchEnd", error, message);
-            this.deltaScheduler.batchEnd();
-            return;
-        }
-
-        const batch = (message?.metadata as IRuntimeMessageMetadata)?.batch;
-        // If no batchClientId has been set then we're in an individual batch. Else, if we get
-        // batch end metadata, this is end of the current batch.
-        if (!this.batchClientId || batch === false) {
-            this.batchClientId = undefined;
-            this.emitter.emit("batchEnd", undefined, message);
-            this.deltaScheduler.batchEnd();
-            return;
-        }
-    }
-
-    // eslint-disable-next-line @typescript-eslint/promise-function-async
-    public pause(): Promise<void> {
-        return this.deltaManager.inbound.systemPause();
-    }
-
-    public resume() {
-        this.deltaManager.inbound.systemResume();
-    }
 }
 
 // Wraps the provided list of packages and augments with some system level services.
@@ -292,7 +223,6 @@ export class ContainerRuntime extends EventEmitter
 
     // Stores tracked by the Domain
     private readonly pendingAttach = new Map<string, IAttachMessage>();
-    private readonly scheduleManager: ScheduleManager;
     private readonly pendingStateManager: PendingStateManager;
 
     // Attached and loaded context proxies
@@ -325,11 +255,6 @@ export class ContainerRuntime extends EventEmitter
             );
             this.setNewContext(key, dataStoreContext);
         }
-
-        this.scheduleManager = new ScheduleManager(
-            context.deltaManager,
-            this,
-        );
 
         this.pendingStateManager = new PendingStateManager(this);
 
@@ -469,38 +394,24 @@ export class ContainerRuntime extends EventEmitter
         // but would not modify contents details
         let message = { ...messageArg };
 
-        let error: any | undefined;
+        message = unpackRuntimeMessage(message);
 
-        // Surround the actual processing of the operation with messages to the schedule manager indicating
-        // the beginning and end. This allows it to emit appropriate events and/or pause the processing of new
-        // messages once a batch has been fully processed.
-        this.scheduleManager.beginOperation(message);
-
-        try {
-            message = unpackRuntimeMessage(message);
-
-            let localMessageMetadata: unknown;
-            if (local) {
-                localMessageMetadata = this.pendingStateManager.processPendingLocalMessage(message);
-            }
-
-            switch (message.type) {
-                case ContainerMessageType.Attach:
-                    this.processAttachMessage(message, local, localMessageMetadata);
-                    break;
-                case ContainerMessageType.FluidDataStoreOp:
-                    this.processFluidDataStoreOp(message, local, localMessageMetadata);
-                    break;
-                default:
-            }
-
-            this.emit("op", message);
-        } catch (e) {
-            error = e;
-            throw e;
-        } finally {
-            this.scheduleManager.endOperation(error, message);
+        let localMessageMetadata: unknown;
+        if (local) {
+            localMessageMetadata = this.pendingStateManager.processPendingLocalMessage(message);
         }
+
+        switch (message.type) {
+            case ContainerMessageType.Attach:
+                this.processAttachMessage(message, local, localMessageMetadata);
+                break;
+            case ContainerMessageType.FluidDataStoreOp:
+                this.processFluidDataStoreOp(message, local, localMessageMetadata);
+                break;
+            default:
+        }
+
+        this.emit("op", message);
     }
 
     public processSignal(message: ISignalMessage, local: boolean) {
