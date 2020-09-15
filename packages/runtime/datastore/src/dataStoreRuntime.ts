@@ -109,10 +109,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         return this.dataStoreContext.connected;
     }
 
-    public get leader(): boolean {
-        return this.dataStoreContext.leader;
-    }
-
     public get clientId(): string | undefined {
         return this.dataStoreContext.clientId;
     }

@@ -10,7 +10,6 @@ import {
     IResponse,
 } from "@fluidframework/core-interfaces";
 import { ISharedDirectory, SharedDirectory } from "@fluidframework/map";
-import { ITaskManager } from "@fluidframework/runtime-definitions";
 import { v4 as uuid } from "uuid";
 import { IEvent } from "@fluidframework/common-definitions";
 import { BlobHandle } from "./blobHandle";
@@ -33,7 +32,6 @@ export abstract class DataObject<P extends IFluidObject = object, S = undefined,
     extends PureDataObject<P, S, E>
 {
     private internalRoot: ISharedDirectory | undefined;
-    private internalTaskManager: ITaskManager | undefined;
     private readonly rootDirectoryId = "root";
     private readonly bigBlobs = "bigBlobs/";
 
@@ -63,17 +61,6 @@ export abstract class DataObject<P extends IFluidObject = object, S = undefined,
     }
 
     /**
-     * Returns the built-in task manager responsible for scheduling tasks.
-     */
-    protected get taskManager(): ITaskManager {
-        if (!this.internalTaskManager) {
-            throw new Error(this.getUninitializedErrorString(`taskManager`));
-        }
-
-        return this.internalTaskManager;
-    }
-
-    /**
      * Temporary implementation of blobs.
      * Currently blobs are stored as properties on root map and we rely
      * on map doing proper snapshot blob partitioning to reuse non-changing big properties.
@@ -90,9 +77,6 @@ export abstract class DataObject<P extends IFluidObject = object, S = undefined,
      * Caller is responsible for ensuring this is only invoked once.
      */
     public async initializeInternal(props?: S): Promise<void> {
-        // Initialize task manager.
-        this.internalTaskManager = await this.context.containerRuntime.getTaskManager();
-
         if (!this.runtime.existing) {
             // Create a root directory and register it before calling initializingFirstTime
             this.internalRoot = SharedDirectory.create(this.runtime, this.rootDirectoryId);

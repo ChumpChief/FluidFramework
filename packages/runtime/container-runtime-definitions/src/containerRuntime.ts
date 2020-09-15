@@ -51,7 +51,6 @@ export interface IContainerRuntime extends
     readonly clientId: string | undefined;
     readonly clientDetails: IClientDetails;
     readonly connected: boolean;
-    readonly leader: boolean;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly blobManager: IBlobManager;
     readonly storage: IDocumentStorageService;

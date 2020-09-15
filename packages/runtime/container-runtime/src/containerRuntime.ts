@@ -39,7 +39,6 @@ import {
     BlobCacheStorageService,
     buildSnapshotTree,
 } from "@fluidframework/driver-utils";
-import { CreateContainerError } from "@fluidframework/container-utils";
 import {
     ConnectionState,
     IClientDetails,
@@ -62,13 +61,10 @@ import {
     IInboundSignalMessage,
     ISignalEnvelop,
     NamedFluidDataStoreRegistryEntries,
-    IAgentScheduler,
-    ITaskManager,
 } from "@fluidframework/runtime-definitions";
 import {
     FluidSerializer,
     RequestParser,
-    requestFluidObject,
 } from "@fluidframework/runtime-utils";
 import { v4 as uuid } from "uuid";
 import {
@@ -320,8 +316,6 @@ export class ScheduleManager {
     }
 }
 
-export const taskSchedulerId = "_scheduler";
-
 // Wraps the provided list of packages and augments with some system level services.
 class ContainerRuntimeDataStoreRegistry extends FluidDataStoreRegistry {
     constructor(namedEntries: NamedFluidDataStoreRegistryEntries) {
@@ -371,15 +365,8 @@ export class ContainerRuntime extends EventEmitter
             context,
             registry,
             chunks,
-            requestHandler);
-
-        // Create all internal data stores if not already existing on storage or loaded a detached
-        // container from snapshot(ex. draft mode).
-        if (!context.existing) {
-            await runtime.createRootDataStore(TaskManagerFactory.type, taskSchedulerId);
-        }
-
-        runtime.subscribeToLeadership();
+            requestHandler,
+        );
 
         return runtime;
     }
@@ -464,17 +451,10 @@ export class ContainerRuntime extends EventEmitter
     private needsFlush = false;
     private flushTrigger = false;
 
-    // Always matched IAgentScheduler.leader property
-    private _leader = false;
-
     private _connected: boolean;
 
     public get connected(): boolean {
         return this._connected;
-    }
-
-    public get leader(): boolean {
-        return this._leader;
     }
 
     private _disposed = false;
@@ -1218,55 +1198,5 @@ export class ContainerRuntime extends EventEmitter
         const context = this.getContext(envelope.address);
         assert(context, "There should be a store context for the op");
         context.reSubmit(envelope.contents, localOpMetadata);
-    }
-
-    private subscribeToLeadership() {
-        if (this.context.clientDetails.capabilities.interactive) {
-            this.getScheduler().then((scheduler) => {
-                const LeaderTaskId = "leader";
-
-                // Each client expresses interest to be a leader.
-                // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                scheduler.pick(LeaderTaskId, async () => {
-                    assert(!this._leader);
-                    this.updateLeader(true);
-                });
-
-                scheduler.on("lost", (key) => {
-                    if (key === LeaderTaskId) {
-                        assert(this._leader);
-                        this._leader = false;
-                        this.updateLeader(false);
-                    }
-                });
-            }).catch((err) => {
-                this.closeFn(CreateContainerError(err));
-            });
-        }
-    }
-
-    public async getTaskManager(): Promise<ITaskManager> {
-        return requestFluidObject<ITaskManager>(
-            await this.getDataStore(taskSchedulerId, true),
-            "");
-    }
-
-    public async getScheduler(): Promise<IAgentScheduler> {
-        const taskManager = await this.getTaskManager();
-        return taskManager.IAgentScheduler;
-    }
-
-    private updateLeader(leadership: boolean) {
-        this._leader = leadership;
-        if (this.leader) {
-            assert(this.clientId === undefined || this.connected && this.deltaManager && this.deltaManager.active);
-            this.emit("leader");
-        } else {
-            this.emit("notleader");
-        }
-
-        for (const [, context] of this.contexts) {
-            context.updateLeader(this.leader);
-        }
     }
 }

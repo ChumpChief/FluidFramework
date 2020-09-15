@@ -120,10 +120,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         return this._containerRuntime.connected;
     }
 
-    public get leader(): boolean {
-        return this._containerRuntime.leader;
-    }
-
     // Back-compat: supporting <= 0.16 stores
     public get connectionState(): ConnectionState {
         return this.connected ? ConnectionState.Connected : ConnectionState.Disconnected;
