@@ -61,11 +61,6 @@ export interface IRuntime extends IDisposable {
     request(request: IRequest): Promise<IResponse>;
 
     /**
-     * Snapshots the runtime
-     */
-    snapshot(tagMessage: string, fullTree?: boolean): Promise<ITree | null>;
-
-    /**
      * Notifies the runtime of a change in the connection state
      */
     setConnectionState(connected: boolean, clientId?: string);

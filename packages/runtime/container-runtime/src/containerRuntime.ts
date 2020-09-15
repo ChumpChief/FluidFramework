@@ -43,10 +43,6 @@ import {
 } from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
 import {
-    BlobTreeEntry,
-    TreeTreeEntry,
-} from "@fluidframework/protocol-base";
-import {
     ConnectionState,
     IClientDetails,
     IDocumentMessage,
@@ -55,7 +51,6 @@ import {
     ISequencedDocumentMessage,
     ISignalMessage,
     ISnapshotTree,
-    ITree,
     MessageType,
 } from "@fluidframework/protocol-definitions";
 import {
@@ -699,46 +694,6 @@ export class ContainerRuntime extends EventEmitter
             mimeType: "text/plain",
             value: "resource not found",
         };
-    }
-
-    /**
-     * Notifies this object to take the snapshot of the container.
-     * @param tagMessage - Message to supply to storage service for writing the snapshot.
-     */
-    public async snapshot(tagMessage: string, fullTree: boolean = false): Promise<ITree> {
-        // Iterate over each store and ask it to snapshot
-        const fluidDataStoreSnapshotsP = Array.from(this.contexts).map(async ([fluidDataStoreId, value]) => {
-            const snapshot = await value.snapshot(fullTree);
-
-            // If ID exists then previous commit is still valid
-            return {
-                fluidDataStoreId,
-                snapshot,
-            };
-        });
-
-        const root: ITree = { entries: [], id: null };
-
-        // Add in module references to the store snapshots
-        const fluidDataStoreSnapshots = await Promise.all(fluidDataStoreSnapshotsP);
-
-        // Sort for better diffing of snapshots (in replay tool, used to find bugs in snapshotting logic)
-        if (fullTree) {
-            fluidDataStoreSnapshots.sort((a, b) => a.fluidDataStoreId.localeCompare(b.fluidDataStoreId));
-        }
-
-        for (const fluidDataStoreSnapshot of fluidDataStoreSnapshots) {
-            root.entries.push(new TreeTreeEntry(
-                fluidDataStoreSnapshot.fluidDataStoreId,
-                fluidDataStoreSnapshot.snapshot,
-            ));
-        }
-
-        if (this.chunkMap.size > 0) {
-            root.entries.push(new BlobTreeEntry(chunksBlobName, JSON.stringify([...this.chunkMap])));
-        }
-
-        return root;
     }
 
     // Back-compat: <= 0.17

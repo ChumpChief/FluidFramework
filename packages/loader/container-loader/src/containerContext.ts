@@ -32,7 +32,6 @@ import {
     IServiceConfiguration,
     ISignalMessage,
     ISnapshotTree,
-    ITree,
     MessageType,
     IVersion,
 } from "@fluidframework/protocol-definitions";
@@ -106,10 +105,6 @@ export class ContainerContext implements IContainerContext {
 
     public get connected(): boolean {
         return this.container.connected;
-    }
-
-    public get canSummarize(): boolean {
-        return "summarize" in this.runtime;
     }
 
     public get serviceConfiguration(): IServiceConfiguration | undefined {
@@ -191,10 +186,6 @@ export class ContainerContext implements IContainerContext {
         this.runtime.dispose(error);
         this.quorum.dispose();
         this.deltaManager.dispose();
-    }
-
-    public async snapshot(tagMessage: string = "", fullTree: boolean = false): Promise<ITree | null> {
-        return this.runtime.snapshot(tagMessage, fullTree);
     }
 
     public getLoadedFromVersion(): IVersion | undefined {
