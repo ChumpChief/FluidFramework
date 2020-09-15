@@ -6,7 +6,6 @@
 import { EventEmitter } from "events";
 import { ITelemetryLogger, IDisposable } from "@fluidframework/common-definitions";
 import {
-    IFluidObject,
     IFluidRouter,
     IProvideFluidHandleContext,
     IProvideFluidSerializer,
@@ -262,10 +261,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
     readonly hostRuntime: IContainerRuntimeBase;
     readonly snapshotFn: (message: string) => Promise<void>;
 
-    /**
-     * Ambient services provided with the context
-     */
-    readonly scope: IFluidObject;
     readonly summaryTracker: ISummaryTracker;
 
     on(event: "leader" | "notleader" | "attaching" | "attached", listener: () => void): this;

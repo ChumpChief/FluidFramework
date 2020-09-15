@@ -52,10 +52,6 @@ export class BaseContainerRuntimeFactory implements
     public async instantiateRuntime(
         context: IContainerContext,
     ): Promise<IRuntime> {
-        // Create a scope object that passes through everything except for IFluidDependencySynthesizer
-        // which we will replace with the new one we just created.
-        const scope: any = context.scope;
-
         const runtime = await ContainerRuntime.load(
             context,
             this.registryEntries,
@@ -63,7 +59,7 @@ export class BaseContainerRuntimeFactory implements
                 ...this.requestHandlers,
                 deprecated_innerRequestHandler),
             undefined,
-            scope);
+        );
 
         if (!runtime.existing) {
             // If it's the first time through.

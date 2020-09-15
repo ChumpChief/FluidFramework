@@ -14,7 +14,6 @@ import {
     CreateChildSummarizerNodeFn,
     CreateSummarizerNodeSource,
 } from "@fluidframework/runtime-definitions";
-import { IFluidObject } from "@fluidframework/core-interfaces";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import { MockFluidDataStoreRuntime } from "@fluidframework/test-runtime-utils";
 import { SummaryTracker, SummarizerNode } from "@fluidframework/runtime-utils";
@@ -38,7 +37,6 @@ describe("Data Store Creation Tests", () => {
          */
 
         let storage: IDocumentStorageService;
-        let scope: IFluidObject;
         const attachCb = (mR: IFluidDataStoreChannel) => { };
         let containerRuntime: ContainerRuntime;
         const defaultName = "default";
@@ -120,7 +118,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
@@ -144,7 +141,6 @@ describe("Data Store Creation Tests", () => {
                 [dataStoreAName],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
@@ -168,7 +164,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
@@ -192,7 +187,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreBName],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
@@ -216,7 +210,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreBName],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreBId),
                 attachCb,
@@ -237,7 +230,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreCName],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreCId),
                 attachCb,
@@ -261,7 +253,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, "fake"],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
@@ -285,7 +276,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreBName, "fake"],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,
@@ -309,7 +299,6 @@ describe("Data Store Creation Tests", () => {
                 [defaultName, dataStoreAName, dataStoreBName, dataStoreCName],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 getCreateSummarizerNodeFn(dataStoreId),
                 attachCb,

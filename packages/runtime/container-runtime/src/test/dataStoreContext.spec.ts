@@ -4,7 +4,6 @@
  */
 
 import { strict as assert } from "assert";
-import { IFluidObject } from "@fluidframework/core-interfaces";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import { BlobCacheStorageService } from "@fluidframework/driver-utils";
 import { IBlob, ISnapshotTree } from "@fluidframework/protocol-definitions";
@@ -49,7 +48,6 @@ describe("Data Store Context Tests", () => {
     describe("LocalFluidDataStoreContext Initialization", () => {
         let localDataStoreContext: LocalFluidDataStoreContext;
         let storage: IDocumentStorageService;
-        let scope: IFluidObject;
         const attachCb = (mR: IFluidDataStoreChannel) => { };
         let containerRuntime: ContainerRuntime;
         beforeEach(async () => {
@@ -76,7 +74,6 @@ describe("Data Store Context Tests", () => {
                 ["TestDataStore1"],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 createSummarizerNodeFn,
                 attachCb,
@@ -108,7 +105,6 @@ describe("Data Store Context Tests", () => {
                 ["TestComp", "SubComp"],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 createSummarizerNodeFn,
                 attachCb,
@@ -140,7 +136,6 @@ describe("Data Store Context Tests", () => {
                 ["TestComp", "SubComp"],
                 containerRuntime,
                 storage,
-                scope,
                 summaryTracker,
                 createSummarizerNodeFn,
                 attachCb,
@@ -169,7 +164,6 @@ describe("Data Store Context Tests", () => {
         let remotedDataStoreContext: RemotedFluidDataStoreContext;
         let dataStoreAttributes: IFluidDataStoreAttributes;
         const storage: Partial<IDocumentStorageService> = {};
-        let scope: IFluidObject;
         let containerRuntime: ContainerRuntime;
         beforeEach(async () => {
             const factory: { [key: string]: any } = {};
@@ -207,7 +201,6 @@ describe("Data Store Context Tests", () => {
                 Promise.resolve(snapshotTree),
                 containerRuntime,
                 new BlobCacheStorageService(storage as IDocumentStorageService, Promise.resolve(blobCache)),
-                scope,
                 summaryTracker,
                 createSummarizerNodeFn,
             );
@@ -240,7 +233,6 @@ describe("Data Store Context Tests", () => {
                 Promise.resolve(snapshotTree),
                 containerRuntime,
                 new BlobCacheStorageService(storage as IDocumentStorageService, Promise.resolve(blobCache)),
-                scope,
                 summaryTracker,
                 createSummarizerNodeFn,
             );

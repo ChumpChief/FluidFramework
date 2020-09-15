@@ -8,7 +8,6 @@ import { EventEmitter } from "events";
 import { TaskManagerFactory } from "@fluidframework/agent-scheduler";
 import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
-    IFluidObject,
     IFluidRouter,
     IFluidHandleContext,
     IFluidSerializer,
@@ -475,7 +474,6 @@ export class ContainerRuntime extends EventEmitter
         registryEntries: NamedFluidDataStoreRegistryEntries,
         requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
         runtimeOptions?: IContainerRuntimeOptions,
-        containerScope: IFluidObject = context.scope,
     ): Promise<ContainerRuntime> {
         // Back-compat: <= 0.18 loader
         if (context.deltaManager.lastSequenceNumber === undefined) {
@@ -496,7 +494,6 @@ export class ContainerRuntime extends EventEmitter
             registry,
             chunks,
             runtimeOptions,
-            containerScope,
             requestHandler);
 
         // Create all internal data stores if not already existing on storage or loaded a detached
@@ -572,10 +569,6 @@ export class ContainerRuntime extends EventEmitter
 
     public get flushMode(): FlushMode {
         return this._flushMode;
-    }
-
-    public get scope(): IFluidObject {
-        return this.containerScope;
     }
 
     public get IFluidDataStoreRegistry(): IFluidDataStoreRegistry {
@@ -678,7 +671,6 @@ export class ContainerRuntime extends EventEmitter
             generateSummaries: true,
             enableWorker: false,
         },
-        private readonly containerScope: IFluidObject,
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ) {
         super();
@@ -770,7 +762,6 @@ export class ContainerRuntime extends EventEmitter
                     typeof value === "string" ? value : Promise.resolve(value),
                     this,
                     this.storage,
-                    this.containerScope,
                     this.summaryTracker.createOrGetChild(key, this.summaryTracker.referenceSequenceNumber),
                     this.summarizerNode.getCreateChildFn(key, { type: CreateSummarizerNodeSource.FromSummary }));
             } else {
@@ -797,7 +788,6 @@ export class ContainerRuntime extends EventEmitter
                     pkgFromSnapshot,
                     this,
                     this.storage,
-                    this.containerScope,
                     this.summaryTracker.createOrGetChild(key, this.deltaManager.lastSequenceNumber),
                     this.summarizerNode.getCreateChildFn(key, { type: CreateSummarizerNodeSource.FromSummary }),
                     (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
@@ -1287,7 +1277,6 @@ export class ContainerRuntime extends EventEmitter
             id,
             this,
             this.storage,
-            this.containerScope,
             this.summaryTracker.createOrGetChild(id, this.deltaManager.lastSequenceNumber),
             this.summarizerNode.getCreateChildFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
@@ -1312,7 +1301,6 @@ export class ContainerRuntime extends EventEmitter
             pkg,
             this,
             this.storage,
-            this.containerScope,
             this.summaryTracker.createOrGetChild(id, this.deltaManager.lastSequenceNumber),
             this.summarizerNode.getCreateChildFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
@@ -1474,7 +1462,6 @@ export class ContainerRuntime extends EventEmitter
             snapshotTreeP,
             this,
             new BlobCacheStorageService(this.storage, flatBlobsP),
-            this.containerScope,
             this.summaryTracker.createOrGetChild(attachMessage.id, message.sequenceNumber),
             this.summarizerNode.getCreateChildFn(
                 attachMessage.id,

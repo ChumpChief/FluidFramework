@@ -1071,7 +1071,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this._context = await ContainerContext.createOrLoad(
             this,
-            {},
             this.containerRuntimeFactory,
             snapshot,
             attributes,
