@@ -113,12 +113,6 @@ export interface IContainerRuntime extends
     raiseContainerWarning(warning: ContainerWarning): void;
 
     /**
-     * Returns true of document is dirty, i.e. there are some pending local changes that
-     * either were not sent out to delta stream or were not yet acknowledged.
-     */
-    isDocumentDirty(): boolean;
-
-    /**
      * Flushes any ops currently being batched to the loader
      */
     flush(): void;

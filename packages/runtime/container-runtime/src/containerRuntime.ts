@@ -490,7 +490,6 @@ export class ContainerRuntime extends EventEmitter
 
     // Stores tracked by the Domain
     private readonly pendingAttach = new Map<string, IAttachMessage>();
-    private dirtyDocument = false;
     private readonly deltaSender: IDeltaSender | undefined;
     private readonly scheduleManager: ScheduleManager;
     private readonly pendingStateManager: PendingStateManager;
@@ -661,13 +660,6 @@ export class ContainerRuntime extends EventEmitter
         const changeOfState = this._connected !== connected;
         this._connected = connected;
 
-        if (connected) {
-            // Once we are connected, all acks are accounted.
-            // If there are any pending ops, DDSes will resubmit them right away (below) and
-            // we will switch back to dirty state in such case.
-            this.updateDocumentDirtyState(false);
-        }
-
         if (changeOfState && this.canSendOps()) {
             this.pendingStateManager.replayPendingStates();
         }
@@ -715,12 +707,6 @@ export class ContainerRuntime extends EventEmitter
                 // Do not process local chunked ops until all pieces are available.
                 if (message.type !== ContainerMessageType.ChunkedOp) {
                     localMessageMetadata = this.pendingStateManager.processPendingLocalMessage(message);
-                }
-
-                // If there are no more pending messages after processing a local message,
-                // the document is no longer dirty.
-                if (!this.pendingStateManager.hasPendingMessages()) {
-                    this.updateDocumentDirtyState(false);
                 }
             }
 
@@ -945,14 +931,6 @@ export class ContainerRuntime extends EventEmitter
     }
 
     /**
-     * Returns true of document is dirty, i.e. there are some pending local changes that
-     * either were not sent out to delta stream or were not yet acknowledged.
-     */
-    public isDocumentDirty(): boolean {
-        return this.dirtyDocument;
-    }
-
-    /**
      * Will return true for any message that affect the dirty state of this document
      * This function can be used to filter out any runtime operations that should not be affecting whether or not
      * the IFluidDataStoreRuntime.isDocumentDirty call returns true/false
@@ -1163,15 +1141,6 @@ export class ContainerRuntime extends EventEmitter
         }
     }
 
-    private updateDocumentDirtyState(dirty: boolean) {
-        if (this.dirtyDocument === dirty) {
-            return;
-        }
-
-        this.dirtyDocument = dirty;
-        this.emit(dirty ? "dirtyDocument" : "savedDocument");
-    }
-
     public submitDataStoreOp(
         id: string,
         contents: any,
@@ -1227,9 +1196,6 @@ export class ContainerRuntime extends EventEmitter
 
         // Let the PendingStateManager know that a message was submitted.
         this.pendingStateManager.onSubmitMessage(type, clientSequenceNumber, content, localOpMetadata);
-        if (this.isContainerMessageDirtyable(type, content)) {
-            this.updateDocumentDirtyState(true);
-        }
     }
 
     private submitChunkedMessage(type: ContainerMessageType, content: string, maxOpSize: number): number {
