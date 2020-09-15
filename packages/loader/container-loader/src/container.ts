@@ -198,7 +198,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
         return this._context;
     }
-    private pkg: IFluidCodeDetails | undefined;
     private _protocolHandler: ProtocolOpHandler | undefined;
     private get protocolHandler() {
         if (this._protocolHandler === undefined) {
@@ -286,10 +285,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get clientDetails(): IClientDetails {
         return this._deltaManager.clientDetails;
-    }
-
-    public get chaincodePackage(): IFluidCodeDetails | undefined {
-        return this.pkg;
     }
 
     /**
@@ -852,22 +847,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
         });
 
-        protocol.quorum.on(
-            "approveProposal",
-            (sequenceNumber, key, value) => {
-                debug(`approved ${key}`);
-                if (key === "code" || key === "code2") {
-                    debug(`loadRuntimeFactory ${JSON.stringify(value)}`);
-
-                    if (value === this.pkg) {
-                        return;
-                    }
-
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                    this.reloadContext();
-                }
-            });
-
         return protocol;
     }
 
@@ -884,19 +863,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         blobManager.loadBlobMetadata(blobs);
 
         return blobManager;
-    }
-
-    private getCodeDetailsFromQuorum(): IFluidCodeDetails | undefined {
-        const quorum = this.protocolHandler.quorum;
-
-        let pkg = quorum.get("code");
-
-        // Back compat
-        if (pkg === undefined) {
-            pkg = quorum.get("code2");
-        }
-
-        return pkg;
     }
 
     private get client(): IClient {
@@ -1107,8 +1073,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         snapshot?: ISnapshotTree,
         previousRuntimeState: IRuntimeState = {},
     ) {
-        this.pkg = this.getCodeDetailsFromQuorum();
-
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
         // are set. Global requests will still go directly to the loader
         const loader = new LocalLoader(this);
@@ -1131,7 +1095,5 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             Container.version,
             previousRuntimeState,
         );
-
-        this.emit("contextChanged", this.pkg);
     }
 }
