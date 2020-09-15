@@ -110,7 +110,6 @@ export interface IContainerContext extends IDisposable {
     readonly loader: ILoader;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
     readonly version: string;
-    readonly previousRuntimeState: IRuntimeState;
 
     raiseContainerWarning(warning: ContainerWarning): void;
 

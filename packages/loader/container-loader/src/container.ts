@@ -15,7 +15,6 @@ import {
     IFluidCodeDetails,
     ILoader,
     IRuntimeFactory,
-    IRuntimeState,
     ICriticalContainerError,
     ContainerWarning,
     IThrottlingWarning,
@@ -680,9 +679,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
     }
 
-    private async loadContext(
-        previousRuntimeState: IRuntimeState = {},
-    ) {
+    private async loadContext() {
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
         // are set. Global requests will still go directly to the loader
         const loader = new LocalLoader(this);
@@ -699,7 +696,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (message) => this.submitSignal(message),
             (error?: ICriticalContainerError) => this.close(error),
             Container.version,
-            previousRuntimeState,
         );
     }
 }
