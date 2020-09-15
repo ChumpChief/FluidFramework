@@ -6,7 +6,6 @@
 import { DocumentDeltaConnection } from "@fluidframework/driver-base";
 import * as api from "@fluidframework/driver-definitions";
 import { IClient } from "@fluidframework/protocol-definitions";
-import { GitManager, Historian, ICredentials } from "@fluidframework/server-services-client";
 import io from "socket.io-client";
 import { DocumentDeltaStorageService } from "./deltaStorageService";
 import { DocumentStorageService } from "./documentStorageService";
@@ -32,19 +31,7 @@ export class DocumentService implements api.IDocumentService {
      * @returns returns the document storage service for routerlicious driver.
      */
     public async connectToStorage(): Promise<api.IDocumentStorageService> {
-        const credentials: ICredentials = {
-            password: this.token,
-            user: this.tenantId,
-        };
-
-        const historian = new Historian(
-            this.storageUrl,
-            true, // historianApi
-            false, // disableCache
-            credentials);
-        const gitManager = new GitManager(historian);
-
-        return new DocumentStorageService(this.documentId, gitManager);
+        return new DocumentStorageService(this.documentId, this.tenantId, this.token, this.storageUrl);
     }
 
     /**

@@ -8,7 +8,6 @@ import {
     DocumentDeltaStorageService,
     DocumentStorageService,
 } from "@fluidframework/routerlicious-driver";
-import { GitManager, Historian, ICredentials } from "@fluidframework/server-services-client";
 import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
 
@@ -36,7 +35,9 @@ if (location.hash.length === 0) {
 const documentId = location.hash.substring(1);
 document.title = documentId;
 
-const deltaFeed = new SocketIODeltaFeed(documentId, "tinylicious", "http://localhost:3000");
+const tenantId = "tinylicious";
+
+const deltaFeed = new SocketIODeltaFeed(documentId, tenantId, "http://localhost:3000");
 window["testDeltaFeed"] = deltaFeed;
 
 const client: IClient = {
@@ -54,7 +55,7 @@ window["oldClient"] = client;
 const token = jwt.sign({
     documentId,
     scopes: ["doc:read", "doc:write", "summary:write"],
-    tenantId: "tinylicious",
+    tenantId,
     user: { id: uuid() },
 }, "12345");
 window["oldToken"] = token;
@@ -62,31 +63,19 @@ window["oldToken"] = token;
 const encodedDocId = encodeURIComponent(documentId);
 const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${encodedDocId}`;
 const deltaStorageService = new DocumentDeltaStorageService(
-    "tinylicious",
+    tenantId,
     token,
     deltaStorageUrl,
 );
 const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService, 0);
 window["testDeltaFeedFollower"] = deltaFeedFollower;
 
-const credentials: ICredentials = {
-    password: token,
-    user: "tinylicious",
-};
-
 const storageUrl = `http://localhost:3000/repos/tinylicious`;
-const historian = new Historian(
-    storageUrl,
-    true, // historianApi
-    false, // disableCache
-    credentials);
-const gitManager = new GitManager(historian);
-
-const documentStorageService = new DocumentStorageService(documentId, gitManager);
+const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
 window["testDocumentStorageService"] = documentStorageService;
 
 const connectTestFeed = () => {
-    deltaFeed.connect("tinylicious", documentId, token, client)
+    deltaFeed.connect(tenantId, documentId, token, client)
         .then(() => console.log("Feed connected"))
         .catch((error) => console.error(error));
 };

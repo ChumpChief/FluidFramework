@@ -79,7 +79,6 @@ import { debug } from "./debug";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { pkgVersion } from "./packageVersion";
-import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
 
 export enum ConnectionState {
@@ -683,7 +682,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const startConnectionP = this.connectToDeltaStream(connectionArgs);
         startConnectionP.catch((error) => { });
 
-        this._storageService = await this.getDocumentStorageService();
+        this._storageService = await this.documentService.connectToStorage();
         this._attachState = AttachState.Attached;
 
         // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null
@@ -736,11 +735,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             sequenceNumber: attributes.sequenceNumber,
             version: maybeSnapshotTree?.id ?? undefined,
         };
-    }
-
-    private async getDocumentStorageService(): Promise<IDocumentStorageService> {
-        const storageService = await this.documentService.connectToStorage();
-        return new PrefetchDocumentStorageService(storageService);
     }
 
     private async getDocumentAttributes(
