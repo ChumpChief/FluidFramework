@@ -6,9 +6,6 @@
 import { strict as assert } from "assert";
 import { EventEmitter } from "events";
 import uuid from "uuid";
-import {
-    ITelemetryLogger,
-} from "@fluidframework/common-definitions";
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IAudience,
@@ -170,7 +167,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public subLogger: TelemetryLogger;
-    private readonly logger: ITelemetryLogger;
 
     private pendingClientId: string | undefined;
     private loaded = false;
@@ -336,9 +332,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 containerAttachState: () => this._attachState,
             });
 
-        // Prefix all events in this file with container-loader
-        this.logger = ChildLogger.create(this.subLogger, "Container");
-
         this._deltaManager = this.createDeltaManager();
     }
 
@@ -362,24 +355,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context?.dispose(error !== undefined ? new Error(error.message) : undefined);
 
         assert.strictEqual(this.connectionState, ConnectionState.Disconnected, "disconnect event was not raised!");
-
-        if (error !== undefined) {
-            // Log current sequence number - useful if we have access to a file to understand better
-            // what op caused trouble (if it's related to op processing).
-            // Runtime may provide sequence number as part of error object - this may not match DeltaManager
-            // knowledge as old ops are processed when data stores / DDS are re-hydrated when delay-loaded
-            this.logger.sendErrorEvent(
-                {
-                    eventName: "ContainerClose",
-                    sequenceNumber: error.sequenceNumber ?? this._deltaManager.lastSequenceNumber,
-                    loading: !this.loaded,
-                },
-                error,
-            );
-        } else {
-            assert(this.loaded);
-            this.logger.sendTelemetryEvent({ eventName: "ContainerClose" });
-        }
 
         this.emit("closed", error);
 
@@ -414,7 +389,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Only snapshot once a code quorum has been established
         if (!this.protocolHandler.quorum.has("code") && !this.protocolHandler.quorum.has("code2")) {
-            this.logger.sendTelemetryEvent({ eventName: "SkipSnapshot" });
             return;
         }
 
@@ -425,9 +399,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
 
             await this.snapshotCore(tagMessage, fullTree);
-        } catch (ex) {
-            this.logger.logException({ eventName: "SnapshotExceptionError" }, ex);
-            throw ex;
         } finally {
             if (this.deltaManager !== undefined) {
                 this.deltaManager.inbound.systemResume();
@@ -443,12 +414,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
 
         this._deltaManager.setAutomaticReconnect(reconnect);
-
-        this.logger.sendTelemetryEvent({
-            eventName: reconnect ? "AutoReconnectEnabled" : "AutoReconnectDisabled",
-            connectionMode: this._deltaManager.connectionMode,
-            connectionState: ConnectionState[this.connectionState],
-        });
 
         if (reconnect) {
             // Ensure connection to web socket
@@ -956,7 +921,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         assert(value !== ConnectionState.Connecting);
         if (this.connectionState === value) {
             // Already in the desired state - exit early
-            this.logger.sendErrorEvent({ eventName: "setConnectionStateSame", value });
             return;
         }
 
@@ -979,12 +943,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const state = this._connectionState === ConnectionState.Connected;
         this.context.setConnectionState(state, this.clientId);
         this.protocolHandler.quorum.setConnectionState(state, this.clientId);
-        raiseConnectedEvent(this.logger, this, state, this.clientId);
+        raiseConnectedEvent(this, state, this.clientId);
     }
 
     private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
-        const outboundMessageType: string = type;
-        switch (outboundMessageType) {
+        switch (type) {
             case MessageType.Operation:
             case MessageType.RemoteHelp:
             case MessageType.Summarize:
@@ -1052,9 +1015,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         if (version !== undefined) {
             this._loadedFromVersion = version;
             return await this.storageService.getSnapshotTree(version) ?? undefined;
-        } else if (specifiedVersion !== undefined) {
-            // We should have a defined version to load from if specified version requested
-            this.logger.sendErrorEvent({ eventName: "NoVersionFoundWhenSpecified", specifiedVersion });
         }
 
         return undefined;

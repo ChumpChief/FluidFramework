@@ -1070,7 +1070,7 @@ export class ContainerRuntime extends EventEmitter
             }
         }
 
-        raiseConnectedEvent(this._logger, this, connected, clientId);
+        raiseConnectedEvent(this, connected, clientId);
 
         if (connected) {
             assert(clientId);

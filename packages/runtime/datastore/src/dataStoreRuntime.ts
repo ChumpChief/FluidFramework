@@ -421,7 +421,7 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             object.setConnectionState(connected, clientId);
         }
 
-        raiseConnectedEvent(this.logger, this, connected, clientId);
+        raiseConnectedEvent(this, connected, clientId);
     }
 
     public getQuorum(): IQuorum {
