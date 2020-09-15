@@ -16,7 +16,6 @@ import {
     IBlobManager,
     IDeltaManager,
     IGenericBlob,
-    ContainerWarning,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -562,10 +561,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
      */
     public async waitAttached(): Promise<void> {
         return this.deferredAttached.promise;
-    }
-
-    public raiseContainerWarning(warning: ContainerWarning): void {
-        this.dataStoreContext.raiseContainerWarning(warning);
     }
 
     /**

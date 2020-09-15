@@ -14,8 +14,6 @@ import {
     IFluidCodeDetails,
     IRuntimeFactory,
     ICriticalContainerError,
-    ContainerWarning,
-    IThrottlingWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -309,15 +307,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.storageService;
     }
 
-    /**
-     * Raise non-critical error to host. Calling this API will not close container.
-     * For critical errors, please call Container.close(error).
-     * @param error - an error to raise
-     */
-    public raiseContainerWarning(warning: ContainerWarning) {
-        this.emit("warning", warning);
-    }
-
     private async connectToDeltaStream(args: IConnectionArgs = {}) {
         // All agents need "write" access, including summarizer.
         if (!this.canReconnect || !this.client.details.capabilities.interactive) {
@@ -516,10 +505,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.setConnectionState(ConnectionState.Disconnected, reason);
         });
 
-        deltaManager.on("throttled", (warning: IThrottlingWarning) => {
-            this.raiseContainerWarning(warning);
-        });
-
         deltaManager.on("pong", (latency) => {
             this.emit("pong", latency);
         });
@@ -652,7 +637,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.blobManager,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
-            (warning: ContainerWarning) => this.raiseContainerWarning(warning),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
         );

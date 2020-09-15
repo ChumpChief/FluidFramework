@@ -10,7 +10,6 @@ import {
     IAudience,
     IBlobManager,
     IDeltaManager,
-    ContainerWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -100,11 +99,6 @@ export interface IContainerRuntime extends
      * Returns the current audience.
      */
     getAudience(): IAudience;
-
-    /**
-     * Used to raise an unrecoverable error on the runtime.
-     */
-    raiseContainerWarning(warning: ContainerWarning): void;
 
     /**
      * Flushes any ops currently being batched to the loader

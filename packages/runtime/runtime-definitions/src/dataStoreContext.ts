@@ -14,7 +14,6 @@ import {
     IAudience,
     IBlobManager,
     IDeltaManager,
-    ContainerWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -261,12 +260,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
      * Returns the current audience.
      */
     getAudience(): IAudience;
-
-    /**
-     * Report error in that happend in the data store runtime layer to the container runtime layer
-     * @param err - the error object.
-     */
-    raiseContainerWarning(warning: ContainerWarning): void;
 
     /**
      * Submits the message to be sent to other clients.

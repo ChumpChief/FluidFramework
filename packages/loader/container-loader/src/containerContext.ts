@@ -15,7 +15,6 @@ import {
     IDeltaManager,
     IRuntime,
     IRuntimeFactory,
-    ContainerWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -39,7 +38,6 @@ export class ContainerContext implements IContainerContext {
         blobManager: BlobManager | undefined,
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         quorum: IQuorum,
-        raiseContainerWarning: (warning: ContainerWarning) => void,
         submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         submitSignalFn: (contents: any) => void,
     ): Promise<ContainerContext> {
@@ -49,7 +47,6 @@ export class ContainerContext implements IContainerContext {
             blobManager,
             deltaManager,
             quorum,
-            raiseContainerWarning,
             submitFn,
             submitSignalFn,
         );
@@ -130,7 +127,6 @@ export class ContainerContext implements IContainerContext {
         public readonly blobManager: BlobManager | undefined,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         public readonly quorum: IQuorum,
-        public readonly raiseContainerWarning: (warning: ContainerWarning) => void,
         public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
     ) {

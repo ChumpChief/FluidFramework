@@ -15,7 +15,6 @@ import {
 import {
     IAudience,
     IGenericBlob,
-    ContainerWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -530,8 +529,6 @@ export class MockFluidDataStoreRuntime extends EventEmitter
     public async requestDataStore(request: IRequest): Promise<IResponse> {
         return null;
     }
-
-    public raiseContainerWarning(warning: ContainerWarning): void { }
 
     public reSubmit(content: any, localOpMetadata: unknown) {
         return;
