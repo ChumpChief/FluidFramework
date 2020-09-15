@@ -29,7 +29,6 @@ import { TreeTreeEntry } from "@fluidframework/protocol-base";
 import {
     IClientDetails,
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
     ITreeEntry,
     ITree,
@@ -90,7 +89,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
             context.existing,
             context.options,
             context.deltaManager,
-            context.getQuorum(),
             context.getAudience(),
             sharedObjectRegistry,
         );
@@ -162,7 +160,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         public existing: boolean,
         public readonly options: any,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
-        private readonly quorum: IQuorum,
         private readonly audience: IAudience,
         private readonly sharedObjectRegistry: ISharedObjectRegistry,
     ) {
@@ -390,10 +387,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         }
 
         raiseConnectedEvent(this, connected, clientId);
-    }
-
-    public getQuorum(): IQuorum {
-        return this.quorum;
     }
 
     public getAudience(): IAudience {

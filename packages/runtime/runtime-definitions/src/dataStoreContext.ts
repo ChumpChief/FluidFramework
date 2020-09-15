@@ -20,7 +20,6 @@ import {
     IClientDetails,
     ConnectionState,
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
     ISnapshotTree,
     ITreeEntry,
@@ -248,11 +247,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
     readonly hostRuntime: IContainerRuntimeBase;
 
     on(event: "leader" | "notleader" | "attaching" | "attached", listener: () => void): this;
-
-    /**
-     * Returns the current quorum.
-     */
-    getQuorum(): IQuorum;
 
     /**
      * Returns the current audience.

@@ -12,7 +12,6 @@ import {
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     IClientDetails,
-    IQuorum,
     ISequencedDocumentMessage,
     IServiceConfiguration,
     ITree,
@@ -100,7 +99,6 @@ export interface IContainerContext extends IDisposable {
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-    readonly quorum: IQuorum;
     readonly audience: IAudience | undefined;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
 

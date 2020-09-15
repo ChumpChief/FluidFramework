@@ -38,7 +38,6 @@ import {
     ConnectionState,
     IClientDetails,
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
     ISignalMessage,
     ISnapshotTree,
@@ -488,10 +487,6 @@ export class ContainerRuntime extends EventEmitter
 
         this.pendingStateManager = new PendingStateManager(this);
 
-        this.context.quorum.on("removeMember", (clientId: string) => {
-            this.clearPartialChunks(clientId);
-        });
-
         this.deltaManager.on("readonly", (readonly: boolean) => {
             // we accumulate ops while being in read-only state.
             // once user gets write permissions and we have active connection, flush all pending ops.
@@ -846,10 +841,6 @@ export class ContainerRuntime extends EventEmitter
         const deferred = new Deferred<FluidDataStoreContext>();
         this.contextsDeferred.set(id, deferred);
         this.contexts.set(id, context);
-    }
-
-    public getQuorum(): IQuorum {
-        return this.context.quorum;
     }
 
     public getAudience(): IAudience {

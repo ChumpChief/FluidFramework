@@ -22,7 +22,6 @@ import { readAndParse } from "@fluidframework/driver-utils";
 import { BlobTreeEntry } from "@fluidframework/protocol-base";
 import {
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
     ISnapshotTree,
     ITree,
@@ -317,10 +316,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         }
 
         this.channel?.processSignal(message, local);
-    }
-
-    public getQuorum(): IQuorum {
-        return this._containerRuntime.getQuorum();
     }
 
     public getAudience(): IAudience {

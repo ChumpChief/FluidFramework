@@ -16,7 +16,6 @@ import {
     IClientDetails,
     IDocumentMessage,
     IHelpMessage,
-    IQuorum,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import {
@@ -87,11 +86,6 @@ export interface IContainerRuntime extends
      * it results in container corruption - loading this file after that will always result in error.
      */
     createRootDataStore(pkg: string | string[], rootDataStoreId: string): Promise<IFluidRouter>;
-
-    /**
-     * Returns the current quorum.
-     */
-    getQuorum(): IQuorum;
 
     /**
      * Returns the current audience.

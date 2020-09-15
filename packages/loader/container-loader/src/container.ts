@@ -29,7 +29,6 @@ import { CreateContainerError } from "@fluidframework/container-utils";
 import {
     isSystemMessage,
     ProtocolOpHandler,
-    QuorumProxy,
 } from "@fluidframework/protocol-base";
 import {
     IClient,
@@ -622,7 +621,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this,
             this.containerRuntimeFactory,
             new DeltaManagerProxy(this._deltaManager),
-            new QuorumProxy(this.protocolHandler.quorum),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
         );
