@@ -876,7 +876,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.deltaService,
             this.deltaStorageService,
             this.client,
-            ChildLogger.create(this.subLogger, "DeltaManager"),
             this.canReconnect,
         );
 
