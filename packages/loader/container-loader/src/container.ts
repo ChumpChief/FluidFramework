@@ -7,7 +7,6 @@ import { strict as assert } from "assert";
 import { EventEmitter } from "events";
 import uuid from "uuid";
 import {
-    ITelemetryBaseLogger,
     ITelemetryLogger,
 } from "@fluidframework/common-definitions";
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
@@ -160,14 +159,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const container = new Container(
             containerRuntimeFactory,
             documentService,
-            decodeURI(documentId),
+            documentId,
         );
         await container.load();
         return container;
     }
 
     public subLogger: TelemetryLogger;
-    private readonly _canReconnect: boolean = true;
     private readonly logger: ITelemetryLogger;
 
     private pendingClientId: string | undefined;
@@ -186,7 +184,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private blobsCacheStorageService: IDocumentStorageService | undefined;
 
     private _clientId: string | undefined;
-    private readonly _id: string | undefined;
+    private readonly _documentId: string | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
     private _parentBranch: string | null = null;
@@ -243,7 +241,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get id(): string {
-        return this._id ?? "";
+        return this._documentId ?? "";
     }
 
     public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {
@@ -259,7 +257,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get canReconnect(): boolean {
-        return this._canReconnect;
+        return true;
     }
 
     /**
@@ -319,13 +317,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private readonly containerRuntimeFactory: IRuntimeFactory,
         private readonly documentService: IDocumentService,
         documentId: string,
-        logger?: ITelemetryBaseLogger,
     ) {
         super();
         this._audience = new Audience();
 
-        this._id = documentId;
-        this._canReconnect = true;
+        this._documentId = documentId;
 
         // Create logger for data stores to use
         const type = this.client.details.type;
@@ -335,7 +331,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Need to use the property getter for docId because for detached flow we don't have the docId initially.
         // We assign the id later so property getter is used.
         this.subLogger = ChildLogger.create(
-            logger,
+            undefined,
             undefined,
             {
                 clientType, // Differentiating summarizer container from main container
