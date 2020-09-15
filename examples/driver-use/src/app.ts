@@ -7,7 +7,6 @@ import { IClient } from "@fluidframework/protocol-definitions";
 import {
     DocumentDeltaStorageService,
     DocumentStorageService,
-    TokenProvider,
 } from "@fluidframework/routerlicious-driver";
 import { GitManager, Historian, ICredentials } from "@fluidframework/server-services-client";
 import jwt from "jsonwebtoken";
@@ -60,12 +59,11 @@ const token = jwt.sign({
 }, "12345");
 window["oldToken"] = token;
 
-const tokenProvider = new TokenProvider(token);
 const encodedDocId = encodeURIComponent(documentId);
 const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${encodedDocId}`;
 const deltaStorageService = new DocumentDeltaStorageService(
     "tinylicious",
-    tokenProvider,
+    token,
     deltaStorageUrl,
 );
 const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService, 0);

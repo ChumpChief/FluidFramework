@@ -8,7 +8,6 @@ import {
     IDocumentServiceFactory,
 } from "@fluidframework/driver-definitions";
 import { DocumentService } from "./documentService";
-import { TokenProvider } from "./tokens";
 
 /**
  * Factory for creating the routerlicious document service. Use this if you want to
@@ -31,13 +30,11 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         documentId: string,
         jwtToken: string,
     ): Promise<IDocumentService> {
-        const tokenProvider = new TokenProvider(jwtToken);
-
         return new DocumentService(
             ordererUrl,
             deltaStorageUrl,
             storageUrl,
-            tokenProvider,
+            jwtToken,
             tenantId,
             documentId,
         );

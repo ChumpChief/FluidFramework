@@ -10,7 +10,6 @@ import { GitManager, Historian, ICredentials } from "@fluidframework/server-serv
 import io from "socket.io-client";
 import { DocumentDeltaStorageService } from "./deltaStorageService";
 import { DocumentStorageService } from "./documentStorageService";
-import { TokenProvider } from "./tokens";
 
 /**
  * The DocumentService manages the Socket.IO connection and manages routing requests to connected
@@ -21,7 +20,7 @@ export class DocumentService implements api.IDocumentService {
         private readonly ordererUrl: string,
         private readonly deltaStorageUrl: string,
         private readonly gitUrl: string,
-        private readonly tokenProvider: TokenProvider,
+        private readonly token: string,
         private readonly tenantId: string,
         private readonly documentId: string,
     ) {
@@ -34,7 +33,7 @@ export class DocumentService implements api.IDocumentService {
      */
     public async connectToStorage(): Promise<api.IDocumentStorageService> {
         const credentials: ICredentials = {
-            password: this.tokenProvider.token,
+            password: this.token,
             user: this.tenantId,
         };
 
@@ -54,7 +53,7 @@ export class DocumentService implements api.IDocumentService {
      * @returns returns the document delta storage service for routerlicious driver.
      */
     public async connectToDeltaStorage(): Promise<api.IDocumentDeltaStorageService> {
-        return new DocumentDeltaStorageService(this.tenantId, this.tokenProvider, this.deltaStorageUrl);
+        return new DocumentDeltaStorageService(this.tenantId, this.token, this.deltaStorageUrl);
     }
 
     /**
@@ -66,7 +65,7 @@ export class DocumentService implements api.IDocumentService {
         return DocumentDeltaConnection.create(
             this.tenantId,
             this.documentId,
-            this.tokenProvider.token,
+            this.token,
             io,
             client,
             this.ordererUrl);

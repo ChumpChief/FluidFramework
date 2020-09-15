@@ -8,7 +8,6 @@ import { fromUtf8ToBase64 } from "@fluidframework/common-utils";
 import { IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
 import * as api from "@fluidframework/protocol-definitions";
 import Axios from "axios";
-import { TokenProvider } from "./tokens";
 
 /**
  * Storage service limited to only being able to fetch documents for a specific document
@@ -16,7 +15,7 @@ import { TokenProvider } from "./tokens";
 export class DocumentDeltaStorageService implements IDocumentDeltaStorageService {
     constructor(
         private readonly tenantId: string,
-        private readonly tokenProvider: api.ITokenProvider,
+        private readonly token: string,
         private readonly url: string,
     ) { }
 
@@ -25,11 +24,9 @@ export class DocumentDeltaStorageService implements IDocumentDeltaStorageService
 
         let headers: { Authorization: string } | null = null;
 
-        const token = (this.tokenProvider as TokenProvider).token;
-
-        if (token) {
+        if (this.token !== "") {
             headers = {
-                Authorization: `Basic ${fromUtf8ToBase64(`${this.tenantId}:${token}`)}`,
+                Authorization: `Basic ${fromUtf8ToBase64(`${this.tenantId}:${this.token}`)}`,
             };
         }
 
