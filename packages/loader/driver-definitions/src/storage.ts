@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IEventProvider, IErrorEvent, ITelemetryBaseLogger } from "@fluidframework/common-definitions";
+import { IEventProvider, IErrorEvent } from "@fluidframework/common-definitions";
 import {
     ConnectionMode,
     IClient,
@@ -23,7 +23,6 @@ import {
     ITree,
     IVersion,
 } from "@fluidframework/protocol-definitions";
-import { IResolvedUrl } from "./urlResolver";
 
 /**
  * Interface to provide access to stored deltas for a shared object
@@ -246,13 +245,13 @@ export interface IDocumentServiceFactory {
     /**
      * Returns an instance of IDocumentService
      */
-    createDocumentService(resolvedUrl: IResolvedUrl, logger?: ITelemetryBaseLogger): Promise<IDocumentService>;
-
-    // Creates a new document on the host with the provided options. Returns the document service.
-    createContainer(
-        createNewSummary: ISummaryTree,
-        createNewResolvedUrl: IResolvedUrl,
-        logger?: ITelemetryBaseLogger,
+    createDocumentService(
+        storageUrl: string,
+        ordererUrl: string,
+        deltaStorageUrl: string,
+        tenantId: string,
+        documentId: string,
+        jwtToken: string,
     ): Promise<IDocumentService>;
 }
 
