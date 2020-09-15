@@ -153,11 +153,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async load(
         documentId: string,
         documentService: IDocumentService,
+        storageService: IDocumentStorageService,
         containerRuntimeFactory: IRuntimeFactory,
     ): Promise<Container> {
         const container = new Container(
             containerRuntimeFactory,
             documentService,
+            storageService,
             documentId,
         );
         await container.load();
@@ -172,14 +174,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private _attachState = AttachState.Detached;
     private blobManager: BlobManager | undefined;
 
-    // Active chaincode and associated runtime
-    private _storageService: IDocumentStorageService | undefined;
-    private get storageService() {
-        if (this._storageService === undefined) {
-            throw new Error("Attempted to access storageService before it was defined");
-        }
-        return this._storageService;
-    }
     private blobsCacheStorageService: IDocumentStorageService | undefined;
 
     private _clientId: string | undefined;
@@ -310,6 +304,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     constructor(
         private readonly containerRuntimeFactory: IRuntimeFactory,
         private readonly documentService: IDocumentService,
+        private readonly storageService: IDocumentStorageService,
         documentId: string,
     ) {
         super();
@@ -478,8 +473,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.connectToDeltaStream(args).catch(() => { });
     }
 
-    public get storage(): IDocumentStorageService | undefined {
-        return this.blobsCacheStorageService ?? this._storageService;
+    public get storage(): IDocumentStorageService {
+        return this.blobsCacheStorageService ?? this.storageService;
     }
 
     /**
@@ -682,7 +677,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const startConnectionP = this.connectToDeltaStream(connectionArgs);
         startConnectionP.catch((error) => { });
 
-        this._storageService = await this.documentService.connectToStorage();
         this._attachState = AttachState.Attached;
 
         // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null

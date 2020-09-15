@@ -8,7 +8,7 @@ import {
 } from "@fluidframework/container-definitions";
 import { Container } from "@fluidframework/container-loader";
 import { ITokenClaims } from "@fluidframework/protocol-definitions";
-import { DocumentService } from "@fluidframework/routerlicious-driver";
+import { DocumentService, DocumentStorageService } from "@fluidframework/routerlicious-driver";
 import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
 
@@ -40,15 +40,17 @@ export async function getTinyliciousContainer(
     const documentService = new DocumentService(
         ordererUrl,
         deltaStorageUrl,
-        storageUrl,
         jwtToken,
         tenantId,
         documentId,
     );
 
+    const storageService = new DocumentStorageService(documentId, tenantId, jwtToken, storageUrl);
+
     const container = await Container.load(
         documentId,
         documentService,
+        storageService,
         containerRuntimeFactory,
     );
 
