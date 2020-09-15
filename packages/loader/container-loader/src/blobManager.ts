@@ -20,11 +20,6 @@ export class BlobManager implements IBlobManager {
         }
     }
 
-    public getBlobMetadata(): IGenericBlob[] {
-        const blobs = [... this.blobs.values()];
-        return blobs.map((value) => value);
-    }
-
     public async getBlob(blobId: string): Promise<IGenericBlob | undefined> {
         const blob = this.blobs.get(blobId);
         if (blob === undefined) {

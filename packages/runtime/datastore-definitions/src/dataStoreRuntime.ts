@@ -103,11 +103,6 @@ export interface IFluidDataStoreRuntime extends
     getBlob(blobId: string): Promise<IGenericBlob | undefined>;
 
     /**
-     * Api to get the blob metadata.
-     */
-    getBlobMetadata(): Promise<IGenericBlob[]>;
-
-    /**
      * Returns the current quorum.
      */
     getQuorum(): IQuorum;

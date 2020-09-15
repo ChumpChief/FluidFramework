@@ -462,10 +462,6 @@ export class MockFluidDataStoreRuntime extends EventEmitter
         return null;
     }
 
-    public async getBlobMetadata(): Promise<IGenericBlob[]> {
-        return null;
-    }
-
     public submitMessage(type: MessageType, content: any) {
         return null;
     }
