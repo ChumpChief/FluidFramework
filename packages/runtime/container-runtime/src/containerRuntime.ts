@@ -205,20 +205,6 @@ export class ContainerRuntime extends EventEmitter
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
-        // Extract stores stored inside the snapshot
-        const fluidDataStores = new Map<string, ISnapshotTree | string>();
-
-        // Create a context for each of them
-        for (const [key, value] of fluidDataStores) {
-            const dataStoreContext = new RemotedFluidDataStoreContext(
-                key,
-                typeof value === "string" ? value : Promise.resolve(value),
-                this,
-                this.storage,
-            );
-            this.setNewContext(key, dataStoreContext);
-        }
-
         this.pendingStateManager = new PendingStateManager(this);
     }
 
