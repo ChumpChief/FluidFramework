@@ -530,7 +530,7 @@ export class DeltaManager
         return this.connectionP;
     }
 
-    public flush() {
+    private flush() {
         if (this.messageBuffer.length === 0) {
             return;
         }

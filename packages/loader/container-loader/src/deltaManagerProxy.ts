@@ -163,8 +163,4 @@ export class DeltaManagerProxy
     public submit(type: MessageType, contents: any, batch: boolean, appData: any): number {
         return this.deltaManager.submit(type, contents, batch, appData);
     }
-
-    public flush(): void {
-        return this.deltaManager.flush();
-    }
 }

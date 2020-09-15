@@ -80,11 +80,6 @@ export interface IDeltaSender extends IProvideDeltaSender {
      * op is submitted.
      */
     submit(type: MessageType, contents: any, batch: boolean, metadata: any): number;
-
-    /**
-     * Flush all pending messages through the outbound queue
-     */
-    flush(): void;
 }
 
 /** Events emitted by the Delta Manager */

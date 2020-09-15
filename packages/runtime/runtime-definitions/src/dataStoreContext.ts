@@ -30,22 +30,6 @@ import { IInboundSignalMessage } from "./protocol";
 import { ISummaryTreeWithStats, ISummarizerNode, SummarizeInternalFn } from "./summary";
 
 /**
- * Runtime flush mode handling
- */
-export enum FlushMode {
-    /**
-     * In automatic flush mode the runtime will immediately send all operations to the driver layer.
-     */
-    Automatic,
-
-    /**
-     * When in manual flush mode the runtime will buffer operations in the current turn and send them as a single
-     * batch at the end of the turn. The flush call on the runtime can be used to force send the current batch.
-     */
-    Manual,
-}
-
-/**
  * A reduced set of functionality of IContainerRuntime that a data store context/data store runtime will need
  * TODO: this should be merged into IFluidDataStoreContext
  */
@@ -56,11 +40,6 @@ export interface IContainerRuntimeBase extends
     /* TODO: Used by spaces. we should switch to IoC to provide the global registry */
     IProvideFluidDataStoreRegistry {
     readonly clientDetails: IClientDetails;
-
-    /**
-     * Sets the flush mode for operations on the document.
-     */
-    setFlushMode(mode: FlushMode): void;
 
     /**
      * Submits a container runtime level signal to be sent to other clients.

@@ -16,7 +16,6 @@ import {
     IAudience,
     IContainerContext,
     IDeltaManager,
-    IDeltaSender,
     IRuntime,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -42,7 +41,6 @@ import {
     MessageType,
 } from "@fluidframework/protocol-definitions";
 import {
-    FlushMode,
     IAttachMessage,
     InboundAttachMessage,
     IFluidDataStoreContext,
@@ -67,7 +65,6 @@ import {
 } from "./dataStoreContext";
 import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
-import { debug } from "./debug";
 import { DeltaScheduler } from "./deltaScheduler";
 import { PendingStateManager } from "./pendingStateManager";
 import { pkgVersion } from "./packageVersion";
@@ -132,29 +129,6 @@ export class ScheduleManager {
         this.deltaScheduler = new DeltaScheduler(
             this.deltaManager,
         );
-
-        // Listen for delta manager sends and add batch metadata to messages
-        this.deltaManager.on("prepareSend", (messages: IDocumentMessage[]) => {
-            if (messages.length === 0) {
-                return;
-            }
-
-            // First message will have the batch flag set to true if doing a batched send
-            const firstMessageMetadata = messages[0].metadata as IRuntimeMessageMetadata;
-            if (!firstMessageMetadata || !firstMessageMetadata.batch) {
-                return;
-            }
-
-            // If only length one then clear
-            if (messages.length === 1) {
-                delete messages[0].metadata;
-                return;
-            }
-
-            // Set the batch flag to false on the last message to indicate the end of the send batch
-            const lastMessage = messages[messages.length - 1];
-            lastMessage.metadata = { ...lastMessage.metadata, ...{ batch: false } };
-        });
     }
 
     public beginOperation(message: ISequencedDocumentMessage) {
@@ -287,10 +261,6 @@ export class ContainerRuntime extends EventEmitter
         return this.reSubmit;
     }
 
-    public get flushMode(): FlushMode {
-        return this._flushMode;
-    }
-
     public get IFluidDataStoreRegistry(): IFluidDataStoreRegistry {
         return this.registry;
     }
@@ -311,10 +281,6 @@ export class ContainerRuntime extends EventEmitter
     // 0.24 back-compat attachingBeforeSummary
     private readonly attachOpFiredForDataStore = new Set<string>();
 
-    private _flushMode = FlushMode.Automatic;
-    private needsFlush = false;
-    private flushTrigger = false;
-
     private _connected: boolean;
 
     public get connected(): boolean {
@@ -326,7 +292,6 @@ export class ContainerRuntime extends EventEmitter
 
     // Stores tracked by the Domain
     private readonly pendingAttach = new Map<string, IAttachMessage>();
-    private readonly deltaSender: IDeltaSender | undefined;
     private readonly scheduleManager: ScheduleManager;
     private readonly pendingStateManager: PendingStateManager;
 
@@ -365,8 +330,6 @@ export class ContainerRuntime extends EventEmitter
             context.deltaManager,
             this,
         );
-
-        this.deltaSender = this.deltaManager;
 
         this.pendingStateManager = new PendingStateManager(this);
 
@@ -585,50 +548,6 @@ export class ContainerRuntime extends EventEmitter
         const registryPath =
             `/${context.packagePath.slice(0, context.packagePath.length - 1).join("/")}`;
         this.emit("fluidDataStoreInstantiated", fluidDataStorePkgName, registryPath, !context.existing);
-    }
-
-    public setFlushMode(mode: FlushMode): void {
-        if (mode === this._flushMode) {
-            return;
-        }
-
-        // If switching to manual mode add a warning trace indicating the underlying loader does not support
-        // this feature yet. Can remove in 0.9.
-        if (!this.deltaSender && mode === FlushMode.Manual) {
-            debug("DeltaManager does not yet support flush modes");
-            return;
-        }
-
-        // Flush any pending batches if switching back to automatic
-        if (mode === FlushMode.Automatic) {
-            this.flush();
-        }
-
-        this._flushMode = mode;
-
-        // Let the PendingStateManager know that FlushMode has been updated.
-        this.pendingStateManager.onFlushModeUpdated(mode);
-    }
-
-    public flush(): void {
-        if (!this.deltaSender) {
-            debug("DeltaManager does not yet support flush modes");
-            return;
-        }
-
-        // Let the PendingStateManager know that there was an attempt to flush messages.
-        // Note that this should happen before the `this.needsFlush` check below because in the scenario where we are
-        // not connected, `this.needsFlush` will be false but the PendingStateManager might have pending messages and
-        // hence needs to track this.
-        this.pendingStateManager.onFlush();
-
-        // If flush has already been called then exit early
-        if (!this.needsFlush) {
-            return;
-        }
-
-        this.needsFlush = false;
-        return this.deltaSender.flush();
     }
 
     public async createDataStore(pkg: string | string[]): Promise<IFluidRouter>
@@ -862,27 +781,11 @@ export class ContainerRuntime extends EventEmitter
         let clientSequenceNumber: number = -1;
 
         if (this.canSendOps()) {
-            // If in manual flush mode we will trigger a flush at the next turn break
-            let batchBegin = false;
-            if (this.flushMode === FlushMode.Manual && !this.needsFlush) {
-                batchBegin = true;
-                this.needsFlush = true;
-
-                // Use Promise.resolve().then() to queue a microtask to detect the end of the turn and force a flush.
-                if (!this.flushTrigger) {
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                    Promise.resolve().then(() => {
-                        this.flushTrigger = false;
-                        this.flush();
-                    });
-                }
-            }
-
             clientSequenceNumber = this.submitRuntimeMessage(
                 type,
                 content,
-                this._flushMode === FlushMode.Manual,
-                batchBegin ? { batch: true } : undefined,
+                false,
+                undefined,
             );
         }
 

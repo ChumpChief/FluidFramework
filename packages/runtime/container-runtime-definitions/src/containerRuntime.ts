@@ -19,7 +19,6 @@ import {
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import {
-    FlushMode,
     IContainerRuntimeBase,
     IInboundSignalMessage,
 } from "@fluidframework/runtime-definitions";
@@ -49,7 +48,6 @@ export interface IContainerRuntime extends
     readonly connected: boolean;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly storage: IDocumentStorageService;
-    readonly flushMode: FlushMode;
     /**
      * Indicates the attachment state of the container to a host service.
      */
@@ -91,11 +89,6 @@ export interface IContainerRuntime extends
      * Returns the current audience.
      */
     getAudience(): IAudience;
-
-    /**
-     * Flushes any ops currently being batched to the loader
-     */
-    flush(): void;
 
     /**
      * Get an absolute url for a provided container-relative request.

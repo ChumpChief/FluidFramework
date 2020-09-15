@@ -15,7 +15,6 @@ import {
 import {
     NamedFluidDataStoreRegistryEntries,
     IFluidDataStoreFactory,
-    FlushMode,
 } from "@fluidframework/runtime-definitions";
 
 const defaultStoreId = "" as const;
@@ -47,9 +46,6 @@ export class RuntimeFactory implements IRuntimeFactory {
                 ...this.requestHandlers,
                 deprecated_innerRequestHandler),
         );
-
-        // Flush mode to manual to batch operations within a turn
-        runtime.setFlushMode(FlushMode.Manual);
 
         // On first boot create the base data store
         if (!runtime.existing && this.defaultStoreFactory.type) {
