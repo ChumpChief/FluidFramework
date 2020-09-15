@@ -319,13 +319,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.loadAndInitializeProtocolState(attributes, this.storageService);
 
         // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
-        const loadDetailsP = startConnectionP.then((details) => {
-            this._existing = details.existing;
-        });
+        const existingP = startConnectionP.then((details) => details.existing);
 
         // LoadContext directly requires blobManager and protocolHandler to be ready, and eventually calls
         // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
-        [this._protocolHandler] = await Promise.all([protocolHandlerP, loadDetailsP]);
+        [this._protocolHandler, this._existing] = await Promise.all([protocolHandlerP, existingP]);
 
         await this.loadContext();
 
