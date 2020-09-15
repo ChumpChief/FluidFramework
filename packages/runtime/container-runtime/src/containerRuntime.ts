@@ -631,28 +631,6 @@ export class ContainerRuntime extends EventEmitter
         return this.deltaSender.flush();
     }
 
-    public orderSequentially(callback: () => void): void {
-        // If flush mode is already manual we are either
-        // nested in another orderSequentially, or
-        // the app is flushing manually, in which
-        // case this invocation doesn't own
-        // flushing.
-        if (this.flushMode === FlushMode.Manual) {
-            callback();
-        } else {
-            const savedFlushMode = this.flushMode;
-
-            this.setFlushMode(FlushMode.Manual);
-
-            try {
-                callback();
-            } finally {
-                this.flush();
-                this.setFlushMode(savedFlushMode);
-            }
-        }
-    }
-
     public async createDataStore(pkg: string | string[]): Promise<IFluidRouter>
     {
         return this._createDataStore(pkg);

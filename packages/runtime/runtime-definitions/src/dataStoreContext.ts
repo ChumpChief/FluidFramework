@@ -58,12 +58,6 @@ export interface IContainerRuntimeBase extends
     readonly clientDetails: IClientDetails;
 
     /**
-     * Invokes the given callback and guarantees that all operations generated within the callback will be ordered
-     * sequentially. Total size of all messages must be less than maxOpSize.
-     */
-    orderSequentially(callback: () => void): void;
-
-    /**
      * Sets the flush mode for operations on the document.
      */
     setFlushMode(mode: FlushMode): void;
