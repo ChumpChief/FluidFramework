@@ -209,7 +209,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                         tree.trees[path],
                         this.sharedObjectRegistry,
                         undefined /* extraBlobs */,
-                        dataStoreContext.branch,
                     );
                 }
                 const deferred = new Deferred<IChannelContext>();
@@ -447,9 +446,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                 } else {
                     assert(!this.contexts.has(id), "Unexpected attach channel OP");
 
-                    // Create storage service that wraps the attach data
-                    const origin = message.origin?.id ?? this.documentId;
-
                     const flatBlobs = new Map<string, string>();
                     const snapshotTreeP = buildSnapshotTree(attachMessage.snapshot.entries, flatBlobs);
                     // flatBlobsP's validity is contingent on snapshotTreeP's resolution
@@ -465,7 +461,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
                         snapshotTreeP,
                         this.sharedObjectRegistry,
                         flatBlobsP,
-                        origin,
                         attachMessage.type);
 
                     this.contexts.set(id, remoteChannelContext);

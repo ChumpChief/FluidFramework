@@ -54,7 +54,6 @@ export interface IContainerRuntime extends
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly blobManager: IBlobManager;
     readonly storage: IDocumentStorageService;
-    readonly branch: string;
     readonly loader: ILoader;
     readonly flushMode: FlushMode;
     /**

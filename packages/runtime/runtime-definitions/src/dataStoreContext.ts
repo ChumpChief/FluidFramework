@@ -238,7 +238,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly blobManager: IBlobManager;
     readonly storage: IDocumentStorageService;
-    readonly branch: string;
     readonly baseSnapshot: ISnapshotTree | undefined;
     readonly loader: ILoader;
     /**

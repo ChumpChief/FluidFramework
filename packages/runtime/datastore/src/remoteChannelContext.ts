@@ -46,7 +46,6 @@ export class RemoteChannelContext implements IChannelContext {
         baseSnapshot: Promise<ISnapshotTree> | ISnapshotTree,
         private readonly registry: ISharedObjectRegistry,
         extraBlobs: Promise<Map<string, string>> | undefined,
-        private readonly branch: string,
         private readonly attachMessageType?: string,
     ) {
         this.services = createServiceEndpoints(
@@ -147,7 +146,7 @@ export class RemoteChannelContext implements IChannelContext {
             this.runtime,
             this.id,
             this.services,
-            this.branch,
+            undefined,
             attributes);
 
         // Send all pending messages to the channel

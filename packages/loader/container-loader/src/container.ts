@@ -411,7 +411,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
         [this.blobManager, this._protocolHandler] = await Promise.all([blobManagerP, protocolHandlerP, loadDetailsP]);
 
-        await this.loadContext(attributes);
+        await this.loadContext();
 
         // Propagate current connection state through the system.
         this.propagateConnectionState();
@@ -681,7 +681,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async loadContext(
-        attributes: IDocumentAttributes,
         previousRuntimeState: IRuntimeState = {},
     ) {
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
@@ -691,7 +690,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context = await ContainerContext.createOrLoad(
             this,
             this.containerRuntimeFactory,
-            attributes,
             this.blobManager,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),

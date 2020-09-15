@@ -406,10 +406,6 @@ export class ContainerRuntime extends EventEmitter
         return this.context.storage!;
     }
 
-    public get branch(): string {
-        return this.context.branch;
-    }
-
     public get reSubmitFn(): (type: ContainerMessageType, content: any, localOpMetadata: unknown) => void {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         return this.reSubmit;

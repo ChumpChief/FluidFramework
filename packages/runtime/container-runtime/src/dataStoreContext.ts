@@ -125,10 +125,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         return this.connected ? ConnectionState.Connected : ConnectionState.Disconnected;
     }
 
-    public get branch(): string {
-        return this._containerRuntime.branch;
-    }
-
     public get loader(): ILoader {
         return this._containerRuntime.loader;
     }
