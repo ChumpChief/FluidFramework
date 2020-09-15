@@ -15,7 +15,6 @@ import {
     IBlobManager,
     IDeltaManager,
     ContainerWarning,
-    ILoader,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -239,7 +238,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
     readonly blobManager: IBlobManager;
     readonly storage: IDocumentStorageService;
     readonly baseSnapshot: ISnapshotTree | undefined;
-    readonly loader: ILoader;
     /**
      * Indicates the attachment state of the data store to a host service.
      */

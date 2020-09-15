@@ -17,7 +17,6 @@ import {
     IDeltaManager,
     IGenericBlob,
     ContainerWarning,
-    ILoader,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -115,10 +114,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
 
     public get clientDetails(): IClientDetails {
         return this.dataStoreContext.containerRuntime.clientDetails;
-    }
-
-    public get loader(): ILoader {
-        return this.dataStoreContext.loader;
     }
 
     public get isAttached(): boolean {

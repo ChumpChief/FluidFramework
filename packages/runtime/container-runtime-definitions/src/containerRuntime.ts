@@ -11,7 +11,6 @@ import {
     IBlobManager,
     IDeltaManager,
     ContainerWarning,
-    ILoader,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -54,7 +53,6 @@ export interface IContainerRuntime extends
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly blobManager: IBlobManager;
     readonly storage: IDocumentStorageService;
-    readonly loader: ILoader;
     readonly flushMode: FlushMode;
     /**
      * Indicates the attachment state of the container to a host service.

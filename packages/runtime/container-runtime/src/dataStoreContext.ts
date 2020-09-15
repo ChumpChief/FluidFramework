@@ -16,7 +16,6 @@ import {
     IDeltaManager,
     IGenericBlob,
     ContainerWarning,
-    ILoader,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -123,10 +122,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
     // Back-compat: supporting <= 0.16 stores
     public get connectionState(): ConnectionState {
         return this.connected ? ConnectionState.Connected : ConnectionState.Disconnected;
-    }
-
-    public get loader(): ILoader {
-        return this._containerRuntime.loader;
     }
 
     public get containerRuntime(): IContainerRuntime {

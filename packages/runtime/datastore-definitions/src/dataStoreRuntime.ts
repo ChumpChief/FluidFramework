@@ -15,7 +15,6 @@ import {
     IDeltaManager,
     IGenericBlob,
     ContainerWarning,
-    ILoader,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -52,8 +51,6 @@ export interface IFluidDataStoreRuntime extends
     readonly existing: boolean;
 
     readonly connected: boolean;
-
-    readonly loader: ILoader;
 
     /**
      * Indicates the attachment state of the data store to a host service.

@@ -4,7 +4,6 @@
  */
 
 import { strict as assert } from "assert";
-import { EventEmitter } from "events";
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IAudience,
@@ -13,7 +12,6 @@ import {
     IContainerEvents,
     IDeltaManager,
     IFluidCodeDetails,
-    ILoader,
     IRuntimeFactory,
     ICriticalContainerError,
     ContainerWarning,
@@ -82,36 +80,6 @@ export type DetachedContainerSource = {
     snapshot: ISnapshotTree,
     create: false,
 };
-
-class LocalLoader extends EventEmitter implements ILoader {
-    /**
-     * BaseRequest is the original request that triggered the load. This URL is used in case credentials need
-     * to be fetched again.
-     */
-    constructor(
-        private readonly container: Container,
-    ) {
-        super();
-    }
-
-    public get IFluidRouter() { return this; }
-
-    public async resolve(request: IRequest): Promise<IContainer> {
-        if (request.url.startsWith("/")) {
-            return this.container;
-        }
-
-        throw new Error("Resolved non-container-relative url");
-    }
-
-    public async request(request: IRequest): Promise<IResponse> {
-        if (request.url.startsWith("/")) {
-            return this.container.request(request);
-        }
-
-        throw new Error("Requested non-container-relative url");
-    }
-}
 
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
     public static version = "^0.1.0";
@@ -680,17 +648,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async loadContext() {
-        // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
-        // are set. Global requests will still go directly to the loader
-        const loader = new LocalLoader(this);
-
         this._context = await ContainerContext.createOrLoad(
             this,
             this.containerRuntimeFactory,
             this.blobManager,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
-            loader,
             (warning: ContainerWarning) => this.raiseContainerWarning(warning),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
