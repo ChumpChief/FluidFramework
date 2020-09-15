@@ -62,7 +62,6 @@ import {
 import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { PendingStateManager } from "./pendingStateManager";
-import { pkgVersion } from "./packageVersion";
 
 export enum ContainerMessageType {
     // An op to be delivered to store
@@ -113,9 +112,6 @@ export class ContainerRuntime extends EventEmitter
     implements IContainerRuntime, IRuntime {
     public get IContainerRuntime() { return this; }
     public get IFluidRouter() { return this; }
-
-    // 0.24 back-compat attachingBeforeSummary
-    public readonly runtimeVersion = pkgVersion;
 
     /**
      * Load the stores from a snapshot and returns the runtime.
