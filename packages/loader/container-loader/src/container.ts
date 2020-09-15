@@ -30,13 +30,10 @@ import {
 } from "@fluidframework/protocol-base";
 import {
     IClient,
-    IDocumentAttributes,
     IDocumentMessage,
     IProcessMessageResult,
     IQuorum,
-    ISequencedClient,
     ISequencedDocumentMessage,
-    ISequencedProposal,
     ISignalClient,
     ISignalMessage,
     MessageType,
@@ -306,24 +303,15 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
         const startConnectionP = this.connectToDeltaStream(connectionArgs);
-        startConnectionP.catch((error) => { });
-
-        const attributes = await this.getDocumentAttributes();
 
         // Attach op handlers to start processing ops
-        this.attachDeltaManagerOpHandler(attributes);
+        this.attachDeltaManagerOpHandler();
 
         // ...load in the existing quorum
         // Initialize the protocol handler
-        const protocolHandlerP =
-            this.loadAndInitializeProtocolState(attributes, this.storageService);
+        this._protocolHandler = this.initializeProtocolState();
 
-        // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
-        const existingP = startConnectionP.then((details) => details.existing);
-
-        // LoadContext directly requires blobManager and protocolHandler to be ready, and eventually calls
-        // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
-        [this._protocolHandler, this._existing] = await Promise.all([protocolHandlerP, existingP]);
+        this._existing = await startConnectionP.then((details) => details.existing);
 
         await this.loadContext();
 
@@ -337,50 +325,20 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         return {
             existing: this._existing,
-            sequenceNumber: attributes.sequenceNumber,
+            sequenceNumber: 0,
             version: undefined,
         };
     }
 
-    private async getDocumentAttributes(): Promise<IDocumentAttributes> {
-        return {
-            branch: this.id,
-            minimumSequenceNumber: 0,
-            sequenceNumber: 0,
-            term: 1,
-        };
-    }
-
-    private async loadAndInitializeProtocolState(
-        attributes: IDocumentAttributes,
-        storage: IDocumentStorageService | undefined,
-    ): Promise<ProtocolOpHandler> {
-        const members: [string, ISequencedClient][] = [];
-        const proposals: [number, ISequencedProposal, string[]][] = [];
-        const values: [string, any][] = [];
-
-        return this.initializeProtocolState(
-            attributes,
-            members,
-            proposals,
-            values,
-        );
-    }
-
-    private initializeProtocolState(
-        attributes: IDocumentAttributes,
-        members: [string, ISequencedClient][],
-        proposals: [number, ISequencedProposal, string[]][],
-        values: [string, any][],
-    ): ProtocolOpHandler {
+    private initializeProtocolState(): ProtocolOpHandler {
         const protocol = new ProtocolOpHandler(
-            attributes.branch,
-            attributes.minimumSequenceNumber,
-            attributes.sequenceNumber,
-            attributes.term,
-            members,
-            proposals,
-            values,
+            this.id, // branch
+            0, // minimumSequenceNumber
+            0, // sequenceNumber
+            1, // term
+            [], // members
+            [], // proposals
+            [], // values
             (key, value) => this.submitMessage(MessageType.Propose, { key, value }),
             (sequenceNumber) => this.submitMessage(MessageType.Reject, sequenceNumber));
 
@@ -471,7 +429,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return deltaManager;
     }
 
-    private attachDeltaManagerOpHandler(attributes: IDocumentAttributes): void {
+    private attachDeltaManagerOpHandler(): void {
         this._deltaManager.on("closed", (error?: ICriticalContainerError) => {
             this.close(error);
         });
@@ -481,9 +439,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // It seems like something, like reconnection, that we would want to retry but otherwise allow
         // the document to load
         this._deltaManager.attachOpHandler(
-            attributes.minimumSequenceNumber,
-            attributes.sequenceNumber,
-            attributes.term ?? 1,
+            0, // minimumSequenceNumber
+            0, // sequenceNumber
+            1, // term
             {
                 process: (message) => this.processRemoteMessage(message),
                 processSignal: (message) => {
