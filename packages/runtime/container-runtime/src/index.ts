@@ -6,4 +6,3 @@
 export * from "./containerRuntime";
 export * from "./deltaScheduler";
 export * from "./dataStoreRegistry";
-export * from "./runWhileConnectedCoordinator";
