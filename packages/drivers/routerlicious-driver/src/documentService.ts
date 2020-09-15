@@ -19,7 +19,7 @@ export class DocumentService implements api.IDocumentService {
     constructor(
         private readonly ordererUrl: string,
         private readonly deltaStorageUrl: string,
-        private readonly gitUrl: string,
+        private readonly storageUrl: string,
         private readonly token: string,
         private readonly tenantId: string,
         private readonly documentId: string,
@@ -38,7 +38,7 @@ export class DocumentService implements api.IDocumentService {
         };
 
         const historian = new Historian(
-            this.gitUrl,
+            this.storageUrl,
             true, // historianApi
             false, // disableCache
             credentials);

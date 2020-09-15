@@ -333,7 +333,7 @@ export class DeltaManager
     }
 
     constructor(
-        private readonly serviceProvider: () => IDocumentService | undefined,
+        private readonly documentService: IDocumentService,
         private client: IClient,
         private readonly logger: ITelemetryLogger,
         reconnectAllowed: boolean,
@@ -478,11 +478,6 @@ export class DeltaManager
             this.fetchMissingDeltas(args.reason ?? "DocumentOpen", this.lastQueuedSequenceNumber);
         }
 
-        const docService = this.serviceProvider();
-        if (docService === undefined) {
-            throw new Error("Container is not attached");
-        }
-
         // The promise returned from connectCore will settle with a resolved DeltaConnection or reject with error
         const connectCore = async () => {
             let connection: DeltaConnection | undefined;
@@ -499,7 +494,7 @@ export class DeltaManager
 
                 try {
                     this.client.mode = requestedMode;
-                    connection = await DeltaConnection.connect(docService, this.client);
+                    connection = await DeltaConnection.connect(this.documentService, this.client);
                 } catch (origError) {
                     const error = CreateContainerError(origError);
 
@@ -654,11 +649,6 @@ export class DeltaManager
         let deltas: ISequencedDocumentMessage[] = [];
         let deltasRetrievedTotal = 0;
 
-        const docService = this.serviceProvider();
-        if (docService === undefined) {
-            throw new Error("Delta manager is not attached");
-        }
-
         const telemetryEvent = PerformanceEvent.start(this.logger, {
             eventName: `GetDeltas_${telemetryEventSuffix}`,
             from,
@@ -681,7 +671,7 @@ export class DeltaManager
                 // Connect to the delta storage endpoint
                 if (deltaStorage === undefined) {
                     if (this.deltaStorageP === undefined) {
-                        this.deltaStorageP = docService.connectToDeltaStorage();
+                        this.deltaStorageP = this.documentService.connectToDeltaStorage();
                     }
                     deltaStorage = await this.deltaStorageP;
                 }
