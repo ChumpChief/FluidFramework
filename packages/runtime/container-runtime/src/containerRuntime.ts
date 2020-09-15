@@ -26,7 +26,7 @@ import {
     ICriticalContainerError,
     AttachState,
 } from "@fluidframework/container-definitions";
-import { IContainerRuntime, IContainerRuntimeDirtyable } from "@fluidframework/container-runtime-definitions";
+import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
 import {
     Deferred,
     unreachableCase,
@@ -339,9 +339,8 @@ class ContainerRuntimeDataStoreRegistry extends FluidDataStoreRegistry {
  * It will define the store level mappings.
  */
 export class ContainerRuntime extends EventEmitter
-    implements IContainerRuntime, IContainerRuntimeDirtyable, IRuntime {
+    implements IContainerRuntime, IRuntime {
     public get IContainerRuntime() { return this; }
-    public get IContainerRuntimeDirtyable() { return this; }
     public get IFluidRouter() { return this; }
 
     // 0.24 back-compat attachingBeforeSummary
@@ -928,36 +927,6 @@ export class ContainerRuntime extends EventEmitter
 
     public on(event: string | symbol, listener: (...args: any[]) => void): this {
         return super.on(event, listener);
-    }
-
-    /**
-     * Will return true for any message that affect the dirty state of this document
-     * This function can be used to filter out any runtime operations that should not be affecting whether or not
-     * the IFluidDataStoreRuntime.isDocumentDirty call returns true/false
-     * @param type - The type of ContainerRuntime message that is being checked
-     * @param contents - The contents of the message that is being verified
-     */
-    public isMessageDirtyable(message: ISequencedDocumentMessage) {
-        assert(
-            isRuntimeMessage(message) === true,
-            "Message passed for dirtyable check should be a container runtime message",
-        );
-        return this.isContainerMessageDirtyable(message.type as ContainerMessageType, message.contents);
-    }
-
-    private isContainerMessageDirtyable(type: ContainerMessageType, contents: any) {
-        if (type === ContainerMessageType.Attach) {
-            const attachMessage = contents as InboundAttachMessage;
-            if (attachMessage.id === taskSchedulerId) {
-                return false;
-            }
-        } else if (type === ContainerMessageType.FluidDataStoreOp) {
-            const envelope = contents as IEnvelope;
-            if (envelope.address === taskSchedulerId) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**
