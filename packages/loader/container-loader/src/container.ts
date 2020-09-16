@@ -23,7 +23,6 @@ import {
     IDocumentDeltaService,
     IDocumentStorageService,
 } from "@fluidframework/driver-definitions";
-import { CreateContainerError } from "@fluidframework/container-utils";
 import {
     isSystemMessage,
     ProtocolOpHandler,
@@ -482,15 +481,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
-        switch (type) {
-            case MessageType.Operation:
-            case MessageType.RemoteHelp:
-            case MessageType.Summarize:
-                break;
-            default:
-                this.close(CreateContainerError(`Runtime can't send arbitrary message type: ${type}`));
-                return -1;
+        if (type !== MessageType.Operation) {
+            throw new Error(`Runtime can't send arbitrary message type: ${type}`);
         }
+
         return this.submitMessage(type, contents, batch, metadata);
     }
 
