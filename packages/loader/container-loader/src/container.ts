@@ -322,14 +322,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.pendingClientId = details.clientId;
 
             if (deltaManager.connectionMode === "read") {
-                this.setConnectionState(
-                    ConnectionState.Connected,
-                    `joined as readonly`);
+                this.setConnectionState(ConnectionState.Connected);
             }
         });
 
-        deltaManager.on("disconnect", (reason: string) => {
-            this.setConnectionState(ConnectionState.Disconnected, reason);
+        deltaManager.on("disconnect", () => {
+            this.setConnectionState(ConnectionState.Disconnected);
         });
 
         deltaManager.on("pong", (latency) => {
@@ -347,9 +345,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return deltaManager;
     }
 
-    private setConnectionState(
-        value: ConnectionState,
-        reason: string) {
+    private setConnectionState(value: ConnectionState) {
         assert(value !== ConnectionState.Connecting);
         if (this.connectionState === value) {
             // Already in the desired state - exit early
@@ -405,9 +401,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             const joinMessage = message as ISequencedDocumentSystemMessage;
             const join = JSON.parse(joinMessage.data) as IClientJoin;
             if (join.clientId === this.pendingClientId) {
-                this.setConnectionState(
-                    ConnectionState.Connected,
-                    `joined @ ${joinMessage.sequenceNumber}`);
+                this.setConnectionState(ConnectionState.Connected);
             }
         }
 
