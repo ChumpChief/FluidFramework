@@ -53,10 +53,6 @@ export interface IContainerRuntime extends
         listener: () => void): this;
     on(event: "connected", listener: (clientId: string) => void): this;
     on(event: "localHelp", listener: (message: IHelpMessage) => void): this;
-    on(
-        event: "fluidDataStoreInstantiated",
-        listener: (dataStorePkgName: string, registryPath: string, createNew: boolean) => void,
-    ): this;
     /**
      * Returns the runtime of the data store.
      * @param id - Id supplied during creating the data store.

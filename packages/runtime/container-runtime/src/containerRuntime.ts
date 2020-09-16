@@ -39,7 +39,6 @@ import {
 import {
     IAttachMessage,
     InboundAttachMessage,
-    IFluidDataStoreContext,
     IFluidDataStoreContextDetached,
     IFluidDataStoreRegistry,
     IFluidDataStoreChannel,
@@ -375,15 +374,7 @@ export class ContainerRuntime extends EventEmitter
         return context.realize();
     }
 
-    public notifyDataStoreInstantiated(context: IFluidDataStoreContext) {
-        const fluidDataStorePkgName = context.packagePath[context.packagePath.length - 1];
-        const registryPath =
-            `/${context.packagePath.slice(0, context.packagePath.length - 1).join("/")}`;
-        this.emit("fluidDataStoreInstantiated", fluidDataStorePkgName, registryPath, !context.existing);
-    }
-
-    public async createDataStore(pkg: string | string[]): Promise<IFluidRouter>
-    {
+    public async createDataStore(pkg: string | string[]): Promise<IFluidRouter> {
         return this._createDataStore(pkg);
     }
 
@@ -407,8 +398,7 @@ export class ContainerRuntime extends EventEmitter
         return context;
     }
 
-    private async _createDataStore(pkg: string | string[], id = uuid()): Promise<IFluidDataStoreChannel>
-    {
+    private async _createDataStore(pkg: string | string[], id = uuid()): Promise<IFluidDataStoreChannel> {
         return this._createFluidDataStoreContext(Array.isArray(pkg) ? pkg : [pkg], id).realize();
     }
 
