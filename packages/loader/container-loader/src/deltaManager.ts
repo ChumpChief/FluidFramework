@@ -129,7 +129,7 @@ export class DeltaManager
     private pending: ISequencedDocumentMessage[] = [];
     private fetching = false;
 
-    private inQuorum = false;
+    private connected = false;
 
     private updateSequenceNumberTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -217,7 +217,7 @@ export class DeltaManager
     }
 
     public get active(): boolean {
-        const res = this.inQuorum && this.connectionMode === "write";
+        const res = this.connected && this.connectionMode === "write";
         // user can't have r/w connection when user has only read permissions.
         // That said, connection can be r/w when host called forceReadonly(), as
         // this is view-only change
@@ -410,12 +410,12 @@ export class DeltaManager
         }
     }
 
-    public updateQuorumJoin() {
-        this.inQuorum = true;
+    public setConnected() {
+        this.connected = true;
     }
 
-    public updateQuorumLeave() {
-        this.inQuorum = false;
+    public setDisconnected() {
+        this.connected = false;
     }
 
     public async connect(args: IConnectionArgs = {}): Promise<IConnectionDetails> {

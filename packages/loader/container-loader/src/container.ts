@@ -409,7 +409,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         if (value === ConnectionState.Connected) {
             this._clientId = this.pendingClientId;
-            this._deltaManager.updateQuorumJoin();
+            this._deltaManager.setConnected();
         } else if (value === ConnectionState.Disconnected) {
             // Important as we process our own joinSession message through delta request
             this.pendingClientId = undefined;
