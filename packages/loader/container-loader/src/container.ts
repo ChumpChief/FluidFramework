@@ -15,7 +15,6 @@ import {
 } from "@fluidframework/container-definitions";
 import {
     EventEmitterWithErrorHandling,
-    raiseConnectedEvent,
 } from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
@@ -322,8 +321,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // we know there can no longer be outstanding ops that we sent with the previous client id.
             this.pendingClientId = details.clientId;
 
-            this.emit("connect", opsBehind);
-
             if (deltaManager.connectionMode === "read") {
                 this.setConnectionState(
                     ConnectionState.Connected,
@@ -377,7 +374,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private propagateConnectionState() {
         const state = this._connectionState === ConnectionState.Connected;
         this.context.setConnectionState(state, this.clientId);
-        raiseConnectedEvent(this, state, this.clientId);
     }
 
     private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
