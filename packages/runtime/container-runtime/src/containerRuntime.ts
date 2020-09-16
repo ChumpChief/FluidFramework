@@ -362,7 +362,7 @@ export class ContainerRuntime extends EventEmitter
         return this.getDataStore(id, wait);
     }
 
-    protected async getDataStore(id: string, wait = true): Promise<IFluidRouter> {
+    private async getDataStore(id: string, wait = true): Promise<IFluidRouter> {
         // Ensure deferred if it doesn't exist which will resolve once the process ID arrives
         const deferredContext = this.ensureContextDeferred(id);
 
