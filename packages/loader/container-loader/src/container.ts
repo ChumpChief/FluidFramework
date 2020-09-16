@@ -271,23 +271,17 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @param pause - start the container in a paused state
      */
     private async load() {
-        // Ideally we always connect as "read" by default.
-        // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.
-        // We should not rely on it by (one of them will address the issue, but we need to address both)
-        // 1) switching create new flow to one where we create file by posting snapshot
-        // 2) Fixing quorum workflows (have retry logic)
-        // That all said, "read" does not work with memorylicious workflows (that opens two simultaneous
-        // connections to same file) in two ways:
-        // A) creation flow breaks (as one of the clients "sees" file as existing, and hits #2 above)
-        // B) Once file is created, transition from view-only connection to write does not work - some bugs to be fixed.
-        const connectionArgs: IConnectionArgs = { mode: "write" };
-
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-        const startConnectionP = this.connectToDeltaStream(connectionArgs);
+        const startConnectionP = this.connectToDeltaStream({ mode: "write" });
 
         // Attach op handlers to start processing ops
-        this.attachDeltaManagerOpHandler();
+        this._deltaManager.attachOpHandler({
+            process: (message) => this.processRemoteMessage(message),
+            processSignal: (message) => {
+                this.processSignal(message);
+            },
+        });
         this._existing = await startConnectionP.then((details) => details.existing);
 
         await this.loadContext();
@@ -373,27 +367,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         });
 
         return deltaManager;
-    }
-
-    private attachDeltaManagerOpHandler(): void {
-        this._deltaManager.on("closed", (error?: ICriticalContainerError) => {
-            this.close(error);
-        });
-
-        // If we're the outer frame, do we want to do this?
-        // Begin fetching any pending deltas once we know the base sequence #. Can this fail?
-        // It seems like something, like reconnection, that we would want to retry but otherwise allow
-        // the document to load
-        this._deltaManager.attachOpHandler(
-            0, // minimumSequenceNumber
-            0, // sequenceNumber
-            1, // term
-            {
-                process: (message) => this.processRemoteMessage(message),
-                processSignal: (message) => {
-                    this.processSignal(message);
-                },
-            });
     }
 
     private setConnectionState(

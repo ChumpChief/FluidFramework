@@ -40,7 +40,6 @@ import {
     createGenericNetworkError,
 } from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
-import { debug } from "./debug";
 import { DeltaConnection } from "./deltaConnection";
 import { DeltaQueue } from "./deltaQueue";
 import { waitForConnectedState } from "./networkUtils";
@@ -376,20 +375,13 @@ export class DeltaManager
     /**
      * Sets the sequence number from which inbound messages should be returned
      */
-    public attachOpHandler(
-        minSequenceNumber: number,
-        sequenceNumber: number,
-        term: number,
-        handler: IDeltaHandlerStrategy,
-    ) {
-        debug("Attached op handler", sequenceNumber);
-
-        this.initSequenceNumber = sequenceNumber;
-        this.lastProcessedSequenceNumber = sequenceNumber;
-        this.baseTerm = term;
-        this.minSequenceNumber = minSequenceNumber;
-        this.lastQueuedSequenceNumber = sequenceNumber;
-        this.lastObservedSeqNumber = sequenceNumber;
+    public attachOpHandler(handler: IDeltaHandlerStrategy) {
+        this.initSequenceNumber = 0;
+        this.lastProcessedSequenceNumber = 0;
+        this.baseTerm = 1;
+        this.minSequenceNumber = 0;
+        this.lastQueuedSequenceNumber = 0;
+        this.lastObservedSeqNumber = 0;
 
         // We will use same check in other places to make sure all the seq number above are set properly.
         assert(this.handler === undefined);
