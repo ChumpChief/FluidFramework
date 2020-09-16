@@ -86,21 +86,17 @@ export function isRuntimeMessage(message: ISequencedDocumentMessage): boolean {
     }
 }
 
-export function unpackRuntimeMessage(message: ISequencedDocumentMessage) {
-    if (message.type === MessageType.Operation) {
-        // legacy op format?
-        if (message.contents.address !== undefined && message.contents.type === undefined) {
-            message.type = ContainerMessageType.FluidDataStoreOp;
-        } else {
-            // new format
-            const innerContents = message.contents as ContainerRuntimeMessage;
-            assert(innerContents.type !== undefined);
-            message.type = innerContents.type;
-            message.contents = innerContents.contents;
-        }
-        assert(isRuntimeMessage(message));
+function unpackRuntimeMessage(message: ISequencedDocumentMessage) {
+    if (message.type !== MessageType.Operation) {
+        return message;
     }
-    return message;
+
+    const unpackedMessage = { ...message };
+    assert(message.contents.type !== undefined);
+    unpackedMessage.type = message.contents.type;
+    unpackedMessage.contents = message.contents.contents;
+    assert(isRuntimeMessage(unpackedMessage));
+    return unpackedMessage;
 }
 
 /**
@@ -300,38 +296,32 @@ export class ContainerRuntime extends EventEmitter
         raiseConnectedEvent(this, connected, clientId);
     }
 
-    public process(messageArg: ISequencedDocumentMessage, local: boolean) {
+    public process(message: ISequencedDocumentMessage, local: boolean) {
         this.verifyNotClosed();
 
         // If it's not message for runtime, bail out right away.
-        if (!isRuntimeMessage(messageArg)) {
+        if (!isRuntimeMessage(message)) {
             return;
         }
 
-        // Do shallow copy of message, as methods below will modify it.
-        // There might be multiple container instances receiving same message
-        // We do not need to make deep copy, as each layer will just replace message.content itself,
-        // but would not modify contents details
-        let message = { ...messageArg };
-
-        message = unpackRuntimeMessage(message);
+        const unpackedMessage = unpackRuntimeMessage(message);
 
         let localMessageMetadata: unknown;
         if (local) {
-            localMessageMetadata = this.pendingStateManager.processPendingLocalMessage(message);
+            localMessageMetadata = this.pendingStateManager.processPendingLocalMessage(unpackedMessage);
         }
 
-        switch (message.type) {
+        switch (unpackedMessage.type) {
             case ContainerMessageType.Attach:
-                this.processAttachMessage(message, local, localMessageMetadata);
+                this.processAttachMessage(unpackedMessage, local, localMessageMetadata);
                 break;
             case ContainerMessageType.FluidDataStoreOp:
-                this.processFluidDataStoreOp(message, local, localMessageMetadata);
+                this.processFluidDataStoreOp(unpackedMessage, local, localMessageMetadata);
                 break;
             default:
         }
 
-        this.emit("op", message);
+        this.emit("op", unpackedMessage);
     }
 
     public processSignal(message: ISignalMessage, local: boolean) {
