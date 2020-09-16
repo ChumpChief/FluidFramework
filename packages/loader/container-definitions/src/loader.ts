@@ -6,7 +6,6 @@
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
@@ -39,12 +38,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
      * The Delta Manager supporting the op stream for this Container
      */
     deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-
-    /**
-     * The collection of write clients which were connected as of the current sequence number.
-     * Also contains a map of key-value pairs that must be agreed upon by all clients before being accepted.
-     */
-    getQuorum(): IQuorum;
 
     /**
      * Issue a request against the container for a resource.

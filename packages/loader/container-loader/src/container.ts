@@ -25,14 +25,13 @@ import {
 } from "@fluidframework/driver-definitions";
 import {
     isSystemMessage,
-    ProtocolOpHandler,
 } from "@fluidframework/protocol-base";
 import {
     IClient,
+    IClientJoin,
     IDocumentMessage,
-    IProcessMessageResult,
-    IQuorum,
     ISequencedDocumentMessage,
+    ISequencedDocumentSystemMessage,
     ISignalClient,
     ISignalMessage,
     MessageType,
@@ -97,13 +96,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             throw new Error("Attempted to access context before it was defined");
         }
         return this._context;
-    }
-    private _protocolHandler: ProtocolOpHandler | undefined;
-    private get protocolHandler() {
-        if (this._protocolHandler === undefined) {
-            throw new Error("Attempted to access protocolHandler before it was defined");
-        }
-        return this._protocolHandler;
     }
 
     private resumedOpProcessingAfterLoad = false;
@@ -199,13 +191,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._deltaManager = this.createDeltaManager();
     }
 
-    /**
-     * Retrieves the quorum associated with the document
-     */
-    public getQuorum(): IQuorum {
-        return this.protocolHandler.quorum;
-    }
-
     public close(error?: ICriticalContainerError) {
         if (this._closed) {
             return;
@@ -213,8 +198,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._closed = true;
 
         this._deltaManager.close(error);
-
-        this._protocolHandler?.close();
 
         this._context?.dispose(error !== undefined ? new Error(error.message) : undefined);
 
@@ -305,11 +288,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Attach op handlers to start processing ops
         this.attachDeltaManagerOpHandler();
-
-        // ...load in the existing quorum
-        // Initialize the protocol handler
-        this._protocolHandler = this.initializeProtocolState();
-
         this._existing = await startConnectionP.then((details) => details.existing);
 
         await this.loadContext();
@@ -327,37 +305,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             sequenceNumber: 0,
             version: undefined,
         };
-    }
-
-    private initializeProtocolState(): ProtocolOpHandler {
-        const protocol = new ProtocolOpHandler(
-            this.id, // branch
-            0, // minimumSequenceNumber
-            0, // sequenceNumber
-            1, // term
-            [], // members
-            [], // proposals
-            [], // values
-            (key, value) => this.submitMessage(MessageType.Propose, { key, value }),
-            (sequenceNumber) => this.submitMessage(MessageType.Reject, sequenceNumber));
-
-        // Track membership changes and update connection state accordingly
-        protocol.quorum.on("addMember", (clientId, details) => {
-            // This is the only one that requires the pending client ID
-            if (clientId === this.pendingClientId) {
-                this.setConnectionState(
-                    ConnectionState.Connected,
-                    `joined @ ${details.sequenceNumber}`);
-            }
-        });
-
-        protocol.quorum.on("removeMember", (clientId) => {
-            if (clientId === this._clientId) {
-                this._deltaManager.updateQuorumLeave();
-            }
-        });
-
-        return protocol;
     }
 
     private get client(): IClient {
@@ -476,7 +423,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private propagateConnectionState() {
         const state = this._connectionState === ConnectionState.Connected;
         this.context.setConnectionState(state, this.clientId);
-        this.protocolHandler.quorum.setConnectionState(state, this.clientId);
         raiseConnectedEvent(this, state, this.clientId);
     }
 
@@ -496,7 +442,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._deltaManager.submit(type, contents, batch, metadata);
     }
 
-    private processRemoteMessage(message: ISequencedDocumentMessage): IProcessMessageResult {
+    private processRemoteMessage(message: ISequencedDocumentMessage): void {
         const local = this._clientId === message.clientId;
 
         // Forward non system messages to the loaded runtime for processing
@@ -504,12 +450,18 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.context.process(message, local, undefined);
         }
 
-        // Allow the protocol handler to process the message
-        const result = this.protocolHandler.processMessage(message, local);
+        // Leftover from quorum's addMember
+        if (message.type === MessageType.ClientJoin) {
+            const joinMessage = message as ISequencedDocumentSystemMessage;
+            const join = JSON.parse(joinMessage.data) as IClientJoin;
+            if (join.clientId === this.pendingClientId) {
+                this.setConnectionState(
+                    ConnectionState.Connected,
+                    `joined @ ${joinMessage.sequenceNumber}`);
+            }
+        }
 
         this.emit("op", message);
-
-        return result;
     }
 
     private submitSignal(message: any) {

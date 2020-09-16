@@ -8,7 +8,6 @@ import {
     ConnectionMode,
     IClientDetails,
     IDocumentMessage,
-    IProcessMessageResult,
     ISequencedDocumentMessage,
     ISignalClient,
     ISignalMessage,
@@ -46,7 +45,7 @@ export interface IDeltaHandlerStrategy {
     /**
      * Processes the message.
      */
-    process: (message: ISequencedDocumentMessage) => IProcessMessageResult;
+    process: (message: ISequencedDocumentMessage) => void;
 
     /**
      * Processes the signal.
