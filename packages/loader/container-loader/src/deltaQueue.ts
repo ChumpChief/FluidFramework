@@ -145,9 +145,5 @@ export class DeltaQueue<T> extends TypedEventEmitter<IDeltaQueueEvents<T>> imple
                 this.emit("error", error);
             }
         }
-
-        if (this.q.length === 0) {
-            this.emit("idle");
-        }
     }
 }
