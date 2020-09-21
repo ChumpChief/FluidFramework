@@ -63,7 +63,6 @@ export class DeltaConnection
             claims: connection.claims,
             clientId: connection.clientId,
             existing: connection.existing,
-            checkpointSequenceNumber: connection.checkpointSequenceNumber,
             get initialClients() { return connection.initialClients; },
             get initialMessages() { return connection.initialMessages; },
             get initialSignals() { return connection.initialSignals; },

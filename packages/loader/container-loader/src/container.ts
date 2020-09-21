@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import { strict as assert } from "assert";
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IConnectionDetails,
@@ -68,8 +67,6 @@ export class Container implements IFluidRouter {
         return this._context;
     }
 
-    private resumedOpProcessingAfterLoad = false;
-
     public get IFluidRouter(): IFluidRouter { return this; }
 
     public get id(): string {
@@ -109,19 +106,6 @@ export class Container implements IFluidRouter {
 
     public async request(path: IRequest): Promise<IResponse> {
         return this.context.request(path);
-    }
-
-    private resumeInternal(args: IConnectionArgs = {}) {
-        // Resume processing ops
-        assert(!this.resumedOpProcessingAfterLoad);
-        this.resumedOpProcessingAfterLoad = true;
-        this._deltaManager.inbound.resume();
-        this._deltaManager.outbound.resume();
-        this._deltaManager.inboundSignal.resume();
-
-        // Ensure connection to web socket
-        // All errors are reported through events ("error" / "disconnected") and telemetry in DeltaManager
-        this.connectToDeltaStream(args).catch(() => { });
     }
 
     public get storage(): IDocumentStorageService {
@@ -165,7 +149,10 @@ export class Container implements IFluidRouter {
         // Propagate current connection state through the system.
         this.propagateConnectionState();
 
-        this.resumeInternal();
+        // The queues start paused
+        this._deltaManager.inbound.resume();
+        this._deltaManager.outbound.resume();
+        this._deltaManager.inboundSignal.resume();
 
         // Internal context is fully loaded at this point
         this.loaded = true;
@@ -192,7 +179,7 @@ export class Container implements IFluidRouter {
             this.client,
         );
 
-        deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {
+        deltaManager.on("connect", (details: IConnectionDetails) => {
             // Stash the clientID to detect when transitioning from connecting (socket.io channel open) to connected
             // (have received the join message for the client ID)
             // This is especially important in the reconnect case. It's possible there could be outstanding
@@ -239,16 +226,12 @@ export class Container implements IFluidRouter {
         this.context.setConnectionState(state, this.clientId);
     }
 
-    private submitOperationMessage(contents: any): number {
-        return this.submitMessage(MessageType.Operation, contents);
-    }
-
-    private submitMessage(type: MessageType, contents: any): number {
+    private submitMessage(contents: any): number {
         if (!this._connected) {
             return -1;
         }
 
-        return this._deltaManager.submit(type, contents);
+        return this._deltaManager.submit(MessageType.Operation, contents);
     }
 
     private processRemoteMessage(message: ISequencedDocumentMessage): void {
@@ -285,7 +268,7 @@ export class Container implements IFluidRouter {
         this._context = await ContainerContext.createOrLoad(
             this,
             this.containerRuntimeFactory,
-            (contents) => this.submitOperationMessage(contents),
+            (contents) => this.submitMessage(contents),
             (message) => this.submitSignal(message),
         );
     }

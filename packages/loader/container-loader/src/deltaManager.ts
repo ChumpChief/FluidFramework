@@ -758,12 +758,6 @@ export class DeltaManager
 
         let hasOpsBehindInfo = false;
 
-        // Some storages may provide checkpointSequenceNumber to identify how far client is behind.
-        if (connection.details.checkpointSequenceNumber !== undefined) {
-            hasOpsBehindInfo = true;
-            this.updateLatestKnownOpSeqNumber(connection.details.checkpointSequenceNumber);
-        }
-
         // Update knowledge of how far we are behind, before raising "connect" event
         // This is duplication of what enqueueMessages() does, but we have to raise event before we get there,
         // so duplicating update logic here as well.
