@@ -29,23 +29,6 @@ import {
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 
-export enum ConnectionState {
-    /**
-     * The document is no longer connected to the delta server
-     */
-    Disconnected,
-
-    /**
-     * The document has an inbound connection but is still pending for outbound deltas
-     */
-    Connecting,
-
-    /**
-     * The document is fully connected
-     */
-    Connected,
-}
-
 export class Container implements IFluidRouter {
     /**
      * Load container.
@@ -75,7 +58,7 @@ export class Container implements IFluidRouter {
     private readonly _documentId: string | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
-    private _connectionState = ConnectionState.Disconnected;
+    private _connected: boolean = false;
 
     private _context: ContainerContext | undefined;
     private get context() {
@@ -94,7 +77,7 @@ export class Container implements IFluidRouter {
     }
 
     public get connected(): boolean {
-        return this._connectionState === ConnectionState.Connected;
+        return this._connected;
     }
 
     /**
@@ -210,8 +193,6 @@ export class Container implements IFluidRouter {
         );
 
         deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {
-            this._connectionState = ConnectionState.Connecting;
-
             // Stash the clientID to detect when transitioning from connecting (socket.io channel open) to connected
             // (have received the join message for the client ID)
             // This is especially important in the reconnect case. It's possible there could be outstanding
@@ -221,30 +202,29 @@ export class Container implements IFluidRouter {
             this.pendingClientId = details.clientId;
 
             if (deltaManager.connectionMode === "read") {
-                this.setConnectionState(ConnectionState.Connected);
+                this.setConnected(true);
             }
         });
 
         deltaManager.on("disconnect", () => {
-            this.setConnectionState(ConnectionState.Disconnected);
+            this.setConnected(false);
         });
 
         return deltaManager;
     }
 
-    private setConnectionState(value: ConnectionState) {
-        assert(value !== ConnectionState.Connecting);
-        if (this._connectionState === value) {
+    private setConnected(value: boolean) {
+        if (this._connected === value) {
             // Already in the desired state - exit early
             return;
         }
 
-        this._connectionState = value;
+        this._connected = value;
 
-        if (value === ConnectionState.Connected) {
+        if (value) {
             this._clientId = this.pendingClientId;
             this._deltaManager.setConnected();
-        } else if (value === ConnectionState.Disconnected) {
+        } else {
             // Important as we process our own joinSession message through delta request
             this.pendingClientId = undefined;
         }
@@ -255,7 +235,7 @@ export class Container implements IFluidRouter {
     }
 
     private propagateConnectionState() {
-        const state = this._connectionState === ConnectionState.Connected;
+        const state = this._connected;
         this.context.setConnectionState(state, this.clientId);
     }
 
@@ -268,7 +248,7 @@ export class Container implements IFluidRouter {
     }
 
     private submitMessage(type: MessageType, contents: any): number {
-        if (this._connectionState !== ConnectionState.Connected) {
+        if (!this._connected) {
             return -1;
         }
 
@@ -288,7 +268,7 @@ export class Container implements IFluidRouter {
             const joinMessage = message as ISequencedDocumentSystemMessage;
             const join = JSON.parse(joinMessage.data) as IClientJoin;
             if (join.clientId === this.pendingClientId) {
-                this.setConnectionState(ConnectionState.Connected);
+                this.setConnected(true);
             }
         }
     }
