@@ -6,7 +6,6 @@
 import { IEventProvider, IEvent, IErrorEvent } from "@fluidframework/common-definitions";
 import {
     ConnectionMode,
-    IClientDetails,
     ISequencedDocumentMessage,
     ISignalClient,
     ISignalMessage,
@@ -101,9 +100,6 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
 
     /** The initial sequence number set when attaching the op handler */
     readonly initialSequenceNumber: number;
-
-    /** Details of client */
-    readonly clientDetails: IClientDetails;
 
     /** Protocol version being used to communicate with the service */
     readonly version: string;

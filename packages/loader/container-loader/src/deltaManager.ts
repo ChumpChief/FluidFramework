@@ -22,7 +22,6 @@ import { isSystemType, isSystemMessage } from "@fluidframework/protocol-base";
 import {
     ConnectionMode,
     IClient,
-    IClientDetails,
     IDocumentMessage,
     IDocumentSystemMessage,
     INack,
@@ -96,7 +95,6 @@ export class DeltaManager
     IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
     IEventProvider<IDeltaManagerInternalEvents>
 {
-    public readonly clientDetails: IClientDetails;
     public get IDeltaSender() { return this; }
 
     // file ACL - whether user has only read-only access to a file
@@ -289,7 +287,6 @@ export class DeltaManager
     ) {
         super();
 
-        this.clientDetails = this.client.details;
         this.defaultReconnectionMode = this.client.mode;
 
         this._inbound = new DeltaQueue<ISequencedDocumentMessage>(
