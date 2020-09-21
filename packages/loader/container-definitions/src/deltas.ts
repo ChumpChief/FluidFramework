@@ -7,7 +7,6 @@ import { IEventProvider, IEvent, IErrorEvent } from "@fluidframework/common-defi
 import {
     ConnectionMode,
     IClientDetails,
-    IDocumentMessage,
     ISequencedDocumentMessage,
     ISignalClient,
     ISignalMessage,
@@ -81,7 +80,6 @@ export interface IDeltaSender extends IProvideDeltaSender {
 
 /** Events emitted by the Delta Manager */
 export interface IDeltaManagerEvents extends IEvent {
-    (event: "submitOp", listener: (message: IDocumentMessage) => void);
     (event: "connect", listener: (details: IConnectionDetails, opsBehind?: number) => void);
     (event: "disconnect", listener: (reason: string) => void);
     (event: "readonly", listener: (readonly: boolean) => void);

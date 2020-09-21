@@ -10,20 +10,13 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
-import { ContainerWarning } from "./error";
 
 /**
  * Events emitted by the Container "upwards" to the Loader and Host
  */
 export interface IContainerEvents extends IEvent {
-    (event: "readonly", listener: (readonly: boolean) => void): void;
     (event: "connected", listener: (clientId: string) => void);
-    /**
-     * @param opsBehind - number of ops this client is behind (if present).
-     */
-    (event: "connect", listener: (opsBehind?: number) => void);
     (event: "disconnected" | "attaching" | "attached", listener: () => void);
-    (event: "warning", listener: (error: ContainerWarning) => void);
     (event: "op", listener: (message: ISequencedDocumentMessage) => void);
 }
 

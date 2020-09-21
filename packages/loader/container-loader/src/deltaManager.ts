@@ -517,7 +517,6 @@ export class DeltaManager
 
         const outbound = this.createOutboundMessage(type, message);
         this.stopSequenceNumberUpdate();
-        this.emit("submitOp", message);
 
         // Not batching
         this.flush();
