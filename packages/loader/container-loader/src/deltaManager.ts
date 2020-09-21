@@ -46,6 +46,8 @@ const MissingFetchDelaySeconds = 0.1;
 const MaxFetchDelaySeconds = 10;
 const MaxBatchDeltas = 2000;
 
+const defaultReconnectionMode = "read";
+
 // Test if we deal with NetworkError object and if it has enough information to make a call.
 // If in doubt, allow retries.
 const canRetryOnError = (error: any): boolean => error?.canRetry !== false;
@@ -102,9 +104,6 @@ export class DeltaManager
 
     // tracks host requiring read-only mode.
     private _forceReadonly = false;
-
-    // Connection mode used when reconnecting on error or disconnect.
-    private readonly defaultReconnectionMode: ConnectionMode;
 
     private pending: ISequencedDocumentMessage[] = [];
     private fetching = false;
@@ -287,8 +286,6 @@ export class DeltaManager
     ) {
         super();
 
-        this.defaultReconnectionMode = this.client.mode;
-
         this._inbound = new DeltaQueue<ISequencedDocumentMessage>(
             (op) => {
                 this.processInboundMessage(op);
@@ -384,7 +381,7 @@ export class DeltaManager
         }
 
         const fetchOpsFromStorage = args.fetchOpsFromStorage ?? true;
-        let requestedMode = args.mode ?? this.defaultReconnectionMode;
+        let requestedMode = args.mode ?? defaultReconnectionMode;
 
         // if we have any non-acked ops from last connection, reconnect as "write".
         // without that we would connect in view-only mode, which will result in immediate
@@ -737,7 +734,7 @@ export class DeltaManager
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.reconnectOnError(
                 connection,
-                this.defaultReconnectionMode,
+                defaultReconnectionMode,
                 createReconnectError("Disconnect", disconnectReason),
             );
         });
@@ -746,7 +743,7 @@ export class DeltaManager
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.reconnectOnError(
                 connection,
-                this.defaultReconnectionMode,
+                defaultReconnectionMode,
                 createReconnectError("error", error),
             );
         });
