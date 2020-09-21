@@ -17,7 +17,6 @@ import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     ISequencedDocumentMessage,
     ISignalMessage,
-    MessageType,
 } from "@fluidframework/protocol-definitions";
 import { Container } from "./container";
 
@@ -25,7 +24,7 @@ export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
         runtimeFactory: IRuntimeFactory,
-        submitFn: (type: MessageType, contents: any) => number,
+        submitFn: (contents: any) => number,
         submitSignalFn: (contents: any) => void,
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
@@ -75,7 +74,7 @@ export class ContainerContext implements IContainerContext {
     constructor(
         private readonly container: Container,
         public readonly runtimeFactory: IRuntimeFactory,
-        public readonly submitFn: (type: MessageType, contents: any) => number,
+        public readonly submitFn: (contents: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
     ) { }
 

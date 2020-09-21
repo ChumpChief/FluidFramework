@@ -603,10 +603,7 @@ export class ContainerRuntime extends EventEmitter
         contents: any,
     ) {
         const payload: ContainerRuntimeMessage = { type, contents };
-        return this.context.submitFn(
-            MessageType.Operation,
-            payload,
-        );
+        return this.context.submitFn(payload);
     }
 
     /**

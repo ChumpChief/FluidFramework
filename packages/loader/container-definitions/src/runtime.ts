@@ -12,7 +12,6 @@ import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     ISequencedDocumentMessage,
     ITree,
-    MessageType,
 } from "@fluidframework/protocol-definitions";
 
 // Represents the attachment state of the entity.
@@ -84,7 +83,7 @@ export interface IContainerContext extends IDisposable {
     readonly clientId: string | undefined;
     readonly storage: IDocumentStorageService | undefined | null;
     readonly connected: boolean;
-    readonly submitFn: (type: MessageType, contents: any) => number;
+    readonly submitFn: (contents: any) => number;
     readonly submitSignalFn: (contents: any) => void;
 
     /**

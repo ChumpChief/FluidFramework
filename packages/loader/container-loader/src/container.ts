@@ -239,12 +239,8 @@ export class Container implements IFluidRouter {
         this.context.setConnectionState(state, this.clientId);
     }
 
-    private submitContainerMessage(type: MessageType, contents: any): number {
-        if (type !== MessageType.Operation) {
-            throw new Error(`Runtime can't send arbitrary message type: ${type}`);
-        }
-
-        return this.submitMessage(type, contents);
+    private submitOperationMessage(contents: any): number {
+        return this.submitMessage(MessageType.Operation, contents);
     }
 
     private submitMessage(type: MessageType, contents: any): number {
@@ -289,7 +285,7 @@ export class Container implements IFluidRouter {
         this._context = await ContainerContext.createOrLoad(
             this,
             this.containerRuntimeFactory,
-            (type, contents) => this.submitContainerMessage(type, contents),
+            (contents) => this.submitOperationMessage(contents),
             (message) => this.submitSignal(message),
         );
     }
