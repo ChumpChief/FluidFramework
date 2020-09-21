@@ -503,7 +503,7 @@ export class DeltaManager
         this.messageBuffer = [];
     }
 
-    public submit(type: MessageType, contents: any, batch = false, metadata?: any): number {
+    public submit(type: MessageType, contents: any): number {
         if (this.readonly) {
             this.close(CreateContainerError("Op is sent in read-only document state"));
             return -1;
@@ -534,7 +534,7 @@ export class DeltaManager
         const message: IDocumentMessage = {
             clientSequenceNumber: ++this.clientSequenceNumber,
             contents: JSON.stringify(contents),
-            metadata,
+            metadata: undefined,
             referenceSequenceNumber: this.lastProcessedSequenceNumber,
             traces,
             type,
@@ -544,13 +544,10 @@ export class DeltaManager
         this.stopSequenceNumberUpdate();
         this.emit("submitOp", message);
 
-        if (!batch) {
-            this.flush();
-            this.messageBuffer.push(outbound);
-            this.flush();
-        } else {
-            this.messageBuffer.push(outbound);
-        }
+        // Not batching
+        this.flush();
+        this.messageBuffer.push(outbound);
+        this.flush();
 
         return outbound.clientSequenceNumber;
     }

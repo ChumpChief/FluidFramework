@@ -84,7 +84,7 @@ export interface IContainerContext extends IDisposable {
     readonly clientId: string | undefined;
     readonly storage: IDocumentStorageService | undefined | null;
     readonly connected: boolean;
-    readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
+    readonly submitFn: (type: MessageType, contents: any) => number;
     readonly submitSignalFn: (contents: any) => void;
 
     /**

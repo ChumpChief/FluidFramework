@@ -26,7 +26,7 @@ export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
         runtimeFactory: IRuntimeFactory,
-        submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
+        submitFn: (type: MessageType, contents: any) => number,
         submitSignalFn: (contents: any) => void,
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
@@ -81,7 +81,7 @@ export class ContainerContext implements IContainerContext {
     constructor(
         private readonly container: Container,
         public readonly runtimeFactory: IRuntimeFactory,
-        public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
+        public readonly submitFn: (type: MessageType, contents: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
     ) { }
 

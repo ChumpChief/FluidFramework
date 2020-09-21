@@ -364,20 +364,20 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.context.setConnectionState(state, this.clientId);
     }
 
-    private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
+    private submitContainerMessage(type: MessageType, contents: any): number {
         if (type !== MessageType.Operation) {
             throw new Error(`Runtime can't send arbitrary message type: ${type}`);
         }
 
-        return this.submitMessage(type, contents, batch, metadata);
+        return this.submitMessage(type, contents);
     }
 
-    private submitMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
+    private submitMessage(type: MessageType, contents: any): number {
         if (this.connectionState !== ConnectionState.Connected) {
             return -1;
         }
 
-        return this._deltaManager.submit(type, contents, batch, metadata);
+        return this._deltaManager.submit(type, contents);
     }
 
     private processRemoteMessage(message: ISequencedDocumentMessage): void {
@@ -416,7 +416,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context = await ContainerContext.createOrLoad(
             this,
             this.containerRuntimeFactory,
-            (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
+            (type, contents) => this.submitContainerMessage(type, contents),
             (message) => this.submitSignal(message),
         );
     }

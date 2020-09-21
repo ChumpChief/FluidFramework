@@ -591,8 +591,6 @@ export class ContainerRuntime extends EventEmitter
             clientSequenceNumber = this.submitRuntimeMessage(
                 type,
                 content,
-                false,
-                undefined,
             );
         }
 
@@ -603,14 +601,12 @@ export class ContainerRuntime extends EventEmitter
     private submitRuntimeMessage(
         type: ContainerMessageType,
         contents: any,
-        batch: boolean,
-        appData?: any) {
+    ) {
         const payload: ContainerRuntimeMessage = { type, contents };
         return this.context.submitFn(
             MessageType.Operation,
             payload,
-            batch,
-            appData);
+        );
     }
 
     /**
