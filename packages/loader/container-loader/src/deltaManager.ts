@@ -487,9 +487,6 @@ export class DeltaManager
             return;
         }
 
-        // The prepareFlush event allows listeners to append metadata to the batch prior to submission.
-        this.emit("prepareSend", this.messageBuffer);
-
         this._outbound.push(this.messageBuffer);
         this.messageBuffer = [];
     }
@@ -981,8 +978,6 @@ export class DeltaManager
             message.term = 1;
         }
         this.baseTerm = message.term;
-
-        this.emit("beforeOpProcessing", message);
 
         if (this.handler === undefined) {
             throw new Error("Attempted to process an inbound message without a handler attached");
