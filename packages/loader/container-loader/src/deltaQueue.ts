@@ -3,13 +3,11 @@
  * Licensed under the MIT License.
  */
 
-import { strict as assert } from "assert";
 import { IDeltaQueue, IDeltaQueueEvents } from "@fluidframework/container-definitions";
 import { Deferred, TypedEventEmitter } from "@fluidframework/common-utils";
 import Deque from "double-ended-queue";
 
 export class DeltaQueue<T> extends TypedEventEmitter<IDeltaQueueEvents<T>> implements IDeltaQueue<T> {
-    private isDisposed: boolean = false;
     private readonly q = new Deque<T>();
 
     /**
@@ -29,10 +27,6 @@ export class DeltaQueue<T> extends TypedEventEmitter<IDeltaQueueEvents<T>> imple
      * Undefined when not processing.
      */
     private processingDeferred: Deferred<void> | undefined;
-
-    public get disposed(): boolean {
-        return this.isDisposed;
-    }
 
     /**
      * @returns True if the queue is paused, false if not.
@@ -59,11 +53,6 @@ export class DeltaQueue<T> extends TypedEventEmitter<IDeltaQueueEvents<T>> imple
         private readonly worker: (delta: T) => void,
     ) {
         super();
-    }
-
-    public dispose() {
-        assert.fail("Not implemented.");
-        this.isDisposed = true;
     }
 
     public clear(): void {

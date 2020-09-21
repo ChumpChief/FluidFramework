@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IDisposable, IEventProvider, IEvent, IErrorEvent } from "@fluidframework/common-definitions";
+import { IEventProvider, IEvent, IErrorEvent } from "@fluidframework/common-definitions";
 import {
     ConnectionMode,
     IClientDetails,
@@ -93,7 +93,7 @@ export interface IDeltaManagerEvents extends IEvent {
 /**
  * Manages the transmission of ops between the runtime and storage.
  */
-export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>, IDeltaSender, IDisposable {
+export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>, IDeltaSender {
     /** The queue of inbound delta messages */
     readonly inbound: IDeltaQueue<T>;
 
@@ -154,7 +154,7 @@ export interface IDeltaQueueEvents<T> extends IErrorEvent {
 /**
  * Queue of ops to be sent to or processed from storage
  */
-export interface IDeltaQueue<T> extends IEventProvider<IDeltaQueueEvents<T>>, IDisposable {
+export interface IDeltaQueue<T> extends IEventProvider<IDeltaQueueEvents<T>> {
     /**
      * Flag indicating whether or not the queue was paused
      */
