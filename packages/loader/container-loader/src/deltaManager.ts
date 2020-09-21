@@ -843,10 +843,6 @@ export class DeltaManager
             );
         });
 
-        connection.on("pong", (latency: number) => {
-            this.emit("pong", latency);
-        });
-
         const initialMessages = connection.details.initialMessages;
 
         let hasOpsBehindInfo = false;
@@ -1017,8 +1013,6 @@ export class DeltaManager
     }
 
     private processInboundMessage(message: ISequencedDocumentMessage): void {
-        const startTime = Date.now();
-
         // All non-system messages are coming from some client, and should have clientId
         // System messages may have no clientId (but some do, like propose, noop, summarize)
         // Note: NoClient has not been added yet to isSystemMessage (in 0.16.x branch)
@@ -1087,9 +1081,6 @@ export class DeltaManager
             throw new Error("Attempted to process an inbound message without a handler attached");
         }
         this.handler.process(message);
-
-        const endTime = Date.now();
-        this.emit("processTime", endTime - startTime);
     }
 
     /**

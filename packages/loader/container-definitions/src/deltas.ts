@@ -85,7 +85,6 @@ export interface IDeltaManagerEvents extends IEvent {
     (event: "submitOp", listener: (message: IDocumentMessage) => void);
     (event: "beforeOpProcessing", listener: (message: ISequencedDocumentMessage) => void);
     (event: "allSentOpsAckd" | "caughtUp", listener: () => void);
-    (event: "pong" | "processTime", listener: (latency: number) => void);
     (event: "connect", listener: (details: IConnectionDetails, opsBehind?: number) => void);
     (event: "disconnect", listener: (reason: string) => void);
     (event: "readonly", listener: (readonly: boolean) => void);

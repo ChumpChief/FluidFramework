@@ -330,14 +330,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.setConnectionState(ConnectionState.Disconnected);
         });
 
-        deltaManager.on("pong", (latency) => {
-            this.emit("pong", latency);
-        });
-
-        deltaManager.on("processTime", (time) => {
-            this.emit("processTime", time);
-        });
-
         deltaManager.on("readonly", (readonly) => {
             this.emit("readonly", readonly);
         });
