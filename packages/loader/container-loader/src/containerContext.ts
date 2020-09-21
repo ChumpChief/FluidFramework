@@ -111,14 +111,6 @@ export class ContainerContext implements IContainerContext {
         return this.runtime.request(path);
     }
 
-    public registerTasks(tasks: string[]): any {
-        return;
-    }
-
-    public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        throw new Error("getAbsoluteUrl not implemented");
-    }
-
     private async load() {
         this._runtime = await this.runtimeFactory.instantiateRuntime(this);
     }
