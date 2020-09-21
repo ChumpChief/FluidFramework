@@ -7,15 +7,10 @@ import { strict as assert } from "assert";
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IConnectionDetails,
-    IContainer,
-    IContainerEvents,
     IDeltaManager,
     IRuntimeFactory,
     ICriticalContainerError,
 } from "@fluidframework/container-definitions";
-import {
-    EventEmitterWithErrorHandling,
-} from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
     IDocumentDeltaService,
@@ -54,7 +49,7 @@ export enum ConnectionState {
     Connected,
 }
 
-export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
+export class Container implements IFluidRouter {
     /**
      * Load container.
      */
@@ -171,8 +166,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private readonly storageService: IDocumentStorageService,
         documentId: string,
     ) {
-        super();
-
         this._documentId = documentId;
 
         this._deltaManager = this.createDeltaManager();
@@ -189,8 +182,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context?.dispose(error !== undefined ? new Error(error.message) : undefined);
 
         assert.strictEqual(this.connectionState, ConnectionState.Disconnected, "disconnect event was not raised!");
-
-        this.removeAllListeners();
     }
 
     public async request(path: IRequest): Promise<IResponse> {
@@ -328,10 +319,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.setConnectionState(ConnectionState.Disconnected);
         });
 
-        deltaManager.on("readonly", (readonly) => {
-            this.emit("readonly", readonly);
-        });
-
         return deltaManager;
     }
 
@@ -394,8 +381,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 this.setConnectionState(ConnectionState.Connected);
             }
         }
-
-        this.emit("op", message);
     }
 
     private submitSignal(message: any) {
