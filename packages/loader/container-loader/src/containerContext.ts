@@ -15,7 +15,6 @@ import {
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    ConnectionState,
     ISequencedDocumentMessage,
     ISignalMessage,
     MessageType,
@@ -49,11 +48,6 @@ export class ContainerContext implements IContainerContext {
 
     public get existing(): boolean | undefined {
         return this.container.existing;
-    }
-
-    // Back-compat: supporting <= 0.16 data stores
-    public get connectionState(): ConnectionState {
-        return this.connected ? ConnectionState.Connected : ConnectionState.Disconnected;
     }
 
     public get connected(): boolean {

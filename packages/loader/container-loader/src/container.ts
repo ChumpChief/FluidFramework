@@ -7,9 +7,7 @@ import { strict as assert } from "assert";
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IConnectionDetails,
-    IDeltaManager,
     IRuntimeFactory,
-    ICriticalContainerError,
 } from "@fluidframework/container-definitions";
 import {
     IDocumentDeltaStorageService,
@@ -22,7 +20,6 @@ import {
 import {
     IClient,
     IClientJoin,
-    IDocumentMessage,
     ISequencedDocumentMessage,
     ISequencedDocumentSystemMessage,
     ISignalMessage,
@@ -90,50 +87,18 @@ export class Container implements IFluidRouter {
 
     private resumedOpProcessingAfterLoad = false;
 
-    private _closed = false;
-
     public get IFluidRouter(): IFluidRouter { return this; }
-
-    /**
-     * {@inheritDoc DeltaManager.readonly}
-     */
-    public get readonly() {
-        return this._deltaManager.readonly;
-    }
-
-    /**
-     * {@inheritDoc DeltaManager.readonlyPermissions}
-     */
-    public get readonlyPermissions() {
-        return this._deltaManager.readonlyPermissions;
-    }
-
-    public forceReadonly(readonly: boolean) {
-        this._deltaManager.forceReadonly(readonly);
-    }
-
-    public get closed(): boolean {
-        return this._closed;
-    }
 
     public get id(): string {
         return this._documentId ?? "";
     }
 
-    public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {
-        return this._deltaManager;
-    }
-
-    public get connectionState(): ConnectionState {
+    private get connectionState(): ConnectionState {
         return this._connectionState;
     }
 
     public get connected(): boolean {
         return this.connectionState === ConnectionState.Connected;
-    }
-
-    public get canReconnect(): boolean {
-        return true;
     }
 
     /**
@@ -142,14 +107,6 @@ export class Container implements IFluidRouter {
      */
     public get clientId(): string | undefined {
         return this._clientId;
-    }
-
-    /**
-     * The server provided claims of the client.
-     * Set once this.connected is true, otherwise undefined
-     */
-    public get scopes(): string[] | undefined {
-        return this._deltaManager.scopes;
     }
 
     /**
@@ -171,47 +128,11 @@ export class Container implements IFluidRouter {
         this._deltaManager = this.createDeltaManager();
     }
 
-    public close(error?: ICriticalContainerError) {
-        if (this._closed) {
-            return;
-        }
-        this._closed = true;
-
-        this._deltaManager.close(error);
-
-        this._context?.dispose(error !== undefined ? new Error(error.message) : undefined);
-
-        assert.strictEqual(this.connectionState, ConnectionState.Disconnected, "disconnect event was not raised!");
-    }
-
     public async request(path: IRequest): Promise<IResponse> {
         return this.context.request(path);
     }
 
-    public setAutoReconnect(reconnect: boolean) {
-        assert(this.resumedOpProcessingAfterLoad);
-
-        if (reconnect && this.closed) {
-            throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
-        }
-
-        this._deltaManager.setAutomaticReconnect(reconnect);
-
-        if (reconnect) {
-            // Ensure connection to web socket
-            this.connectToDeltaStream({ reason: "autoReconnect" }).catch((error) => { });
-        }
-    }
-
-    public resume() {
-        this.resumeInternal();
-    }
-
     private resumeInternal(args: IConnectionArgs = {}) {
-        if (this.closed) {
-            throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
-        }
-
         // Resume processing ops
         assert(!this.resumedOpProcessingAfterLoad);
         this.resumedOpProcessingAfterLoad = true;
@@ -230,7 +151,7 @@ export class Container implements IFluidRouter {
 
     private async connectToDeltaStream(args: IConnectionArgs = {}) {
         // All agents need "write" access, including summarizer.
-        if (!this.canReconnect || !this.client.details.capabilities.interactive) {
+        if (!this.client.details.capabilities.interactive) {
             args.mode = "write";
         }
 
@@ -265,7 +186,7 @@ export class Container implements IFluidRouter {
         // Propagate current connection state through the system.
         this.propagateConnectionState();
 
-        this.resume();
+        this.resumeInternal();
 
         // Internal context is fully loaded at this point
         this.loaded = true;
@@ -296,7 +217,6 @@ export class Container implements IFluidRouter {
             this.deltaService,
             this.deltaStorageService,
             this.client,
-            this.canReconnect,
         );
 
         deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {
