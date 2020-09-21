@@ -93,12 +93,8 @@ export class Container implements IFluidRouter {
         return this._documentId ?? "";
     }
 
-    private get connectionState(): ConnectionState {
-        return this._connectionState;
-    }
-
     public get connected(): boolean {
-        return this.connectionState === ConnectionState.Connected;
+        return this._connectionState === ConnectionState.Connected;
     }
 
     /**
@@ -190,12 +186,6 @@ export class Container implements IFluidRouter {
 
         // Internal context is fully loaded at this point
         this.loaded = true;
-
-        return {
-            existing: this._existing,
-            sequenceNumber: 0,
-            version: undefined,
-        };
     }
 
     private get client(): IClient {
@@ -244,7 +234,7 @@ export class Container implements IFluidRouter {
 
     private setConnectionState(value: ConnectionState) {
         assert(value !== ConnectionState.Connecting);
-        if (this.connectionState === value) {
+        if (this._connectionState === value) {
             // Already in the desired state - exit early
             return;
         }
@@ -278,7 +268,7 @@ export class Container implements IFluidRouter {
     }
 
     private submitMessage(type: MessageType, contents: any): number {
-        if (this.connectionState !== ConnectionState.Connected) {
+        if (this._connectionState !== ConnectionState.Connected) {
             return -1;
         }
 

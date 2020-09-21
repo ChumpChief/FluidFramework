@@ -24,7 +24,6 @@ import { v4 as uuid } from "uuid";
 export async function getTinyliciousContainer(
     documentId: string,
     containerRuntimeFactory: IRuntimeFactory,
-    createNew: boolean,
 ): Promise<Container> {
     const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${documentId}`;
     const storageUrl = `http://localhost:3000/repos/tinylicious`;
