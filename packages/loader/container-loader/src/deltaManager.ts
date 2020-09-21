@@ -29,7 +29,6 @@ import {
     INackContent,
     ISequencedDocumentMessage,
     ISignalMessage,
-    ITrace,
     MessageType,
     ScopeType,
 } from "@fluidframework/protocol-definitions";
@@ -519,24 +518,11 @@ export class DeltaManager
             this.clientSequenceNumberObserved = 0;
         }
 
-        const service = this.clientDetails.type === undefined || this.clientDetails.type === ""
-            ? "unknown"
-            : this.clientDetails.type;
-
-        // Start adding trace for the op.
-        const traces: ITrace[] = [
-            {
-                action: "start",
-                service,
-                timestamp: Date.now(),
-            }];
-
         const message: IDocumentMessage = {
             clientSequenceNumber: ++this.clientSequenceNumber,
             contents: JSON.stringify(contents),
             metadata: undefined,
             referenceSequenceNumber: this.lastProcessedSequenceNumber,
-            traces,
             type,
         };
 
