@@ -5,7 +5,6 @@
 
 import { DocumentDeltaConnection } from "@fluidframework/driver-base";
 import * as api from "@fluidframework/driver-definitions";
-import { IClient } from "@fluidframework/protocol-definitions";
 
 /**
  * The DocumentService manages the Socket.IO connection and manages routing requests to connected
@@ -24,12 +23,11 @@ export class DocumentDeltaService implements api.IDocumentDeltaService {
      *
      * @returns returns the document delta stream service for routerlicious driver.
      */
-    public async connectToDeltaStream(client: IClient): Promise<api.IDocumentDeltaConnection> {
+    public async connectToDeltaStream(): Promise<api.IDocumentDeltaConnection> {
         return DocumentDeltaConnection.create(
             this.tenantId,
             this.documentId,
             this.token,
-            client,
             this.ordererUrl);
     }
 }

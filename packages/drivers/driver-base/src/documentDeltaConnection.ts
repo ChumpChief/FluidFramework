@@ -67,11 +67,15 @@ export class DocumentDeltaConnection
         tenantId: string,
         documentId: string,
         token: string,
-        client: IClient,
         ordererUrl: string,
     ): Promise<IDocumentDeltaConnection> {
         const deltaConnection = new DocumentDeltaConnection();
-        await deltaConnection.connect(ordererUrl, tenantId, documentId, client, token);
+        await deltaConnection.connect(
+            ordererUrl,
+            tenantId,
+            documentId,
+            token,
+        );
 
         return deltaConnection;
     }
@@ -241,7 +245,6 @@ export class DocumentDeltaConnection
         ordererUrl: string,
         tenantId: string,
         documentId: string,
-        client: IClient,
         token: string,
     ): Promise<void> {
         this.socket = io(
@@ -257,9 +260,9 @@ export class DocumentDeltaConnection
             });
 
         const connectMessage: IConnect = {
-            client,
+            client: {} as unknown as IClient,
             id: documentId,
-            mode: client.mode,
+            mode: "write",
             tenantId,
             token,  // Token is going to indicate tenant level information, etc...
             versions: protocolVersions,

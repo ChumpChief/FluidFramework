@@ -17,7 +17,6 @@ import {
     isSystemMessage,
 } from "@fluidframework/protocol-base";
 import {
-    IClient,
     IClientJoin,
     ISequencedDocumentMessage,
     ISequencedDocumentSystemMessage,
@@ -26,7 +25,7 @@ import {
 } from "@fluidframework/protocol-definitions";
 
 import { ContainerContext } from "./containerContext";
-import { IConnectionArgs, DeltaManager } from "./deltaManager";
+import { DeltaManager } from "./deltaManager";
 
 export class Container implements IFluidRouter {
     /**
@@ -112,15 +111,6 @@ export class Container implements IFluidRouter {
         return this.storageService;
     }
 
-    private async connectToDeltaStream(args: IConnectionArgs = {}) {
-        // All agents need "write" access, including summarizer.
-        if (!this.client.details.capabilities.interactive) {
-            args.mode = "write";
-        }
-
-        return this._deltaManager.connect(args);
-    }
-
     /**
      * Load container.
      *
@@ -133,7 +123,7 @@ export class Container implements IFluidRouter {
     private async load() {
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-        const startConnectionP = this.connectToDeltaStream({ mode: "write" });
+        const startConnectionP = this._deltaManager.connect();
 
         // Attach op handlers to start processing ops
         this._deltaManager.attachOpHandler({
@@ -158,25 +148,10 @@ export class Container implements IFluidRouter {
         this.loaded = true;
     }
 
-    private get client(): IClient {
-        const client: IClient = {
-            details: {
-                capabilities: { interactive: true },
-            },
-            mode: "read", // default reconnection mode on lost connection / connection error
-            permission: [],
-            scopes: [],
-            user: { id: "" },
-        };
-
-        return client;
-    }
-
     private createDeltaManager() {
         const deltaManager = new DeltaManager(
             this.deltaService,
             this.deltaStorageService,
-            this.client,
         );
 
         deltaManager.on("connect", (details: IConnectionDetails) => {

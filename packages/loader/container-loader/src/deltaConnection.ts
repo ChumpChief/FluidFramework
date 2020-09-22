@@ -13,7 +13,6 @@ import {
     IDocumentDeltaConnectionEvents,
 } from "@fluidframework/driver-definitions";
 import {
-    IClient,
     IDocumentMessage,
     INack,
 } from "@fluidframework/protocol-definitions";
@@ -21,10 +20,8 @@ import { TypedEventEmitter } from "@fluidframework/common-utils";
 
 export class DeltaConnection
     extends TypedEventEmitter<IDocumentDeltaConnectionEvents> {
-    public static async connect(
-        service: IDocumentDeltaService,
-        client: IClient) {
-        const connection = await service.connectToDeltaStream(client);
+    public static async connect(service: IDocumentDeltaService) {
+        const connection = await service.connectToDeltaStream();
         return new DeltaConnection(connection);
     }
 

@@ -6,7 +6,6 @@
 import { IEventProvider, IErrorEvent } from "@fluidframework/common-definitions";
 import {
     ConnectionMode,
-    IClient,
     ICreateBlobResponse,
     IDocumentMessage,
     INack,
@@ -189,7 +188,7 @@ export interface IDocumentDeltaService {
     /**
      * Subscribes to the document delta stream
      */
-    connectToDeltaStream(client: IClient): Promise<IDocumentDeltaConnection>;
+    connectToDeltaStream(): Promise<IDocumentDeltaConnection>;
 }
 
 /**

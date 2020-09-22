@@ -11,7 +11,6 @@ import {
     IResolvedUrl,
 } from "@fluidframework/driver-definitions";
 import {
-    IClient,
     IErrorTrackingService,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
@@ -48,7 +47,7 @@ export class MockDocumentService implements IDocumentDeltaService {
             ? this.deltaStorageFactory()
             : new MockDocumentDeltaStorageService(this.deltaStorageMessages);
     }
-    public async connectToDeltaStream(client: IClient): Promise<IDocumentDeltaConnection> {
+    public async connectToDeltaStream(): Promise<IDocumentDeltaConnection> {
         return this.deltaConnectionFactory !== undefined
             ? this.deltaConnectionFactory()
             : new MockDocumentDeltaConnection(`mock_client_${this.nextClientId++}`);
