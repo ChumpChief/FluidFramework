@@ -140,9 +140,7 @@ export class Container implements IFluidRouter {
         this.propagateConnectionState();
 
         // The queues start paused
-        this._deltaManager.inbound.resume();
-        this._deltaManager.outbound.resume();
-        this._deltaManager.inboundSignal.resume();
+        this._deltaManager.resume();
 
         // Internal context is fully loaded at this point
         this.loaded = true;

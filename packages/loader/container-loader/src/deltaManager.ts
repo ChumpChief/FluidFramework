@@ -474,6 +474,12 @@ export class DeltaManager
         this.connection?.submitSignal(content);
     }
 
+    public resume(): void {
+        this.inbound.resume();
+        this.outbound.resume();
+        this.inboundSignal.resume();
+    }
+
     private async getDeltas(
         fromInitial: number,
         to: number | undefined,
