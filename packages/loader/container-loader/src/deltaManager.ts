@@ -93,7 +93,6 @@ export class DeltaManager
     // * lastProcessedSequenceNumber - last processed sequence number
     private lastQueuedSequenceNumber: number = 0;
     private lastProcessedSequenceNumber: number = 0;
-    private baseTerm: number = 0;
 
     // The sequence number we initially loaded from
     private initSequenceNumber: number = 0;
@@ -135,10 +134,6 @@ export class DeltaManager
         return this.lastProcessedSequenceNumber;
     }
 
-    public get referenceTerm(): number {
-        return this.baseTerm;
-    }
-
     public get minimumSequenceNumber(): number {
         return this.minSequenceNumber;
     }
@@ -152,25 +147,6 @@ export class DeltaManager
 
     public get scopes(): string[] | undefined {
         return this.connection?.details.claims.scopes;
-    }
-
-    public get socketDocumentId(): string | undefined {
-        return this.connection?.details.claims.documentId;
-    }
-
-    /**
-     * Automatic reconnecting enabled or disabled.
-     * If set to Never, then reconnecting will never be allowed.
-     */
-    public get reconnectMode(): ReconnectMode {
-        return ReconnectMode.Enabled;
-    }
-
-    /**
-     * Enables or disables automatic reconnecting.
-     * Will throw an error if reconnectMode set to Never.
-     */
-    public setAutomaticReconnect(reconnect: boolean): void {
     }
 
     constructor(
@@ -232,7 +208,6 @@ export class DeltaManager
     public attachOpHandler(handler: IDeltaHandlerStrategy) {
         this.initSequenceNumber = 0;
         this.lastProcessedSequenceNumber = 0;
-        this.baseTerm = 1;
         this.minSequenceNumber = 0;
         this.lastQueuedSequenceNumber = 0;
 
@@ -719,7 +694,6 @@ export class DeltaManager
         if (message.term === undefined) {
             message.term = 1;
         }
-        this.baseTerm = message.term;
 
         if (this.handler === undefined) {
             throw new Error("Attempted to process an inbound message without a handler attached");
