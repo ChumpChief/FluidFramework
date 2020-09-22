@@ -79,7 +79,7 @@ export interface IDeltaManagerEvents extends IEvent {
 /**
  * Manages the transmission of ops between the runtime and storage.
  */
-export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>, IDeltaSender {
+export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents> {
     /** The current minimum sequence number */
     readonly minimumSequenceNumber: number;
 
@@ -89,11 +89,15 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
     /** The initial sequence number set when attaching the op handler */
     readonly initialSequenceNumber: number;
 
-    /** Protocol version being used to communicate with the service */
-    readonly version: string;
-
-    /** Terminate the connection to storage */
-    close(): void;
+    /**
+     * Submits the given delta returning the client sequence number for the message. Contents is the actual
+     * contents of the message. appData is optional metadata that can be attached to the op by the app.
+     *
+     * If batch is set to true then the submit will be batched - and as a result guaranteed to be ordered sequentially
+     * in the global sequencing space. The batch will be flushed either when flush is called or when a non-batched
+     * op is submitted.
+     */
+    submit(type: MessageType, contents: any): number;
 
     /** Submit a signal to the service to be broadcast to other connected clients, but not persisted */
     submitSignal(content: any): void;

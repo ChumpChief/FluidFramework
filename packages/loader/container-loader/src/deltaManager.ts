@@ -28,9 +28,6 @@ import {
     ISignalMessage,
     MessageType,
 } from "@fluidframework/protocol-definitions";
-import {
-    createGenericNetworkError,
-} from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
 import { DeltaConnection } from "./deltaConnection";
 import { DeltaQueue } from "./deltaQueue";
@@ -77,8 +74,6 @@ export class DeltaManager
     IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
     IEventProvider<IDeltaManagerInternalEvents>
 {
-    public get IDeltaSender() { return this; }
-
     private pending: ISequencedDocumentMessage[] = [];
     private fetching = false;
 
@@ -105,7 +100,6 @@ export class DeltaManager
     private connection: DeltaConnection | undefined;
     private clientSequenceNumber = 0;
     private clientSequenceNumberObserved = 0;
-    private closed = false;
 
     // track clientId used last time when we sent any ops
     private lastSubmittedClientId: string | undefined;
@@ -138,13 +132,6 @@ export class DeltaManager
         return this.minSequenceNumber;
     }
 
-    public get version(): string {
-        if (this.connection === undefined) {
-            throw new Error("Cannot check version without a connection");
-        }
-        return this.connection.details.version;
-    }
-
     public get scopes(): string[] | undefined {
         return this.connection?.details.claims.scopes;
     }
@@ -160,10 +147,6 @@ export class DeltaManager
                 this.processInboundMessage(op);
             });
 
-        this._inbound.on("error", (error) => {
-            this.close(CreateContainerError(error));
-        });
-
         // Outbound message queue. The outbound queue is represented as a queue of an array of ops. Ops contained
         // within an array *must* fit within the maxMessageSize and are guaranteed to be ordered sequentially.
         this._outbound = new DeltaQueue<IDocumentMessage[]>(
@@ -174,10 +157,6 @@ export class DeltaManager
                 this.connection.submit(messages);
             });
 
-        this._outbound.on("error", (error) => {
-            this.close(CreateContainerError(error));
-        });
-
         // Inbound signal queue
         this._inboundSignal = new DeltaQueue<ISignalMessage>((message) => {
             if (this.handler === undefined) {
@@ -187,10 +166,6 @@ export class DeltaManager
                 clientId: message.clientId,
                 content: JSON.parse(message.content as string),
             });
-        });
-
-        this._inboundSignal.on("error", (error) => {
-            this.close(CreateContainerError(error));
         });
 
         // Require the user to start the processing
@@ -264,10 +239,6 @@ export class DeltaManager
 
             // This loop will keep trying to connect until successful, with a delay between each iteration.
             while (connection === undefined) {
-                if (this.closed) {
-                    throw new Error("Attempting to connect a closed DeltaManager");
-                }
-
                 try {
                     connection = await DeltaConnection.connect(this.documentService);
                 } catch (origError) {
@@ -275,7 +246,6 @@ export class DeltaManager
 
                     // Socket.io error when we connect to wrong socket, or hit some multiplexing bug
                     if (!canRetryOnError(origError)) {
-                        this.close(error);
                         throw error;
                     }
 
@@ -371,7 +341,8 @@ export class DeltaManager
         let from: number = fromInitial;
         let deltas: ISequencedDocumentMessage[] = [];
 
-        while (!this.closed) {
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
             const maxFetchTo = from + MaxBatchDeltas;
             const fetchTo = to === undefined ? maxFetchTo : Math.min(maxFetchTo, to);
 
@@ -416,11 +387,8 @@ export class DeltaManager
                 from = lastFetch;
             } catch (origError) {
                 canRetry = canRetry && canRetryOnError(origError);
-                const error = CreateContainerError(origError);
 
                 if (!canRetry) {
-                    // It's game over scenario.
-                    this.close(error);
                     return;
                 }
                 success = false;
@@ -441,51 +409,12 @@ export class DeltaManager
                 // Only bail out if we successfully connected to storage, but there were no ops
                 // One (last) successful connection is sufficient, even if user was disconnected all prior attempts
                 if (success && retry >= 100) {
-                    const closeError = createGenericNetworkError(
-                        "Failed to retrieve ops from storage: giving up after too many retries",
-                        false /* canRetry */,
-                    );
-                    this.close(closeError);
                     return;
                 }
             }
 
             await waitForConnectedState(delay * 1000);
         }
-    }
-
-    /**
-     * Closes the connection and clears inbound & outbound queues.
-     */
-    public close(error?: ICriticalContainerError): void {
-        if (this.closed) {
-            return;
-        }
-        this.closed = true;
-
-        this.stopSequenceNumberUpdate();
-
-        // This raises "disconnect" event
-        this.disconnectFromDeltaStream(error !== undefined ? `${error.message}` : "Container closed");
-
-        this._inbound.clear();
-        this._outbound.clear();
-        this._inboundSignal.clear();
-
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this._inbound.systemPause();
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this._inboundSignal.systemPause();
-
-        // Drop pending messages - this will ensure catchUp() does not go into infinite loop
-        this.pending = [];
-
-        // This needs to be the last thing we do (before removing listeners), as it causes
-        // Container to dispose context and break ability of data stores / runtime to "hear"
-        // from delta manager, including notification (above) about readonly state.
-        this.emit("closed", error);
-
-        this.removeAllListeners();
     }
 
     // Specific system level message attributes are need to be looked at by the server.
@@ -513,13 +442,6 @@ export class DeltaManager
      */
     private setupNewSuccessfulConnection(connection: DeltaConnection, requestedMode: ConnectionMode) {
         this.connection = connection;
-
-        if (this.closed) {
-            // Raise proper events, Log telemetry event and close connection.
-            this.disconnectFromDeltaStream(`Disconnect on close`);
-            assert(!connection.connected); // Check we indeed closed it!
-            return;
-        }
 
         // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
         // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
@@ -569,34 +491,6 @@ export class DeltaManager
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
         }
-    }
-
-    /**
-     * Disconnect the current connection.
-     * @param reason - Text description of disconnect reason to emit with disconnect event
-     */
-    private disconnectFromDeltaStream(reason: string) {
-        const connection = this.connection;
-        if (connection === undefined) {
-            return;
-        }
-
-        // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
-        // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
-        // but it's safe to assume (until better design is put into place) that batches should not exist
-        // across multiple connections. Right now we assume runtime will not submit any ops in disconnected
-        // state. As requirements change, so should these checks.
-        assert(this.messageBuffer.length === 0, "messageBuffer is not empty on disconnect");
-
-        // Avoid any re-entrancy - clear object reference
-        this.connection = undefined;
-
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this._outbound.systemPause();
-        this._outbound.clear();
-        this.emit("disconnect", reason);
-
-        connection.close();
     }
 
     private processInitialMessages(
@@ -707,10 +601,6 @@ export class DeltaManager
     private async fetchMissingDeltas(from: number, to?: number): Promise<void> {
         // Exit out early if we're already fetching deltas
         if (this.fetching) {
-            return;
-        }
-
-        if (this.closed) {
             return;
         }
 

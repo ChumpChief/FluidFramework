@@ -113,12 +113,6 @@ export class Container implements IFluidRouter {
 
     /**
      * Load container.
-     *
-     * @param specifiedVersion - one of the following
-     *   - null: use ops, no snapshots
-     *   - undefined - fetch latest snapshot
-     *   - otherwise, version sha to load snapshot
-     * @param pause - start the container in a paused state
      */
     private async load() {
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
