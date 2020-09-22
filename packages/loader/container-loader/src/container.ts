@@ -160,10 +160,6 @@ export class Container implements IFluidRouter {
             // join message. after we see the join message for out new connection with our new client id,
             // we know there can no longer be outstanding ops that we sent with the previous client id.
             this.pendingClientId = details.clientId;
-
-            if (deltaManager.connectionMode === "read") {
-                this.setConnected(true);
-            }
         });
 
         deltaManager.on("disconnect", () => {
@@ -183,7 +179,6 @@ export class Container implements IFluidRouter {
 
         if (value) {
             this._clientId = this.pendingClientId;
-            this._deltaManager.setConnected();
         } else {
             // Important as we process our own joinSession message through delta request
             this.pendingClientId = undefined;

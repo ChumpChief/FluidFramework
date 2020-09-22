@@ -27,7 +27,6 @@ import {
     ISequencedDocumentMessage,
     ISignalMessage,
     MessageType,
-    ScopeType,
 } from "@fluidframework/protocol-definitions";
 import {
     createGenericNetworkError,
@@ -80,16 +79,8 @@ export class DeltaManager
 {
     public get IDeltaSender() { return this; }
 
-    // file ACL - whether user has only read-only access to a file
-    private _readonlyPermissions: boolean | undefined;
-
-    // tracks host requiring read-only mode.
-    private _forceReadonly = false;
-
     private pending: ISequencedDocumentMessage[] = [];
     private fetching = false;
-
-    private connected = false;
 
     private updateSequenceNumberTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -163,52 +154,8 @@ export class DeltaManager
         return this.connection?.details.claims.scopes;
     }
 
-    public get active(): boolean {
-        const res = this.connected && this.connectionMode === "write";
-        // user can't have r/w connection when user has only read permissions.
-        // That said, connection can be r/w when host called forceReadonly(), as
-        // this is view-only change
-        assert(!(this._readonlyPermissions && res));
-        return res;
-    }
-
     public get socketDocumentId(): string | undefined {
         return this.connection?.details.claims.documentId;
-    }
-
-    /**
-     * The current connection mode, initially write.
-     */
-    public get connectionMode(): ConnectionMode {
-        if (this.connection === undefined) {
-            return "read";
-        }
-        return this.connection.details.mode;
-    }
-
-    /**
-     * Tells if container is in read-only mode.
-     * Data stores should listen for "readonly" notifications and disallow user
-     * making changes to data stores.
-     * Readonly state can be because of no storage write permission,
-     * or due to host forcing readonly mode for container.
-     * It is undefined if we have not yet established websocket connection
-     * and do not know if user has write access to a file.
-     */
-    public get readonly() {
-        if (this._forceReadonly) {
-            return true;
-        }
-        return this._readonlyPermissions;
-    }
-
-    /**
-     * Tells if user has no write permissions for file in storage
-     * It is undefined if we have not yet established websocket connection
-     * and do not know if user has write access to a file.
-     */
-    public get readonlyPermissions() {
-        return this._readonlyPermissions;
     }
 
     /**
@@ -224,32 +171,6 @@ export class DeltaManager
      * Will throw an error if reconnectMode set to Never.
      */
     public setAutomaticReconnect(reconnect: boolean): void {
-    }
-
-    /**
-     * Sends signal to runtime (and data stores) to be read-only.
-     * Hosts may have read only views, indicating to data stores that no edits are allowed.
-     * This is independent from this._readonlyPermissions (permissions) and this.connectionMode
-     * (server can return "write" mode even when asked for "read")
-     * Leveraging same "readonly" event as runtime & data stores should behave the same in such case
-     * as in read-only permissions.
-     * But this.active can be used by some DDSes to figure out if ops can be sent
-     * (for example, read-only view still participates in code proposals / upgrades decisions)
-     */
-    public forceReadonly(readonly: boolean) {
-        const oldValue = this.readonly;
-        this._forceReadonly = readonly;
-        if (oldValue !== this.readonly) {
-            this.emit("readonly", this.readonly);
-        }
-    }
-
-    private set_readonlyPermissions(readonly: boolean) {
-        const oldValue = this.readonly;
-        this._readonlyPermissions = readonly;
-        if (oldValue !== this.readonly) {
-            this.emit("readonly", this.readonly);
-        }
     }
 
     constructor(
@@ -332,14 +253,6 @@ export class DeltaManager
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
         }
-    }
-
-    public setConnected() {
-        this.connected = true;
-    }
-
-    public setDisconnected() {
-        this.connected = false;
     }
 
     public async connect(): Promise<IConnectionDetails> {
@@ -436,11 +349,6 @@ export class DeltaManager
     }
 
     public submit(type: MessageType, contents: any): number {
-        if (this.readonly) {
-            this.close(CreateContainerError("Op is sent in read-only document state"));
-            return -1;
-        }
-
         // reset clientSequenceNumber if we are using new clientId.
         // we keep info about old connection as long as possible to be able to account for all non-acked ops
         // that we pick up on next connection.
@@ -597,11 +505,6 @@ export class DeltaManager
         // Drop pending messages - this will ensure catchUp() does not go into infinite loop
         this.pending = [];
 
-        // Notify everyone we are in read-only state.
-        // Useful for data stores in case we hit some critical error,
-        // to switch to a mode where user edits are not accepted
-        this.set_readonlyPermissions(true);
-
         // This needs to be the last thing we do (before removing listeners), as it causes
         // Container to dispose context and break ability of data stores / runtime to "hear"
         // from delta manager, including notification (above) about readonly state.
@@ -635,15 +538,6 @@ export class DeltaManager
      */
     private setupNewSuccessfulConnection(connection: DeltaConnection, requestedMode: ConnectionMode) {
         this.connection = connection;
-
-        // Does information in scopes & mode matches?
-        // If we asked for "write" and got "read", then file is read-only
-        // But if we ask read, server can still give us write.
-        const readonly = !connection.details.claims.scopes.includes(ScopeType.DocWrite);
-        assert(requestedMode === "read" || readonly === (this.connectionMode === "read"),
-            "claims/connectionMode mismatch");
-        assert(!readonly || this.connectionMode === "read", "readonly perf with write connection");
-        this.set_readonlyPermissions(readonly);
 
         if (this.closed) {
             // Raise proper events, Log telemetry event and close connection.
