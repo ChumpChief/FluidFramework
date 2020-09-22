@@ -162,27 +162,17 @@ export class Container implements IFluidRouter {
             this.pendingClientId = details.clientId;
         });
 
-        deltaManager.on("disconnect", () => {
-            this.setConnected(false);
-        });
-
         return deltaManager;
     }
 
-    private setConnected(value: boolean) {
-        if (this._connected === value) {
+    private setConnected() {
+        if (this._connected) {
             // Already in the desired state - exit early
             return;
         }
 
-        this._connected = value;
-
-        if (value) {
-            this._clientId = this.pendingClientId;
-        } else {
-            // Important as we process our own joinSession message through delta request
-            this.pendingClientId = undefined;
-        }
+        this._connected = true;
+        this._clientId = this.pendingClientId;
 
         if (this.loaded) {
             this.propagateConnectionState();
@@ -215,7 +205,7 @@ export class Container implements IFluidRouter {
             const joinMessage = message as ISequencedDocumentSystemMessage;
             const join = JSON.parse(joinMessage.data) as IClientJoin;
             if (join.clientId === this.pendingClientId) {
-                this.setConnected(true);
+                this.setConnected();
             }
         }
     }
