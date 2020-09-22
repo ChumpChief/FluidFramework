@@ -99,12 +99,8 @@ export class DeltaManager
     // There are three numbers we track
     // * lastQueuedSequenceNumber is the last queued sequence number. If there are gaps in seq numbers, then this number
     //   is not updated until we cover that gap, so it increases each time by 1.
-    // * lastObservedSeqNumber is  an estimation of last known sequence number for container in storage. It's initially
-    //   populated at web socket connection time (if storage provides that info) and is  updated once ops shows up.
-    //   It's never less than lastQueuedSequenceNumber
     // * lastProcessedSequenceNumber - last processed sequence number
     private lastQueuedSequenceNumber: number = 0;
-    private lastObservedSeqNumber: number = 0;
     private lastProcessedSequenceNumber: number = 0;
     private baseTerm: number = 0;
 
@@ -146,10 +142,6 @@ export class DeltaManager
 
     public get lastSequenceNumber(): number {
         return this.lastProcessedSequenceNumber;
-    }
-
-    public get lastKnownSeqNumber() {
-        return this.lastObservedSeqNumber;
     }
 
     public get referenceTerm(): number {
@@ -322,7 +314,6 @@ export class DeltaManager
         this.baseTerm = 1;
         this.minSequenceNumber = 0;
         this.lastQueuedSequenceNumber = 0;
-        this.lastObservedSeqNumber = 0;
 
         // We will use same check in other places to make sure all the seq number above are set properly.
         assert(this.handler === undefined);
@@ -682,23 +673,14 @@ export class DeltaManager
 
         const initialMessages = connection.details.initialMessages;
 
-        let hasOpsBehindInfo = false;
-
-        // Update knowledge of how far we are behind, before raising "connect" event
-        // This is duplication of what enqueueMessages() does, but we have to raise event before we get there,
-        // so duplicating update logic here as well.
-        if (initialMessages.length > 0) {
-            hasOpsBehindInfo = true;
-            this.updateLatestKnownOpSeqNumber(initialMessages[initialMessages.length - 1].sequenceNumber);
-        }
-
         // Notify of the connection
         // WARNING: This has to happen before processInitialMessages() call below.
         // If not, we may not update Container.pendingClientId in time before seeing our own join session op.
         this.emit(
             "connect",
             connection.details,
-            hasOpsBehindInfo ? this.lastKnownSeqNumber - this.lastSequenceNumber : undefined);
+            undefined,
+        );
 
         this.processInitialMessages(
             initialMessages,
@@ -767,10 +749,6 @@ export class DeltaManager
 
         let duplicateStart: number | undefined;
         let duplicateEnd: number | undefined;
-
-        if (messages.length > 0) {
-            this.updateLatestKnownOpSeqNumber(messages[messages.length - 1].sequenceNumber);
-        }
 
         for (const message of messages) {
             // Check that the messages are arriving in the expected order
@@ -913,11 +891,5 @@ export class DeltaManager
             clearTimeout(this.updateSequenceNumberTimer);
         }
         this.updateSequenceNumberTimer = undefined;
-    }
-
-    private updateLatestKnownOpSeqNumber(seq: number) {
-        if (this.lastObservedSeqNumber < seq) {
-            this.lastObservedSeqNumber = seq;
-        }
     }
 }
