@@ -98,11 +98,6 @@ export class DeltaManagerProxy
         return this.deltaManager.lastSequenceNumber;
     }
 
-    // Back-compat: <= 0.18
-    public get referenceSequenceNumber(): number {
-        return this.lastSequenceNumber;
-    }
-
     public get initialSequenceNumber(): number {
         return this.deltaManager.initialSequenceNumber;
     }
@@ -135,7 +130,7 @@ export class DeltaManagerProxy
         return this.deltaManager.submitSignal(content);
     }
 
-    public submit(type: MessageType, contents: any, batch: boolean, appData: any): number {
-        return this.deltaManager.submit(type, contents, batch, appData);
+    public submit(type: MessageType, contents: any): number {
+        return this.deltaManager.submit(type, contents);
     }
 }

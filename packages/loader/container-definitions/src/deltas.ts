@@ -66,7 +66,7 @@ export interface IDeltaSender extends IProvideDeltaSender {
      * in the global sequencing space. The batch will be flushed either when flush is called or when a non-batched
      * op is submitted.
      */
-    submit(type: MessageType, contents: any, batch: boolean, metadata: any): number;
+    submit(type: MessageType, contents: any): number;
 }
 
 /** Events emitted by the Delta Manager */
