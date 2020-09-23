@@ -48,14 +48,28 @@ export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvent
         }
     };
 
-    // sequenceOps will run async until the incoming op queue is empty.  We'll hold the promise until it is done to
-    // avoid reentrancy.
+    /**
+     * sequenceOps's job is to take the incoming ops from the stream, validate they are sequential, and push them to
+     * the list of sequentialOps.  If they are not sequential, it should attempt to correct (e.g. fetch missing ops
+     * from deltaStorage) or error out.
+     *
+     * It will run async until the incoming op queue is empty, which allows it to use async approaches to the fixup
+     * (like fetching ops).  Accordingly, we must hold its promise until the incoming op queue is empty to avoid
+     * kicking off a duplicative async sequencing task.
+     *
+     * "Until it is empty" makes it easy to restrict this to only be called from the "op" event alone, without
+     * recursion.  This makes it a bit easier to follow than the recursive approach used by DeltaManager currently
+     * (enqueueMessages -> fetchMissingDeltas -> getDeltas -> catchUpCore -> enqueueMessages)
+     */
     private async sequenceOps() {
         // Even if more ops come in while we are processing (i.e. while we are awaiting storage) the loop will still
         // iterate over those newly added ops.
         for (const incomingOp of this.incomingOps) {
             if (incomingOp.sequenceNumber > this.latestSequentialOpSequenceNumber + 1) {
-                // Should handle if this fails or only gets some of the ops?
+                // We are missing some ops between the last one we saw and the one we just got, so we need to
+                // fetch them.
+                // TODO: Is there risk this will fail or only get some of the ops?  Maybe that should be handled in
+                // the DeltaStorage driver though.
                 const missingOps = await this.deltaStorage.get(
                     this.latestSequentialOpSequenceNumber,
                     incomingOp.sequenceNumber,
