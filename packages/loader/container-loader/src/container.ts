@@ -187,7 +187,7 @@ export class Container implements IFluidRouter {
 
         // Forward non system messages to the loaded runtime for processing
         if (!isSystemMessage(message)) {
-            this.context.process(message, local, undefined);
+            this.context.process(message, local);
         }
 
         // Leftover from quorum's addMember

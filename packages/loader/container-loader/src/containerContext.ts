@@ -88,8 +88,8 @@ export class ContainerContext implements IContainerContext {
         this.runtime.setConnectionState(connected, clientId);
     }
 
-    public process(message: ISequencedDocumentMessage, local: boolean, context: any) {
-        this.runtime.process(message, local, context);
+    public process(message: ISequencedDocumentMessage, local: boolean) {
+        this.runtime.process(message, local);
     }
 
     public async request(path: IRequest): Promise<IResponse> {

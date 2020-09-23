@@ -55,7 +55,7 @@ export interface IRuntime extends IDisposable {
     /**
      * Processes the given op (message)
      */
-    process(message: ISequencedDocumentMessage, local: boolean, context: any);
+    process(message: ISequencedDocumentMessage, local: boolean);
 
     /**
      * Propagate the container state when container is attaching or attached.

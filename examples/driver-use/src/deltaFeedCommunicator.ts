@@ -36,7 +36,6 @@ export class DeltaFeedCommunicator
             this.containerRuntime.process(
                 nextOp,
                 true,
-                undefined,
             );
             this.lastProcessedOpSequenceNumber++;
         }
