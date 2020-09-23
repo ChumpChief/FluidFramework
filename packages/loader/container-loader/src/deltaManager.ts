@@ -240,7 +240,6 @@ export class DeltaManager
         const message: IDocumentMessage = {
             clientSequenceNumber: ++this.clientSequenceNumber,
             contents: JSON.stringify(contents),
-            metadata: undefined,
             referenceSequenceNumber: this.lastProcessedSequenceNumber,
             type,
         };

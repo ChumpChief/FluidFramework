@@ -69,7 +69,7 @@ const deltaStorageService = new DocumentDeltaStorageService(
 const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService, 0);
 window["testDeltaFeedFollower"] = deltaFeedFollower;
 
-const deltaFeedCommunicator = new DeltaFeedCommunicator(deltaFeedFollower);
+const deltaFeedCommunicator = new DeltaFeedCommunicator(deltaFeed, deltaFeedFollower);
 window["testDeltaFeedCommunicator"] = deltaFeedCommunicator;
 
 const storageUrl = `http://localhost:3000/repos/tinylicious`;
