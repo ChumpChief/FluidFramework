@@ -43,18 +43,6 @@ const MaxBatchDeltas = 2000;
 const canRetryOnError = (error: any): boolean => error?.canRetry !== false;
 const getRetryDelayFromError = (error: any): number | undefined => error?.retryAfterSeconds;
 
-export interface IConnectionArgs {
-    mode?: ConnectionMode;
-    fetchOpsFromStorage?: boolean;
-    reason?: string;
-}
-
-export enum ReconnectMode {
-    Never = "Never",
-    Disabled = "Disabled",
-    Enabled = "Enabled",
-}
-
 /**
  * Includes events emitted by the concrete implementation DeltaManager
  * but not exposed on the public interface IDeltaManager
@@ -94,8 +82,6 @@ export class DeltaManager
     private lastSubmittedClientId: string | undefined;
 
     private handler: IDeltaHandlerStrategy | undefined;
-
-    private messageBuffer: IDocumentMessage[] = [];
 
     public get inbound(): IDeltaQueue<ISequencedDocumentMessage> {
         return this._inbound;
@@ -241,15 +227,6 @@ export class DeltaManager
         return this.connectionP;
     }
 
-    private flush() {
-        if (this.messageBuffer.length === 0) {
-            return;
-        }
-
-        this._outbound.push(this.messageBuffer);
-        this.messageBuffer = [];
-    }
-
     public submit(type: MessageType, contents: any): number {
         // reset clientSequenceNumber if we are using new clientId.
         // we keep info about old connection as long as possible to be able to account for all non-acked ops
@@ -268,14 +245,10 @@ export class DeltaManager
             type,
         };
 
-        const outbound = this.createOutboundMessage(type, message);
+        const outboundMessage = this.createOutboundMessage(type, message);
+        this._outbound.push([outboundMessage]);
 
-        // Not batching
-        this.flush();
-        this.messageBuffer.push(outbound);
-        this.flush();
-
-        return outbound.clientSequenceNumber;
+        return outboundMessage.clientSequenceNumber;
     }
 
     public resume(): void {
@@ -392,13 +365,6 @@ export class DeltaManager
      */
     private setupNewSuccessfulConnection(connection: DeltaConnection, requestedMode: ConnectionMode) {
         this.connection = connection;
-
-        // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
-        // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
-        // but it's safe to assume (until better design is put into place) that batches should not exist
-        // across multiple connections. Right now we assume runtime will not submit any ops in disconnected
-        // state. As requirements change, so should these checks.
-        assert(this.messageBuffer.length === 0, "messageBuffer is not empty on new connection");
 
         this._outbound.systemResume();
 
