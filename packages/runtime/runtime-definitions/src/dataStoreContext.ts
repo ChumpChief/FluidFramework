@@ -192,11 +192,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
     readonly attachState: AttachState;
 
     readonly containerRuntime: IContainerRuntimeBase;
-    /**
-     * @deprecated 0.17 Issue #1888 Rename IHostRuntime to IContainerRuntime and refactor usages
-     * Use containerRuntime instead of hostRuntime
-     */
-    readonly hostRuntime: IContainerRuntimeBase;
 
     on(event: "leader" | "notleader" | "attaching" | "attached", listener: () => void): this;
 
