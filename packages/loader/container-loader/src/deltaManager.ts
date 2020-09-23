@@ -117,10 +117,6 @@ export class DeltaManager
         return this._inboundSignal;
     }
 
-    public get minimumSequenceNumber(): number {
-        return this.minSequenceNumber;
-    }
-
     public get scopes(): string[] | undefined {
         return this.connection?.details.claims.scopes;
     }

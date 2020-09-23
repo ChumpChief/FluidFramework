@@ -80,9 +80,6 @@ export interface IDeltaManagerEvents extends IEvent {
  * Manages the transmission of ops between the runtime and storage.
  */
 export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents> {
-    /** The current minimum sequence number */
-    readonly minimumSequenceNumber: number;
-
     /**
      * Submits the given delta returning the client sequence number for the message. Contents is the actual
      * contents of the message. appData is optional metadata that can be attached to the op by the app.
