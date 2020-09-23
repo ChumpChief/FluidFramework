@@ -10,17 +10,19 @@ import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions"
 
 import { IDeltaFeed } from "./socketIoDeltaFeed";
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface IDeltaFeedFollowerEvents extends IErrorEvent {
+    (event: "sequentialOpsAvailable", listener: () => void);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface IDeltaFeedFollower extends IEventProvider<IDeltaFeedFollowerEvents> {
+    // TODO Don't really want this to be directly public but rather with some controlled access (maybe via seq #?)
+    readonly sequentialOps: ISequencedDocumentMessage[];
 }
 
 export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvents> implements IDeltaFeedFollower {
     // The op buffer that can be read from as desired.  Guaranteed to not include disjoint spans.
-    private readonly sequentialOps: ISequencedDocumentMessage[] = [];
+    // TODO Don't really want this to be directly public but rather with some controlled access (maybe via seq #?)
+    public readonly sequentialOps: ISequencedDocumentMessage[] = [];
     // The list of ops received via "op" events that have not yet been sequenced.  May include disjoint spans.
     private incomingOps: ISequencedDocumentMessage[] = [];
     // To determine whether the next op we see is sequential or disjoint, we'll see if it's one more than
@@ -80,6 +82,9 @@ export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvent
             // Should handle if the incoming op is non-increasing (throw)?
             this.sequentialOps.push(incomingOp);
             this.latestSequentialOpSequenceNumber = incomingOp.sequenceNumber;
+            // Event here to trigger processors?  "sequentialOpsAvailable" maybe?
+            // Or maybe attempt to defer firing until we're either done or about to await to minimize noise.
+            this.emit("sequentialOpsAvailable");
         }
 
         // Clear the ops we processed

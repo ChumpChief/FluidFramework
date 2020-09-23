@@ -76,8 +76,6 @@ export class DeltaManager
     private pending: ISequencedDocumentMessage[] = [];
     private fetching = false;
 
-    private updateSequenceNumberTimer: ReturnType<typeof setTimeout> | undefined;
-
     // There are three numbers we track
     // * lastQueuedSequenceNumber is the last queued sequence number. If there are gaps in seq numbers, then this number
     //   is not updated until we cover that gap, so it increases each time by 1.
@@ -271,7 +269,6 @@ export class DeltaManager
         };
 
         const outbound = this.createOutboundMessage(type, message);
-        this.stopSequenceNumberUpdate();
 
         // Not batching
         this.flush();
@@ -548,12 +545,5 @@ export class DeltaManager
             this.pending = [];
             this.enqueueMessages(pendingSorted);
         }
-    }
-
-    private stopSequenceNumberUpdate(): void {
-        if (this.updateSequenceNumberTimer !== undefined) {
-            clearTimeout(this.updateSequenceNumberTimer);
-        }
-        this.updateSequenceNumberTimer = undefined;
     }
 }

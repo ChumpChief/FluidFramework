@@ -114,6 +114,10 @@ export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> imple
         });
     }
 
+    /**
+     * This is "document connected".  Other transports may not have a socket, and the interface shouldn't expose
+     * any sort of transport-specific connection state.
+     */
     public get connected() {
         return this._connectionInfo !== undefined;
     }

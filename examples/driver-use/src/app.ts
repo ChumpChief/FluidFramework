@@ -68,6 +68,8 @@ const deltaStorageService = new DocumentDeltaStorageService(
 const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService, 0);
 window["testDeltaFeedFollower"] = deltaFeedFollower;
 
+deltaFeedFollower.on("sequentialOpsAvailable", () => { console.log(deltaFeedFollower.sequentialOps); });
+
 const storageUrl = `http://localhost:3000/repos/tinylicious`;
 const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
 window["testDocumentStorageService"] = documentStorageService;
