@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IClient, ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
+import { IClient, ISequencedDocumentMessage, MessageType } from "@fluidframework/protocol-definitions";
 import {
     DocumentDeltaStorageService,
     DocumentStorageService,
@@ -89,7 +89,7 @@ const handleSequentialOpsAvailable = () => {
         //     isOpLocal(nextOp),
         // );
         console.log(nextOp, isOpLocal(nextOp));
-        lastProcessedOpSequenceNumber++;
+        lastProcessedOpSequenceNumber = nextOp.sequenceNumber;
     }
 };
 
@@ -97,6 +97,38 @@ deltaStreamFollower.on("sequentialOpsAvailable", handleSequentialOpsAvailable);
 
 const deltaStreamWriter = new DeltaStreamWriter(deltaStream);
 window["testDeltaStreamWriter"] = deltaStreamWriter;
+
+const submitRoll = (diceValue: number) => {
+    const opContent = {
+        type: "component",
+        contents: {
+            address: "default",
+            contents: {
+                content: {
+                    address: "root",
+                    contents: {
+                        key: "diceValue",
+                        path: "/",
+                        type: "set",
+                        value: {
+                            type: "Plain",
+                            value: diceValue,
+                        },
+                    },
+                },
+                type: "op",
+            },
+        },
+    };
+    console.log(opContent, lastProcessedOpSequenceNumber);
+
+    deltaStreamWriter.submit(
+        MessageType.Operation,
+        opContent,
+        lastProcessedOpSequenceNumber,
+    );
+};
+window["submitRoll"] = submitRoll;
 
 const storageUrl = `http://localhost:3000/repos/tinylicious`;
 const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
