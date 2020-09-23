@@ -8,18 +8,18 @@ import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 
-import { IDeltaFeed } from "./socketIoDeltaFeed";
+import { IDeltaStream } from "./socketIoDeltaStream";
 
-export interface IDeltaFeedFollowerEvents extends IErrorEvent {
+export interface IDeltaStreamFollowerEvents extends IErrorEvent {
     (event: "sequentialOpsAvailable", listener: () => void);
 }
 
-export interface IDeltaFeedFollower extends IEventProvider<IDeltaFeedFollowerEvents> {
+export interface IDeltaStreamFollower extends IEventProvider<IDeltaStreamFollowerEvents> {
     // TODO Don't really want this to be directly public but rather with some controlled access (maybe via seq #?)
     readonly sequentialOps: ISequencedDocumentMessage[];
 }
 
-export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvents> implements IDeltaFeedFollower {
+export class DeltaStreamFollower extends TypedEventEmitter<IDeltaStreamFollowerEvents> implements IDeltaStreamFollower {
     // The op buffer that can be read from as desired.  Guaranteed to not include disjoint spans.
     // TODO Don't really want this to be directly public but rather with some controlled access (maybe via seq #?)
     public readonly sequentialOps: ISequencedDocumentMessage[] = [];
@@ -31,13 +31,13 @@ export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvent
     private sequencingPromise: Promise<void> | undefined;
 
     constructor(
-        deltaFeed: IDeltaFeed,
+        private readonly deltaStream: IDeltaStream,
         private readonly deltaStorage: IDocumentDeltaStorageService,
         startAfterSequenceNumber: number,
     ) {
         super();
         this.latestSequentialOpSequenceNumber = startAfterSequenceNumber;
-        deltaFeed.on("op", this.handleIncomingOp);
+        this.deltaStream.on("op", this.handleIncomingOp);
     }
 
     // This will just append the incoming ops to the incoming op queue and ensure we're sequencing.

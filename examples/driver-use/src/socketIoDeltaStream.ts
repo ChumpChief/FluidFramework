@@ -19,7 +19,7 @@ const protocolVersions = ["^0.4.0", "^0.3.0", "^0.2.0", "^0.1.0"];
 
 const timeoutMs = 20000;
 
-export interface IDeltaFeedEvents extends IErrorEvent {
+export interface IDeltaStreamEvents extends IErrorEvent {
     // Document connection state
     (event: "connected" | "disconnected", listener: () => void);
 
@@ -28,12 +28,19 @@ export interface IDeltaFeedEvents extends IErrorEvent {
     (event: "op", listener: (message: ISequencedDocumentMessage) => void);
 }
 
-export interface IDeltaFeed extends IEventProvider<IDeltaFeedEvents> {
+export interface IDeltaStream extends IEventProvider<IDeltaStreamEvents> {
+    /**
+     * Whether the stream is connected or not.
+     */
     readonly connected: boolean;
-    readonly connectionInfo: IConnected;
 
     /**
-     * Connect to the document.  After resolving, document messages will start flowing.
+     * If connected to the stream, the information about the connection.  Undefined if not connected.
+     */
+    readonly connectionInfo: IConnected | undefined;
+
+    /**
+     * Connect to the stream.  After resolving, messages will start flowing.
      * @param tenantId - ID for the tenant
      * @param documentId - ID for the document
      * @param token - token for access
@@ -47,20 +54,20 @@ export interface IDeltaFeed extends IEventProvider<IDeltaFeedEvents> {
     ): Promise<void>;
 
     /**
-     * Submit a new message to the server
+     * Submit a new message to the stream
      */
     submit(message: IDocumentMessage): void;
 
     /**
-     * Disconnects the given delta connection
+     * Disconnect from the delta stream
      */
     disconnect();
 }
 
 /**
- * Enables connecting to, reading from, and submitting to a feed of delta updates
+ * Enables connecting to, reading from, and submitting to a stream of delta updates
  */
-export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> implements IDeltaFeed {
+export class SocketIODeltaStream extends TypedEventEmitter<IDeltaStreamEvents> implements IDeltaStream {
     private readonly socket: SocketIOClient.Socket;
     /**
      * Contains information about the connection if document-connected, or undefined if not document-connected
@@ -123,9 +130,6 @@ export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> imple
     }
 
     public get connectionInfo() {
-        if (this._connectionInfo === undefined) {
-            throw new Error("Cannot access connectionInfo when not document-connected");
-        }
         return this._connectionInfo;
     }
 
@@ -216,7 +220,11 @@ export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> imple
      * @param message - delta operation to submit
      */
     public submit(message: IDocumentMessage): void {
+        if (this.connectionInfo === undefined) {
+            throw new Error("Attempted to submit a mesage in disconnected state");
+        }
         // I don't really want to submit as an array, but currently Tinylicious will barf if it's not.
+        // submitOp is transport detail - it's not persisted in the op stream in any way
         this.socket.emit("submitOp", this.connectionInfo.clientId, [message]);
     }
 

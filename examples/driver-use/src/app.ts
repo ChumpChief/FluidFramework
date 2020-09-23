@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IClient } from "@fluidframework/protocol-definitions";
+import { IClient, ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 import {
     DocumentDeltaStorageService,
     DocumentStorageService,
@@ -13,10 +13,10 @@ import { v4 as uuid } from "uuid";
 
 import { DiceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
-import { DeltaFeedCommunicator } from "./deltaFeedCommunicator";
-import { DeltaFeedFollower } from "./deltaFeedFollower";
+import { DeltaStreamWriter } from "./deltaStreamWriter";
+import { DeltaStreamFollower } from "./deltaStreamFollower";
 import { getTinyliciousContainer } from "./getTinyliciousContainer";
-import { SocketIODeltaFeed } from "./socketIoDeltaFeed";
+import { SocketIODeltaStream } from "./socketIoDeltaStream";
 import { renderDiceRoller } from "./view";
 
 /* eslint-disable dot-notation */
@@ -36,8 +36,8 @@ document.title = documentId;
 
 const tenantId = "tinylicious";
 
-const deltaFeed = new SocketIODeltaFeed(documentId, tenantId, "http://localhost:3000");
-window["testDeltaFeed"] = deltaFeed;
+const deltaStream = new SocketIODeltaStream(documentId, tenantId, "http://localhost:3000");
+window["testDeltaStream"] = deltaStream;
 
 const client: IClient = {
     details: {
@@ -66,22 +66,48 @@ const deltaStorageService = new DocumentDeltaStorageService(
     token,
     deltaStorageUrl,
 );
-const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService, 0);
-window["testDeltaFeedFollower"] = deltaFeedFollower;
+const deltaStreamFollower = new DeltaStreamFollower(deltaStream, deltaStorageService, 0);
+window["testDeltaStreamFollower"] = deltaStreamFollower;
 
-const deltaFeedCommunicator = new DeltaFeedCommunicator(deltaFeed, deltaFeedFollower);
-window["testDeltaFeedCommunicator"] = deltaFeedCommunicator;
+let lastProcessedOpSequenceNumber = -1;
+
+const handleSequentialOpsAvailable = () => {
+    const isOpLocal = (op: ISequencedDocumentMessage) => {
+        if (deltaStream.connectionInfo === undefined) {
+            throw new Error("Cannot compute local ops when disconnected");
+        }
+        // TODO this needs something more sophisticated - client ID doesn't persist across reconnect
+        return op.clientId === deltaStream.connectionInfo.clientId;
+    };
+    // TODO maybe off by one, unclear if this should be 1-indexed
+    while (lastProcessedOpSequenceNumber < deltaStreamFollower.sequentialOps.length - 1) {
+        const nextOp = deltaStreamFollower.sequentialOps[lastProcessedOpSequenceNumber + 1];
+        // TODO maybe this should happen directly in/above the follower - communicator only needs to know the
+        // new reference sequence number
+        // containerRuntime.process(
+        //     nextOp,
+        //     isOpLocal(nextOp),
+        // );
+        console.log(nextOp, isOpLocal(nextOp));
+        lastProcessedOpSequenceNumber++;
+    }
+};
+
+deltaStreamFollower.on("sequentialOpsAvailable", handleSequentialOpsAvailable);
+
+const deltaStreamWriter = new DeltaStreamWriter(deltaStream);
+window["testDeltaStreamWriter"] = deltaStreamWriter;
 
 const storageUrl = `http://localhost:3000/repos/tinylicious`;
 const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
 window["testDocumentStorageService"] = documentStorageService;
 
-const connectTestFeed = () => {
-    deltaFeed.connect(tenantId, documentId, token, client)
-        .then(() => console.log("Feed connected"))
+const connectTestStream = () => {
+    deltaStream.connect(tenantId, documentId, token, client)
+        .then(() => console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo))
         .catch((error) => console.error(error));
 };
-window["connectTestFeed"] = connectTestFeed;
+window["connectTestStream"] = connectTestStream;
 
 async function start(): Promise<void> {
     // The getTinyliciousContainer helper function facilitates loading our container code into a Container and
