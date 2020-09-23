@@ -35,18 +35,18 @@ export class DeltaFeedFollower extends TypedEventEmitter<IDeltaFeedFollowerEvent
     ) {
         super();
         this.latestSequentialOpSequenceNumber = startAfterSequenceNumber;
-        deltaFeed.on("op", (op: ISequencedDocumentMessage) => { this.handleIncomingOp(op); });
+        deltaFeed.on("op", this.handleIncomingOp);
     }
 
     // This will just append the incoming ops to the incoming op queue and ensure we're sequencing.
-    private handleIncomingOp(op: ISequencedDocumentMessage) {
+    private readonly handleIncomingOp = (op: ISequencedDocumentMessage) => {
         this.incomingOps.push(op);
         if (this.sequencingPromise === undefined) {
             this.sequencingPromise = this.sequenceOps()
                 .then(() => { this.sequencingPromise = undefined; })
                 .catch((err) => { console.error(err); });
         }
-    }
+    };
 
     // sequenceOps will run async until the incoming op queue is empty.  We'll hold the promise until it is done to
     // avoid reentrancy.
