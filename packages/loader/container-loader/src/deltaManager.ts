@@ -484,21 +484,10 @@ export class DeltaManager
     }
 
     private processInboundMessage(message: ISequencedDocumentMessage): void {
-        // TODO Remove after SPO picks up the latest build.
-        if (
-            typeof message.contents === "string"
-            && message.contents !== ""
-            && message.type !== MessageType.ClientLeave
-        ) {
-            message.contents = JSON.parse(message.contents);
-        }
-        assert.equal(message.sequenceNumber, this.lastProcessedSequenceNumber + 1, "non-seq seq#");
-        this.lastProcessedSequenceNumber = message.sequenceNumber;
+        // TODO Assuming message.contents is a string here
+        message.contents = JSON.parse(message.contents);
 
-        // Back-compat for older server with no term
-        if (message.term === undefined) {
-            message.term = 1;
-        }
+        this.lastProcessedSequenceNumber = message.sequenceNumber;
 
         if (this.handler === undefined) {
             throw new Error("Attempted to process an inbound message without a handler attached");
