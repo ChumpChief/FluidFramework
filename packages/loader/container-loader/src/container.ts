@@ -191,6 +191,7 @@ export class Container implements IFluidRouter {
         }
 
         // Leftover from quorum's addMember
+        // Maybe push down into the socket driver?
         if (message.type === MessageType.ClientJoin) {
             const joinMessage = message as ISequencedDocumentSystemMessage;
             const join = JSON.parse(joinMessage.data) as IClientJoin;
