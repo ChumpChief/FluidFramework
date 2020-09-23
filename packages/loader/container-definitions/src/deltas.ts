@@ -83,12 +83,6 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
     /** The current minimum sequence number */
     readonly minimumSequenceNumber: number;
 
-    /** The last sequence number processed by the delta manager */
-    readonly lastSequenceNumber: number;
-
-    /** The initial sequence number set when attaching the op handler */
-    readonly initialSequenceNumber: number;
-
     /**
      * Submits the given delta returning the client sequence number for the message. Contents is the actual
      * contents of the message. appData is optional metadata that can be attached to the op by the app.

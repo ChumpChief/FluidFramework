@@ -148,7 +148,8 @@ describe("SharedString Partial Load", () => {
         assert.notEqual(localSharedString.getText(), remoteSharedString.getText());
 
         await localSharedString.loaded;
-        localDataStoreRuntime.deltaManager.lastSequenceNumber = localSharedString.getCurrentSeq();
+        // TODO broken
+        // localDataStoreRuntime.deltaManager.lastSequenceNumber = localSharedString.getCurrentSeq();
 
         assert.equal(localSharedString.getText(), remoteSharedString.getText());
     });
@@ -175,8 +176,9 @@ describe("SharedString Partial Load", () => {
         // eslint-disable-next-line no-null/no-null
         await localSharedString.load(null, localServices);
 
-        localDataStoreRuntime.deltaManager.lastSequenceNumber =
-            containerRuntimeFactory.sequenceNumber;
+        // TODO broken
+        // localDataStoreRuntime.deltaManager.lastSequenceNumber =
+        //     containerRuntimeFactory.sequenceNumber;
 
         localDataStoreRuntime.deltaManager.minimumSequenceNumber =
             containerRuntimeFactory.getMinSeq();
@@ -220,8 +222,9 @@ describe("SharedString Partial Load", () => {
         // eslint-disable-next-line no-null/no-null
         await localSharedString.load(null, localServices);
 
-        localDataStoreRuntime.deltaManager.lastSequenceNumber =
-            containerRuntimeFactory.sequenceNumber;
+        // TODO broken
+        // localDataStoreRuntime.deltaManager.lastSequenceNumber =
+        //     containerRuntimeFactory.sequenceNumber;
 
         localDataStoreRuntime.deltaManager.minimumSequenceNumber =
             containerRuntimeFactory.getMinSeq();
@@ -262,8 +265,9 @@ describe("SharedString Partial Load", () => {
         // eslint-disable-next-line no-null/no-null
         await localSharedString.load(null, localServices);
 
-        localDataStoreRuntime.deltaManager.lastSequenceNumber =
-            containerRuntimeFactory.sequenceNumber;
+        // TODO broken
+        // localDataStoreRuntime.deltaManager.lastSequenceNumber =
+        //     containerRuntimeFactory.sequenceNumber;
 
         localDataStoreRuntime.deltaManager.minimumSequenceNumber =
             containerRuntimeFactory.getMinSeq();

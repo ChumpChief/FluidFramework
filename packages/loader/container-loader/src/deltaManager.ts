@@ -89,9 +89,6 @@ export class DeltaManager
     private lastQueuedSequenceNumber: number = 0;
     private lastProcessedSequenceNumber: number = 0;
 
-    // The sequence number we initially loaded from
-    private initSequenceNumber: number = 0;
-
     private readonly _inbound: DeltaQueue<ISequencedDocumentMessage>;
     private readonly _inboundSignal: DeltaQueue<ISignalMessage>;
     private readonly _outbound: DeltaQueue<IDocumentMessage[]>;
@@ -118,14 +115,6 @@ export class DeltaManager
 
     public get inboundSignal(): IDeltaQueue<ISignalMessage> {
         return this._inboundSignal;
-    }
-
-    public get initialSequenceNumber(): number {
-        return this.initSequenceNumber;
-    }
-
-    public get lastSequenceNumber(): number {
-        return this.lastProcessedSequenceNumber;
     }
 
     public get minimumSequenceNumber(): number {
@@ -181,7 +170,6 @@ export class DeltaManager
      * Sets the sequence number from which inbound messages should be returned
      */
     public attachOpHandler(handler: IDeltaHandlerStrategy) {
-        this.initSequenceNumber = 0;
         this.lastProcessedSequenceNumber = 0;
         this.minSequenceNumber = 0;
         this.lastQueuedSequenceNumber = 0;

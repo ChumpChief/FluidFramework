@@ -134,7 +134,8 @@ export class MockContainerRuntime {
             clientId: this.clientId,
             clientSequenceNumber,
             contents: messageContent,
-            referenceSequenceNumber: this.deltaManager.lastSequenceNumber,
+            // TODO broken
+            referenceSequenceNumber: 0,
             type: MessageType.Operation,
 
         };
@@ -148,7 +149,6 @@ export class MockContainerRuntime {
     public dirty(): void { }
 
     public process(message: ISequencedDocumentMessage) {
-        this.deltaManager.lastSequenceNumber = message.sequenceNumber;
         this.deltaManager.minimumSequenceNumber = message.minimumSequenceNumber;
         const [local, localOpMetadata] = this.processInternal(message);
         this.deltaConnections.forEach((dc) => {
