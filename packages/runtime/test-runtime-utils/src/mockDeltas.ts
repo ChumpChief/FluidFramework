@@ -8,7 +8,6 @@ import {
     IClientDetails,
     IDocumentMessage,
     ISequencedDocumentMessage,
-    ISignalMessage,
     MessageType,
 } from "@fluidframework/protocol-definitions";
 
@@ -58,10 +57,6 @@ class MockDeltaQueue<T> extends EventEmitter implements IDeltaQueue<T> {
     }
 
     public dispose() { }
-
-    constructor() {
-        super();
-    }
 }
 
 /**
@@ -77,7 +72,6 @@ export class MockDeltaManager extends EventEmitter
     public get IDeltaSender() { return this; }
 
     private readonly _inbound: MockDeltaQueue<ISequencedDocumentMessage>;
-    private readonly _inboundSignal: MockDeltaQueue<ISignalMessage>;
     private readonly _outbound: MockDeltaQueue<IDocumentMessage[]>;
 
     public get inbound(): IDeltaQueue<ISequencedDocumentMessage> {
@@ -86,10 +80,6 @@ export class MockDeltaManager extends EventEmitter
 
     public get outbound(): IDeltaQueue<IDocumentMessage[]> {
         return this._outbound;
-    }
-
-    public get inboundSignal(): IDeltaQueue<ISignalMessage> {
-        return this._inboundSignal;
     }
 
     public minimumSequenceNumber = 0;
@@ -108,8 +98,6 @@ export class MockDeltaManager extends EventEmitter
 
     public close(): void { }
 
-    public submitSignal(content: any): void { }
-
     public flush() { }
 
     public submit(type: MessageType, contents: any): number {
@@ -123,6 +111,5 @@ export class MockDeltaManager extends EventEmitter
 
         this._inbound = new MockDeltaQueue<ISequencedDocumentMessage>();
         this._outbound = new MockDeltaQueue<IDocumentMessage[]>();
-        this._inboundSignal = new MockDeltaQueue<ISignalMessage>();
     }
 }

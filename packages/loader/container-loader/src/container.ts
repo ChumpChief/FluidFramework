@@ -20,7 +20,6 @@ import {
     IClientJoin,
     ISequencedDocumentMessage,
     ISequencedDocumentSystemMessage,
-    ISignalMessage,
     MessageType,
 } from "@fluidframework/protocol-definitions";
 
@@ -122,9 +121,6 @@ export class Container implements IFluidRouter {
         // Attach op handlers to start processing ops
         this._deltaManager.attachOpHandler({
             process: (message) => this.processRemoteMessage(message),
-            processSignal: (message) => {
-                this.processSignal(message);
-            },
         });
         this._existing = await startConnectionP.then((details) => details.existing);
 
@@ -204,24 +200,11 @@ export class Container implements IFluidRouter {
         }
     }
 
-    private submitSignal(message: any) {
-        this._deltaManager.submitSignal(JSON.stringify(message));
-    }
-
-    private processSignal(message: ISignalMessage) {
-        // No clientId indicates a system signal message.
-        if (message.clientId !== null) {
-            const local = this._clientId === message.clientId;
-            this.context.processSignal(message, local);
-        }
-    }
-
     private async loadContext() {
         this._context = await ContainerContext.createOrLoad(
             this,
             this.containerRuntimeFactory,
             (contents) => this.submitMessage(contents),
-            (message) => this.submitSignal(message),
         );
     }
 }

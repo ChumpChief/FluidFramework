@@ -9,8 +9,6 @@ import {
     IDocumentMessage,
     INack,
     ISequencedDocumentMessage,
-    ISignalClient,
-    ISignalMessage,
     ITokenClaims,
 } from "@fluidframework/protocol-definitions";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
@@ -35,13 +33,10 @@ export class MockDocumentDeltaConnection
     public readonly maxMessageSize: number = 16 * 1024;
     public readonly version: string = "";
     public initialMessages: ISequencedDocumentMessage[] = [];
-    public initialSignals: ISignalMessage[] = [];
-    public initialClients: ISignalClient[] = [];
 
     constructor(
         public readonly clientId: string,
         private readonly submitHandler?: (messages: IDocumentMessage[]) => void,
-        private readonly submitSignalHandler?: (message: any) => void,
     ) {
         super();
     }
@@ -52,11 +47,6 @@ export class MockDocumentDeltaConnection
         }
     }
 
-    public submitSignal(message: any): void {
-        if (this.submitSignalHandler !== undefined) {
-            this.submitSignalHandler(message);
-        }
-    }
     public disconnect(reason?: string) {
         this.emit("disconnect", reason ?? "mock disconnect called");
     }
@@ -64,9 +54,6 @@ export class MockDocumentDeltaConnection
     // Mock methods for raising events
     public emitOp(documentId: string, messages: Partial<ISequencedDocumentMessage>[]) {
         this.emit("op", documentId, messages);
-    }
-    public emitSignal(signal: Partial<ISignalMessage>) {
-        this.emit("signal", signal);
     }
     public emitNack(documentId: string, message: Partial<INack>[]) {
         this.emit("nack", documentId, message);

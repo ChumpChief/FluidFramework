@@ -12,7 +12,6 @@ import {
     IDocumentMessage,
     INack,
     ISequencedDocumentMessage,
-    ISignalMessage,
 } from "@fluidframework/protocol-definitions";
 import io from "socket.io-client";
 
@@ -27,7 +26,6 @@ export interface IDeltaFeedEvents extends IErrorEvent {
     // Protocol messages not handled at this layer, rebroadcast up to higher layers
     (event: "nack", listener: (message: INack[]) => void);
     (event: "op", listener: (message: ISequencedDocumentMessage) => void);
-    (event: "signal", listener: (message: ISignalMessage) => void);
 }
 
 export interface IDeltaFeed extends IEventProvider<IDeltaFeedEvents> {
@@ -52,11 +50,6 @@ export interface IDeltaFeed extends IEventProvider<IDeltaFeedEvents> {
      * Submit a new message to the server
      */
     submit(message: IDocumentMessage): void;
-
-    /**
-     * Submit a new signal to the server
-     */
-    submitSignal(message: IDocumentMessage): void;
 
     /**
      * Disconnects the given delta connection
@@ -118,10 +111,6 @@ export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> imple
             for (const message of messages) {
                 this.emit("op", message);
             }
-        });
-
-        this.socket.on("signal", (message: ISignalMessage) => {
-            this.emit("signal", message);
         });
     }
 
@@ -225,16 +214,6 @@ export class SocketIODeltaFeed extends TypedEventEmitter<IDeltaFeedEvents> imple
     public submit(message: IDocumentMessage): void {
         // I don't really want to submit as an array, but currently Tinylicious will barf if it's not.
         this.socket.emit("submitOp", this.connectionInfo.clientId, [message]);
-    }
-
-    /**
-     * Submits a new signal to the server
-     *
-     * @param message - signal to submit
-     */
-    public submitSignal(message: IDocumentMessage): void {
-        // I don't really want to submit as an array, but currently Tinylicious will barf if it's not.
-        this.socket.emit("submitSignal", this.connectionInfo.clientId, [message]);
     }
 
     /**

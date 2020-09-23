@@ -58,11 +58,6 @@ export interface IRuntime extends IDisposable {
     process(message: ISequencedDocumentMessage, local: boolean, context: any);
 
     /**
-     * Processes the given signal
-     */
-    processSignal(message: any, local: boolean);
-
-    /**
      * Propagate the container state when container is attaching or attached.
      * @param attachState - State of the container.
      */
@@ -84,7 +79,6 @@ export interface IContainerContext extends IDisposable {
     readonly storage: IDocumentStorageService | undefined | null;
     readonly connected: boolean;
     readonly submitFn: (contents: any) => number;
-    readonly submitSignalFn: (contents: any) => void;
 
     /**
      * Get an absolute url for a provided container-relative request.

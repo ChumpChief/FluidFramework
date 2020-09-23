@@ -25,7 +25,6 @@ import {
     IDocumentSystemMessage,
     INack,
     ISequencedDocumentMessage,
-    ISignalMessage,
     MessageType,
 } from "@fluidframework/protocol-definitions";
 import { CreateContainerError } from "@fluidframework/container-utils";
@@ -90,7 +89,6 @@ export class DeltaManager
     private lastProcessedSequenceNumber: number = 0;
 
     private readonly _inbound: DeltaQueue<ISequencedDocumentMessage>;
-    private readonly _inboundSignal: DeltaQueue<ISignalMessage>;
     private readonly _outbound: DeltaQueue<IDocumentMessage[]>;
 
     private connectionP: Promise<IConnectionDetails> | undefined;
@@ -111,10 +109,6 @@ export class DeltaManager
 
     public get outbound(): IDeltaQueue<IDocumentMessage[]> {
         return this._outbound;
-    }
-
-    public get inboundSignal(): IDeltaQueue<ISignalMessage> {
-        return this._inboundSignal;
     }
 
     public get scopes(): string[] | undefined {
@@ -142,24 +136,11 @@ export class DeltaManager
                 this.connection.submit(messages);
             });
 
-        // Inbound signal queue
-        this._inboundSignal = new DeltaQueue<ISignalMessage>((message) => {
-            if (this.handler === undefined) {
-                throw new Error("Attempted to process an inbound signal without a handler attached");
-            }
-            this.handler.processSignal({
-                clientId: message.clientId,
-                content: JSON.parse(message.content as string),
-            });
-        });
-
         // Require the user to start the processing
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this._inbound.pause();
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this._outbound.pause();
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this._inboundSignal.pause();
     }
 
     /**
@@ -176,7 +157,6 @@ export class DeltaManager
         assert(this.handler);
 
         this._inbound.systemResume();
-        this._inboundSignal.systemResume();
 
         // We could have connected to delta stream before getting here
         // If so, it's time to process any accumulated ops
@@ -307,14 +287,9 @@ export class DeltaManager
         return outbound.clientSequenceNumber;
     }
 
-    public submitSignal(content: any) {
-        this.connection?.submitSignal(content);
-    }
-
     public resume(): void {
         this.inbound.resume();
         this.outbound.resume();
-        this.inboundSignal.resume();
     }
 
     private async getDeltas(
@@ -444,10 +419,6 @@ export class DeltaManager
             }
         });
 
-        connection.on("signal", (message: ISignalMessage) => {
-            this._inboundSignal.push(message);
-        });
-
         connection.on("nack", (documentId: string, messages: INack[]) => {
             console.error(`Got NACK'd: ${messages}`);
         });
@@ -465,7 +436,6 @@ export class DeltaManager
 
         this.processInitialMessages(
             initialMessages,
-            connection.details.initialSignals ?? [],
         );
 
         // if we have some op on the wire (or will have a "join" op for ourselves for r/w connection), then client
@@ -479,13 +449,9 @@ export class DeltaManager
 
     private processInitialMessages(
         messages: ISequencedDocumentMessage[],
-        signals: ISignalMessage[],
     ): void {
         if (messages.length > 0) {
             this.catchUp(messages);
-        }
-        for (const signal of signals) {
-            this._inboundSignal.push(signal);
         }
     }
 

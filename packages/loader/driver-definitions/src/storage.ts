@@ -10,8 +10,6 @@ import {
     IDocumentMessage,
     INack,
     ISequencedDocumentMessage,
-    ISignalClient,
-    ISignalMessage,
     ISnapshotTree,
     ISummaryHandle,
     ISummaryTree,
@@ -101,7 +99,6 @@ export interface IDocumentDeltaConnectionEvents extends IErrorEvent {
     (event: "nack", listener: (documentId: string, message: INack[]) => void);
     (event: "disconnect", listener: (reason: any) => void);
     (event: "op", listener: (documentId: string, messages: ISequencedDocumentMessage[]) => void);
-    (event: "signal", listener: (message: ISignalMessage) => void);
 }
 
 export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaConnectionEvents> {
@@ -141,24 +138,9 @@ export interface IDocumentDeltaConnection extends IEventProvider<IDocumentDeltaC
     initialMessages: ISequencedDocumentMessage[];
 
     /**
-     * Signals sent during the connection
-     */
-    initialSignals: ISignalMessage[];
-
-    /**
-     * Prior clients already connected.
-     */
-    initialClients: ISignalClient[];
-
-    /**
      * Submit a new message to the server
      */
     submit(messages: IDocumentMessage[]): void;
-
-    /**
-     * Submit a new signal to the server
-     */
-    submitSignal(message: any): void;
 
     /**
      * Disconnects the given delta connection

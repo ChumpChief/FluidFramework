@@ -22,7 +22,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { IProvideFluidDataStoreFactory } from "./dataStoreFactory";
 import { IProvideFluidDataStoreRegistry } from "./dataStoreRegistry";
-import { IInboundSignalMessage } from "./protocol";
 import { ISummaryTreeWithStats, ISummarizerNode, SummarizeInternalFn } from "./summary";
 
 /**
@@ -35,17 +34,10 @@ export interface IContainerRuntimeBase extends
     IProvideFluidSerializer,
     /* TODO: Used by spaces. we should switch to IoC to provide the global registry */
     IProvideFluidDataStoreRegistry {
-    /**
-     * Submits a container runtime level signal to be sent to other clients.
-     * @param type - Type of the signal.
-     * @param content - Content of the signal.
-     */
-    submitSignal(type: string, content: any): void;
 
     on(event: "batchBegin", listener: (op: ISequencedDocumentMessage) => void): this;
     on(event: "batchEnd", listener: (error: any, op: ISequencedDocumentMessage) => void): this;
     on(event: "op", listener: (message: ISequencedDocumentMessage) => void): this;
-    on(event: "signal", listener: (message: IInboundSignalMessage, local: boolean) => void): this;
     on(event: "leader" | "notleader", listener: () => void): this;
 
     /**
@@ -104,11 +96,6 @@ export interface IFluidDataStoreChannel extends
      * Processes the op.
      */
     process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
-
-    /**
-     * Processes the signal.
-     */
-    processSignal(message: any, local: boolean): void;
 
     /**
      * Generates a snapshot of the given data store
@@ -222,13 +209,6 @@ export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFl
      * we are asked to resubmit the message.
      */
     submitMessage(type: string, content: any, localOpMetadata: unknown): void;
-
-    /**
-     * Submits the signal to be sent to other clients.
-     * @param type - Type of the signal.
-     * @param content - Content of the signal.
-     */
-    submitSignal(type: string, content: any): void;
 
     /**
      * Register the runtime to the container

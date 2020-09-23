@@ -34,7 +34,6 @@ import {
     IFluidDataStoreContext,
     IFluidDataStoreChannel,
     IEnvelope,
-    IInboundSignalMessage,
     IFluidDataStoreContextType,
 } from "@fluidframework/runtime-definitions";
 import { generateHandleContextPath } from "@fluidframework/runtime-utils";
@@ -429,10 +428,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         this.emit("op", message);
     }
 
-    public processSignal(message: IInboundSignalMessage, local: boolean) {
-        this.emit("signal", message, local);
-    }
-
     private isChannelAttached(id: string): boolean {
         return (
             // Added in createChannel
@@ -499,11 +494,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
 
     public submitMessage(type: DataStoreMessageType, content: any, localOpMetadata: unknown) {
         this.submit(type, content, localOpMetadata);
-    }
-
-    public submitSignal(type: string, content: any) {
-        this.verifyNotClosed();
-        return this.dataStoreContext.submitSignal(type, content);
     }
 
     /**

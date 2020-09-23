@@ -33,7 +33,6 @@ import {
     IFluidDataStoreContext,
     IFluidDataStoreContextDetached,
     IFluidDataStoreRegistry,
-    IInboundSignalMessage,
     IProvideFluidDataStoreFactory,
 } from "@fluidframework/runtime-definitions";
 import { ContainerRuntime } from "./containerRuntime";
@@ -296,17 +295,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
         }
     }
 
-    public processSignal(message: IInboundSignalMessage, local: boolean): void {
-        this.verifyNotClosed();
-
-        // Signals are ignored if the store is not yet loaded
-        if (!this.loaded) {
-            return;
-        }
-
-        this.channel?.processSignal(message, local);
-    }
-
     /**
      * Notifies the object to take snapshot of a store.
      * @deprecated in 0.22 summarizerNode
@@ -344,12 +332,6 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
             this.id,
             fluidDataStoreContent,
             localOpMetadata);
-    }
-
-    public submitSignal(type: string, content: any) {
-        this.verifyNotClosed();
-        assert(this.channel);
-        return this._containerRuntime.submitDataStoreSignal(this.id, type, content);
     }
 
     /**

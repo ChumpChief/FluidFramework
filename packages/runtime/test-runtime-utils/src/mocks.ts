@@ -457,15 +457,7 @@ export class MockFluidDataStoreRuntime extends EventEmitter
         return null;
     }
 
-    public submitSignal(type: string, content: any) {
-        return null;
-    }
-
     public process(message: ISequencedDocumentMessage, local: boolean): void {
-        return;
-    }
-
-    public processSignal(message: any, local: boolean) {
         return;
     }
 

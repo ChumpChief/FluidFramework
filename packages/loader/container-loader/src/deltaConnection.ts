@@ -40,7 +40,7 @@ export class DeltaConnection
     private readonly _details: IConnectionDetails;
     private _nacked = false;
 
-    private readonly forwardEvents = ["op", "signal", "error"];
+    private readonly forwardEvents = ["op", "error"];
     private readonly nonForwardEvents = ["nack", "disconnect"];
 
     private _connection?: IDocumentDeltaConnection;
@@ -60,9 +60,7 @@ export class DeltaConnection
             claims: connection.claims,
             clientId: connection.clientId,
             existing: connection.existing,
-            get initialClients() { return connection.initialClients; },
             get initialMessages() { return connection.initialMessages; },
-            get initialSignals() { return connection.initialSignals; },
             maxMessageSize: connection.maxMessageSize,
             mode: connection.mode,
             version: connection.version,
@@ -115,9 +113,5 @@ export class DeltaConnection
 
     public submit(messages: IDocumentMessage[]): void {
         this.connection.submit(messages);
-    }
-
-    public submitSignal(message: any): void {
-        return this.connection.submitSignal(message);
     }
 }

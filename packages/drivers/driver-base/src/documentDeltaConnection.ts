@@ -14,8 +14,6 @@ import {
     IConnected,
     IDocumentMessage,
     ISequencedDocumentMessage,
-    ISignalClient,
-    ISignalMessage,
     ITokenClaims,
 } from "@fluidframework/protocol-definitions";
 import io from "socket.io-client";
@@ -84,7 +82,6 @@ export class DocumentDeltaConnection
 
     // Listen for ops sent before we receive a response to connect_document
     private readonly queuedMessages: ISequencedDocumentMessage[] = [];
-    private readonly queuedSignals: ISignalMessage[] = [];
 
     private readonly submitManager: BatchManager<IDocumentMessage[]>;
 
@@ -196,49 +193,12 @@ export class DocumentDeltaConnection
     }
 
     /**
-     * Get signals sent during the connection
-     *
-     * @returns signals sent during the connection
-     */
-    public get initialSignals(): ISignalMessage[] {
-        this.removeEarlySignalHandler();
-
-        assert(this.listeners("signal").length !== 0, "No signal handler is setup!");
-
-        if (this.queuedSignals.length > 0) {
-            // Some signals were queued.
-            // add them to the list of initialSignals to be processed
-            this.details.initialSignals.push(...this.queuedSignals);
-            this.queuedSignals.length = 0;
-        }
-        return this.details.initialSignals;
-    }
-
-    /**
-     * Get initial client list
-     *
-     * @returns initial client list sent during the connection
-     */
-    public get initialClients(): ISignalClient[] {
-        return this.details.initialClients;
-    }
-
-    /**
      * Submits a new delta operation to the server
      *
      * @param message - delta operation to submit
      */
     public submit(messages: IDocumentMessage[]): void {
         this.submitManager.add("submitOp", messages);
-    }
-
-    /**
-     * Submits a new signal to the server
-     *
-     * @param message - signal to submit
-     */
-    public submitSignal(message: IDocumentMessage): void {
-        this.submitManager.add("submitSignal", [message]);
     }
 
     public async connect(
@@ -269,7 +229,6 @@ export class DocumentDeltaConnection
         };
 
         this.socket.on("op", this.earlyOpHandler);
-        this.socket.on("signal", this.earlySignalHandler);
 
         this._details = await new Promise<IConnected>((resolve, reject) => {
             // Listen for connection issues
@@ -357,17 +316,8 @@ export class DocumentDeltaConnection
         this.queuedMessages.push(...msgs);
     };
 
-    private readonly earlySignalHandler = (msg: ISignalMessage) => {
-        debug("Queued early signals");
-        this.queuedSignals.push(msg);
-    };
-
     private removeEarlyOpHandler() {
         this.socket?.removeListener("op", this.earlyOpHandler);
-    }
-
-    private removeEarlySignalHandler() {
-        this.socket?.removeListener("signal", this.earlySignalHandler);
     }
 
     private addConnectionListener(event: string, listener: (...args: any[]) => void) {
@@ -393,7 +343,6 @@ export class DocumentDeltaConnection
 
         if (!connectionListenerOnly) {
             this.removeEarlyOpHandler();
-            this.removeEarlySignalHandler();
         }
     }
 }

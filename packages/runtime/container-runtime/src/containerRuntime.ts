@@ -32,7 +32,6 @@ import {
 import {
     ConnectionState,
     ISequencedDocumentMessage,
-    ISignalMessage,
     ISnapshotTree,
     MessageType,
 } from "@fluidframework/protocol-definitions";
@@ -43,8 +42,6 @@ import {
     IFluidDataStoreRegistry,
     IFluidDataStoreChannel,
     IEnvelope,
-    IInboundSignalMessage,
-    ISignalEnvelop,
     NamedFluidDataStoreRegistryEntries,
 } from "@fluidframework/runtime-definitions";
 import {
@@ -324,30 +321,6 @@ export class ContainerRuntime extends EventEmitter
         this.emit("op", unpackedMessage);
     }
 
-    public processSignal(message: ISignalMessage, local: boolean) {
-        const envelope = message.content as ISignalEnvelop;
-        const transformed: IInboundSignalMessage = {
-            clientId: message.clientId,
-            content: envelope.contents.content,
-            type: envelope.contents.type,
-        };
-
-        if (envelope.address === undefined) {
-            // No address indicates a container signal message.
-            this.emit("signal", transformed, local);
-            return;
-        }
-
-        const context = this.contexts.get(envelope.address);
-        if (!context) {
-            // Attach message may not have been processed yet
-            assert(!local);
-            return;
-        }
-
-        context.processSignal(transformed, local);
-    }
-
     public async getRootDataStore(id: string, wait = true): Promise<IFluidRouter> {
         return this.getDataStore(id, wait);
     }
@@ -421,22 +394,6 @@ export class ContainerRuntime extends EventEmitter
 
     public on(event: string | symbol, listener: (...args: any[]) => void): this {
         return super.on(event, listener);
-    }
-
-    /**
-     * Submits the signal to be sent to other clients.
-     * @param type - Type of the signal.
-     * @param content - Content of the signal.
-     */
-    public submitSignal(type: string, content: any) {
-        this.verifyNotClosed();
-        const envelope: ISignalEnvelop = { address: undefined, contents: { type, content } };
-        return this.context.submitSignalFn(envelope);
-    }
-
-    public submitDataStoreSignal(address: string, type: string, content: any) {
-        const envelope: ISignalEnvelop = { address, contents: { type, content } };
-        return this.context.submitSignalFn(envelope);
     }
 
     private processAttachMessage(message: ISequencedDocumentMessage, local: boolean, localMessageMetadata: unknown) {

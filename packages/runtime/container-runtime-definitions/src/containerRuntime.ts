@@ -15,7 +15,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import {
     IContainerRuntimeBase,
-    IInboundSignalMessage,
 } from "@fluidframework/runtime-definitions";
 
 declare module "@fluidframework/core-interfaces" {
@@ -47,7 +46,6 @@ export interface IContainerRuntime extends
     on(event: "batchBegin", listener: (op: ISequencedDocumentMessage) => void): this;
     on(event: "batchEnd", listener: (error: any, op: ISequencedDocumentMessage) => void): this;
     on(event: "op", listener: (message: ISequencedDocumentMessage) => void): this;
-    on(event: "signal", listener: (message: IInboundSignalMessage, local: boolean) => void): this;
     on(
         event: "dirtyDocument" | "disconnected" | "dispose" | "savedDocument" | "leader" | "notleader",
         listener: () => void): this;

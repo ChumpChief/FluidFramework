@@ -16,7 +16,7 @@ import {
 import {
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
-import { IInboundSignalMessage, IProvideFluidDataStoreRegistry } from "@fluidframework/runtime-definitions";
+import { IProvideFluidDataStoreRegistry } from "@fluidframework/runtime-definitions";
 import { IChannel } from ".";
 
 /**
@@ -52,7 +52,6 @@ export interface IFluidDataStoreRuntime extends
         listener: () => void,
     ): this;
     on(event: "op", listener: (message: ISequencedDocumentMessage) => void): this;
-    on(event: "signal", listener: (message: IInboundSignalMessage, local: boolean) => void): this;
     on(event: "connected", listener: (clientId: string) => void): this;
 
     /**
@@ -72,13 +71,6 @@ export interface IFluidDataStoreRuntime extends
      * is attached then we attach the channel to make it live.
      */
     bindChannel(channel: IChannel): void;
-
-    /**
-     * Submits the signal to be sent to other clients.
-     * @param type - Type of the signal.
-     * @param content - Content of the signal.
-     */
-    submitSignal(type: string, content: any): void;
 
     /**
      * Resolves when a local data store is attached.

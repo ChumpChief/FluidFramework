@@ -7,8 +7,6 @@ import { IEventProvider, IEvent, IErrorEvent } from "@fluidframework/common-defi
 import {
     ConnectionMode,
     ISequencedDocumentMessage,
-    ISignalClient,
-    ISignalMessage,
     ITokenClaims,
     MessageType,
 } from "@fluidframework/protocol-definitions";
@@ -22,9 +20,7 @@ export interface IConnectionDetails {
     existing: boolean;
     mode: ConnectionMode;
     version: string;
-    initialClients: ISignalClient[];
     initialMessages: ISequencedDocumentMessage[];
-    initialSignals: ISignalMessage[];
     maxMessageSize: number;
 }
 
@@ -36,11 +32,6 @@ export interface IDeltaHandlerStrategy {
      * Processes the message.
      */
     process: (message: ISequencedDocumentMessage) => void;
-
-    /**
-     * Processes the signal.
-     */
-    processSignal: (message: ISignalMessage) => void;
 }
 
 declare module "@fluidframework/core-interfaces" {
@@ -89,9 +80,6 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
      * op is submitted.
      */
     submit(type: MessageType, contents: any): number;
-
-    /** Submit a signal to the service to be broadcast to other connected clients, but not persisted */
-    submitSignal(content: any): void;
 }
 
 /** Events emmitted by a Delta Queue */
