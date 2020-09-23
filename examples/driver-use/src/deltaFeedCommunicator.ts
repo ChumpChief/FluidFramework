@@ -5,7 +5,7 @@
 
 import { IEventProvider, IErrorEvent } from "@fluidframework/common-definitions";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
-import { IRuntime } from "@fluidframework/container-definitions";
+// import { IRuntime } from "@fluidframework/container-definitions";
 
 import { IDeltaFeedFollower } from "./deltaFeedFollower";
 
@@ -23,7 +23,7 @@ export class DeltaFeedCommunicator
     private lastProcessedOpSequenceNumber: number;
     constructor(
         private readonly deltaFeedFollower: IDeltaFeedFollower,
-        private readonly containerRuntime: IRuntime,
+        // private readonly containerRuntime: IRuntime,
     ) {
         super();
         this.lastProcessedOpSequenceNumber = -1;
@@ -31,12 +31,14 @@ export class DeltaFeedCommunicator
     }
 
     private readonly handleSequentialOpsAvailable = () => {
-        while (this.lastProcessedOpSequenceNumber < this.deltaFeedFollower.sequentialOps.length) {
+        // TODO maybe off by one, unclear if this should be 1-indexed
+        while (this.lastProcessedOpSequenceNumber < this.deltaFeedFollower.sequentialOps.length - 1) {
             const nextOp = this.deltaFeedFollower.sequentialOps[this.lastProcessedOpSequenceNumber + 1];
-            this.containerRuntime.process(
-                nextOp,
-                true,
-            );
+            // this.containerRuntime.process(
+            //     nextOp,
+            //     true,
+            // );
+            console.log(nextOp);
             this.lastProcessedOpSequenceNumber++;
         }
     };

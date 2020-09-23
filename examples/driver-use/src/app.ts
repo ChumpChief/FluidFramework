@@ -13,6 +13,7 @@ import { v4 as uuid } from "uuid";
 
 import { DiceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
+import { DeltaFeedCommunicator } from "./deltaFeedCommunicator";
 import { DeltaFeedFollower } from "./deltaFeedFollower";
 import { getTinyliciousContainer } from "./getTinyliciousContainer";
 import { SocketIODeltaFeed } from "./socketIoDeltaFeed";
@@ -68,7 +69,8 @@ const deltaStorageService = new DocumentDeltaStorageService(
 const deltaFeedFollower = new DeltaFeedFollower(deltaFeed, deltaStorageService, 0);
 window["testDeltaFeedFollower"] = deltaFeedFollower;
 
-deltaFeedFollower.on("sequentialOpsAvailable", () => { console.log(deltaFeedFollower.sequentialOps); });
+const deltaFeedCommunicator = new DeltaFeedCommunicator(deltaFeedFollower);
+window["testDeltaFeedCommunicator"] = deltaFeedCommunicator;
 
 const storageUrl = `http://localhost:3000/repos/tinylicious`;
 const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
