@@ -69,7 +69,6 @@ export class DeltaQueue<T> extends TypedEventEmitter<IDeltaQueueEvents<T>> imple
 
     public push(task: T) {
         this.q.push(task);
-        this.emit("push", task);
         this.ensureProcessing();
     }
 
