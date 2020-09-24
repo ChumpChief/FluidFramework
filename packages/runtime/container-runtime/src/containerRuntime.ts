@@ -21,16 +21,12 @@ import { IContainerRuntime } from "@fluidframework/container-runtime-definitions
 import {
     Deferred,
 } from "@fluidframework/common-utils";
-import {
-    raiseConnectedEvent,
-} from "@fluidframework/telemetry-utils";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     BlobCacheStorageService,
     buildSnapshotTree,
 } from "@fluidframework/driver-utils";
 import {
-    ConnectionState,
     ISequencedDocumentMessage,
     ISnapshotTree,
     MessageType,
@@ -246,13 +242,6 @@ export class ContainerRuntime extends EventEmitter
         };
     }
 
-    // Back-compat: <= 0.17
-    public changeConnectionState(state: ConnectionState, clientId?: string) {
-        if (state !== ConnectionState.Connecting) {
-            this.setConnectionState(state === ConnectionState.Connected, clientId);
-        }
-    }
-
     public setConnectionState(connected: boolean, clientId?: string) {
         this.verifyNotClosed();
 
@@ -269,8 +258,6 @@ export class ContainerRuntime extends EventEmitter
                 context.setConnectionState(connected, clientId);
             } catch (error) { }
         }
-
-        raiseConnectedEvent(this, connected, clientId);
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean) {
