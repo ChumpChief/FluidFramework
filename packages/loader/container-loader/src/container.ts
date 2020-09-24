@@ -49,13 +49,11 @@ export class Container implements IFluidRouter {
     }
 
     private pendingClientId: string | undefined;
-    private loaded = false;
 
     private _clientId: string | undefined;
     private readonly _documentId: string | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
-    private _connected: boolean = true;
 
     private _context: ContainerContext | undefined;
     private get context() {
@@ -72,7 +70,7 @@ export class Container implements IFluidRouter {
     }
 
     public get connected(): boolean {
-        return this._connected;
+        return true;
     }
 
     /**
@@ -131,9 +129,6 @@ export class Container implements IFluidRouter {
 
         // The queues start paused
         this._deltaManager.resume();
-
-        // Internal context is fully loaded at this point
-        this.loaded = true;
     }
 
     private createDeltaManager() {
@@ -156,23 +151,15 @@ export class Container implements IFluidRouter {
     }
 
     private setConnected() {
-        this._connected = true;
         this._clientId = this.pendingClientId;
-
-        if (this.loaded) {
-            this.propagateConnectionState();
-        }
+        this.propagateConnectionState();
     }
 
     private propagateConnectionState() {
-        this.context.setConnectionState(this._connected);
+        this.context.setConnectionState(true);
     }
 
     private submitMessage(contents: any): number {
-        if (!this._connected) {
-            return -1;
-        }
-
         return this._deltaManager.submit(MessageType.Operation, contents);
     }
 

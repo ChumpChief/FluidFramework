@@ -64,7 +64,7 @@ export class ContainerContext implements IContainerContext {
     ) { }
 
     public setConnectionState(connected: boolean) {
-        this.runtime.setConnectionState(connected);
+        this.runtime.setConnectionState(true);
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean) {

@@ -122,7 +122,7 @@ export class ContainerRuntime extends EventEmitter
 
     private readonly notBoundContexts = new Set<string>();
 
-    private _connected: boolean;
+    private _connected: boolean = true;
 
     public get connected(): boolean {
         return this._connected;
@@ -149,8 +149,6 @@ export class ContainerRuntime extends EventEmitter
         super();
 
         this.registry = new FluidDataStoreRegistry(registryEntries);
-
-        this._connected = this.context.connected;
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
