@@ -4,5 +4,4 @@
  */
 
 export * from "./interfaces";
-export * from "./testContainerRuntimeFactory";
 export * from "./testFluidObject";

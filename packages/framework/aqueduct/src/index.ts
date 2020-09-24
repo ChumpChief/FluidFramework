@@ -20,7 +20,6 @@
 
 export * from "./data-object-factories";
 export * from "./data-objects";
-export * from "./container-runtime-factories";
 export * from "./container-services";
 export * from "./request-handlers";
 export * from "./utils";
