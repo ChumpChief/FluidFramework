@@ -6,6 +6,7 @@
 import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
 import {
     IConnectionDetails,
+    IRuntime,
     IRuntimeFactory,
 } from "@fluidframework/container-definitions";
 import {
@@ -23,7 +24,6 @@ import {
     MessageType,
 } from "@fluidframework/protocol-definitions";
 
-import { ContainerContext } from "./containerContext";
 import { DeltaManager } from "./deltaManager";
 
 export class Container implements IFluidRouter {
@@ -55,12 +55,12 @@ export class Container implements IFluidRouter {
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
 
-    private _context: ContainerContext | undefined;
-    private get context() {
-        if (this._context === undefined) {
-            throw new Error("Attempted to access context before it was defined");
+    private _runtime: IRuntime | undefined;
+    private get runtime() {
+        if (this._runtime === undefined) {
+            throw new Error("Attempted to access runtime before it was defined");
         }
-        return this._context;
+        return this._runtime;
     }
 
     public get IFluidRouter(): IFluidRouter { return this; }
@@ -104,7 +104,7 @@ export class Container implements IFluidRouter {
     }
 
     public async request(path: IRequest): Promise<IResponse> {
-        return this.context.request(path);
+        return this.runtime.request(path);
     }
 
     public get storage(): IDocumentStorageService {
@@ -125,7 +125,11 @@ export class Container implements IFluidRouter {
         });
         this._existing = await startConnectionP.then((details) => details.existing);
 
-        await this.loadContext();
+        this._runtime = await this.containerRuntimeFactory.instantiateRuntime(
+            this.existing,
+            (contents) => this.submitMessage(contents),
+            this.storage,
+        );
 
         // The queues start paused
         this._deltaManager.resume();
@@ -156,7 +160,7 @@ export class Container implements IFluidRouter {
     }
 
     private propagateConnectionState() {
-        this.context.setConnectionState(true);
+        this.runtime.setConnectionState(true);
     }
 
     private submitMessage(contents: any): number {
@@ -168,7 +172,7 @@ export class Container implements IFluidRouter {
 
         // Forward non system messages to the loaded runtime for processing
         if (!isSystemMessage(message)) {
-            this.context.process(message, local);
+            this.runtime.process(message, local);
         }
 
         // Leftover from quorum's addMember
@@ -180,13 +184,5 @@ export class Container implements IFluidRouter {
                 this.setConnected();
             }
         }
-    }
-
-    private async loadContext() {
-        this._context = await ContainerContext.createOrLoad(
-            this,
-            this.containerRuntimeFactory,
-            (contents) => this.submitMessage(contents),
-        );
     }
 }
