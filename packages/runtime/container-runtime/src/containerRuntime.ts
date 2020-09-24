@@ -13,7 +13,6 @@ import {
     IResponse,
 } from "@fluidframework/core-interfaces";
 import {
-    IContainerContext,
     IRuntime,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -140,8 +139,8 @@ export class ContainerRuntime extends EventEmitter
     private readonly registry: IFluidDataStoreRegistry;
 
     constructor(
-        private readonly context: IContainerContext,
         public readonly existing: boolean,
+        private readonly submitFn: (contents: any) => number,
         private readonly storage: IDocumentStorageService,
         registryEntries: NamedFluidDataStoreRegistryEntries,
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
@@ -442,7 +441,7 @@ export class ContainerRuntime extends EventEmitter
         contents: any,
     ) {
         const payload: ContainerRuntimeMessage = { type, contents };
-        return this.context.submitFn(payload);
+        return this.submitFn(payload);
     }
 
     /**

@@ -32,8 +32,8 @@ export class DiceRollerContainerRuntimeFactory implements IRuntimeFactory {
         context: IContainerContext,
     ): Promise<IRuntime> {
         const runtime = new ContainerRuntime(
-            context,
             context.existing,
+            context.submitFn,
             context.storage,
             new Map([
                 DiceRollerInstantiationFactory.registryEntry,
