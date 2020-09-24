@@ -55,7 +55,7 @@ export class Container implements IFluidRouter {
     private readonly _documentId: string | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
-    private _connected: boolean = false;
+    private _connected: boolean = true;
 
     private _context: ContainerContext | undefined;
     private get context() {
@@ -156,11 +156,6 @@ export class Container implements IFluidRouter {
     }
 
     private setConnected() {
-        if (this._connected) {
-            // Already in the desired state - exit early
-            return;
-        }
-
         this._connected = true;
         this._clientId = this.pendingClientId;
 

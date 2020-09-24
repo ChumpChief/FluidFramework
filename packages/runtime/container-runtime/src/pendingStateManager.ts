@@ -11,7 +11,7 @@ import {
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import Deque from "double-ended-queue";
-import { ContainerRuntime, ContainerMessageType } from "./containerRuntime";
+import { ContainerMessageType } from "./containerRuntime";
 
 export class DataCorruptionError extends CustomErrorWithProps implements IErrorBase {
     readonly errorType = "dataCorruptionError";
@@ -50,8 +50,6 @@ type IPendingState = IPendingMessage;
  */
 export class PendingStateManager {
     private readonly pendingStates = new Deque<IPendingState>();
-
-    constructor(private readonly containerRuntime: ContainerRuntime) { }
 
     /**
      * Called when a message is submitted locally. Adds the message and the associated details to the pending state
@@ -104,38 +102,5 @@ export class PendingStateManager {
         const nextPendingState = this.pendingStates.peekFront();
         assert(nextPendingState, "No pending state found for the remote message");
         return nextPendingState;
-    }
-
-    /**
-     * Called when the Container's connection state changes. If the Container gets connected, it replays all the pending
-     * states in its queue. This includes setting the FlushMode and trigerring resubmission of unacked ops.
-     */
-    public replayPendingStates() {
-        // console.log(this.pendingStates, this.pendingStates.peekFront());
-        let pendingStatesCount = this.pendingStates.length;
-        if (pendingStatesCount === 0) {
-            return;
-        }
-
-        // Process exactly `pendingStatesCount` items in the queue as it represents the number of states that were
-        // pending when we connected. This is important because the `reSubmitFn` might add more items in the queue
-        // which must not be replayed.
-        while (pendingStatesCount > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const pendingState = this.pendingStates.shift()!;
-            switch (pendingState.type) {
-                case "message":
-                    {
-                        this.containerRuntime.reSubmitFn(
-                            pendingState.messageType,
-                            pendingState.content,
-                            pendingState.localOpMetadata);
-                    }
-                    break;
-                default:
-                    break;
-            }
-            pendingStatesCount--;
-        }
     }
 }

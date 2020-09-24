@@ -154,7 +154,7 @@ export class ContainerRuntime extends EventEmitter
 
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
-        this.pendingStateManager = new PendingStateManager(this);
+        this.pendingStateManager = new PendingStateManager();
     }
 
     /**
@@ -206,12 +206,7 @@ export class ContainerRuntime extends EventEmitter
 
     public setConnectionState(connected: boolean) {
         // There might be no change of state due to Container calling this API after loading runtime.
-        const changeOfState = this._connected !== connected;
         this._connected = connected;
-
-        if (changeOfState && this.canSendOps()) {
-            this.pendingStateManager.replayPendingStates();
-        }
 
         for (const [, context] of this.contexts) {
             context.setConnectionState(connected);
@@ -273,10 +268,6 @@ export class ContainerRuntime extends EventEmitter
 
     private async _createDataStore(pkg: string | string[], id = uuid()): Promise<IFluidDataStoreChannel> {
         return this._createFluidDataStoreContext(Array.isArray(pkg) ? pkg : [pkg], id).realize();
-    }
-
-    private canSendOps() {
-        return true;
     }
 
     private _createFluidDataStoreContext(pkg: string[], id) {
@@ -400,7 +391,7 @@ export class ContainerRuntime extends EventEmitter
     private getContext(id: string): FluidDataStoreContext {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const context = this.contexts.get(id)!;
-        assert(context);
+        assert(context, `Didn't find context: ${id}`);
         return context;
     }
 
@@ -439,12 +430,10 @@ export class ContainerRuntime extends EventEmitter
         localOpMetadata: unknown = undefined): void {
         let clientSequenceNumber: number = -1;
 
-        if (this.canSendOps()) {
-            clientSequenceNumber = this.submitRuntimeMessage(
-                type,
-                content,
-            );
-        }
+        clientSequenceNumber = this.submitRuntimeMessage(
+            type,
+            content,
+        );
 
         // Let the PendingStateManager know that a message was submitted.
         this.pendingStateManager.onSubmitMessage(type, clientSequenceNumber, content, localOpMetadata);
