@@ -105,29 +105,6 @@ export class ContainerRuntime extends EventEmitter
     public get IContainerRuntime() { return this; }
     public get IFluidRouter() { return this; }
 
-    /**
-     * Load the stores from a snapshot and returns the runtime.
-     * @param context - Context of the container.
-     * @param registry - Mapping to the stores.
-     * @param requestHandlers - Request handlers for the container runtime
-     * @param runtimeOptions - Additional options to be passed to the runtime
-     */
-    public static async load(
-        context: IContainerContext,
-        registryEntries: NamedFluidDataStoreRegistryEntries,
-        requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
-    ): Promise<ContainerRuntime> {
-        const registry = new FluidDataStoreRegistry(registryEntries);
-
-        const runtime = new ContainerRuntime(
-            context,
-            registry,
-            requestHandler,
-        );
-
-        return runtime;
-    }
-
     public get id(): string {
         return this.context.id;
     }
@@ -185,13 +162,16 @@ export class ContainerRuntime extends EventEmitter
     // List of pending contexts (for the case where a client knows a store will exist and is waiting
     // on its creation). This is a superset of contexts.
     private readonly contextsDeferred = new Map<string, Deferred<FluidDataStoreContext>>();
+    private readonly registry: IFluidDataStoreRegistry;
 
-    private constructor(
+    constructor(
         private readonly context: IContainerContext,
-        private readonly registry: IFluidDataStoreRegistry,
+        registryEntries: NamedFluidDataStoreRegistryEntries,
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ) {
         super();
+
+        this.registry = new FluidDataStoreRegistry(registryEntries);
 
         this._connected = this.context.connected;
 

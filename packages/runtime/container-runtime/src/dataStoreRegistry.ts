@@ -18,10 +18,6 @@ export class FluidDataStoreRegistry implements IFluidDataStoreRegistry {
     }
 
     public async get(name: string): Promise<FluidDataStoreRegistryEntry | undefined> {
-        if (this.map.has(name)) {
-            return this.map.get(name);
-        }
-
-        return undefined;
+        return this.map.get(name);
     }
 }
