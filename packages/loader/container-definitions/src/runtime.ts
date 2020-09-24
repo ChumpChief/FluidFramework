@@ -73,19 +73,11 @@ export interface IRuntime extends IDisposable {
  * and the Container has created a new ContainerContext.
  */
 export interface IContainerContext extends IDisposable {
-    readonly existing: boolean | undefined;
+    readonly existing: boolean;
     readonly clientId: string | undefined;
     readonly storage: IDocumentStorageService | undefined | null;
     readonly connected: boolean;
     readonly submitFn: (contents: any) => number;
-
-    /**
-     * Get an absolute url for a provided container-relative request.
-     * @param relativeUrl - A relative request within the container
-     *
-     * TODO: Optional for backwards compatibility. Make non-optional in version 0.19
-     */
-    getAbsoluteUrl?(relativeUrl: string): Promise<string | undefined>;
 }
 
 export const IRuntimeFactory: keyof IProvideRuntimeFactory = "IRuntimeFactory";

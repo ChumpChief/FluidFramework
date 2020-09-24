@@ -38,7 +38,7 @@ export class ContainerContext implements IContainerContext {
         return this.container.clientId;
     }
 
-    public get existing(): boolean | undefined {
+    public get existing(): boolean {
         return this.container.existing;
     }
 

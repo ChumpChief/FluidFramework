@@ -86,7 +86,10 @@ export class Container implements IFluidRouter {
     /**
      * Flag indicating whether the document already existed at the time of load
      */
-    public get existing(): boolean | undefined {
+    public get existing(): boolean {
+        if (this._existing === undefined) {
+            throw new Error("Tried to check existing prior to connection");
+        }
         return this._existing;
     }
 

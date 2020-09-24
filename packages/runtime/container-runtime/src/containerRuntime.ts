@@ -101,11 +101,6 @@ export class ContainerRuntime extends EventEmitter
     public get IContainerRuntime() { return this; }
     public get IFluidRouter() { return this; }
 
-    public get existing(): boolean {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        return this.context.existing!;
-    }
-
     public get clientId(): string | undefined {
         return this.context.clientId;
     }
@@ -156,6 +151,7 @@ export class ContainerRuntime extends EventEmitter
 
     constructor(
         private readonly context: IContainerContext,
+        public readonly existing: boolean,
         registryEntries: NamedFluidDataStoreRegistryEntries,
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ) {
