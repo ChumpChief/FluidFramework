@@ -18,6 +18,7 @@ export interface IDeltaStreamWriter extends IEventProvider<IDeltaStreamWriterEve
 }
 
 // This is now protocol layer?  Does this really need to exist as a separate object?
+// Should probably hold a queue of outbound rather than direct-submitting
 export class DeltaStreamWriter
     extends TypedEventEmitter<IDeltaStreamWriterEvents>
     implements IDeltaStreamWriter {
