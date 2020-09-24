@@ -69,7 +69,7 @@ const deltaStorageService = new DocumentDeltaStorageService(
 const deltaStreamFollower = new DeltaStreamFollower(deltaStream, deltaStorageService, 0);
 window["testDeltaStreamFollower"] = deltaStreamFollower;
 
-let lastProcessedOpSequenceNumber = -1;
+let lastProcessedOpSequenceNumber = 0;
 
 const handleSequentialOpsAvailable = () => {
     const isOpLocal = (op: ISequencedDocumentMessage) => {
@@ -79,11 +79,10 @@ const handleSequentialOpsAvailable = () => {
         // TODO this needs something more sophisticated - client ID doesn't persist across reconnect
         return op.clientId === deltaStream.connectionInfo.clientId;
     };
-    // TODO maybe off by one, unclear if this should be 1-indexed
-    while (lastProcessedOpSequenceNumber < deltaStreamFollower.sequentialOps.length - 1) {
-        const nextOp = deltaStreamFollower.sequentialOps[lastProcessedOpSequenceNumber + 1];
-        // TODO maybe this should happen directly in/above the follower - communicator only needs to know the
-        // new reference sequence number
+
+    // Note: op sequence numbers are 1-indexed, is why this works
+    while (lastProcessedOpSequenceNumber < deltaStreamFollower.sequentialOps.length) {
+        const nextOp = deltaStreamFollower.sequentialOps[lastProcessedOpSequenceNumber];
         // containerRuntime.process(
         //     nextOp,
         //     isOpLocal(nextOp),
