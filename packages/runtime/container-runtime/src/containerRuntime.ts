@@ -34,7 +34,6 @@ import {
 import {
     IAttachMessage,
     InboundAttachMessage,
-    IFluidDataStoreContextDetached,
     IFluidDataStoreRegistry,
     IFluidDataStoreChannel,
     IEnvelope,
@@ -48,7 +47,6 @@ import { v4 as uuid } from "uuid";
 import {
     FluidDataStoreContext,
     LocalFluidDataStoreContext,
-    LocalDetachedFluidDataStoreContext,
     RemotedFluidDataStoreContext,
 } from "./dataStoreContext";
 import { ContainerFluidHandleContext } from "./containerHandleContext";
@@ -271,19 +269,6 @@ export class ContainerRuntime extends EventEmitter
         const fluidDataStore = await this._createDataStore(pkg, rootDataStoreId);
         fluidDataStore.bindToContext();
         return fluidDataStore;
-    }
-
-    public createDetachedDataStore(): IFluidDataStoreContextDetached {
-        const id = uuid();
-        const context = new LocalDetachedFluidDataStoreContext(
-            id,
-            this,
-            this.storage,
-            (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
-            undefined,
-        );
-        this.setupNewContext(context);
-        return context;
     }
 
     private async _createDataStore(pkg: string | string[], id = uuid()): Promise<IFluidDataStoreChannel> {

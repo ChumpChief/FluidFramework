@@ -4,7 +4,7 @@
  */
 
  import assert from "assert";
-import { IRequest, IFluidObject } from "@fluidframework/core-interfaces";
+import { IRequest } from "@fluidframework/core-interfaces";
 import { FluidDataStoreRuntime, ISharedObjectRegistry } from "@fluidframework/datastore";
 import { FluidDataStoreRegistry } from "@fluidframework/container-runtime";
 import {
@@ -17,7 +17,6 @@ import {
     NamedFluidDataStoreRegistryEntry,
 } from "@fluidframework/runtime-definitions";
 import { IChannelFactory } from "@fluidframework/datastore-definitions";
-import { requestFluidObject } from "@fluidframework/runtime-utils";
 
 import {
     IDataObjectProps,
@@ -35,67 +34,6 @@ function buildRegistryPath(
     assert(parentPath[parentPath.length - 1] !== factory.type);
     return [...parentPath, factory.type];
 }
-
-/*
- * This interface is exposed by data store objects to create sub-objects.
- * It assumes that factories passed in to methods of this interface are present in registry of object's context
- * that is represented by this interface.
- */
-export interface IFluidDataObjectFactory {
-    /**
-     * Creates a new child instance of the object. Uses PureDataObjectFactory for that, and thus we
-     * have type information about object created and can pass in initia state.
-     * @param initialState - The initial state to provide to the created component.
-     * @returns an object created by this factory. Data store and objects created are not attached to container.
-     * They get attached only when a handle to one of them is attached to already attached objects.
-     */
-    createChildInstance<
-        P,
-        S,
-        TObject extends PureDataObject<P,S>,
-        TFactory extends PureDataObjectFactory<TObject, P,S>>
-    (subFactory: TFactory, initialState?: S): Promise<TObject>;
-
-    /**
-     * Similar to above, but uses any data store factory. Given that there is no type information about such factory
-     * (or objects it creates, hanse "Anonymous" in name), IFluidObject (by default) is returned by doing a request
-     * to created data store.
-     */
-    createAnonymousChildInstance<T = IFluidObject>(
-        subFactory: IFluidDataStoreFactory,
-        request?: string | IRequest): Promise<T>;
-}
-
-/**
- * An implementation of IFluidDataObjectFactory for PureDataObjectFactory's objects (i.e. PureDataObject).
- */
-class FluidDataObjectFactory {
-    constructor(private readonly context: IFluidDataStoreContext) {
-    }
-
-    public async createChildInstance<
-        P,
-        S,
-        TObject extends PureDataObject<P,S>,
-        TFactory extends PureDataObjectFactory<TObject,P,S>>(subFactory: TFactory, initialState?: S)
-    {
-        return subFactory.createChildInstance(this.context, initialState);
-    }
-
-    public async createAnonymousChildInstance<T = IFluidObject>(
-        subFactory: IFluidDataStoreFactory,
-        request: string | IRequest = "/")
-    {
-        const packagePath = buildRegistryPath(this.context, subFactory);
-        const factory2 = await this.context.IFluidDataStoreRegistry?.get(subFactory.type);
-        assert(factory2 === subFactory);
-            const router = await this.context.containerRuntime.createDataStore(packagePath);
-        return requestFluidObject<T>(router, request);
-    }
-}
-
-export const getFluidObjectFactoryFromInstance = (context: IFluidDataStoreContext) =>
-    new FluidDataObjectFactory(context) as IFluidDataObjectFactory;
 
 /**
  * PureDataObjectFactory is a barebones IFluidDataStoreFactory for use with PureDataObject.
@@ -221,81 +159,4 @@ export class PureDataObjectFactory<TObj extends PureDataObject<P, S>, P, S>
 
        return packagePath;
    }
-
-    /**
-     * Creates a new instance of the object. Uses parent context's registry to build package path to this factory.
-     * In other words, registry of context passed in has to contain this factory, with the name that matches
-     * this factory's type.
-     * It is intended to be used by data store objects that create sub-objects.
-     * @param context - The context being used to create the runtime
-     * (the created object will have its own new context created as well)
-     * @param initialState - The initial state to provide to the created data store.
-     * @returns an object created by this factory. Data store and objects created are not attached to container.
-     * They get attached only when a handle to one of them is attached to already attached objects.
-     */
-    public async createChildInstance(
-        parentContext: IFluidDataStoreContext,
-        initialState?: S,
-    ): Promise<TObj> {
-        const packagePath = buildRegistryPath(parentContext, this);
-        return this.createInstanceCore(parentContext.containerRuntime, packagePath, initialState);
-    }
-
-    /**
-     * Creates a new instance of the object. Uses peer context's registry and its package path to identify this factory.
-     * In other words, registry of context passed in has to have this factory.
-     * Intended to be used by data store objects that need to create peers (similar) instances of existing objects.
-     * @param context - The component context being used to create the object
-     * (the created object will have its own new context created as well)
-     * @param initialState - The initial state to provide to the created component.
-     * @returns an object created by this factory. Data store and objects created are not attached to container.
-     * They get attached only when a handle to one of them is attached to already attached objects.
-     */
-    public async createPeerInstance(
-        peerContext: IFluidDataStoreContext,
-        initialState?: S,
-    ): Promise<TObj> {
-        return this.createInstanceCore(peerContext.containerRuntime, peerContext.packagePath, initialState);
-    }
-
-    /**
-     * Creates a new instance of the object. Uses container's registry to find this factory.
-     * It's expected that only container owners would use this functionality, as only such developers
-     * have knowledge of entries in container registry.
-     * The name in this registry for such record should match type of this factory.
-     * @param runtime - container runtime. It's registry is used to create an object.
-     * @param initialState - The initial state to provide to the created component.
-     * @returns an object created by this factory. Data store and objects created are not attached to container.
-     * They get attached only when a handle to one of them is attached to already attached objects.
-     */
-    public async createInstance(
-        runtime: IContainerRuntimeBase,
-        initialState?: S,
-    ): Promise<TObj> {
-        return this.createInstanceCore(runtime, [this.type], initialState);
-    }
-
-    protected async createInstanceCore(
-        containerRuntime: IContainerRuntimeBase,
-        packagePath: Readonly<string[]>,
-        initialState?: S,
-    ): Promise<TObj> {
-        const newContext = containerRuntime.createDetachedDataStore();
-
-        const runtime = FluidDataStoreRuntime.load(
-            newContext,
-            this.sharedObjectRegistry,
-        );
-
-        const instanceP = this.instantiateInstance(runtime, newContext, initialState);
-
-        runtime.registerRequestHandler(async (request: IRequest) => {
-            const instance = await instanceP;
-            return instance.request(request);
-        });
-
-        await newContext.attachRuntime(packagePath, this, runtime);
-
-        return instanceP;
-    }
 }

@@ -47,12 +47,6 @@ export interface IContainerRuntimeBase extends
      * @param pkg - Package name of the data store factory
      */
     createDataStore(pkg: string | string[]): Promise<IFluidRouter>;
-
-    /**
-     * Creates detached data store context. only after context.attachRuntime() is called,
-     * data store initialization is considered compete.
-     */
-    createDetachedDataStore(): IFluidDataStoreContextDetached;
 }
 
 /**
