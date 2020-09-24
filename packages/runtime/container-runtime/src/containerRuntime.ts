@@ -133,8 +133,6 @@ export class ContainerRuntime extends EventEmitter
     public readonly IFluidHandleContext: IFluidHandleContext;
 
     private readonly notBoundContexts = new Set<string>();
-    // 0.24 back-compat attachingBeforeSummary
-    private readonly attachOpFiredForDataStore = new Set<string>();
 
     private _connected: boolean;
 
@@ -422,7 +420,6 @@ export class ContainerRuntime extends EventEmitter
 
             this.pendingAttach.set(fluidDataStoreRuntime.id, message);
             this.submit(ContainerMessageType.Attach, message);
-            this.attachOpFiredForDataStore.add(fluidDataStoreRuntime.id);
         }
 
         // Resolve the deferred so other local stores can access it.
