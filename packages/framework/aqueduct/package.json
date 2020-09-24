@@ -68,7 +68,6 @@
     "@fluidframework/request-handler": "^0.27.0",
     "@fluidframework/runtime-definitions": "^0.27.0",
     "@fluidframework/runtime-utils": "^0.27.0",
-    "@fluidframework/view-interfaces": "^0.27.0",
     "uuid": "^3.3.2"
   },
   "devDependencies": {
