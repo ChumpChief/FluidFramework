@@ -76,6 +76,10 @@ export class ContainerContext implements IContainerContext {
     }
 
     private async load() {
-        this._runtime = await this.runtimeFactory.instantiateRuntime(this);
+        this._runtime = await this.runtimeFactory.instantiateRuntime(
+            this.existing,
+            this.submitFn,
+            this.storage,
+        );
     }
 }

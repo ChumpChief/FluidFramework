@@ -4,7 +4,7 @@
  */
 
 import { defaultRouteRequestHandler } from "@fluidframework/aqueduct";
-import { IContainerContext, IRuntime, IRuntimeFactory } from "@fluidframework/container-definitions";
+import { IRuntime, IRuntimeFactory } from "@fluidframework/container-definitions";
 import {
     ContainerRuntime,
 } from "@fluidframework/container-runtime";
@@ -30,16 +30,6 @@ export class DiceRollerContainerRuntimeFactory implements IRuntimeFactory {
      * {@inheritDoc @fluidframework/container-definitions#IRuntimeFactory.instantiateRuntime}
      */
     public async instantiateRuntime(
-        context: IContainerContext,
-    ): Promise<IRuntime> {
-        return this.instantiateRuntimeCore(
-            context.existing,
-            context.submitFn,
-            context.storage,
-        );
-    }
-
-    public async instantiateRuntimeCore(
         existing: boolean,
         submitFn: (contents: any) => number,
         storage: IDocumentStorageService,
