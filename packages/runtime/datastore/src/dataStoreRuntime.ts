@@ -79,7 +79,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
     ): FluidDataStoreRuntime {
         const runtime = new FluidDataStoreRuntime(
             context as IFluidDataStoreContextType,
-            context.documentId,
             context.id,
             context.existing,
             sharedObjectRegistry,
@@ -143,7 +142,6 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
 
     private constructor(
         private readonly dataStoreContext: IFluidDataStoreContextType,
-        public readonly documentId: string,
         public readonly id: string,
         public existing: boolean,
         private readonly sharedObjectRegistry: ISharedObjectRegistry,

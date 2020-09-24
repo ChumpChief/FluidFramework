@@ -165,7 +165,6 @@ export type CreateChildSummarizerNodeFn = (summarizeInternal: SummarizeInternalF
  * get information and call functionality to the container.
  */
 export interface IFluidDataStoreContext extends EventEmitter, Partial<IProvideFluidDataStoreRegistry> {
-    readonly documentId: string;
     readonly id: string;
     /**
      * The package path of the data store as per the package factory.

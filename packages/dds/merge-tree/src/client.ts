@@ -30,7 +30,6 @@ import * as OpBuilder from "./opBuilder";
 import * as ops from "./ops";
 import * as Properties from "./properties";
 // import { SnapshotLegacy } from "./snapshotlegacy";
-import { SnapshotLoader } from "./snapshotLoader";
 import { MergeTreeTextHelper } from "./textSegment";
 // import { SnapshotV1 } from "./snapshotV1";
 import {
@@ -941,9 +940,7 @@ export class Client {
         storage: IChannelStorageService,
         branchId?: string,
     ): Promise<{ catchupOpsP: Promise<ISequencedDocumentMessage[]> }> {
-        const loader = new SnapshotLoader(runtime, this, this.mergeTree, this.logger);
-
-        return loader.initialize(branchId, storage);
+        throw new Error("Merge tree is not working right now.");
     }
 
     getStackContext(startPos: number, rangeLabels: string[]) {

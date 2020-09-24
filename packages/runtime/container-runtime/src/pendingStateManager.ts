@@ -56,10 +56,6 @@ export class PendingStateManager {
 
     private clientId: string | undefined;
 
-    private get connected(): boolean {
-        return this.containerRuntime.connected;
-    }
-
     /**
      * Called to check if there are any pending messages in the pending state queue.
      * @returns A boolean indicating whether there are messages or not.
@@ -132,8 +128,6 @@ export class PendingStateManager {
      * states in its queue. This includes setting the FlushMode and trigerring resubmission of unacked ops.
      */
     public replayPendingStates() {
-        assert(this.connected, "The connection state is not consistent with the runtime");
-
         // This assert suggests we are about to send same ops twice, which will result in data loss.
         assert(this.clientId !== this.containerRuntime.clientId, "replayPendingStates called twice for same clientId!");
         this.clientId = this.containerRuntime.clientId;
