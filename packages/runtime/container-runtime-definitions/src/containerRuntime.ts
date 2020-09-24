@@ -69,11 +69,4 @@ export interface IContainerRuntime extends
      * it results in container corruption - loading this file after that will always result in error.
      */
     createRootDataStore(pkg: string | string[], rootDataStoreId: string): Promise<IFluidRouter>;
-
-    /**
-     * Get an absolute url for a provided container-relative request.
-     * Returns undefined if the container isn't attached to storage.
-     * @param relativeUrl - A relative request within the container
-     */
-    getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
 }

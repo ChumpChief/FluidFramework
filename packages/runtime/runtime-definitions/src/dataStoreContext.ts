@@ -54,13 +54,6 @@ export interface IContainerRuntimeBase extends
      * data store initialization is considered compete.
      */
     createDetachedDataStore(): IFluidDataStoreContextDetached;
-
-    /**
-     * Get an absolute url for a provided container-relative request.
-     * Returns undefined if the container or data store isn't attached to storage.
-     * @param relativeUrl - A relative request within the container
-     */
-    getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
 }
 
 /**

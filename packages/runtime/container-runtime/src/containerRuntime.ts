@@ -495,16 +495,6 @@ export class ContainerRuntime extends EventEmitter
         }
     }
 
-    public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        if (this.context.getAbsoluteUrl === undefined) {
-            throw new Error("Driver does not implement getAbsoluteUrl");
-        }
-        if (this.attachState !== AttachState.Attached) {
-            return undefined;
-        }
-        return this.context.getAbsoluteUrl(relativeUrl);
-    }
-
     public submitDataStoreOp(
         id: string,
         contents: any,
