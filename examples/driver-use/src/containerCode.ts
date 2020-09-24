@@ -8,6 +8,7 @@ import { IContainerContext, IRuntime, IRuntimeFactory } from "@fluidframework/co
 import {
     ContainerRuntime,
 } from "@fluidframework/container-runtime";
+import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     buildRuntimeRequestHandler,
     deprecated_innerRequestHandler,
@@ -31,10 +32,22 @@ export class DiceRollerContainerRuntimeFactory implements IRuntimeFactory {
     public async instantiateRuntime(
         context: IContainerContext,
     ): Promise<IRuntime> {
-        const runtime = new ContainerRuntime(
+        return this.instantiateRuntimeCore(
             context.existing,
             context.submitFn,
             context.storage,
+        );
+    }
+
+    public async instantiateRuntimeCore(
+        existing: boolean,
+        submitFn: (contents: any) => number,
+        storage: IDocumentStorageService,
+    ): Promise<IRuntime> {
+        const runtime = new ContainerRuntime(
+            existing,
+            submitFn,
+            storage,
             new Map([
                 DiceRollerInstantiationFactory.registryEntry,
             ]),
