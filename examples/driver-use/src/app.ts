@@ -11,7 +11,7 @@ import {
 import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
 
-import { DiceRollerContainerRuntimeFactory } from "./containerCode";
+import { diceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
 import { DeltaStreamWriter } from "./deltaStreamWriter";
 import { DeltaStreamFollower } from "./deltaStreamFollower";
@@ -146,7 +146,7 @@ async function start(): Promise<void> {
     // production service, but ultimately we'll still be getting a reference to a Container object.  The helper
     // function takes the ID of the document we're creating or loading, the container code to load into it, and a
     // flag to specify whether we're creating a new document or loading an existing one.
-    const container = await getTinyliciousContainer(documentId, DiceRollerContainerRuntimeFactory);
+    const container = await getTinyliciousContainer(documentId, diceRollerContainerRuntimeFactory);
 
     // Since we're using a ContainerRuntimeFactoryWithDefaultDataStore, our dice roller is available at the URL "/".
     const url = "/";
