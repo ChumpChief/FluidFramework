@@ -3,9 +3,13 @@
  * Licensed under the MIT License.
  */
 
-import { BaseContainerRuntimeFactory, defaultRouteRequestHandler } from "@fluidframework/aqueduct";
-import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
+import { defaultRouteRequestHandler } from "@fluidframework/aqueduct";
+import { IContainerContext, IRuntime, IRuntimeFactory } from "@fluidframework/container-definitions";
 import {
+    ContainerRuntime,
+} from "@fluidframework/container-runtime";
+import {
+    buildRuntimeRequestHandler,
     deprecated_innerRequestHandler,
 } from "@fluidframework/request-handler";
 
@@ -14,37 +18,42 @@ import { DiceRollerInstantiationFactory } from "./dataObject";
 const defaultDataStoreId = "default";
 
 /**
- * A ContainerRuntimeFactory that initializes Containers with a single default data store, which can be requested from
- * the container with an empty URL.
- *
- * This factory should be exposed as fluidExport off the entry point to your module.
+ * BaseContainerRuntimeFactory produces container runtimes with a given data store and service registry, as well as
+ * given request handlers.  It can be subclassed to implement a first-time initialization procedure for the containers
+ * it creates.
  */
-class DiceRollerContainerRuntimeFactory extends BaseContainerRuntimeFactory {
-    public static readonly defaultDataStoreId = defaultDataStoreId;
+export class DiceRollerContainerRuntimeFactory implements IRuntimeFactory {
+    public get IRuntimeFactory() { return this; }
 
-    constructor() {
-        super(
+    /**
+     * {@inheritDoc @fluidframework/container-definitions#IRuntimeFactory.instantiateRuntime}
+     */
+    public async instantiateRuntime(
+        context: IContainerContext,
+    ): Promise<IRuntime> {
+        const runtime = await ContainerRuntime.load(
+            context,
             new Map([
                 DiceRollerInstantiationFactory.registryEntry,
             ]),
-            [
+            buildRuntimeRequestHandler(
                 defaultRouteRequestHandler(defaultDataStoreId),
                 deprecated_innerRequestHandler,
-            ],
+            ),
         );
-    }
 
-    /**
-     * {@inheritDoc BaseContainerRuntimeFactory.containerInitializingFirstTime}
-     */
-    protected async containerInitializingFirstTime(runtime: IContainerRuntime) {
-        const router = await runtime.createRootDataStore(
-            DiceRollerInstantiationFactory.type,
-            defaultDataStoreId,
-        );
-        // We need to request the data store before attaching to ensure it
-        // runs through its entire instantiation flow.
-        await router.request({ url: "/" });
+        if (!runtime.existing) {
+            // If it's the first time through.
+            const router = await runtime.createRootDataStore(
+                DiceRollerInstantiationFactory.type,
+                defaultDataStoreId,
+            );
+            // We need to request the data store before attaching to ensure it
+            // runs through its entire instantiation flow.
+            await router.request({ url: "/" });
+        }
+
+        return runtime;
     }
 }
 
