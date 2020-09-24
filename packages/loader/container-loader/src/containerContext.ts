@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import { strict as assert } from "assert";
 import {
     IRequest,
     IResponse,
@@ -58,29 +57,13 @@ export class ContainerContext implements IContainerContext {
         return this._runtime;
     }
 
-    private _disposed = false;
-
-    public get disposed() {
-        return this._disposed;
-    }
-
     constructor(
         private readonly container: Container,
         public readonly runtimeFactory: IRuntimeFactory,
         public readonly submitFn: (contents: any) => number,
     ) { }
 
-    public dispose(error?: Error): void {
-        if (this._disposed) {
-            return;
-        }
-        this._disposed = true;
-
-        this.runtime.dispose(error);
-    }
-
     public setConnectionState(connected: boolean) {
-        assert.strictEqual(connected, this.connected, "Mismatch in connection state while setting");
         this.runtime.setConnectionState(connected);
     }
 

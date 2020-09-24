@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import { IDisposable } from "@fluidframework/common-definitions";
 import {
     IRequest,
     IResponse,
@@ -40,7 +39,7 @@ export interface IRuntimeState {
  * The IRuntime represents an instantiation of a code package within a Container.
  * Primarily held by the ContainerContext to be able to interact with the running instance of the Container.
  */
-export interface IRuntime extends IDisposable {
+export interface IRuntime {
 
     /**
      * Executes a request against the runtime
@@ -72,7 +71,7 @@ export interface IRuntime extends IDisposable {
  * so the old IRuntime is no longer valid, as its ContainerContext has been revoked,
  * and the Container has created a new ContainerContext.
  */
-export interface IContainerContext extends IDisposable {
+export interface IContainerContext {
     readonly existing: boolean;
     readonly clientId: string | undefined;
     readonly storage: IDocumentStorageService;

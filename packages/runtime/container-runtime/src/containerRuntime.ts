@@ -130,9 +130,6 @@ export class ContainerRuntime extends EventEmitter
         return this._connected;
     }
 
-    private _disposed = false;
-    public get disposed() { return this._disposed; }
-
     // Stores tracked by the Domain
     private readonly pendingAttach = new Map<string, IAttachMessage>();
     private readonly pendingStateManager: PendingStateManager;
@@ -160,25 +157,6 @@ export class ContainerRuntime extends EventEmitter
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
 
         this.pendingStateManager = new PendingStateManager(this);
-    }
-
-    public dispose(): void {
-        if (this._disposed) {
-            return;
-        }
-        this._disposed = true;
-
-        // close/stop all store contexts
-        for (const [, contextD] of this.contextsDeferred) {
-            contextD.promise.then((context) => {
-                context.dispose();
-            }).catch((contextError) => {
-                console.log(contextError);
-            });
-        }
-
-        this.emit("dispose");
-        this.removeAllListeners();
     }
 
     /**
@@ -229,8 +207,6 @@ export class ContainerRuntime extends EventEmitter
     }
 
     public setConnectionState(connected: boolean) {
-        this.verifyNotClosed();
-
         // There might be no change of state due to Container calling this API after loading runtime.
         const changeOfState = this._connected !== connected;
         this._connected = connected;
@@ -245,8 +221,6 @@ export class ContainerRuntime extends EventEmitter
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean) {
-        this.verifyNotClosed();
-
         // If it's not message for runtime, bail out right away.
         if (!isRuntimeMessage(message)) {
             return;
@@ -334,7 +308,6 @@ export class ContainerRuntime extends EventEmitter
     }
 
     private setupNewContext(context) {
-        this.verifyNotClosed();
         const id = context.id;
         assert(!this.contexts.has(id), "Creating store with existing ID");
         this.notBoundContexts.add(id);
@@ -396,7 +369,6 @@ export class ContainerRuntime extends EventEmitter
     }
 
     private bindFluidDataStore(fluidDataStoreRuntime: IFluidDataStoreChannel): void {
-        this.verifyNotClosed();
         assert(this.notBoundContexts.has(fluidDataStoreRuntime.id),
             "Store to be bound should be in not bounded set");
         this.notBoundContexts.delete(fluidDataStoreRuntime.id);
@@ -480,8 +452,6 @@ export class ContainerRuntime extends EventEmitter
         type: ContainerMessageType,
         content: any,
         localOpMetadata: unknown = undefined): void {
-        this.verifyNotClosed();
-
         let clientSequenceNumber: number = -1;
 
         if (this.canSendOps()) {
@@ -501,16 +471,6 @@ export class ContainerRuntime extends EventEmitter
     ) {
         const payload: ContainerRuntimeMessage = { type, contents };
         return this.context.submitFn(payload);
-    }
-
-    /**
-     * Throw an error if the runtime is closed.  Methods that are expected to potentially
-     * be called after dispose due to asynchrony should not call this.
-     */
-    private verifyNotClosed() {
-        if (this._disposed) {
-            throw new Error("Runtime is closed");
-        }
     }
 
     /**

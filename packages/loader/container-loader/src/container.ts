@@ -170,8 +170,7 @@ export class Container implements IFluidRouter {
     }
 
     private propagateConnectionState() {
-        const state = this._connected;
-        this.context.setConnectionState(state);
+        this.context.setConnectionState(this._connected);
     }
 
     private submitMessage(contents: any): number {
