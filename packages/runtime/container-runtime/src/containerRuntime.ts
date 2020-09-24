@@ -101,10 +101,6 @@ export class ContainerRuntime extends EventEmitter
     public get IContainerRuntime() { return this; }
     public get IFluidRouter() { return this; }
 
-    public get id(): string {
-        return this.context.id;
-    }
-
     public get existing(): boolean {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return this.context.existing!;

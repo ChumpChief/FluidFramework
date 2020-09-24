@@ -34,7 +34,6 @@ export interface IProvideContainerRuntime {
 export interface IContainerRuntime extends
     IProvideContainerRuntime,
     IContainerRuntimeBase {
-    readonly id: string;
     readonly existing: boolean;
     readonly clientId: string | undefined;
     readonly connected: boolean;
