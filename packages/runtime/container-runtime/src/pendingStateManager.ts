@@ -51,19 +51,6 @@ type IPendingState = IPendingMessage;
 export class PendingStateManager {
     private readonly pendingStates = new Deque<IPendingState>();
 
-    // Maintains the count of messages that are currently unacked.
-    private pendingMessagesCount: number = 0;
-
-    private clientId: string | undefined;
-
-    /**
-     * Called to check if there are any pending messages in the pending state queue.
-     * @returns A boolean indicating whether there are messages or not.
-     */
-    public hasPendingMessages(): boolean {
-        return this.pendingMessagesCount !== 0;
-    }
-
     constructor(private readonly containerRuntime: ContainerRuntime) { }
 
     /**
@@ -88,8 +75,6 @@ export class PendingStateManager {
         };
 
         this.pendingStates.push(pendingMessage);
-
-        this.pendingMessagesCount++;
     }
 
     /**
@@ -109,8 +94,6 @@ export class PendingStateManager {
             throw new Error("Unexpected ack received in pendingStateManager");
         }
 
-        this.pendingMessagesCount--;
-
         return pendingState.localOpMetadata;
     }
 
@@ -128,17 +111,11 @@ export class PendingStateManager {
      * states in its queue. This includes setting the FlushMode and trigerring resubmission of unacked ops.
      */
     public replayPendingStates() {
-        // This assert suggests we are about to send same ops twice, which will result in data loss.
-        assert(this.clientId !== this.containerRuntime.clientId, "replayPendingStates called twice for same clientId!");
-        this.clientId = this.containerRuntime.clientId;
-
+        // console.log(this.pendingStates, this.pendingStates.peekFront());
         let pendingStatesCount = this.pendingStates.length;
         if (pendingStatesCount === 0) {
             return;
         }
-
-        // Reset the pending message count because all these messages will be removed from the queue.
-        this.pendingMessagesCount = 0;
 
         // Process exactly `pendingStatesCount` items in the queue as it represents the number of states that were
         // pending when we connected. This is important because the `reSubmitFn` might add more items in the queue
