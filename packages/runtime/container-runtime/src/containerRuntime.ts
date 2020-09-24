@@ -100,7 +100,7 @@ export class ContainerRuntime extends EventEmitter
     public get IFluidRouter() { return this; }
 
     public get clientId(): string | undefined {
-        return this.context.clientId;
+        throw new Error("Client ID not supported on ContainerRuntime right now");
     }
 
     public get reSubmitFn(): (type: ContainerMessageType, content: any, localOpMetadata: unknown) => void {
