@@ -129,9 +129,6 @@ export class Container implements IFluidRouter {
 
         await this.loadContext();
 
-        // Propagate current connection state through the system.
-        this.propagateConnectionState();
-
         // The queues start paused
         this._deltaManager.resume();
 
@@ -174,7 +171,7 @@ export class Container implements IFluidRouter {
 
     private propagateConnectionState() {
         const state = this._connected;
-        this.context.setConnectionState(state, this.clientId);
+        this.context.setConnectionState(state);
     }
 
     private submitMessage(contents: any): number {

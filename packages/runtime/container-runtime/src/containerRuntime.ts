@@ -228,7 +228,7 @@ export class ContainerRuntime extends EventEmitter
         };
     }
 
-    public setConnectionState(connected: boolean, clientId?: string) {
+    public setConnectionState(connected: boolean) {
         this.verifyNotClosed();
 
         // There might be no change of state due to Container calling this API after loading runtime.
@@ -240,9 +240,7 @@ export class ContainerRuntime extends EventEmitter
         }
 
         for (const [, context] of this.contexts) {
-            try {
-                context.setConnectionState(connected, clientId);
-            } catch (error) { }
+            context.setConnectionState(connected);
         }
     }
 

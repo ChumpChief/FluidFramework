@@ -91,7 +91,7 @@ export class LocalChannelContext implements IChannelContext {
         return this._isLoaded;
     }
 
-    public setConnectionState(connected: boolean, clientId?: string) {
+    public setConnectionState(connected: boolean) {
         // Connection events are ignored if the data store is not yet attached
         if (!this.attached) {
             return;

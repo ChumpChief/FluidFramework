@@ -68,7 +68,7 @@ export class RemoteChannelContext implements IChannelContext {
         return this.channelP;
     }
 
-    public setConnectionState(connected: boolean, clientId?: string) {
+    public setConnectionState(connected: boolean) {
         // Connection events are ignored if the data store is not yet loaded
         if (!this.isLoaded) {
             return;

@@ -79,9 +79,9 @@ export class ContainerContext implements IContainerContext {
         this.runtime.dispose(error);
     }
 
-    public setConnectionState(connected: boolean, clientId?: string) {
+    public setConnectionState(connected: boolean) {
         assert.strictEqual(connected, this.connected, "Mismatch in connection state while setting");
-        this.runtime.setConnectionState(connected, clientId);
+        this.runtime.setConnectionState(connected);
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean) {

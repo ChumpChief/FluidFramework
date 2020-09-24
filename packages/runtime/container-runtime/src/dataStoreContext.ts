@@ -242,7 +242,7 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
      * @param clientId - ID of the client. It's old ID when in disconnected state and
      * it's new client ID when we are connecting or connected.
      */
-    public setConnectionState(connected: boolean, clientId?: string) {
+    public setConnectionState(connected: boolean) {
         this.verifyNotClosed();
 
         // Connection events are ignored if the store is not yet loaded
@@ -254,15 +254,7 @@ export abstract class FluidDataStoreContext extends EventEmitter implements
 
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const channel: IFluidDataStoreChannel = this.channel!;
-
-        // Back-compat: supporting <= 0.16 stores
-        if (channel.setConnectionState) {
-            channel.setConnectionState(connected, clientId);
-        } else if (channel.changeConnectionState) {
-            channel.changeConnectionState(this.connectionState, clientId);
-        } else {
-            assert(false);
-        }
+        channel.setConnectionState(connected);
     }
 
     public process(messageArg: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void {

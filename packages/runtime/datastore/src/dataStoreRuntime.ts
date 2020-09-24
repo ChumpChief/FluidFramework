@@ -19,9 +19,6 @@ import {
     Deferred,
     unreachableCase,
 } from "@fluidframework/common-utils";
-import {
-    raiseConnectedEvent,
-} from "@fluidframework/telemetry-utils";
 import { buildSnapshotTree, readAndParseFromBlobs } from "@fluidframework/driver-utils";
 import { TreeTreeEntry } from "@fluidframework/protocol-base";
 import {
@@ -362,14 +359,12 @@ export class FluidDataStoreRuntime extends EventEmitter implements IFluidDataSto
         this.boundhandles.add(handle);
     }
 
-    public setConnectionState(connected: boolean, clientId?: string) {
+    public setConnectionState(connected: boolean) {
         this.verifyNotClosed();
 
         for (const [, object] of this.contexts) {
-            object.setConnectionState(connected, clientId);
+            object.setConnectionState(connected);
         }
-
-        raiseConnectedEvent(this, connected, clientId);
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {

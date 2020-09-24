@@ -15,7 +15,6 @@ import {
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    ConnectionState,
     ISequencedDocumentMessage,
     ISnapshotTree,
     ITreeEntry,
@@ -106,13 +105,8 @@ export interface IFluidDataStoreChannel extends
     /**
      * Notifies this object about changes in the connection state.
      * @param value - New connection state.
-     * @param clientId - ID of the client. It's old ID when in disconnected state and
-     * it's new client ID when we are connecting or connected.
      */
-    setConnectionState(connected: boolean, clientId?: string);
-
-    // Back-compat: supporting <= 0.16 data stores
-    changeConnectionState?: (value: ConnectionState, clientId?: string) => void;
+    setConnectionState(connected: boolean);
 
     /**
      * Ask the DDS to resubmit a message. This could be because we reconnected and this message was not acked.

@@ -50,7 +50,7 @@ export interface IRuntime extends IDisposable {
     /**
      * Notifies the runtime of a change in the connection state
      */
-    setConnectionState(connected: boolean, clientId?: string);
+    setConnectionState(connected: boolean);
 
     /**
      * Processes the given op (message)

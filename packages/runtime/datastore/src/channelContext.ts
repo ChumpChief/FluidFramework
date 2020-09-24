@@ -17,7 +17,7 @@ import { ChannelStorageService } from "./channelStorageService";
 export interface IChannelContext {
     getChannel(): Promise<IChannel>;
 
-    setConnectionState(connected: boolean, clientId?: string);
+    setConnectionState(connected: boolean);
 
     processOp(message: ISequencedDocumentMessage, local: boolean, localOpMetadata?: unknown): void;
 
