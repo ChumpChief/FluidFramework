@@ -31,7 +31,6 @@ export class Container implements IFluidRouter {
      * Load container.
      */
     public static async load(
-        documentId: string,
         documentService: IDocumentDeltaService,
         deltaStorageService: IDocumentDeltaStorageService,
         storageService: IDocumentStorageService,
@@ -42,7 +41,6 @@ export class Container implements IFluidRouter {
             documentService,
             deltaStorageService,
             storageService,
-            documentId,
         );
         await container.load();
         return container;
@@ -51,7 +49,6 @@ export class Container implements IFluidRouter {
     private pendingClientId: string | undefined;
 
     private _clientId: string | undefined;
-    private readonly _documentId: string | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
 
@@ -64,22 +61,6 @@ export class Container implements IFluidRouter {
     }
 
     public get IFluidRouter(): IFluidRouter { return this; }
-
-    public get id(): string {
-        return this._documentId ?? "";
-    }
-
-    public get connected(): boolean {
-        return true;
-    }
-
-    /**
-     * The server provided id of the client.
-     * Set once this.connected is true, otherwise undefined
-     */
-    public get clientId(): string | undefined {
-        return this._clientId;
-    }
 
     /**
      * Flag indicating whether the document already existed at the time of load
@@ -96,19 +77,12 @@ export class Container implements IFluidRouter {
         private readonly deltaService: IDocumentDeltaService,
         private readonly deltaStorageService: IDocumentDeltaStorageService,
         private readonly storageService: IDocumentStorageService,
-        documentId: string,
     ) {
-        this._documentId = documentId;
-
         this._deltaManager = this.createDeltaManager();
     }
 
     public async request(path: IRequest): Promise<IResponse> {
         return this.runtime.request(path);
-    }
-
-    public get storage(): IDocumentStorageService {
-        return this.storageService;
     }
 
     /**
@@ -128,7 +102,7 @@ export class Container implements IFluidRouter {
         this._runtime = await this.containerRuntimeFactory.instantiateRuntime(
             this.existing,
             (contents) => this.submitMessage(contents),
-            this.storage,
+            this.storageService,
         );
 
         // The queues start paused
