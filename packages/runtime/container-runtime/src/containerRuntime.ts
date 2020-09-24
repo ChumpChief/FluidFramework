@@ -105,11 +105,6 @@ export class ContainerRuntime extends EventEmitter
         return this.context.clientId;
     }
 
-    private get storage(): IDocumentStorageService {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        return this.context.storage!;
-    }
-
     public get reSubmitFn(): (type: ContainerMessageType, content: any, localOpMetadata: unknown) => void {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         return this.reSubmit;
@@ -152,6 +147,7 @@ export class ContainerRuntime extends EventEmitter
     constructor(
         private readonly context: IContainerContext,
         public readonly existing: boolean,
+        private readonly storage: IDocumentStorageService,
         registryEntries: NamedFluidDataStoreRegistryEntries,
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ) {

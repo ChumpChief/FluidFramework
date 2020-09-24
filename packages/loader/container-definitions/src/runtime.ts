@@ -75,7 +75,7 @@ export interface IRuntime extends IDisposable {
 export interface IContainerContext extends IDisposable {
     readonly existing: boolean;
     readonly clientId: string | undefined;
-    readonly storage: IDocumentStorageService | undefined | null;
+    readonly storage: IDocumentStorageService;
     readonly connected: boolean;
     readonly submitFn: (contents: any) => number;
 }

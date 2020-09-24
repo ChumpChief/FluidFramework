@@ -46,7 +46,7 @@ export class ContainerContext implements IContainerContext {
         return this.container.connected;
     }
 
-    public get storage(): IDocumentStorageService | undefined | null {
+    public get storage(): IDocumentStorageService {
         return this.container.storage;
     }
 
