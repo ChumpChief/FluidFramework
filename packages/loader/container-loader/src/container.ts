@@ -27,25 +27,6 @@ import {
 import { DeltaManager } from "./deltaManager";
 
 export class Container implements IFluidRouter {
-    /**
-     * Load container.
-     */
-    public static async load(
-        documentService: IDocumentDeltaService,
-        deltaStorageService: IDocumentDeltaStorageService,
-        storageService: IDocumentStorageService,
-        containerRuntimeFactory: IRuntimeFactory,
-    ): Promise<Container> {
-        const container = new Container(
-            containerRuntimeFactory,
-            documentService,
-            deltaStorageService,
-            storageService,
-        );
-        await container.load();
-        return container;
-    }
-
     private pendingClientId: string | undefined;
 
     private _clientId: string | undefined;
@@ -88,7 +69,7 @@ export class Container implements IFluidRouter {
     /**
      * Load container.
      */
-    private async load() {
+    public async load() {
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
         const startConnectionP = this._deltaManager.connect();
