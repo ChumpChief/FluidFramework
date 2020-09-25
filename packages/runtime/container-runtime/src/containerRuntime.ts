@@ -102,11 +102,6 @@ export class ContainerRuntime extends EventEmitter
         throw new Error("Client ID not supported on ContainerRuntime right now");
     }
 
-    public get reSubmitFn(): (type: ContainerMessageType, content: any, localOpMetadata: unknown) => void {
-        // eslint-disable-next-line @typescript-eslint/unbound-method
-        return this.reSubmit;
-    }
-
     public get IFluidDataStoreRegistry(): IFluidDataStoreRegistry {
         return this.registry;
     }
@@ -201,6 +196,7 @@ export class ContainerRuntime extends EventEmitter
         };
     }
 
+    // Call this after we see our own join message
     public setConnectionState(connected: boolean) {
         // There might be no change of state due to Container calling this API after loading runtime.
         this._connected = connected;
@@ -442,33 +438,5 @@ export class ContainerRuntime extends EventEmitter
     ) {
         const payload: ContainerRuntimeMessage = { type, contents };
         return this.submitFn(payload);
-    }
-
-    /**
-     * Finds the right store and asks it to resubmit the message. This typically happens when we
-     * reconnect and there are pending messages.
-     * @param content - The content of the original message.
-     * @param localOpMetadata - The local metadata associated with the original message.
-     */
-    private reSubmit(type: ContainerMessageType, content: any, localOpMetadata: unknown) {
-        switch (type) {
-            case ContainerMessageType.FluidDataStoreOp:
-                // For Operations, call resubmitDataStoreOp which will find the right store
-                // and trigger resubmission on it.
-                this.resubmitDataStoreOp(content, localOpMetadata);
-                break;
-            case ContainerMessageType.Attach:
-                this.submit(type, content, localOpMetadata);
-                break;
-            default:
-                throw new Error(`Unknown ContainerMessageType: ${type}`);
-        }
-    }
-
-    private resubmitDataStoreOp(content: any, localOpMetadata: unknown) {
-        const envelope = content as IEnvelope;
-        const context = this.getContext(envelope.address);
-        assert(context, "There should be a store context for the op");
-        context.reSubmit(envelope.contents, localOpMetadata);
     }
 }
