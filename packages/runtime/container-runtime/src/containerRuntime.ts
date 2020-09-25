@@ -367,9 +367,8 @@ export class ContainerRuntime extends EventEmitter
     }
 
     private getContextDeferred(id: string): Deferred<FluidDataStoreContext> {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const deferred = this.contextsDeferred.get(id)!;
-        assert(deferred);
+        const deferred = this.contextsDeferred.get(id);
+        assert(deferred !== undefined);
         return deferred;
     }
 
@@ -382,9 +381,8 @@ export class ContainerRuntime extends EventEmitter
     }
 
     private getContext(id: string): FluidDataStoreContext {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const context = this.contexts.get(id)!;
-        assert(context, `Didn't find context: ${id}`);
+        const context = this.contexts.get(id);
+        assert(context !== undefined, `Didn't find context: ${id}`);
         return context;
     }
 
