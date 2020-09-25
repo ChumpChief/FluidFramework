@@ -105,7 +105,7 @@ async function startOld(): Promise<void> {
     const diceRoller: IDiceRoller = response.value;
 
     // Given an IDiceRoller, we can render the value and provide controls for users to roll it.
-    const div = document.getElementById("content") as HTMLDivElement;
+    const div = document.getElementById("content1") as HTMLDivElement;
     renderDiceRoller(diceRoller, div);
 }
 
@@ -193,6 +193,11 @@ async function startNew(): Promise<void> {
 
     await deltaStream.connect(tenantId, documentId, token, client);
     console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo);
+
+    // Given an IDiceRoller, we can render the value and provide controls for users to roll it.
+    const div = document.getElementById("content2") as HTMLDivElement;
+    // renderDiceRoller(diceRoller, div);
+    console.log(div);
 }
 window["startNew"] = startNew;
 
