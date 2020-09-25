@@ -3,14 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import {
-    IRuntimeFactory,
-} from "@fluidframework/container-definitions";
 import { Container, DeltaManager } from "@fluidframework/container-loader";
 import {
     IClient,
     ISequencedDocumentMessage,
-    ITokenClaims,
     MessageType,
 } from "@fluidframework/protocol-definitions";
 import {
@@ -40,14 +36,14 @@ import { renderDiceRoller } from "./view";
 if (location.hash.length === 0) {
     location.hash = Date.now().toString();
 }
+
+// Setting up shared constants
 const documentId = location.hash.substring(1);
-document.title = documentId;
-
+const encodedDocId = encodeURIComponent(documentId);
 const tenantId = "tinylicious";
-
-const deltaStream = new SocketIODeltaStream(documentId, tenantId, "http://localhost:3000");
-window["testDeltaStream"] = deltaStream;
-
+const ordererUrl = "http://localhost:3000";
+const deltaStorageUrl = `http://localhost:3000/deltas/${tenantId}/${encodedDocId}`;
+const storageUrl = `http://localhost:3000/repos/${tenantId}`;
 const client: IClient = {
     details: {
         capabilities: { interactive: true },
@@ -57,121 +53,28 @@ const client: IClient = {
     scopes: [],
     user: { id: "" },
 };
-window["oldClient"] = client;
+// End shared constants
 
-// ITokenClaims
-const token = jwt.sign({
-    documentId,
-    scopes: ["doc:read", "doc:write", "summary:write"],
-    tenantId,
-    user: { id: uuid() },
-}, "12345");
-window["oldToken"] = token;
+document.title = documentId;
 
-const encodedDocId = encodeURIComponent(documentId);
-const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${encodedDocId}`;
-const deltaStorageService = new DocumentDeltaStorageService(
-    tenantId,
-    token,
-    deltaStorageUrl,
-);
-const deltaStreamFollower = new DeltaStreamFollower(deltaStream, deltaStorageService, 0);
-window["testDeltaStreamFollower"] = deltaStreamFollower;
-
-let lastProcessedOpSequenceNumber = 0;
-
-const handleSequentialOpsAvailable = () => {
-    const isOpLocal = (op: ISequencedDocumentMessage) => {
-        if (deltaStream.connectionInfo === undefined) {
-            throw new Error("Cannot compute local ops when disconnected");
-        }
-        // TODO this needs something more sophisticated - client ID doesn't persist across reconnect
-        return op.clientId === deltaStream.connectionInfo.clientId;
-    };
-
-    // Note: op sequence numbers are 1-indexed, is why this works
-    while (lastProcessedOpSequenceNumber < deltaStreamFollower.sequentialOps.length) {
-        const nextOp = deltaStreamFollower.sequentialOps[lastProcessedOpSequenceNumber];
-        // containerRuntime.process(
-        //     nextOp,
-        //     isOpLocal(nextOp),
-        // );
-        console.log(nextOp, isOpLocal(nextOp));
-        lastProcessedOpSequenceNumber = nextOp.sequenceNumber;
-    }
-};
-
-deltaStreamFollower.on("sequentialOpsAvailable", handleSequentialOpsAvailable);
-
-const deltaStreamWriter = new DeltaStreamWriter(deltaStream);
-window["testDeltaStreamWriter"] = deltaStreamWriter;
-
-const submitRoll = (diceValue: number) => {
-    const opContent = {
-        type: "component",
-        contents: {
-            address: "default",
-            contents: {
-                content: {
-                    address: "root",
-                    contents: {
-                        key: "diceValue",
-                        path: "/",
-                        type: "set",
-                        value: {
-                            type: "Plain",
-                            value: diceValue,
-                        },
-                    },
-                },
-                type: "op",
-            },
-        },
-    };
-    console.log(opContent, lastProcessedOpSequenceNumber);
-
-    deltaStreamWriter.submit(
-        MessageType.Operation,
-        opContent,
-        lastProcessedOpSequenceNumber,
-    );
-};
-window["submitRoll"] = submitRoll;
-
-const storageUrl = `http://localhost:3000/repos/tinylicious`;
-const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
-window["testDocumentStorageService"] = documentStorageService;
-
-const connectTestStream = () => {
-    deltaStream.connect(tenantId, documentId, token, client)
-        .then(() => console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo))
-        .catch((error) => console.error(error));
-};
-window["connectTestStream"] = connectTestStream;
-
-async function getTinyliciousContainer(
-    containerRuntimeFactory: IRuntimeFactory,
-): Promise<Container> {
-    const ordererUrl = "http://localhost:3000";
-
-    const claims: ITokenClaims = {
+async function startOld(): Promise<void> {
+    const token = jwt.sign({
         documentId,
         scopes: ["doc:read", "doc:write", "summary:write"],
-        tenantId: "tinylicious",
+        tenantId,
         user: { id: uuid() },
-    };
+    }, "12345");
 
-    const jwtToken = jwt.sign(claims, "12345");
-
+    // getTinyliciousContainer start
     const deltaService = new DocumentDeltaService(
         ordererUrl,
-        jwtToken,
+        token,
         tenantId,
         documentId,
     );
 
-    const oldDeltaStorageService = new DocumentDeltaStorageService(tenantId, jwtToken, deltaStorageUrl);
-    const storageService = new DocumentStorageService(documentId, tenantId, jwtToken, storageUrl);
+    const oldDeltaStorageService = new DocumentDeltaStorageService(tenantId, token, deltaStorageUrl);
+    const storageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
 
     const deltaManager = new DeltaManager(
         deltaService,
@@ -182,20 +85,10 @@ async function getTinyliciousContainer(
         deltaManager,
     );
     await container.load(
-        containerRuntimeFactory,
+        diceRollerContainerRuntimeFactory,
         storageService,
     );
-
-    return container;
-}
-
-async function start(): Promise<void> {
-    // The getTinyliciousContainer helper function facilitates loading our container code into a Container and
-    // connecting to a locally-running test service called Tinylicious.  This will look different when moving to a
-    // production service, but ultimately we'll still be getting a reference to a Container object.  The helper
-    // function takes the ID of the document we're creating or loading, the container code to load into it, and a
-    // flag to specify whether we're creating a new document or loading an existing one.
-    const container = await getTinyliciousContainer(diceRollerContainerRuntimeFactory);
+    // getTinyliciousContainer end
 
     // Since we're using a ContainerRuntimeFactoryWithDefaultDataStore, our dice roller is available at the URL "/".
     const url = "/";
@@ -216,6 +109,97 @@ async function start(): Promise<void> {
     renderDiceRoller(diceRoller, div);
 }
 
-start().catch((error) => console.error(error));
+async function startNew(): Promise<void> {
+    const token = jwt.sign({
+        documentId,
+        scopes: ["doc:read", "doc:write", "summary:write"],
+        tenantId,
+        user: { id: uuid() },
+    }, "12345");
+
+    const deltaStream = new SocketIODeltaStream(documentId, tenantId, ordererUrl);
+    window["testDeltaStream"] = deltaStream;
+
+    const deltaStorageService = new DocumentDeltaStorageService(
+        tenantId,
+        token,
+        deltaStorageUrl,
+    );
+    const deltaStreamFollower = new DeltaStreamFollower(deltaStream, deltaStorageService, 0);
+    window["testDeltaStreamFollower"] = deltaStreamFollower;
+
+    let lastProcessedOpSequenceNumber = 0;
+
+    const handleSequentialOpsAvailable = () => {
+        const isOpLocal = (op: ISequencedDocumentMessage) => {
+            if (deltaStream.connectionInfo === undefined) {
+                throw new Error("Cannot compute local ops when disconnected");
+            }
+            // TODO this needs something more sophisticated - client ID doesn't persist across reconnect
+            return op.clientId === deltaStream.connectionInfo.clientId;
+        };
+
+        // Note: op sequence numbers are 1-indexed, is why this works
+        while (lastProcessedOpSequenceNumber < deltaStreamFollower.sequentialOps.length) {
+            const nextOp = deltaStreamFollower.sequentialOps[lastProcessedOpSequenceNumber];
+            // containerRuntime.process(
+            //     nextOp,
+            //     isOpLocal(nextOp),
+            // );
+            console.log(nextOp, isOpLocal(nextOp));
+            lastProcessedOpSequenceNumber = nextOp.sequenceNumber;
+        }
+    };
+
+    deltaStreamFollower.on("sequentialOpsAvailable", handleSequentialOpsAvailable);
+
+    const deltaStreamWriter = new DeltaStreamWriter(deltaStream);
+    window["testDeltaStreamWriter"] = deltaStreamWriter;
+
+    const submitRoll = (diceValue: number) => {
+        const opContent = {
+            type: "component",
+            contents: {
+                address: "default",
+                contents: {
+                    content: {
+                        address: "root",
+                        contents: {
+                            key: "diceValue",
+                            path: "/",
+                            type: "set",
+                            value: {
+                                type: "Plain",
+                                value: diceValue,
+                            },
+                        },
+                    },
+                    type: "op",
+                },
+            },
+        };
+        console.log(opContent, lastProcessedOpSequenceNumber);
+
+        deltaStreamWriter.submit(
+            MessageType.Operation,
+            opContent,
+            lastProcessedOpSequenceNumber,
+        );
+    };
+    window["submitRoll"] = submitRoll;
+
+    const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
+    window["testDocumentStorageService"] = documentStorageService;
+
+    const connectTestStream = () => {
+        deltaStream.connect(tenantId, documentId, token, client)
+            .then(() => console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo))
+            .catch((error) => console.error(error));
+    };
+    window["connectTestStream"] = connectTestStream;
+}
+window["startNew"] = startNew;
+
+startOld().catch((error) => console.error(error));
 
 /* eslint-enable dot-notation */
