@@ -420,23 +420,12 @@ export class ContainerRuntime extends EventEmitter
     private submit(
         type: ContainerMessageType,
         content: any,
-        localOpMetadata: unknown = undefined): void {
-        let clientSequenceNumber: number = -1;
-
-        clientSequenceNumber = this.submitRuntimeMessage(
-            type,
-            content,
-        );
+        localOpMetadata: unknown = undefined,
+    ): void {
+        const payload: ContainerRuntimeMessage = { type, contents: content };
+        const clientSequenceNumber = this.submitFn(payload);
 
         // Let the PendingStateManager know that a message was submitted.
         this.pendingStateManager.onSubmitMessage(type, clientSequenceNumber, content, localOpMetadata);
-    }
-
-    private submitRuntimeMessage(
-        type: ContainerMessageType,
-        contents: any,
-    ) {
-        const payload: ContainerRuntimeMessage = { type, contents };
-        return this.submitFn(payload);
     }
 }
