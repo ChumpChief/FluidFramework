@@ -70,55 +70,47 @@ export class Container {
      * Load container.
      */
     public async load() {
+        const submitMessage = (contents: any): number => {
+            return this._deltaManager.submit(MessageType.Operation, contents);
+        };
+
+        const processRemoteMessage = (message: ISequencedDocumentMessage): void => {
+            const local = this._clientId === message.clientId;
+
+            // Forward non system messages to the loaded runtime for processing
+            if (!isSystemMessage(message)) {
+                this.runtime.process(message, local);
+            }
+
+            // Leftover from quorum's addMember
+            // Maybe push down into the socket driver?
+            if (message.type === MessageType.ClientJoin) {
+                const joinMessage = message as ISequencedDocumentSystemMessage;
+                const join = JSON.parse(joinMessage.data) as IClientJoin;
+                if (join.clientId === this.pendingClientId) {
+                    this._clientId = this.pendingClientId;
+                    this.runtime.setConnectionState(true);
+                }
+            }
+        };
+
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
         const startConnectionP = this._deltaManager.connect();
 
         // Attach op handlers to start processing ops
         this._deltaManager.attachOpHandler({
-            process: (message) => this.processRemoteMessage(message),
+            process: processRemoteMessage,
         });
         const existing = await startConnectionP.then((details) => details.existing);
 
         this._runtime = await this.containerRuntimeFactory.instantiateRuntime(
             existing,
-            (contents) => this.submitMessage(contents),
+            submitMessage,
             this.storageService,
         );
 
         // The queues start paused
         this._deltaManager.resume();
-    }
-
-    private setConnected() {
-        this._clientId = this.pendingClientId;
-        this.propagateConnectionState();
-    }
-
-    private propagateConnectionState() {
-        this.runtime.setConnectionState(true);
-    }
-
-    private submitMessage(contents: any): number {
-        return this._deltaManager.submit(MessageType.Operation, contents);
-    }
-
-    private processRemoteMessage(message: ISequencedDocumentMessage): void {
-        const local = this._clientId === message.clientId;
-
-        // Forward non system messages to the loaded runtime for processing
-        if (!isSystemMessage(message)) {
-            this.runtime.process(message, local);
-        }
-
-        // Leftover from quorum's addMember
-        // Maybe push down into the socket driver?
-        if (message.type === MessageType.ClientJoin) {
-            const joinMessage = message as ISequencedDocumentSystemMessage;
-            const join = JSON.parse(joinMessage.data) as IClientJoin;
-            if (join.clientId === this.pendingClientId) {
-                this.setConnected();
-            }
-        }
     }
 }
