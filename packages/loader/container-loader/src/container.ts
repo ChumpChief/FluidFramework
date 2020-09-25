@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IRequest, IResponse, IFluidRouter } from "@fluidframework/core-interfaces";
+import { IRequest, IResponse } from "@fluidframework/core-interfaces";
 import {
     IConnectionDetails,
     IRuntime,
@@ -26,12 +26,11 @@ import {
 
 import { DeltaManager } from "./deltaManager";
 
-export class Container implements IFluidRouter {
+export class Container {
     private pendingClientId: string | undefined;
 
     private _clientId: string | undefined;
     private readonly _deltaManager: DeltaManager;
-    private _existing: boolean | undefined;
 
     private _runtime: IRuntime | undefined;
     private get runtime() {
@@ -41,25 +40,26 @@ export class Container implements IFluidRouter {
         return this._runtime;
     }
 
-    public get IFluidRouter(): IFluidRouter { return this; }
-
-    /**
-     * Flag indicating whether the document already existed at the time of load
-     */
-    public get existing(): boolean {
-        if (this._existing === undefined) {
-            throw new Error("Tried to check existing prior to connection");
-        }
-        return this._existing;
-    }
-
     constructor(
         private readonly containerRuntimeFactory: IRuntimeFactory,
-        private readonly deltaService: IDocumentDeltaService,
-        private readonly deltaStorageService: IDocumentDeltaStorageService,
+        deltaService: IDocumentDeltaService,
+        deltaStorageService: IDocumentDeltaStorageService,
         private readonly storageService: IDocumentStorageService,
     ) {
-        this._deltaManager = this.createDeltaManager();
+        this._deltaManager = new DeltaManager(
+            deltaService,
+            deltaStorageService,
+        );
+
+        this._deltaManager.on("connect", (details: IConnectionDetails) => {
+            // Stash the clientID to detect when transitioning from connecting (socket.io channel open) to connected
+            // (have received the join message for the client ID)
+            // This is especially important in the reconnect case. It's possible there could be outstanding
+            // ops sent by this client, so we should keep the old client id until we see our own client's
+            // join message. after we see the join message for out new connection with our new client id,
+            // we know there can no longer be outstanding ops that we sent with the previous client id.
+            this.pendingClientId = details.clientId;
+        });
     }
 
     public async request(path: IRequest): Promise<IResponse> {
@@ -78,35 +78,16 @@ export class Container implements IFluidRouter {
         this._deltaManager.attachOpHandler({
             process: (message) => this.processRemoteMessage(message),
         });
-        this._existing = await startConnectionP.then((details) => details.existing);
+        const existing = await startConnectionP.then((details) => details.existing);
 
         this._runtime = await this.containerRuntimeFactory.instantiateRuntime(
-            this.existing,
+            existing,
             (contents) => this.submitMessage(contents),
             this.storageService,
         );
 
         // The queues start paused
         this._deltaManager.resume();
-    }
-
-    private createDeltaManager() {
-        const deltaManager = new DeltaManager(
-            this.deltaService,
-            this.deltaStorageService,
-        );
-
-        deltaManager.on("connect", (details: IConnectionDetails) => {
-            // Stash the clientID to detect when transitioning from connecting (socket.io channel open) to connected
-            // (have received the join message for the client ID)
-            // This is especially important in the reconnect case. It's possible there could be outstanding
-            // ops sent by this client, so we should keep the old client id until we see our own client's
-            // join message. after we see the join message for out new connection with our new client id,
-            // we know there can no longer be outstanding ops that we sent with the previous client id.
-            this.pendingClientId = details.clientId;
-        });
-
-        return deltaManager;
     }
 
     private setConnected() {
