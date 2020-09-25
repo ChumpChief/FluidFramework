@@ -82,8 +82,8 @@ export class DeltaStreamFollower extends TypedEventEmitter<IDeltaStreamFollowerE
             // Should handle if the incoming op is non-increasing (throw)?
             this.sequentialOps.push(incomingOp);
             this.latestSequentialOpSequenceNumber = incomingOp.sequenceNumber;
-            // Event here to trigger processors?  "sequentialOpsAvailable" maybe?
-            // Or maybe attempt to defer firing until we're either done or about to await to minimize noise.
+            // TODO: This approach fires a single time for a larger batch of ops, which probably offer performance
+            // optimization opportunities?.  Consider exposing a per-op event though which would be easier to use.
             this.emit("sequentialOpsAvailable");
         }
 

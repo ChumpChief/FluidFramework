@@ -3,9 +3,19 @@
  * Licensed under the MIT License.
  */
 
-import { IClient, ISequencedDocumentMessage, MessageType } from "@fluidframework/protocol-definitions";
+import {
+    IRuntimeFactory,
+} from "@fluidframework/container-definitions";
+import { Container, DeltaManager } from "@fluidframework/container-loader";
+import {
+    IClient,
+    ISequencedDocumentMessage,
+    ITokenClaims,
+    MessageType,
+} from "@fluidframework/protocol-definitions";
 import {
     DocumentDeltaStorageService,
+    DocumentDeltaService,
     DocumentStorageService,
 } from "@fluidframework/routerlicious-driver";
 import jwt from "jsonwebtoken";
@@ -15,7 +25,6 @@ import { diceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
 import { DeltaStreamWriter } from "./deltaStreamWriter";
 import { DeltaStreamFollower } from "./deltaStreamFollower";
-import { getTinyliciousContainer } from "./getTinyliciousContainer";
 import { SocketIODeltaStream } from "./socketIoDeltaStream";
 import { renderDiceRoller } from "./view";
 
@@ -140,13 +149,53 @@ const connectTestStream = () => {
 };
 window["connectTestStream"] = connectTestStream;
 
+async function getTinyliciousContainer(
+    containerRuntimeFactory: IRuntimeFactory,
+): Promise<Container> {
+    const ordererUrl = "http://localhost:3000";
+
+    const claims: ITokenClaims = {
+        documentId,
+        scopes: ["doc:read", "doc:write", "summary:write"],
+        tenantId: "tinylicious",
+        user: { id: uuid() },
+    };
+
+    const jwtToken = jwt.sign(claims, "12345");
+
+    const deltaService = new DocumentDeltaService(
+        ordererUrl,
+        jwtToken,
+        tenantId,
+        documentId,
+    );
+
+    const oldDeltaStorageService = new DocumentDeltaStorageService(tenantId, jwtToken, deltaStorageUrl);
+    const storageService = new DocumentStorageService(documentId, tenantId, jwtToken, storageUrl);
+
+    const deltaManager = new DeltaManager(
+        deltaService,
+        oldDeltaStorageService,
+    );
+
+    const container = new Container(
+        deltaManager,
+    );
+    await container.load(
+        containerRuntimeFactory,
+        storageService,
+    );
+
+    return container;
+}
+
 async function start(): Promise<void> {
     // The getTinyliciousContainer helper function facilitates loading our container code into a Container and
     // connecting to a locally-running test service called Tinylicious.  This will look different when moving to a
     // production service, but ultimately we'll still be getting a reference to a Container object.  The helper
     // function takes the ID of the document we're creating or loading, the container code to load into it, and a
     // flag to specify whether we're creating a new document or loading an existing one.
-    const container = await getTinyliciousContainer(documentId, diceRollerContainerRuntimeFactory);
+    const container = await getTinyliciousContainer(diceRollerContainerRuntimeFactory);
 
     // Since we're using a ContainerRuntimeFactoryWithDefaultDataStore, our dice roller is available at the URL "/".
     const url = "/";
