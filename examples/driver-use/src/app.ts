@@ -191,12 +191,8 @@ async function startNew(): Promise<void> {
     const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
     window["testDocumentStorageService"] = documentStorageService;
 
-    const connectTestStream = () => {
-        deltaStream.connect(tenantId, documentId, token, client)
-            .then(() => console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo))
-            .catch((error) => console.error(error));
-    };
-    window["connectTestStream"] = connectTestStream;
+    await deltaStream.connect(tenantId, documentId, token, client);
+    console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo);
 }
 window["startNew"] = startNew;
 
