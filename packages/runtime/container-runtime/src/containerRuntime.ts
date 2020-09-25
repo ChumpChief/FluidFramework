@@ -252,8 +252,7 @@ export class ContainerRuntime extends EventEmitter
         return this._createDataStore(pkg);
     }
 
-    public async createRootDataStore(pkg: string | string[], rootDataStoreId: string): Promise<IFluidRouter>
-    {
+    public async createRootDataStore(pkg: string | string[], rootDataStoreId: string): Promise<IFluidRouter> {
         const fluidDataStore = await this._createDataStore(pkg, rootDataStoreId);
         fluidDataStore.bindToContext();
         return fluidDataStore;

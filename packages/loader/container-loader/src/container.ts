@@ -10,8 +10,6 @@ import {
     IRuntimeFactory,
 } from "@fluidframework/container-definitions";
 import {
-    IDocumentDeltaStorageService,
-    IDocumentDeltaService,
     IDocumentStorageService,
 } from "@fluidframework/driver-definitions";
 import {
@@ -41,13 +39,9 @@ export class Container {
     }
 
     constructor(
-        deltaService: IDocumentDeltaService,
-        deltaStorageService: IDocumentDeltaStorageService,
+        deltaManager: DeltaManager,
     ) {
-        this._deltaManager = new DeltaManager(
-            deltaService,
-            deltaStorageService,
-        );
+        this._deltaManager = deltaManager;
 
         this._deltaManager.on("connect", (details: IConnectionDetails) => {
             // Stash the clientID to detect when transitioning from connecting (socket.io channel open) to connected

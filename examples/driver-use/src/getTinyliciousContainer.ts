@@ -6,7 +6,7 @@
 import {
     IRuntimeFactory,
 } from "@fluidframework/container-definitions";
-import { Container } from "@fluidframework/container-loader";
+import { Container, DeltaManager } from "@fluidframework/container-loader";
 import { ITokenClaims } from "@fluidframework/protocol-definitions";
 import {
     DocumentDeltaStorageService,
@@ -50,9 +50,13 @@ export async function getTinyliciousContainer(
     const deltaStorageService = new DocumentDeltaStorageService(tenantId, jwtToken, deltaStorageUrl);
     const storageService = new DocumentStorageService(documentId, tenantId, jwtToken, storageUrl);
 
-    const container = new Container(
+    const deltaManager = new DeltaManager(
         deltaService,
         deltaStorageService,
+    );
+
+    const container = new Container(
+        deltaManager,
     );
     await container.load(
         containerRuntimeFactory,
