@@ -41,10 +41,8 @@ export class Container {
     }
 
     constructor(
-        private readonly containerRuntimeFactory: IRuntimeFactory,
         deltaService: IDocumentDeltaService,
         deltaStorageService: IDocumentDeltaStorageService,
-        private readonly storageService: IDocumentStorageService,
     ) {
         this._deltaManager = new DeltaManager(
             deltaService,
@@ -69,7 +67,10 @@ export class Container {
     /**
      * Load container.
      */
-    public async load() {
+    public async load(
+        containerRuntimeFactory: IRuntimeFactory,
+        storageService: IDocumentStorageService,
+    ) {
         const submitMessage = (contents: any): number => {
             return this._deltaManager.submit(MessageType.Operation, contents);
         };
@@ -104,10 +105,10 @@ export class Container {
         });
         const existing = await startConnectionP.then((details) => details.existing);
 
-        this._runtime = await this.containerRuntimeFactory.instantiateRuntime(
+        this._runtime = await containerRuntimeFactory.instantiateRuntime(
             existing,
             submitMessage,
-            this.storageService,
+            storageService,
         );
 
         // The queues start paused

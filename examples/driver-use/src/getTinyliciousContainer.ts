@@ -51,12 +51,13 @@ export async function getTinyliciousContainer(
     const storageService = new DocumentStorageService(documentId, tenantId, jwtToken, storageUrl);
 
     const container = new Container(
-        containerRuntimeFactory,
         deltaService,
         deltaStorageService,
+    );
+    await container.load(
+        containerRuntimeFactory,
         storageService,
     );
-    await container.load();
 
     return container;
 }
