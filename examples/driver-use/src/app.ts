@@ -152,7 +152,7 @@ async function startNew(): Promise<void> {
         }
     };
 
-    deltaStreamFollower.on("sequentialOpsAvailable", handleSequentialOpsAvailable);
+    deltaStreamFollower.on("upToDate", handleSequentialOpsAvailable);
 
     const deltaStreamWriter = new DeltaStreamWriter(deltaStream);
     window["testDeltaStreamWriter"] = deltaStreamWriter;

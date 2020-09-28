@@ -11,7 +11,7 @@ import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions"
 import { IDeltaStream } from "./socketIoDeltaStream";
 
 export interface IDeltaStreamFollowerEvents extends IErrorEvent {
-    (event: "sequentialOpsAvailable", listener: () => void);
+    (event: "opSequenced" | "upToDate", listener: () => void);
 }
 
 export interface IDeltaStreamFollower extends IEventProvider<IDeltaStreamFollowerEvents> {
@@ -40,6 +40,14 @@ export class DeltaStreamFollower extends TypedEventEmitter<IDeltaStreamFollowerE
         this.deltaStream.on("op", this.handleOpMessage);
     }
 
+    private readonly sequenceOp = (op: ISequencedDocumentMessage) => {
+        this.sequentialOps.push(op);
+        this.emit("opSequenced");
+        if (this.latestOpSequenceNumber === op.sequenceNumber) {
+            this.emit("upToDate");
+        }
+    };
+
     /**
      * As ops come in, handleOpMessage will synchronously kick off the async steps to get them sequenced.  As it does,
      * it also updates the promise chain we use to track the completion of those async steps plus sequencing.
@@ -54,16 +62,12 @@ export class DeltaStreamFollower extends TypedEventEmitter<IDeltaStreamFollowerE
             );
             // Once we've fetched the gap and sequenced all previous ops, sequence the gap
             this.sequenceP = Promise.all([gapFetchP, this.sequenceP])
-                .then(([gapOps]) => { this.sequentialOps.push(...gapOps); });
+                .then(([gapOps]) => { gapOps.forEach(this.sequenceOp); });
         }
 
         // Now we know there's no gap, so sequence the newly received op
         this.sequenceP = this.sequenceP
-            .then(() => {
-                this.sequentialOps.push(op);
-                // TODO maybe event elsewhere, or only event if the op.sequenceNumber is still equal to the latest
-                this.emit("sequentialOpsAvailable");
-            });
+            .then(() => { this.sequenceOp(op); });
 
         // Update the latest op sequence number so we know which sequence number to expect next
         this.latestOpSequenceNumber = op.sequenceNumber;
