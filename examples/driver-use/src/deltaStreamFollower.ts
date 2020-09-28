@@ -20,15 +20,15 @@ export interface IDeltaStreamFollower extends IEventProvider<IDeltaStreamFollowe
 }
 
 export class DeltaStreamFollower extends TypedEventEmitter<IDeltaStreamFollowerEvents> implements IDeltaStreamFollower {
-    // The op buffer that can be read from as desired.  Guaranteed to not include disjoint spans.
+    // The op buffer that can be read from as desired.  Guaranteed to not include disjoint spans (gaps).
     // TODO Don't really want this to be directly public but rather with some controlled access (maybe via seq #?)
     public readonly sequentialOps: ISequencedDocumentMessage[] = [];
-    // The list of ops received via "op" events that have not yet been sequenced.  May include disjoint spans.
-    private incomingOps: ISequencedDocumentMessage[] = [];
-    // To determine whether the next op we see is sequential or disjoint, we'll see if it's one more than
-    // the latestProcessedOpSequenceNumber.
-    private latestSequentialOpSequenceNumber: number;
-    private sequencingPromise: Promise<void> | undefined;
+    // To determine whether the next op we see is sequential or disjoint (a gap), we'll see if it's one more than
+    // the latestOpSequenceNumber.
+    private latestOpSequenceNumber: number;
+    // sequenceP is a promise chain which will resolve when all ops received so far up to the current
+    // latestOpSequenceNumber have been sequenced.  As new ops come in, we link new promises to the end of it.
+    private sequenceP: Promise<void> = Promise.resolve();
 
     constructor(
         private readonly deltaStream: IDeltaStream,
@@ -36,58 +36,36 @@ export class DeltaStreamFollower extends TypedEventEmitter<IDeltaStreamFollowerE
         startAfterSequenceNumber: number,
     ) {
         super();
-        this.latestSequentialOpSequenceNumber = startAfterSequenceNumber;
-        this.deltaStream.on("op", this.handleIncomingOp);
+        this.latestOpSequenceNumber = startAfterSequenceNumber;
+        this.deltaStream.on("op", this.handleOpMessage);
     }
-
-    // This will just append the incoming ops to the incoming op queue and ensure we're sequencing.
-    private readonly handleIncomingOp = (op: ISequencedDocumentMessage) => {
-        this.incomingOps.push(op);
-        if (this.sequencingPromise === undefined) {
-            this.sequencingPromise = this.sequenceOps()
-                .then(() => { this.sequencingPromise = undefined; })
-                .catch((err) => { console.error(err); });
-        }
-    };
 
     /**
-     * sequenceOps's job is to take the incoming ops from the stream, validate they are sequential, and push them to
-     * the list of sequentialOps.  If they are not sequential, it should attempt to correct (e.g. fetch missing ops
-     * from deltaStorage) or error out.
-     *
-     * It will run async until the incoming op queue is empty, which allows it to use async approaches to the fixup
-     * (like fetching ops).  Accordingly, we must hold its promise until the incoming op queue is empty to avoid
-     * kicking off a duplicative async sequencing task.
-     *
-     * "Until it is empty" makes it easy to restrict this to only be called from the "op" event alone, without
-     * recursion.  This makes it a bit easier to follow than the recursive approach used by DeltaManager currently
-     * (enqueueMessages -> fetchMissingDeltas -> getDeltas -> catchUpCore -> enqueueMessages)
+     * As ops come in, handleOpMessage will synchronously kick off the async steps to get them sequenced.  As it does,
+     * it also updates the promise chain we use to track the completion of those async steps plus sequencing.
+     * @param op - The newly received message
      */
-    private async sequenceOps() {
-        // Even if more ops come in while we are processing (i.e. while we are awaiting storage) the loop will still
-        // iterate over those newly added ops.
-        for (const incomingOp of this.incomingOps) {
-            if (incomingOp.sequenceNumber > this.latestSequentialOpSequenceNumber + 1) {
-                // We are missing some ops between the last one we saw and the one we just got, so we need to
-                // fetch them.
-                // TODO: Is there risk this will fail or only get some of the ops?  Maybe that should be handled in
-                // the DeltaStorage driver though.
-                const missingOps = await this.deltaStorage.get(
-                    this.latestSequentialOpSequenceNumber,
-                    incomingOp.sequenceNumber,
-                );
-                this.sequentialOps.push(...missingOps);
-            }
-
-            // Should handle if the incoming op is non-increasing (throw)?
-            this.sequentialOps.push(incomingOp);
-            this.latestSequentialOpSequenceNumber = incomingOp.sequenceNumber;
-            // TODO: This approach fires a single time for a larger batch of ops, which probably offer performance
-            // optimization opportunities?.  Consider exposing a per-op event though which would be easier to use.
-            this.emit("sequentialOpsAvailable");
+    private readonly handleOpMessage = (op: ISequencedDocumentMessage) => {
+        if (op.sequenceNumber > this.latestOpSequenceNumber + 1) {
+            // We have a gap, kick off fetching the gap ops from deltaStorage
+            const gapFetchP = this.deltaStorage.get(
+                this.latestOpSequenceNumber,
+                op.sequenceNumber,
+            );
+            // Once we've fetched the gap and sequenced all previous ops, sequence the gap
+            this.sequenceP = Promise.all([gapFetchP, this.sequenceP])
+                .then(([gapOps]) => { this.sequentialOps.push(...gapOps); });
         }
 
-        // Clear the ops we processed
-        this.incomingOps = [];
-    }
+        // Now we know there's no gap, so sequence the newly received op
+        this.sequenceP = this.sequenceP
+            .then(() => {
+                this.sequentialOps.push(op);
+                // TODO maybe event elsewhere, or only event if the op.sequenceNumber is still equal to the latest
+                this.emit("sequentialOpsAvailable");
+            });
+
+        // Update the latest op sequence number so we know which sequence number to expect next
+        this.latestOpSequenceNumber = op.sequenceNumber;
+    };
 }

@@ -108,6 +108,7 @@ async function startOld(): Promise<void> {
     const div = document.getElementById("content1") as HTMLDivElement;
     renderDiceRoller(diceRoller, div);
 }
+window["startOld"] = startOld;
 
 async function startNew(): Promise<void> {
     const token = jwt.sign({
@@ -201,6 +202,6 @@ async function startNew(): Promise<void> {
 }
 window["startNew"] = startNew;
 
-startOld().catch((error) => console.error(error));
+// startOld().catch((error) => console.error(error));
 
 /* eslint-enable dot-notation */
