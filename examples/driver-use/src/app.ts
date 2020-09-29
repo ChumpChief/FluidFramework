@@ -128,6 +128,14 @@ async function startNew(): Promise<void> {
     const deltaStreamManager = new DeltaStreamManager(deltaStream, deltaStorage);
     window["testDeltaStreamManager"] = deltaStreamManager;
 
+    deltaStreamManager.on("opsAvailable", () => {
+        while (deltaStreamManager.hasAvailableOps()) {
+            const nextOp = deltaStreamManager.pullOp();
+            // Processing goes here
+            console.log(nextOp);
+        }
+    });
+
     await deltaStream.connect(tenantId, documentId, token, client);
     console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo);
 

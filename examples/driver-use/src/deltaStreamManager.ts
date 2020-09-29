@@ -14,10 +14,19 @@ import { IDeltaStream } from "./socketIoDeltaStream";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface IDeltaStreamManagerEvents extends IErrorEvent {
+    (event: "opsAvailable", listener: () => void);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface IDeltaStreamManager extends IEventProvider<IDeltaStreamManagerEvents> {
+    hasAvailableOps(): boolean;
+    pullOp(): IAvailableOp;
+    submit(type: MessageType, contents: any);
+}
+
+interface IAvailableOp {
+    local: boolean;
+    op: ISequencedDocumentMessage;
 }
 
 // This is now protocol layer?  Does this really need to exist as a separate object?
@@ -41,6 +50,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
     private readonly deltaStreamFollower: IDeltaStreamFollower;
     private readonly deltaStreamWriter: IDeltaStreamWriter;
     private lastProcessedOpSequenceNumber = 0;
+    private readonly availableOps: IAvailableOp[] = [];
 
     constructor(
         private readonly deltaStream: IDeltaStream,
@@ -62,6 +72,19 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
         this.deltaStreamWriter.submit(type, contents, this.lastProcessedOpSequenceNumber);
     }
 
+    public hasAvailableOps(): boolean {
+        return this.availableOps.length > 0;
+    }
+
+    public pullOp(): IAvailableOp {
+        const nextOp = this.availableOps.shift();
+        if (nextOp === undefined) {
+            throw new Error("Attempted to pullOp with no available ops");
+        }
+        this.lastProcessedOpSequenceNumber = nextOp.op.sequenceNumber;
+        return nextOp;
+    }
+
     private readonly processOps = () => {
         const isOpLocal = (op: ISequencedDocumentMessage) => {
             if (this.deltaStream.connectionInfo === undefined) {
@@ -74,12 +97,11 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
         // Note: op sequence numbers are 1-indexed, is why this works
         while (this.lastProcessedOpSequenceNumber < this.deltaStreamFollower.sequentialOps.length) {
             const nextOp = this.deltaStreamFollower.sequentialOps[this.lastProcessedOpSequenceNumber];
-            // containerRuntime.process(
-            //     nextOp,
-            //     isOpLocal(nextOp),
-            // );
-            console.log(nextOp, isOpLocal(nextOp));
-            this.lastProcessedOpSequenceNumber = nextOp.sequenceNumber;
+            this.availableOps.push({
+                local: isOpLocal(nextOp),
+                op: nextOp,
+            });
+            this.emit("opsAvailable");
         }
     };
 }
