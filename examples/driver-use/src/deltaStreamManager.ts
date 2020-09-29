@@ -5,17 +5,19 @@
 
 import { IEventProvider, IErrorEvent } from "@fluidframework/common-definitions";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
-import { IDocumentMessage, MessageType } from "@fluidframework/protocol-definitions";
+import { IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
+import { ISequencedDocumentMessage, MessageType } from "@fluidframework/protocol-definitions";
+import { DeltaStreamFollower, IDeltaStreamFollower } from "./deltaStreamFollower";
+import { DeltaStreamWriter, IDeltaStreamWriter } from "./deltaStreamWriter";
 
 import { IDeltaStream } from "./socketIoDeltaStream";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface IDeltaStreamWriterEvents extends IErrorEvent {
+export interface IDeltaStreamManagerEvents extends IErrorEvent {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface IDeltaStreamWriter extends IEventProvider<IDeltaStreamWriterEvents> {
-    submit(type: MessageType, contents: any, referenceSequenceNumber: number);
+export interface IDeltaStreamManager extends IEventProvider<IDeltaStreamManagerEvents> {
 }
 
 // This is now protocol layer?  Does this really need to exist as a separate object?
@@ -35,36 +37,49 @@ export interface IDeltaStreamWriter extends IEventProvider<IDeltaStreamWriterEve
 // When ops come in to the follower, the manager prepares them for processing, puts them in a ready-for-process queue.
 // -- First it uses the waiting for ack queue to compute local, and retrieve the relevant metadata
 // Then runtime does something like ContainerRuntime.process to actually do anything with the message.
-export class DeltaStreamWriter
-    extends TypedEventEmitter<IDeltaStreamWriterEvents>
-    implements IDeltaStreamWriter {
-    private clientSequenceNumber: number = 0;
+export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEvents> implements IDeltaStreamManager {
+    private readonly deltaStreamFollower: IDeltaStreamFollower;
+    private readonly deltaStreamWriter: IDeltaStreamWriter;
+    private lastProcessedOpSequenceNumber = 0;
+
     constructor(
         private readonly deltaStream: IDeltaStream,
+        private readonly deltaStorage: IDocumentDeltaStorageService,
     ) {
         super();
+
+        this.deltaStreamFollower = new DeltaStreamFollower(this.deltaStream, this.deltaStorage, 0);
+        this.deltaStreamWriter = new DeltaStreamWriter(this.deltaStream);
+
+        this.deltaStreamFollower.on("upToDate", this.processOps);
     }
 
     // Thinking something like this, promise resolves after real submit to network
     // const submissionP = writer.submit(...);
     // submissionP.then((submissionDetails) => { waitingForAckQueue.push({ submissionDetails, metadata }); });
     // TODO contents should be Jsonable, not any
-    public async submit(type: MessageType, contents: any, referenceSequenceNumber: number) {
-        // TODO maybe include clientId in here or something?  Or have it returned from the deltaStream.submit()?
-        const message: IDocumentMessage = {
-            clientSequenceNumber: ++this.clientSequenceNumber,
-            contents: JSON.stringify(contents),
-            referenceSequenceNumber,
-            type,
-        };
-
-        // await this.deltaStream.canSubmit() or something here maybe
-        // maybe do a similar promise chain to keep the order correct?
-
-        this.deltaStream.submit(message);
-        return {
-            clientId: this.deltaStream.connectionInfo?.clientId,
-            message,
-        };
+    public async submit(type: MessageType, contents: any) {
+        this.deltaStreamWriter.submit(type, contents, this.lastProcessedOpSequenceNumber);
     }
+
+    private readonly processOps = () => {
+        const isOpLocal = (op: ISequencedDocumentMessage) => {
+            if (this.deltaStream.connectionInfo === undefined) {
+                throw new Error("Cannot compute local ops when disconnected");
+            }
+            // TODO this needs something more sophisticated - client ID doesn't persist across reconnect
+            return op.clientId === this.deltaStream.connectionInfo.clientId;
+        };
+
+        // Note: op sequence numbers are 1-indexed, is why this works
+        while (this.lastProcessedOpSequenceNumber < this.deltaStreamFollower.sequentialOps.length) {
+            const nextOp = this.deltaStreamFollower.sequentialOps[this.lastProcessedOpSequenceNumber];
+            // containerRuntime.process(
+            //     nextOp,
+            //     isOpLocal(nextOp),
+            // );
+            console.log(nextOp, isOpLocal(nextOp));
+            this.lastProcessedOpSequenceNumber = nextOp.sequenceNumber;
+        }
+    };
 }

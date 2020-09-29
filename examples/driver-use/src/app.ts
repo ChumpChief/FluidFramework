@@ -6,7 +6,6 @@
 import { Container, DeltaManager } from "@fluidframework/container-loader";
 import {
     IClient,
-    ISequencedDocumentMessage,
     MessageType,
 } from "@fluidframework/protocol-definitions";
 import {
@@ -19,10 +18,9 @@ import { v4 as uuid } from "uuid";
 
 import { diceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
-import { DeltaStreamWriter } from "./deltaStreamWriter";
-import { DeltaStreamFollower } from "./deltaStreamFollower";
 import { SocketIODeltaStream } from "./socketIoDeltaStream";
 import { renderDiceRoller } from "./view";
+import { DeltaStreamManager } from "./deltaStreamManager";
 
 /* eslint-disable dot-notation */
 
@@ -121,41 +119,17 @@ async function startNew(): Promise<void> {
     const deltaStream = new SocketIODeltaStream(documentId, tenantId, ordererUrl);
     window["testDeltaStream"] = deltaStream;
 
-    const deltaStorageService = new DocumentDeltaStorageService(
+    const deltaStorage = new DocumentDeltaStorageService(
         tenantId,
         token,
         deltaStorageUrl,
     );
-    const deltaStreamFollower = new DeltaStreamFollower(deltaStream, deltaStorageService, 0);
-    window["testDeltaStreamFollower"] = deltaStreamFollower;
 
-    let lastProcessedOpSequenceNumber = 0;
+    const deltaStreamManager = new DeltaStreamManager(deltaStream, deltaStorage);
+    window["testDeltaStreamManager"] = deltaStreamManager;
 
-    const handleSequentialOpsAvailable = () => {
-        const isOpLocal = (op: ISequencedDocumentMessage) => {
-            if (deltaStream.connectionInfo === undefined) {
-                throw new Error("Cannot compute local ops when disconnected");
-            }
-            // TODO this needs something more sophisticated - client ID doesn't persist across reconnect
-            return op.clientId === deltaStream.connectionInfo.clientId;
-        };
-
-        // Note: op sequence numbers are 1-indexed, is why this works
-        while (lastProcessedOpSequenceNumber < deltaStreamFollower.sequentialOps.length) {
-            const nextOp = deltaStreamFollower.sequentialOps[lastProcessedOpSequenceNumber];
-            // containerRuntime.process(
-            //     nextOp,
-            //     isOpLocal(nextOp),
-            // );
-            console.log(nextOp, isOpLocal(nextOp));
-            lastProcessedOpSequenceNumber = nextOp.sequenceNumber;
-        }
-    };
-
-    deltaStreamFollower.on("upToDate", handleSequentialOpsAvailable);
-
-    const deltaStreamWriter = new DeltaStreamWriter(deltaStream);
-    window["testDeltaStreamWriter"] = deltaStreamWriter;
+    await deltaStream.connect(tenantId, documentId, token, client);
+    console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo);
 
     const submitRoll = (diceValue: number) => {
         const opContent = {
@@ -179,22 +153,19 @@ async function startNew(): Promise<void> {
                 },
             },
         };
-        console.log(opContent, lastProcessedOpSequenceNumber);
 
-        deltaStreamWriter.enqueue(
+        const submitResultP = deltaStreamManager.submit(
             MessageType.Operation,
             opContent,
-            lastProcessedOpSequenceNumber,
         );
-        deltaStreamWriter.flushQueue();
+        submitResultP
+            .then((submitResult) => { console.log(submitResult); })
+            .catch((error) => { console.error(error); });
     };
     window["submitRoll"] = submitRoll;
 
     const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
     window["testDocumentStorageService"] = documentStorageService;
-
-    await deltaStream.connect(tenantId, documentId, token, client);
-    console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo);
 
     // Given an IDiceRoller, we can render the value and provide controls for users to roll it.
     const div = document.getElementById("content2") as HTMLDivElement;
