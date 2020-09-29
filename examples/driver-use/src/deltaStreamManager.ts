@@ -12,12 +12,10 @@ import { DeltaStreamWriter, IDeltaStreamWriter } from "./deltaStreamWriter";
 
 import { IDeltaStream } from "./socketIoDeltaStream";
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface IDeltaStreamManagerEvents extends IErrorEvent {
     (event: "opsAvailable", listener: () => void);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface IDeltaStreamManager extends IEventProvider<IDeltaStreamManagerEvents> {
     hasAvailableOps(): boolean;
     pullOp(): IAvailableOp;
@@ -68,8 +66,8 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
     // const submissionP = writer.submit(...);
     // submissionP.then((submissionDetails) => { waitingForAckQueue.push({ submissionDetails, metadata }); });
     // TODO contents should be Jsonable, not any
-    public async submit(type: MessageType, contents: any) {
-        this.deltaStreamWriter.submit(type, contents, this.lastProcessedOpSequenceNumber);
+    public submit(type: MessageType, contents: any) {
+        return this.deltaStreamWriter.submit(type, contents, this.lastProcessedOpSequenceNumber);
     }
 
     public hasAvailableOps(): boolean {
@@ -96,7 +94,11 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
 
         // Note: op sequence numbers are 1-indexed, is why this works
         while (this.lastProcessedOpSequenceNumber < this.deltaStreamFollower.sequentialOps.length) {
-            const nextOp = this.deltaStreamFollower.sequentialOps[this.lastProcessedOpSequenceNumber];
+            const nextOp = { ...this.deltaStreamFollower.sequentialOps[this.lastProcessedOpSequenceNumber] };
+
+            // Need to convert from string to object
+            nextOp.contents = JSON.parse(nextOp.contents);
+
             this.availableOps.push({
                 local: isOpLocal(nextOp),
                 op: nextOp,

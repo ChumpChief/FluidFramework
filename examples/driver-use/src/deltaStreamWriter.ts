@@ -13,9 +13,8 @@ import { IDeltaStream } from "./socketIoDeltaStream";
 export interface IDeltaStreamWriterEvents extends IErrorEvent {
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface IDeltaStreamWriter extends IEventProvider<IDeltaStreamWriterEvents> {
-    submit(type: MessageType, contents: any, referenceSequenceNumber: number);
+    submit(type: MessageType, contents: any, referenceSequenceNumber: number): number;
 }
 
 // This is now protocol layer?  Does this really need to exist as a separate object?
@@ -49,7 +48,7 @@ export class DeltaStreamWriter
     // const submissionP = writer.submit(...);
     // submissionP.then((submissionDetails) => { waitingForAckQueue.push({ submissionDetails, metadata }); });
     // TODO contents should be Jsonable, not any
-    public async submit(type: MessageType, contents: any, referenceSequenceNumber: number) {
+    public submit(type: MessageType, contents: any, referenceSequenceNumber: number) {
         // TODO maybe include clientId in here or something?  Or have it returned from the deltaStream.submit()?
         const message: IDocumentMessage = {
             clientSequenceNumber: ++this.clientSequenceNumber,
@@ -62,9 +61,7 @@ export class DeltaStreamWriter
         // maybe do a similar promise chain to keep the order correct?
 
         this.deltaStream.submit(message);
-        return {
-            clientId: this.deltaStream.connectionInfo?.clientId,
-            message,
-        };
+        // If async, this will also include the clientId it was submitted under
+        return this.clientSequenceNumber;
     }
 }

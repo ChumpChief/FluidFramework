@@ -82,10 +82,10 @@ function unpackRuntimeMessage(message: ISequencedDocumentMessage) {
     }
 
     const unpackedMessage = { ...message };
-    assert(message.contents.type !== undefined);
+    assert(message.contents.type !== undefined, "Message contents have no type");
     unpackedMessage.type = message.contents.type;
     unpackedMessage.contents = message.contents.contents;
-    assert(isRuntimeMessage(unpackedMessage));
+    assert(isRuntimeMessage(unpackedMessage), "Message is not runtime message");
     return unpackedMessage;
 }
 

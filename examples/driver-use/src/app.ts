@@ -4,6 +4,7 @@
  */
 
 import { Container, DeltaManager } from "@fluidframework/container-loader";
+import { ContainerRuntime } from "@fluidframework/container-runtime";
 import {
     IClient,
     MessageType,
@@ -128,16 +129,36 @@ async function startNew(): Promise<void> {
     const deltaStreamManager = new DeltaStreamManager(deltaStream, deltaStorage);
     window["testDeltaStreamManager"] = deltaStreamManager;
 
+    await deltaStream.connect(tenantId, documentId, token, client);
+    console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo);
+
+    const existing = deltaStream.connectionInfo?.existing;
+    if (existing === undefined) {
+        throw new Error("Couldn't get existing info");
+    }
+
+    const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
+    window["testDocumentStorageService"] = documentStorageService;
+
+    const containerRuntime = await diceRollerContainerRuntimeFactory.instantiateRuntime(
+        existing,
+        (contents: any) => {
+            const clientSequenceNumber = deltaStreamManager.submit(
+                MessageType.Operation,
+                contents,
+            );
+            return clientSequenceNumber;
+        },
+        documentStorageService,
+    ) as unknown as ContainerRuntime;
+
     deltaStreamManager.on("opsAvailable", () => {
         while (deltaStreamManager.hasAvailableOps()) {
             const nextOp = deltaStreamManager.pullOp();
-            // Processing goes here
             console.log(nextOp);
+            containerRuntime.process(nextOp.op, nextOp.local);
         }
     });
-
-    await deltaStream.connect(tenantId, documentId, token, client);
-    console.log("Stream connected, connectionInfo:", deltaStream.connectionInfo);
 
     const submitRoll = (diceValue: number) => {
         const opContent = {
@@ -162,23 +183,20 @@ async function startNew(): Promise<void> {
             },
         };
 
-        const submitResultP = deltaStreamManager.submit(
+        deltaStreamManager.submit(
             MessageType.Operation,
             opContent,
         );
-        submitResultP
-            .then((submitResult) => { console.log(submitResult); })
-            .catch((error) => { console.error(error); });
     };
     window["submitRoll"] = submitRoll;
 
-    const documentStorageService = new DocumentStorageService(documentId, tenantId, token, storageUrl);
-    window["testDocumentStorageService"] = documentStorageService;
+    console.log("About to request");
+    const diceRoller = (await containerRuntime.IFluidHandleContext.resolveHandle({ url: "default" })).value;
+    console.log("Diceroller", diceRoller);
 
     // Given an IDiceRoller, we can render the value and provide controls for users to roll it.
     const div = document.getElementById("content2") as HTMLDivElement;
-    // renderDiceRoller(diceRoller, div);
-    console.log(div);
+    renderDiceRoller(diceRoller, div);
 }
 window["startNew"] = startNew;
 
