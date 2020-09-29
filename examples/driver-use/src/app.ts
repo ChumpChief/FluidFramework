@@ -181,11 +181,12 @@ async function startNew(): Promise<void> {
         };
         console.log(opContent, lastProcessedOpSequenceNumber);
 
-        deltaStreamWriter.submit(
+        deltaStreamWriter.enqueue(
             MessageType.Operation,
             opContent,
             lastProcessedOpSequenceNumber,
         );
+        deltaStreamWriter.flushQueue();
     };
     window["submitRoll"] = submitRoll;
 

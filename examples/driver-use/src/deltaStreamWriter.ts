@@ -17,6 +17,12 @@ export interface IDeltaStreamWriterEvents extends IErrorEvent {
 export interface IDeltaStreamWriter extends IEventProvider<IDeltaStreamWriterEvents> {
 }
 
+interface ISubmissionQueueItem {
+    type: MessageType;
+    contents: any;
+    referenceSequenceNumber: number;
+}
+
 // This is now protocol layer?  Does this really need to exist as a separate object?
 // Should probably hold a queue of outbound rather than direct-submitting
 // Probably sends without caring about acks -- let the layer above care about acks?
@@ -24,11 +30,12 @@ export interface IDeltaStreamWriter extends IEventProvider<IDeltaStreamWriterEve
 // mode then maybe it just sits in a queue for a while)?
 
 // Runtime tells the manager "here is content and metadata for the op I want to submit"
-// Manager pushes the content/metadata into the writer, where it sits in a queue for submission
+// Manager pushes the content into the writer, where it sits in a queue for submission
 // -- if in offline state it will just sit there
 // -- if in online state it will go ahead and get submitted for real
 // After real submission, the op moves from the submission queue to the waiting for ack queue along with metadata
 // (this waiting for ack queue prob lives in the manager instead - writer emits event to let it know)
+// (Maybe it actually moves there immediately but with a flag to indicate whether it's really submitted?)
 // -- These "real submissions" also offer up the clientId that the op was submitted under to help compute local later?
 // When ops come in to the follower, the manager prepares them for processing, puts them in a ready-for-process queue.
 // -- First it uses the waiting for ack queue to compute local, and retrieve the relevant metadata
@@ -37,14 +44,40 @@ export class DeltaStreamWriter
     extends TypedEventEmitter<IDeltaStreamWriterEvents>
     implements IDeltaStreamWriter {
     private clientSequenceNumber: number = 0;
+    private readonly waitingForSubmit: ISubmissionQueueItem[] = [];
     constructor(
         private readonly deltaStream: IDeltaStream,
     ) {
         super();
     }
 
+    // Maybe return a promise that resolves after real submit?
+    // const submissionP = writer.enqueue(...);
+    // submissionP.then((submissionDetails) => { waitingForAckQueue.push({ submissionDetails, metadata }); });
+    public enqueue(type: MessageType, contents: any, referenceSequenceNumber: number) {
+        this.waitingForSubmit.push({
+            type,
+            contents,
+            referenceSequenceNumber,
+        });
+    }
+
+    public flushQueue() {
+        let nextItem: ISubmissionQueueItem | undefined = this.waitingForSubmit.shift();
+        while (nextItem !== undefined) {
+            const submitResult = this.submit(
+                nextItem.type,
+                nextItem.contents,
+                nextItem.referenceSequenceNumber,
+            );
+            console.log(submitResult);
+            nextItem = this.waitingForSubmit.shift();
+        }
+    }
+
     // TODO contents should be Jsonable, not any
     public submit(type: MessageType, contents: any, referenceSequenceNumber: number) {
+        // TODO maybe include clientId in here or something?  Or have it returned from the deltaStream.submit()?
         const message: IDocumentMessage = {
             clientSequenceNumber: ++this.clientSequenceNumber,
             contents: JSON.stringify(contents),
@@ -52,6 +85,9 @@ export class DeltaStreamWriter
             type,
         };
         this.deltaStream.submit(message);
-        return this.clientSequenceNumber;
+        return {
+            clientId: this.deltaStream.connectionInfo?.clientId,
+            message,
+        };
     }
 }
