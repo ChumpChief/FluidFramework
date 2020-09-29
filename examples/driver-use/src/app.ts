@@ -160,36 +160,6 @@ async function startNew(): Promise<void> {
         }
     });
 
-    const submitRoll = (diceValue: number) => {
-        const opContent = {
-            type: "component",
-            contents: {
-                address: "default",
-                contents: {
-                    content: {
-                        address: "root",
-                        contents: {
-                            key: "diceValue",
-                            path: "/",
-                            type: "set",
-                            value: {
-                                type: "Plain",
-                                value: diceValue,
-                            },
-                        },
-                    },
-                    type: "op",
-                },
-            },
-        };
-
-        deltaStreamManager.submit(
-            MessageType.Operation,
-            opContent,
-        );
-    };
-    window["submitRoll"] = submitRoll;
-
     console.log("About to request");
     const diceRoller = (await containerRuntime.IFluidHandleContext.resolveHandle({ url: "default" })).value;
     console.log("Diceroller", diceRoller);
@@ -200,6 +170,7 @@ async function startNew(): Promise<void> {
 }
 window["startNew"] = startNew;
 
-// startOld().catch((error) => console.error(error));
+startOld().catch((error) => console.error(error));
+startNew().catch((error) => console.error(error));
 
 /* eslint-enable dot-notation */

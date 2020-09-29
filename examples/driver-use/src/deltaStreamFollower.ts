@@ -56,7 +56,7 @@ export class DeltaStreamFollower extends TypedEventEmitter<IDeltaStreamFollowerE
     private readonly handleOpMessage = (op: ISequencedDocumentMessage) => {
         if (op.sequenceNumber > this.latestOpSequenceNumber + 1) {
             // We have a gap, kick off fetching the gap ops from deltaStorage
-            // TODO This is where retry logic could live, gapFetchP would not resolve until successful retrieval.
+            // TODO This is where retry logic could live, gapFetchP should not resolve until successful retrieval.
             const gapFetchP = this.deltaStorage.get(
                 this.latestOpSequenceNumber,
                 op.sequenceNumber,
