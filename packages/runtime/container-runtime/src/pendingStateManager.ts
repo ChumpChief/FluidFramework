@@ -30,14 +30,11 @@ export class DataCorruptionError extends CustomErrorWithProps implements IErrorB
  * ContainerRuntime. This message has either not been ack'd by the server or has not been submitted to the server yet.
  */
 interface IPendingMessage {
-    type: "message";
     messageType: ContainerMessageType;
     clientSequenceNumber: number;
     content: any;
     localOpMetadata: unknown;
 }
-
-type IPendingState = IPendingMessage;
 
 /**
  * PendingStateManager is responsible for maintaining the messages that have not been sent or have not yet been
@@ -49,7 +46,7 @@ type IPendingState = IPendingMessage;
  * It verifies that all the ops are acked, are received in the right order and batch information is correct.
  */
 export class PendingStateManager {
-    private readonly pendingStates = new Deque<IPendingState>();
+    private readonly pendingStates = new Deque<IPendingMessage>();
 
     /**
      * Called when a message is submitted locally. Adds the message and the associated details to the pending state
@@ -65,7 +62,6 @@ export class PendingStateManager {
         content: any,
         localOpMetadata: unknown) {
         const pendingMessage: IPendingMessage = {
-            type: "message",
             messageType: type,
             clientSequenceNumber,
             content,
@@ -81,9 +77,8 @@ export class PendingStateManager {
      * @param message - The messsage that got ack'd and needs to be processed.
      */
     public processPendingLocalMessage(message: ISequencedDocumentMessage): unknown {
-        // Get the next state from the pending queue and verify that it is of type "message".
+        // Get the next state from the pending queue
         const pendingState = this.peekNextPendingState();
-        assert(pendingState.type === "message", "No pending message found for this remote message");
         this.pendingStates.shift();
 
         // Processing part - Verify that there has been no data corruption.
@@ -98,7 +93,7 @@ export class PendingStateManager {
     /**
      * Returns the next pending state from the pending state queue.
      */
-    private peekNextPendingState(): IPendingState {
+    private peekNextPendingState(): IPendingMessage {
         const nextPendingState = this.pendingStates.peekFront();
         assert(nextPendingState, "No pending state found for the remote message");
         return nextPendingState;
