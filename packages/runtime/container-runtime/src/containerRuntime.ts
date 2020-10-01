@@ -385,24 +385,6 @@ export class ContainerRuntime extends EventEmitter
         return context;
     }
 
-    public setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void {
-        let eventName: string;
-        if (attachState === AttachState.Attaching) {
-            assert(this.attachState === AttachState.Attaching,
-                "Container Context should already be in attaching state");
-            eventName = "attaching";
-        } else {
-            assert(this.attachState === AttachState.Attached, "Container Context should already be in attached state");
-            eventName = "attached";
-        }
-        for (const context of this.contexts.values()) {
-            // Fire only for bounded stores.
-            if (!this.notBoundContexts.has(context.id)) {
-                context.emit(eventName);
-            }
-        }
-    }
-
     public submitDataStoreOp(
         id: string,
         contents: any,

@@ -220,7 +220,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
                 }
                 // TODO Should I be doing more validation here?  Using the stashed info?  Or is that really only
                 // needed for resubmit
-                assert(this.pendingAck[0] !== undefined, "Wasn't expecting an ack")
+                assert(this.pendingAck[0] !== undefined, "Wasn't expecting an ack");
                 assert(localMessageId === this.pendingAck[0].localMessageId, "Ack different from expected");
                 this.pendingAck.shift();
             }

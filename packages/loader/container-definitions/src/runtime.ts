@@ -55,12 +55,6 @@ export interface IRuntime {
      * Processes the given op (message)
      */
     process(message: ISequencedDocumentMessage, local: boolean);
-
-    /**
-     * Propagate the container state when container is attaching or attached.
-     * @param attachState - State of the container.
-     */
-    setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void;
 }
 
 /**
