@@ -31,6 +31,7 @@ export class DiceRollerContainerRuntimeFactory implements IRuntimeFactory {
         existing: boolean,
         submitFn: (contents: any) => number,
         storage: IDocumentStorageService,
+        newSubmitFn?: (contents: any, localOpMetadata: unknown) => string,
     ): Promise<IRuntime> {
         const runtime = new ContainerRuntime(
             existing,
@@ -40,6 +41,7 @@ export class DiceRollerContainerRuntimeFactory implements IRuntimeFactory {
                 DiceRollerInstantiationFactory.registryEntry,
             ]),
             deprecated_innerRequestHandler,
+            newSubmitFn,
         );
 
         if (!runtime.existing) {

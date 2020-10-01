@@ -139,6 +139,7 @@ export class ContainerRuntime extends EventEmitter
         private readonly storage: IDocumentStorageService,
         registryEntries: NamedFluidDataStoreRegistryEntries,
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
+        private readonly newSubmitFn?: (contents: any, localOpMetadata: unknown) => string,
     ) {
         super();
 
@@ -218,6 +219,27 @@ export class ContainerRuntime extends EventEmitter
         if (local) {
             localMessageMetadata = this.pendingStateManager.processPendingLocalMessage(unpackedMessage);
         }
+
+        switch (unpackedMessage.type) {
+            case ContainerMessageType.Attach:
+                this.processAttachMessage(unpackedMessage, local, localMessageMetadata);
+                break;
+            case ContainerMessageType.FluidDataStoreOp:
+                this.processFluidDataStoreOp(unpackedMessage, local, localMessageMetadata);
+                break;
+            default:
+        }
+
+        this.emit("op", unpackedMessage);
+    }
+
+    public processNew(message: ISequencedDocumentMessage, local: boolean, localMessageMetadata: any) {
+        // If it's not message for runtime, bail out right away.
+        if (!isRuntimeMessage(message)) {
+            return;
+        }
+
+        const unpackedMessage = unpackRuntimeMessage(message);
 
         switch (unpackedMessage.type) {
             case ContainerMessageType.Attach:
@@ -398,9 +420,13 @@ export class ContainerRuntime extends EventEmitter
         localOpMetadata: unknown = undefined,
     ): void {
         const payload: ContainerRuntimeMessage = { type, contents: content };
-        const clientSequenceNumber = this.submitFn(payload);
+        if (this.newSubmitFn === undefined) {
+            const clientSequenceNumber = this.submitFn(payload);
 
-        // Let the PendingStateManager know that a message was submitted.
-        this.pendingStateManager.onSubmitMessage(type, clientSequenceNumber, content, localOpMetadata);
+            // Let the PendingStateManager know that a message was submitted.
+            this.pendingStateManager.onSubmitMessage(type, clientSequenceNumber, content, localOpMetadata);
+        } else {
+            this.newSubmitFn(payload, localOpMetadata);
+        }
     }
 }
