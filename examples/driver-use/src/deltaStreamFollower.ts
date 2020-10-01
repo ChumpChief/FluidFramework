@@ -41,9 +41,13 @@ export class DeltaStreamFollower extends TypedEventEmitter<IDeltaStreamFollowerE
     }
 
     private readonly sequenceOp = (op: ISequencedDocumentMessage) => {
-        this.sequentialOps.push(op);
+        // As we receive the ops, the contents are stringified JSON.  We need to parse these into objects for use.
+        const parsedOp = { ...op };
+        parsedOp.contents = JSON.parse(parsedOp.contents);
+
+        this.sequentialOps.push(parsedOp);
         this.emit("opSequenced");
-        if (this.latestOpSequenceNumber === op.sequenceNumber) {
+        if (this.latestOpSequenceNumber === parsedOp.sequenceNumber) {
             this.emit("upToDate");
         }
     };

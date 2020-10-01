@@ -197,8 +197,6 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
      * processOps will run when the DeltaStreamFollower has finished sequencing a set of ops.  Its job is to
      * take those ops, groom them with information like local, metadata, parse the JSON, etc. and make them
      * available to the upper layers (with an event to let them know they are available).
-     *
-     * TODO needs to weed out system messages.
      */
     private readonly prepareOps = () => {
         const isOpLocal = (op: ISequencedDocumentMessage) => {
@@ -217,9 +215,6 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
         // Note: op sequence numbers are 1-indexed, is why this works
         while (this.lastPreparedOpSequenceNumber < this.deltaStreamFollower.sequentialOps.length) {
             const nextOp = { ...this.deltaStreamFollower.sequentialOps[this.lastPreparedOpSequenceNumber] };
-
-            // Need to convert from string to object
-            nextOp.contents = JSON.parse(nextOp.contents);
 
             const local = isOpLocal(nextOp);
 
