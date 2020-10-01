@@ -94,7 +94,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
         this.deltaStreamFollower = new DeltaStreamFollower(this.deltaStream, this.deltaStorage, 0);
         this.deltaStreamWriter = new DeltaStreamWriter(this.deltaStream);
 
-        this.deltaStreamFollower.on("upToDate", this.processOps);
+        this.deltaStreamFollower.on("upToDate", this.prepareOps);
     }
 
     // Thinking something like this, promise resolves after real submit to network
@@ -199,7 +199,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
      *
      * TODO needs to weed out system messages.
      */
-    private readonly processOps = () => {
+    private readonly prepareOps = () => {
         const isOpLocal = (op: ISequencedDocumentMessage) => {
             if (this.deltaStream.connectionInfo === undefined) {
                 throw new Error("Cannot compute local ops when disconnected");
