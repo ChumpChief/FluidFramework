@@ -16,7 +16,7 @@ import { DeltaStreamWriter, IDeltaStreamWriter } from "./deltaStreamWriter";
 import { IDeltaStream } from "./socketIoDeltaStream";
 
 export interface IDeltaStreamManagerEvents extends IErrorEvent {
-    (event: "opsAvailable", listener: () => void);
+    (event: "opPrepared" | "upToDate", listener: () => void);
 }
 
 export interface IDeltaStreamManager extends IEventProvider<IDeltaStreamManagerEvents> {
@@ -197,8 +197,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
      * take those ops, groom them with information like local, metadata, parse the JSON, etc. and make them
      * available to the upper layers (with an event to let them know they are available).
      *
-     * TODO Probably want a similar eventing pattern to the follwer with a chatty per-op event and also a
-     * "done" event.  Also needs to weed out system messages.
+     * TODO needs to weed out system messages.
      */
     private readonly processOps = () => {
         const isOpLocal = (op: ISequencedDocumentMessage) => {
@@ -246,7 +245,8 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
                 metadata,
             });
             this.lastPreparedOpSequenceNumber++;
+            this.emit("opPrepared");
         }
-        this.emit("opsAvailable");
+        this.emit("upToDate");
     };
 }

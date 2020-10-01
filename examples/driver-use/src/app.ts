@@ -156,7 +156,7 @@ async function startNew(): Promise<void> {
         },
     ) as unknown as ContainerRuntime;
 
-    deltaStreamManager.on("opsAvailable", () => {
+    deltaStreamManager.on("upToDate", () => {
         while (deltaStreamManager.hasAvailableOps()) {
             const nextOp = deltaStreamManager.pullOp();
             console.log(nextOp);
