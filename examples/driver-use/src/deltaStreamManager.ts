@@ -202,6 +202,10 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
      */
     private readonly prepareOps = () => {
         const isOpLocal = (op: ISequencedDocumentMessage) => {
+            if (isSystemMessage(op)) {
+                // System messages are never local
+                return false;
+            }
             if (this.deltaStream.connectionInfo === undefined) {
                 throw new Error("Cannot compute local ops when disconnected");
             }
@@ -217,7 +221,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
             // Need to convert from string to object
             nextOp.contents = JSON.parse(nextOp.contents);
 
-            const local = isSystemMessage(nextOp) ? false : isOpLocal(nextOp);
+            const local = isOpLocal(nextOp);
 
             // We'll get the message id off the map based on the clientId and clientSequenceNumber
             let localMessageId: string | undefined;
