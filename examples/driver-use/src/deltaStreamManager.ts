@@ -28,6 +28,7 @@ interface IAvailableOp {
     local: boolean;
     op: ISequencedDocumentMessage;
     localMessageId: string | undefined;
+    metadata: any | undefined;
 }
 
 // TODO if instead we want the metadata to be handled externally, we need to provide back a unique identifier that
@@ -42,6 +43,7 @@ interface IPendingSendOp {
     referenceSequenceNumber: number;
 }
 
+// TODO Do I need to retain the type/contents/ref here in case of resubmit case?  Like if I get NACK'd?
 interface IPendingAckOp {
     clientId: string;
     clientSequenceNumber: number;
@@ -79,6 +81,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
     private readonly pendingAck: IPendingAckOp[] = [];
     private readonly metadataStash: Map<string, any> = new Map<string, any>();
     private readonly localMessageIdMap: Map<string, string> = new Map<string, string>();
+    private sendingP: Promise<void> | undefined;
 
     constructor(
         private readonly deltaStream: IDeltaStream,
@@ -98,6 +101,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
     // TODO contents should be Jsonable, not any
     public submit(type: MessageType, contents: any) {
         const localMessageId = uuid();
+        // TODO Need to either take in the metadata or return the localMessageId for the caller to use
         this.metadataStash.set(localMessageId, undefined);
 
         this.pendingSend.push({
@@ -120,6 +124,57 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
             });
         }
         return clientSequenceNumber;
+    }
+
+    public submitNew(type: MessageType, contents: any) {
+        const localMessageId = uuid();
+        // TODO Need to either take in the metadata or the caller needs to use the returned localMessageId
+        // to do its own stashing
+        this.metadataStash.set(localMessageId, Math.random());
+
+        this.pendingSend.push({
+            type,
+            contents,
+            localMessageId,
+            referenceSequenceNumber: this.lastProcessedOpSequenceNumber,
+        });
+
+        if (this.sendingP === undefined) {
+            this.sendingP = this.ensureSending()
+                .finally(() => { this.sendingP = undefined; });
+        }
+
+        return localMessageId;
+    }
+
+    private async ensureSending() {
+        while (this.pendingSend.length > 0) {
+            // await can send
+            const nextOp = this.pendingSend.shift();
+            if (nextOp === undefined) {
+                throw new Error("The op we expected to send vanished before we could send it");
+            }
+            const clientSequenceNumber = this.deltaStreamWriter.submit(
+                nextOp.type,
+                nextOp.contents,
+                nextOp.referenceSequenceNumber,
+            );
+
+            const clientId = this.deltaStream.connectionInfo?.clientId;
+            if (clientId === undefined) {
+                throw new Error("Mistakenly thought we were connected and tried to send");
+            }
+
+            this.localMessageIdMap.set(
+                localMessageIdMapKey(clientId, clientSequenceNumber),
+                nextOp.localMessageId,
+            );
+            this.pendingAck.push({
+                clientId,
+                clientSequenceNumber,
+                localMessageId: nextOp.localMessageId,
+            });
+        }
     }
 
     public hasAvailableOps(): boolean {
@@ -164,10 +219,15 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
                 }
             }
 
+            const metadata = localMessageId !== undefined
+                ? this.metadataStash.get(localMessageId)
+                : undefined;
+
             this.availableOps.push({
                 local,
                 op: nextOp,
                 localMessageId,
+                metadata,
             });
             this.emit("opsAvailable");
         }
