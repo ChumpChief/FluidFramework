@@ -191,16 +191,26 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
         return nextOp;
     }
 
+    /**
+     * processOps will run when the DeltaStreamFollower has finished sequencing a set of ops.  Its job is to
+     * take those ops, groom them with information like local, metadata, parse the JSON, etc. and make them
+     * available to the upper layers (with an event to let them know they are available).
+     *
+     * TODO Probably want a similar eventing pattern to the follwer with a chatty per-op event and also a
+     * "done" event.  Also needs to weed out system messages.
+     */
     private readonly processOps = () => {
         const isOpLocal = (op: ISequencedDocumentMessage) => {
             if (this.deltaStream.connectionInfo === undefined) {
                 throw new Error("Cannot compute local ops when disconnected");
             }
             // TODO this needs something more sophisticated - client ID doesn't persist across reconnect
+            // Maybe search our pendingAck collection to see if we get a match
             return op.clientId === this.deltaStream.connectionInfo.clientId;
         };
 
         // Note: op sequence numbers are 1-indexed, is why this works
+        // I broke something with this loop, need to split processed/pulled
         while (this.lastProcessedOpSequenceNumber < this.deltaStreamFollower.sequentialOps.length) {
             const nextOp = { ...this.deltaStreamFollower.sequentialOps[this.lastProcessedOpSequenceNumber] };
 
