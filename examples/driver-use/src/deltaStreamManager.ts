@@ -76,7 +76,8 @@ const localMessageIdMapKey = (clientId: string, clientSequenceNumber: number) =>
 export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEvents> implements IDeltaStreamManager {
     private readonly deltaStreamFollower: IDeltaStreamFollower;
     private readonly deltaStreamWriter: IDeltaStreamWriter;
-    private lastProcessedOpSequenceNumber = 0;
+    private lastPreparedOpSequenceNumber = 0;
+    private lastPulledOpSequenceNumber = 0;
     private readonly availableOps: IAvailableOp[] = [];
     private readonly pendingSend: IPendingSendOp[] = [];
     private readonly pendingAck: IPendingAckOp[] = [];
@@ -109,11 +110,11 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
             type,
             contents,
             localMessageId,
-            referenceSequenceNumber: this.lastProcessedOpSequenceNumber,
+            referenceSequenceNumber: this.lastPulledOpSequenceNumber,
         });
 
         // this part should be in a separate method
-        const clientSequenceNumber = this.deltaStreamWriter.submit(type, contents, this.lastProcessedOpSequenceNumber);
+        const clientSequenceNumber = this.deltaStreamWriter.submit(type, contents, this.lastPulledOpSequenceNumber);
         const clientId = this.deltaStream.connectionInfo?.clientId;
         // This should actually be guaranteed already if we're deciding to real-send
         if (clientId !== undefined) {
@@ -137,7 +138,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
             type,
             contents,
             localMessageId,
-            referenceSequenceNumber: this.lastProcessedOpSequenceNumber,
+            referenceSequenceNumber: this.lastPulledOpSequenceNumber,
         });
 
         if (this.sendingP === undefined) {
@@ -187,7 +188,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
         if (nextOp === undefined) {
             throw new Error("Attempted to pullOp with no available ops");
         }
-        this.lastProcessedOpSequenceNumber = nextOp.op.sequenceNumber;
+        this.lastPulledOpSequenceNumber = nextOp.op.sequenceNumber;
         return nextOp;
     }
 
@@ -210,9 +211,8 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
         };
 
         // Note: op sequence numbers are 1-indexed, is why this works
-        // I broke something with this loop, need to split processed/pulled
-        while (this.lastProcessedOpSequenceNumber < this.deltaStreamFollower.sequentialOps.length) {
-            const nextOp = { ...this.deltaStreamFollower.sequentialOps[this.lastProcessedOpSequenceNumber] };
+        while (this.lastPreparedOpSequenceNumber < this.deltaStreamFollower.sequentialOps.length) {
+            const nextOp = { ...this.deltaStreamFollower.sequentialOps[this.lastPreparedOpSequenceNumber] };
 
             // Need to convert from string to object
             nextOp.contents = JSON.parse(nextOp.contents);
@@ -245,7 +245,8 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
                 localMessageId,
                 metadata,
             });
-            this.emit("opsAvailable");
+            this.lastPreparedOpSequenceNumber++;
         }
+        this.emit("opsAvailable");
     };
 }
