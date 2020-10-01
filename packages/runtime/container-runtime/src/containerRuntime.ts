@@ -284,10 +284,6 @@ export class ContainerRuntime extends EventEmitter
         this.contexts.set(id, context);
     }
 
-    public on(event: string | symbol, listener: (...args: any[]) => void): this {
-        return super.on(event, listener);
-    }
-
     private processAttachMessage(message: ISequencedDocumentMessage, local: boolean, localMessageMetadata: unknown) {
         const attachMessage = message.contents as InboundAttachMessage;
         // The local object has already been attached
