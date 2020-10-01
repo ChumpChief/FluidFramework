@@ -150,13 +150,17 @@ async function startNew(): Promise<void> {
             return clientSequenceNumber;
         },
         documentStorageService,
+        (contents: any, localOpMetadata: unknown) => {
+            const messageId = deltaStreamManager.submitNew(MessageType.Operation, contents, localOpMetadata);
+            return messageId;
+        },
     ) as unknown as ContainerRuntime;
 
     deltaStreamManager.on("opsAvailable", () => {
         while (deltaStreamManager.hasAvailableOps()) {
             const nextOp = deltaStreamManager.pullOp();
             console.log(nextOp);
-            containerRuntime.process(nextOp.op, nextOp.local);
+            containerRuntime.processNew(nextOp.op, nextOp.local, nextOp.metadata);
         }
     });
 

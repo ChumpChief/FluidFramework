@@ -80,7 +80,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
     private readonly availableOps: IAvailableOp[] = [];
     private readonly pendingSend: IPendingSendOp[] = [];
     private readonly pendingAck: IPendingAckOp[] = [];
-    private readonly metadataStash: Map<string, any> = new Map<string, any>();
+    private readonly metadataStash: Map<string, unknown> = new Map<string, unknown>();
     private readonly localMessageIdMap: Map<string, string> = new Map<string, string>();
     private sendingP: Promise<void> | undefined;
 
@@ -127,11 +127,11 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
         return clientSequenceNumber;
     }
 
-    public submitNew(type: MessageType, contents: any) {
+    public submitNew(type: MessageType, contents: any, metadata: unknown) {
         const localMessageId = uuid();
         // TODO Need to either take in the metadata or the caller needs to use the returned localMessageId
         // to do its own stashing
-        this.metadataStash.set(localMessageId, Math.random());
+        this.metadataStash.set(localMessageId, metadata);
 
         this.pendingSend.push({
             type,
