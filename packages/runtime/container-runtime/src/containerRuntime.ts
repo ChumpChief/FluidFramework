@@ -201,7 +201,7 @@ export class ContainerRuntime extends EventEmitter
         // There might be no change of state due to Container calling this API after loading runtime.
         this._connected = connected;
 
-        for (const [, context] of this.contexts) {
+        for (const context of this.contexts.values()) {
             context.setConnectionState(connected);
         }
     }

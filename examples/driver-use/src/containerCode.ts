@@ -3,14 +3,12 @@
  * Licensed under the MIT License.
  */
 
-import { defaultRouteRequestHandler } from "@fluidframework/aqueduct";
 import { IRuntime, IRuntimeFactory } from "@fluidframework/container-definitions";
 import {
     ContainerRuntime,
 } from "@fluidframework/container-runtime";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    buildRuntimeRequestHandler,
     deprecated_innerRequestHandler,
 } from "@fluidframework/request-handler";
 
@@ -41,10 +39,7 @@ export class DiceRollerContainerRuntimeFactory implements IRuntimeFactory {
             new Map([
                 DiceRollerInstantiationFactory.registryEntry,
             ]),
-            buildRuntimeRequestHandler(
-                defaultRouteRequestHandler(defaultDataStoreId),
-                deprecated_innerRequestHandler,
-            ),
+            deprecated_innerRequestHandler,
         );
 
         if (!runtime.existing) {

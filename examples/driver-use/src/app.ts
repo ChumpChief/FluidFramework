@@ -90,7 +90,7 @@ async function startOld(): Promise<void> {
     // getTinyliciousContainer end
 
     // Since we're using a ContainerRuntimeFactoryWithDefaultDataStore, our dice roller is available at the URL "/".
-    const url = "/";
+    const url = "default";
     const response = await container.request({ url });
 
     // Verify the response to make sure we got what we expected.
