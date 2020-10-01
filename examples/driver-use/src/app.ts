@@ -5,6 +5,7 @@
 
 import { Container, DeltaManager } from "@fluidframework/container-loader";
 import { ContainerRuntime } from "@fluidframework/container-runtime";
+import { isSystemMessage } from "@fluidframework/protocol-base";
 import {
     IClient,
     MessageType,
@@ -159,8 +160,10 @@ async function startNew(): Promise<void> {
     deltaStreamManager.on("upToDate", () => {
         while (deltaStreamManager.hasAvailableOps()) {
             const nextOp = deltaStreamManager.pullOp();
-            console.log(nextOp);
-            containerRuntime.processNew(nextOp.op, nextOp.local, nextOp.metadata);
+            if (!isSystemMessage(nextOp.op)) {
+                console.log(nextOp);
+                containerRuntime.processNew(nextOp.op, nextOp.local, nextOp.metadata);
+            }
         }
     });
 

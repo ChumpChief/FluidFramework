@@ -235,9 +235,7 @@ export class ContainerRuntime extends EventEmitter
 
     public processNew(message: ISequencedDocumentMessage, local: boolean, localMessageMetadata: any) {
         // If it's not message for runtime, bail out right away.
-        if (!isRuntimeMessage(message)) {
-            return;
-        }
+        assert(isRuntimeMessage(message), "Tried to processNew a non-runtime message");
 
         const unpackedMessage = unpackRuntimeMessage(message);
 

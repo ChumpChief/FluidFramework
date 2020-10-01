@@ -7,6 +7,7 @@ import assert from "assert";
 import { IEventProvider, IErrorEvent } from "@fluidframework/common-definitions";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
+import { isSystemMessage } from "@fluidframework/protocol-base";
 import { ISequencedDocumentMessage, MessageType } from "@fluidframework/protocol-definitions";
 import { v4 as uuid } from "uuid";
 
@@ -216,7 +217,7 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
             // Need to convert from string to object
             nextOp.contents = JSON.parse(nextOp.contents);
 
-            const local = isOpLocal(nextOp);
+            const local = isSystemMessage(nextOp) ? false : isOpLocal(nextOp);
 
             // We'll get the message id off the map based on the clientId and clientSequenceNumber
             let localMessageId: string | undefined;
