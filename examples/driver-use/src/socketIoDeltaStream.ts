@@ -221,7 +221,7 @@ export class SocketIODeltaStream extends TypedEventEmitter<IDeltaStreamEvents> i
      */
     public submit(message: IDocumentMessage): void {
         if (this.connectionInfo === undefined) {
-            throw new Error("Attempted to submit a mesage in disconnected state");
+            throw new Error("Attempted to submit a message in disconnected state");
         }
         // I don't really want to submit as an array, but currently Tinylicious will barf if it's not.
         // submitOp is transport detail - it's not persisted in the op stream in any way

@@ -7,6 +7,8 @@ import { IEventProvider, IErrorEvent } from "@fluidframework/common-definitions"
 import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDocumentDeltaStorageService } from "@fluidframework/driver-definitions";
 import { ISequencedDocumentMessage, MessageType } from "@fluidframework/protocol-definitions";
+import { v4 as uuid } from "uuid";
+
 import { DeltaStreamFollower, IDeltaStreamFollower } from "./deltaStreamFollower";
 import { DeltaStreamWriter, IDeltaStreamWriter } from "./deltaStreamWriter";
 
@@ -25,7 +27,28 @@ export interface IDeltaStreamManager extends IEventProvider<IDeltaStreamManagerE
 interface IAvailableOp {
     local: boolean;
     op: ISequencedDocumentMessage;
+    localMessageId: string | undefined;
 }
+
+// TODO if instead we want the metadata to be handled externally, we need to provide back a unique identifier that
+// can be used to match an incoming op.  Today, this is a clientId + clientSequenceNumber combo, but we won't have
+// that available at the time the op is submitted (the clientId might change if the connection drops).  So we'll
+// instead need to provide back a guid or something that we'll match internally.  This might be nice anyway to help
+// hide the clientId.
+interface IPendingSendOp {
+    type: MessageType;
+    contents: any;
+    localMessageId: string;
+    referenceSequenceNumber: number;
+}
+
+interface IPendingAckOp {
+    clientId: string;
+    clientSequenceNumber: number;
+    localMessageId: string;
+}
+
+const localMessageIdMapKey = (clientId: string, clientSequenceNumber: number) => `${clientId}#${clientSequenceNumber}`;
 
 // This is now protocol layer?  Does this really need to exist as a separate object?
 // Should probably hold a queue of outbound rather than direct-submitting
@@ -44,11 +67,18 @@ interface IAvailableOp {
 // When ops come in to the follower, the manager prepares them for processing, puts them in a ready-for-process queue.
 // -- First it uses the waiting for ack queue to compute local, and retrieve the relevant metadata
 // Then runtime does something like ContainerRuntime.process to actually do anything with the message.
+
+// I just want to sync write type/content/metadata, not think about connected.
+// I want to sync read op content plus get out the metadata and know local
 export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEvents> implements IDeltaStreamManager {
     private readonly deltaStreamFollower: IDeltaStreamFollower;
     private readonly deltaStreamWriter: IDeltaStreamWriter;
     private lastProcessedOpSequenceNumber = 0;
     private readonly availableOps: IAvailableOp[] = [];
+    private readonly pendingSend: IPendingSendOp[] = [];
+    private readonly pendingAck: IPendingAckOp[] = [];
+    private readonly metadataStash: Map<string, any> = new Map<string, any>();
+    private readonly localMessageIdMap: Map<string, string> = new Map<string, string>();
 
     constructor(
         private readonly deltaStream: IDeltaStream,
@@ -67,7 +97,29 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
     // submissionP.then((submissionDetails) => { waitingForAckQueue.push({ submissionDetails, metadata }); });
     // TODO contents should be Jsonable, not any
     public submit(type: MessageType, contents: any) {
-        return this.deltaStreamWriter.submit(type, contents, this.lastProcessedOpSequenceNumber);
+        const localMessageId = uuid();
+        this.metadataStash.set(localMessageId, undefined);
+
+        this.pendingSend.push({
+            type,
+            contents,
+            localMessageId,
+            referenceSequenceNumber: this.lastProcessedOpSequenceNumber,
+        });
+
+        // this part should be in a separate method
+        const clientSequenceNumber = this.deltaStreamWriter.submit(type, contents, this.lastProcessedOpSequenceNumber);
+        const clientId = this.deltaStream.connectionInfo?.clientId;
+        // This should actually be guaranteed already if we're deciding to real-send
+        if (clientId !== undefined) {
+            this.localMessageIdMap.set(localMessageIdMapKey(clientId, clientSequenceNumber), localMessageId);
+            this.pendingAck.push({
+                clientId,
+                clientSequenceNumber,
+                localMessageId,
+            });
+        }
+        return clientSequenceNumber;
     }
 
     public hasAvailableOps(): boolean {
@@ -99,9 +151,23 @@ export class DeltaStreamManager extends TypedEventEmitter<IDeltaStreamManagerEve
             // Need to convert from string to object
             nextOp.contents = JSON.parse(nextOp.contents);
 
+            const local = isOpLocal(nextOp);
+
+            // We'll get the message id off the map based on the clientId and clientSequenceNumber
+            let localMessageId: string | undefined;
+            if (local) {
+                localMessageId = this.localMessageIdMap.get(
+                    localMessageIdMapKey(nextOp.clientId, nextOp.clientSequenceNumber),
+                );
+                if (localMessageId === undefined) {
+                    throw new Error("Couldn't find the localMessageId");
+                }
+            }
+
             this.availableOps.push({
-                local: isOpLocal(nextOp),
+                local,
                 op: nextOp,
+                localMessageId,
             });
             this.emit("opsAvailable");
         }

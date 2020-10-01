@@ -42,6 +42,7 @@ export class DeltaStreamWriter
         private readonly deltaStream: IDeltaStream,
     ) {
         super();
+        // TODO does nack handling belong here?
     }
 
     // Thinking something like this, promise resolves after real submit to network
