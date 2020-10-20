@@ -4,7 +4,7 @@
  */
 
 import url from "url";
-import { BatchManager, TypedEventEmitter } from "@fluidframework/common-utils";
+import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDocumentDeltaConnection, IDocumentDeltaConnectionEvents } from "@fluidframework/driver-definitions";
 import {
     ConnectionMode,
@@ -63,7 +63,6 @@ export class WSDeltaConnection
     }
 
     private readonly socket: ws;
-    private readonly submitManager: BatchManager<IDocumentMessage[]>;
     private details: IConnected | undefined;
 
     public get clientId(): string {
@@ -157,24 +156,20 @@ export class WSDeltaConnection
         this.once("connect_document_success", (connectedMessage: IConnected) => {
             this.details = connectedMessage;
         });
-
-        this.submitManager = new BatchManager<IDocumentMessage[]>((submitType, work) => {
-            this.sendMessage(JSON.stringify([submitType, this.details!.clientId, work]));
-        });
     }
 
     /**
      * Submits a new delta operation to the server
      */
     public submit(messages: IDocumentMessage[]): void {
-        this.submitManager.add("submitOp", messages);
+        this.sendMessage(JSON.stringify(["submitOp", this.details!.clientId, messages]));
     }
 
     /**
      * Submits a new signal to the server
      */
     public submitSignal(message: any): void {
-        this.submitManager.add("submitSignal", message);
+        this.sendMessage(JSON.stringify(["submitSignal", this.details!.clientId, message]));
     }
 
     public close() {

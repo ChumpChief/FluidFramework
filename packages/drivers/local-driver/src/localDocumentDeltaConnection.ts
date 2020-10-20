@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { BatchManager, TypedEventEmitter } from "@fluidframework/common-utils";
+import { TypedEventEmitter } from "@fluidframework/common-utils";
 import { IDocumentDeltaConnection, IDocumentDeltaConnectionEvents } from "@fluidframework/driver-definitions";
 import {
     ConnectionMode,
@@ -95,7 +95,6 @@ export class LocalDocumentDeltaConnection
         return Promise.resolve(deltaConnection);
     }
 
-    private readonly submitManager: BatchManager<IDocumentMessage[]>;
     private readonly subscribedEvents = new Set<string>();
 
     public get clientId(): string {
@@ -148,18 +147,6 @@ export class LocalDocumentDeltaConnection
         public details: IConnected) {
         super();
 
-        this.submitManager = new BatchManager<IDocumentMessage[]>((submitType, work) => {
-            this.socket.emit(
-                submitType,
-                this.details.clientId,
-                work,
-                (error) => {
-                    if (error) {
-                        debug("Emit error", error);
-                    }
-                });
-        });
-
         this.on("newListener", (event, listener) => {
             if (!this.subscribedEvents.has(event)) {
                 this.subscribedEvents.add(event);
@@ -179,8 +166,15 @@ export class LocalDocumentDeltaConnection
         // We use a promise resolve to force a turn break given message processing is sync
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         Promise.resolve().then(() => {
-            this.submitManager.add("submitOp", messages);
-            this.submitManager.drain();
+            this.socket.emit(
+                "submitOp",
+                this.details.clientId,
+                messages,
+                (error) => {
+                    if (error) {
+                        debug("Emit error", error);
+                    }
+                });
         });
     }
 
@@ -188,8 +182,15 @@ export class LocalDocumentDeltaConnection
      * Submits a new signal to the server
      */
     public submitSignal(message: any): void {
-        this.submitManager.add("submitSignal", message);
-        this.submitManager.drain();
+        this.socket.emit(
+            "submitSignal",
+            this.details.clientId,
+            message,
+            (error) => {
+                if (error) {
+                    debug("Emit error", error);
+                }
+            });
     }
 
     public close() {
