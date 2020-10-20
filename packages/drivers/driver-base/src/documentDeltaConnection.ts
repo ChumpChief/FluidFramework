@@ -4,7 +4,7 @@
  */
 
 import { strict as assert } from "assert";
-import { BatchManager, TypedEventEmitter } from "@fluidframework/common-utils";
+import { TypedEventEmitter } from "@fluidframework/common-utils";
 import {
     IDocumentDeltaConnection,
     IDocumentDeltaConnectionEvents,
@@ -121,8 +121,6 @@ export class DocumentDeltaConnection
     protected readonly queuedMessages: ISequencedDocumentMessage[] = [];
     protected readonly queuedSignals: ISignalMessage[] = [];
 
-    private readonly submitManager: BatchManager<IDocumentMessage[]>;
-
     private _details: IConnected | undefined;
 
     // Listeners only needed while the connection is in progress
@@ -155,16 +153,6 @@ export class DocumentDeltaConnection
         protected readonly socket: SocketIOClient.Socket,
         public documentId: string) {
         super();
-
-        this.submitManager = new BatchManager<IDocumentMessage[]>(
-            (submitType, work) => {
-                // Although the implementation here disconnects the socket and does not reuse it, other subclasses
-                // (e.g. OdspDocumentDeltaConnection) may reuse the socket.  In these cases, we need to avoid emitting
-                // on the still-live socket.
-                if (!this.closed) {
-                    this.socket.emit(submitType, this.clientId, work);
-                }
-            });
 
         this.on("newListener", (event, listener) => {
             if (!DocumentDeltaConnection.eventsToForward.includes(event)) {
@@ -305,7 +293,12 @@ export class DocumentDeltaConnection
      * @param message - delta operation to submit
      */
     public submit(messages: IDocumentMessage[]): void {
-        this.submitManager.add("submitOp", messages);
+        // Although the implementation here disconnects the socket and does not reuse it, other subclasses
+        // (e.g. OdspDocumentDeltaConnection) may reuse the socket.  In these cases, we need to avoid emitting
+        // on the still-live socket.
+        if (!this.closed) {
+            this.socket.emit("submitOp", this.clientId, messages);
+        }
     }
 
     /**
@@ -314,7 +307,12 @@ export class DocumentDeltaConnection
      * @param message - signal to submit
      */
     public submitSignal(message: IDocumentMessage): void {
-        this.submitManager.add("submitSignal", [message]);
+        // Although the implementation here disconnects the socket and does not reuse it, other subclasses
+        // (e.g. OdspDocumentDeltaConnection) may reuse the socket.  In these cases, we need to avoid emitting
+        // on the still-live socket.
+        if (!this.closed) {
+            this.socket.emit("submitSignal", this.clientId, [message]);
+        }
     }
 
     /**
