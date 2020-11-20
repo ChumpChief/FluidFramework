@@ -130,7 +130,7 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
     }
 
     public get routeContext(): IFluidHandleContext {
-        return this.dataStoreContext.containerRuntime.IFluidHandleContext;
+        return this.dataStoreContext.routeContext;
     }
 
     private readonly serializer = new FluidSerializer(this.IFluidHandleContext);

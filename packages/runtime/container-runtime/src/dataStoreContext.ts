@@ -9,6 +9,7 @@ import {
     IRequest,
     IResponse,
     IFluidHandle,
+    IFluidHandleContext,
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
@@ -150,6 +151,10 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
 
     public get containerRuntime(): IContainerRuntime {
         return this._containerRuntime;
+    }
+
+    public get routeContext(): IFluidHandleContext {
+        return this._containerRuntime.IFluidHandleContext;
     }
 
     public get isLoaded(): boolean {

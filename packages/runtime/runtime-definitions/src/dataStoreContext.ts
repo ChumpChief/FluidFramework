@@ -9,6 +9,7 @@ import {
     IFluidRouter,
     IProvideFluidHandleContext,
     IFluidHandle,
+    IFluidHandleContext,
     IRequest,
     IResponse,
 } from "@fluidframework/core-interfaces";
@@ -280,6 +281,7 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
     readonly attachState: AttachState;
 
     readonly containerRuntime: IContainerRuntimeBase;
+    readonly routeContext: IFluidHandleContext;
     readonly snapshotFn: (message: string) => Promise<void>;
 
     /**
