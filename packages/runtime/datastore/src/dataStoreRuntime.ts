@@ -30,7 +30,6 @@ import {
 } from "@fluidframework/telemetry-utils";
 import { buildSnapshotTree, readAndParseFromBlobs } from "@fluidframework/driver-utils";
 import {
-    IClientDetails,
     IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
@@ -114,10 +113,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
         return this.dataStoreContext.clientId;
     }
 
-    public get clientDetails(): IClientDetails {
-        return this.dataStoreContext.containerRuntime.clientDetails;
-    }
-
     public get loader(): ILoader {
         return this.dataStoreContext.loader;
     }
@@ -128,13 +123,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
 
     public get attachState(): AttachState {
         return this._attachState;
-    }
-
-    /**
-     * @deprecated - 0.21 back-compat
-     */
-    public get path(): string {
-        return this.id;
     }
 
     public get absolutePath(): string {
@@ -185,7 +173,7 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
     ) {
         super();
 
-        this.logger = ChildLogger.create(dataStoreContext.containerRuntime.logger, undefined, { dataStoreId: uuid() });
+        this.logger = ChildLogger.create(undefined, undefined, { dataStoreId: uuid() });
         this.documentId = dataStoreContext.documentId;
         this.id = dataStoreContext.id;
         this.existing = dataStoreContext.existing;
