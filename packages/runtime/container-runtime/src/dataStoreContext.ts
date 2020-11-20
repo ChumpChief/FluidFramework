@@ -661,10 +661,6 @@ export class LocalFluidDataStoreContextBase extends FluidDataStoreContext {
         bindChannel: (channel: IFluidDataStoreChannel) => void,
         private readonly snapshotTree: ISnapshotTree | undefined,
         protected readonly isRootDataStore: boolean,
-        /**
-         * @deprecated 0.16 Issue #1635, #3631
-         */
-        public readonly createProps?: any,
     ) {
         super(
             runtime,
@@ -752,10 +748,6 @@ export class LocalFluidDataStoreContext extends LocalFluidDataStoreContextBase {
         bindChannel: (channel: IFluidDataStoreChannel) => void,
         snapshotTree: ISnapshotTree | undefined,
         isRootDataStore: boolean,
-        /**
-         * @deprecated 0.16 Issue #1635, #3631
-         */
-        createProps?: any,
     ) {
         super(
             id,
@@ -768,7 +760,7 @@ export class LocalFluidDataStoreContext extends LocalFluidDataStoreContextBase {
             bindChannel,
             snapshotTree,
             isRootDataStore,
-            createProps);
+        );
     }
 }
 

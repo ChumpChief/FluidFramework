@@ -24,12 +24,11 @@ import { handleFromLegacyUri } from "@fluidframework/request-handler";
 import { serviceRoutePathRoot } from "../container-services";
 
 // eslint-disable-next-line @typescript-eslint/ban-types
-export interface IDataObjectProps<O = object, S = undefined> {
+export interface IDataObjectProps<O = object> {
     readonly runtime: IFluidDataStoreRuntime;
     readonly context: IFluidDataStoreContext;
     // eslint-disable-next-line @typescript-eslint/ban-types
     readonly providers: AsyncFluidObjectProvider<FluidObjectKey<O>, FluidObjectKey<object>>;
-    readonly initProps?: S;
 }
 
 /**
@@ -69,8 +68,6 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
     // eslint-disable-next-line @typescript-eslint/ban-types
     protected readonly providers: AsyncFluidObjectProvider<FluidObjectKey<O>, FluidObjectKey<object>>;
 
-    protected initProps?: S;
-
     protected initializeP: Promise<void> | undefined;
 
     public get disposed() { return this._disposed; }
@@ -92,12 +89,11 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
         return obj;
     }
 
-    public constructor(props: IDataObjectProps<O, S>) {
+    public constructor(props: IDataObjectProps<O>) {
         super();
         this.runtime = props.runtime;
         this.context = props.context;
         this.providers = props.providers;
-        this.initProps = props.initProps;
 
         assert((this.runtime as any)._dataObject === undefined);
         (this.runtime as any)._dataObject = this;
@@ -174,10 +170,9 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
     public async initializeInternal(): Promise<void> {
         await this.preInitialize();
         if (this.runtime.existing) {
-            assert(this.initProps === undefined);
             await this.initializingFromExisting();
         } else {
-            await this.initializingFirstTime(this.context.createProps as S ?? this.initProps);
+            await this.initializingFirstTime();
         }
         await this.hasInitialized();
     }
@@ -236,10 +231,8 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
     /**
      * Called the first time the data store is initialized (new creations with a new
      * data store runtime)
-     *
-     * @param props - Optional props to be passed in on create
      */
-    protected async initializingFirstTime(props?: S): Promise<void> { }
+    protected async initializingFirstTime(): Promise<void> { }
 
     /**
      * Called every time but the first time the data store is initialized (creations

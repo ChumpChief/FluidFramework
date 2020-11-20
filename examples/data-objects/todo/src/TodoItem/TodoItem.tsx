@@ -176,14 +176,13 @@ export class TodoItem extends DataObject<{}, ITodoItemInitialState> implements I
             case "todo":
                 component = await TodoItem.getFactory().createPeerInstance(
                     this.context,
-                    { startingText: type },
                 );
                 break;
             case "clicker":
                 component = await ClickerInstantiationFactory.createChildInstance(this.context);
                 break;
             case "textBox":
-                component = await TextBoxInstantiationFactory.createChildInstance(this.context, type);
+                component = await TextBoxInstantiationFactory.createChildInstance(this.context);
                 break;
             case "textList":
                 component = await TextListInstantiationFactory.createChildInstance(this.context);

@@ -34,7 +34,7 @@ export class DataObjectFactory<TObj extends DataObject<O, S, E>, O, S, E extends
 {
     constructor(
         type: string,
-        ctor: new (props: IDataObjectProps<O, S>) => TObj,
+        ctor: new (props: IDataObjectProps<O>) => TObj,
         sharedObjects: readonly IChannelFactory[] = [],
         optionalProviders: FluidObjectSymbolProvider<O>,
         registryEntries?: NamedFluidDataStoreRegistryEntries,

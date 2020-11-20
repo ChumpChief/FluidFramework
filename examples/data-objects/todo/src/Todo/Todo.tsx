@@ -78,7 +78,7 @@ export class Todo extends DataObject implements IFluidHTMLView {
 
     public async addTodoItemComponent(props?: ITodoItemInitialState) {
         // Create a new todo item
-        const component = await TodoItem.getFactory().createChildInstance(this.context, props);
+        const component = await TodoItem.getFactory().createChildInstance(this.context);
 
         // Store the handle to the component in the sequence
         this.todoItems.insert(this.todoItems.getLength(), [component.handle]);

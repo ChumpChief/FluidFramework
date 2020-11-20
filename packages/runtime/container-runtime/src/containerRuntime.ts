@@ -1343,12 +1343,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return context;
     }
 
-    public async _createDataStoreWithProps(pkg: string | string[], props?: any, id = uuid()):
-        Promise<IFluidDataStoreChannel> {
-        return this._createFluidDataStoreContext(
-            Array.isArray(pkg) ? pkg : [pkg], id, false /* isRoot */, props).realize();
-    }
-
     private async _createDataStore(
         pkg: string | string[],
         isRoot: boolean,
@@ -1361,7 +1355,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return this.connected && !this.deltaManager.readonly;
     }
 
-    private _createFluidDataStoreContext(pkg: string[], id: string, isRoot: boolean, props?: any) {
+    private _createFluidDataStoreContext(pkg: string[], id: string, isRoot: boolean) {
         const context = new LocalFluidDataStoreContext(
             id,
             pkg,
@@ -1373,7 +1367,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
             undefined,
             isRoot,
-            props,
         );
         this.setupNewContext(context);
         return context;

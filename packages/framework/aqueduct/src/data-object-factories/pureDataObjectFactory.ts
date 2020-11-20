@@ -47,13 +47,12 @@ export interface IRootDataObjectFactory extends IFluidDataStoreFactory {
  * Does delayed creation & initialization of PureDataObject
 */
 async function createDataObject<TObj extends PureDataObject<O, S, E>, O, S, E extends IEvent = IEvent>(
-    ctor: new (props: IDataObjectProps<O, S>) => TObj,
+    ctor: new (props: IDataObjectProps<O>) => TObj,
     context: IFluidDataStoreContext,
     sharedObjectRegistry: ISharedObjectRegistry,
     optionalProviders: FluidObjectSymbolProvider<O>,
     runtimeClassArg: typeof FluidDataStoreRuntime,
-    initProps?: S)
-{
+) {
     // base
     let runtimeClass = runtimeClassArg;
 
@@ -77,7 +76,7 @@ async function createDataObject<TObj extends PureDataObject<O, S, E>, O, S, E ex
     // In order to use object, we need to go through full initialization by calling finishInitialization().
     const dependencyContainer = new DependencyContainer(context.scope.IFluidDependencySynthesizer);
     const providers = dependencyContainer.synthesize<O>(optionalProviders, {});
-    const instance = new ctor({ runtime, context, providers, initProps });
+    const instance = new ctor({ runtime, context, providers });
 
     // if it's a newly created object, we need to wait for it to finish initialization
     // as that results in creation of DDSs, before it gets attached, providing atomic
@@ -114,7 +113,7 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
 
     constructor(
         public readonly type: string,
-        private readonly ctor: new (props: IDataObjectProps<O, S>) => TObj,
+        private readonly ctor: new (props: IDataObjectProps<O>) => TObj,
         sharedObjects: readonly IChannelFactory[],
         private readonly optionalProviders: FluidObjectSymbolProvider<O>,
         registryEntries?: NamedFluidDataStoreRegistryEntries,
@@ -168,18 +167,16 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
      * It is intended to be used by data store objects that create sub-objects.
      * @param context - The context being used to create the runtime
      * (the created object will have its own new context created as well)
-     * @param initialState - The initial state to provide to the created data store.
      * @returns an object created by this factory. Data store and objects created are not attached to container.
      * They get attached only when a handle to one of them is attached to already attached objects.
      */
     public async createChildInstance(
         parentContext: IFluidDataStoreContext,
-        initialState?: S,
     ): Promise<TObj> {
         return this.createNonRootInstanceCore(
             parentContext.containerRuntime,
             [...parentContext.packagePath, this.type],
-            initialState);
+        );
     }
 
     /**
@@ -188,18 +185,16 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
      * Intended to be used by data store objects that need to create peers (similar) instances of existing objects.
      * @param context - The component context being used to create the object
      * (the created object will have its own new context created as well)
-     * @param initialState - The initial state to provide to the created component.
      * @returns an object created by this factory. Data store and objects created are not attached to container.
      * They get attached only when a handle to one of them is attached to already attached objects.
      */
     public async createPeerInstance(
         peerContext: IFluidDataStoreContext,
-        initialState?: S,
     ): Promise<TObj> {
         return this.createNonRootInstanceCore(
             peerContext.containerRuntime,
             peerContext.packagePath,
-            initialState);
+        );
     }
 
     /**
@@ -208,18 +203,16 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
      * have knowledge of entries in container registry.
      * The name in this registry for such record should match type of this factory.
      * @param runtime - container runtime. It's registry is used to create an object.
-     * @param initialState - The initial state to provide to the created component.
      * @returns an object created by this factory. Data store and objects created are not attached to container.
      * They get attached only when a handle to one of them is attached to already attached objects.
      */
     public async createInstance(
         runtime: IContainerRuntimeBase,
-        initialState?: S,
     ): Promise<TObj> {
         return this.createNonRootInstanceCore(
             runtime,
             [this.type],
-            initialState);
+        );
     }
 
     /**
@@ -228,31 +221,27 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
      * have knowledge of entries in container registry.
      * The name in this registry for such record should match type of this factory.
      * @param runtime - container runtime. It's registry is used to create an object.
-     * @param initialState - The initial state to provide to the created component.
      * @returns an object created by this factory. Data store and objects created are not attached to container.
      * They get attached only when a handle to one of them is attached to already attached objects.
      */
     public async createRootInstance(
         rootDataStoreId: string,
         runtime: IContainerRuntime,
-        initialState?: S,
     ): Promise<TObj> {
         const context = runtime.createDetachedRootDataStore([this.type], rootDataStoreId);
-        return this.createInstanceCore(context, initialState);
+        return this.createInstanceCore(context);
     }
 
     protected async createNonRootInstanceCore(
         containerRuntime: IContainerRuntimeBase,
         packagePath: Readonly<string[]>,
-        initialState?: S,
     ): Promise<TObj> {
         const context = containerRuntime.createDetachedDataStore(packagePath);
-        return this.createInstanceCore(context, initialState);
+        return this.createInstanceCore(context);
     }
 
     protected async createInstanceCore(
         context: IFluidDataStoreContextDetached,
-        initialState?: S,
     ): Promise<TObj> {
         const { instance, runtime } = await createDataObject(
             this.ctor,
@@ -260,7 +249,7 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
             this.sharedObjectRegistry,
             this.optionalProviders,
             this.runtimeClass,
-            initialState);
+        );
 
         await context.attachRuntime(this, runtime);
 
