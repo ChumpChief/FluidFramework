@@ -4,4 +4,3 @@
  */
 
 export * from "./getTinyliciousContainer";
-export * from "./getContainer";
