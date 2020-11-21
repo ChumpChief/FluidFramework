@@ -137,14 +137,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
     close(error?: ICriticalContainerError): void;
 
     /**
-     * Propose new code details that define the code to be loaded
-     * for this container's runtime. The returned promise will
-     * be true when the proposal is accepted, and false if
-     * the proposal is rejected.
-     */
-    proposeCodeDetails(codeDetails: IFluidCodeDetails): Promise<boolean>
-
-    /**
      * Attaches the Container to the Container specified by the given Request.
      *
      * TODO - in the case of failure options should give a retry policy. Or some continuation function
