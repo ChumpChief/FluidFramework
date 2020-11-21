@@ -32,7 +32,7 @@ export interface ICodeLoader extends Partial<IProvideFluidCodeDetailsComparer> {
     /**
      * Loads the package specified by code details and returns a promise to its entry point exports.
      */
-    load(source: IFluidCodeDetails): Promise<IFluidModule>;
+    load(): Promise<IFluidModule>;
 }
 
 /**
@@ -120,11 +120,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
      * Indicates the attachment state of the container to a host service.
      */
     readonly attachState: AttachState;
-
-    /**
-     * The current code details for the container's runtime
-     */
-    readonly codeDetails: IFluidCodeDetails | undefined
 
     /**
      * Returns true if the container has been closed, otherwise false

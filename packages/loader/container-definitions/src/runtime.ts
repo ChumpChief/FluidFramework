@@ -9,7 +9,6 @@ import {
     IFluidConfiguration,
     IRequest,
     IResponse,
-    IFluidCodeDetails,
 } from "@fluidframework/core-interfaces";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
@@ -118,7 +117,6 @@ export interface IContainerContext extends IDisposable {
     readonly configuration: IFluidConfiguration;
     readonly clientId: string | undefined;
     readonly clientDetails: IClientDetails;
-    readonly codeDetails: IFluidCodeDetails;
     readonly storage: IDocumentStorageService | undefined | null;
     readonly connected: boolean;
     readonly branch: string;
@@ -143,7 +141,6 @@ export interface IContainerContext extends IDisposable {
 
     raiseContainerWarning(warning: ContainerWarning): void;
     requestSnapshot(tagMessage: string): Promise<void>;
-    reloadContext(): Promise<void>;
 
     /**
      * Get an absolute url for a provided container-relative request.

@@ -14,8 +14,6 @@ import {
     IRequest,
     IResponse,
     IFluidRouter,
-    IFluidCodeDetails,
-    isFluidCodeDetails,
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
@@ -41,14 +39,12 @@ import {
     DriverHeader,
 } from "@fluidframework/driver-definitions";
 import {
-    BlobCacheStorageService,
     readAndParse,
     OnlineStatus,
     isOnline,
     ensureFluidResolvedUrl,
     combineAppAndProtocolSummary,
     readAndParseFromBlobs,
-    buildSnapshotTree,
 } from "@fluidframework/driver-utils";
 import {
     isSystemMessage,
@@ -88,7 +84,6 @@ import {
 } from "@fluidframework/telemetry-utils";
 import { Audience } from "./audience";
 import { ContainerContext } from "./containerContext";
-import { debug } from "./debug";
 import { IConnectionArgs, DeltaManager, ReconnectMode } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { Loader, RelativeLoader } from "./loader";
@@ -241,13 +236,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async createDetached(
         loader: Loader,
         codeLoader: ICodeLoader,
-        codeDetails: IFluidCodeDetails,
     ): Promise<Container> {
         const container = new Container(
             loader,
             codeLoader,
             {});
-        await container.createDetached(codeDetails);
+        await container.createDetached();
         return container;
     }
 
@@ -288,7 +282,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
         return this._storageService;
     }
-    private blobsCacheStorageService: IDocumentStorageService | undefined;
 
     private _clientId: string | undefined;
     private _id: string | undefined;
@@ -405,17 +398,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get clientDetails(): IClientDetails {
         return this._deltaManager.clientDetails;
-    }
-
-    /**
-     * @deprecated use codeDetails
-     */
-    public get chaincodePackage(): IFluidCodeDetails | undefined {
-        return this.codeDetails;
-    }
-
-    public get codeDetails(): IFluidCodeDetails | undefined {
-        return this._context?.codeDetails ?? this.getCodeDetailsFromQuorum();
     }
 
     /**
@@ -726,7 +708,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get storage(): IDocumentStorageService | undefined {
-        return this.blobsCacheStorageService ?? this._storageService;
+        return this._storageService;
     }
 
     /**
@@ -741,17 +723,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.logContainerError(warning);
         }
         this.emit("warning", warning);
-    }
-
-    public async reloadContext(): Promise<void> {
-        return this.reloadContextCore().catch((error) => {
-            this.close(CreateContainerError(error));
-            throw error;
-        });
-    }
-
-    public hasNullRuntime() {
-        return this.context.hasNullRuntime();
     }
 
     public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
@@ -773,7 +744,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             return this.urlResolver.getAbsoluteUrl(
                 this.resolvedUrl,
                 relativeUrl,
-                this._context?.codeDetails);
+            );
         }
 
         if (legacyResolver.requestUrl !== undefined) {
@@ -788,71 +759,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
 
         throw new Error("Url Resolver does not support creating urls");
-    }
-
-    private async reloadContextCore(): Promise<void> {
-        const codeDetails = this.getCodeDetailsFromQuorum();
-
-        await Promise.all([
-            this.deltaManager.inbound.systemPause(),
-            this.deltaManager.inboundSignal.systemPause()]);
-
-        if (await this.context.satisfies(codeDetails) === true) {
-            this.deltaManager.inbound.systemResume();
-            this.deltaManager.inboundSignal.systemResume();
-            return;
-        }
-
-        const previousContextState = await this.context.snapshotRuntimeState();
-        this.context.dispose(new Error("ContextDisposedForReload"));
-
-        // don't fire this event if we are transitioning from a null runtime to a real runtime
-        // with detached container we no longer need the null runtime, but for legacy
-        // reasons need to keep it around (old documents without summary before code proposal).
-        // client's shouldn't need to care about this transition, as it is a implementation detail.
-        // if we didn't do this check, the clients would need to do it themselves,
-        // which would futher spread the usage of the hasNullRuntime property
-        // making it harder to deprecate.
-        if (!this.hasNullRuntime()) {
-            this.emit("contextDisposed", codeDetails, this.context?.codeDetails);
-        }
-        if (this.closed) {
-            return;
-        }
-        let snapshot: ISnapshotTree | undefined;
-        const blobs = new Map();
-        if (previousContextState.snapshot !== undefined) {
-            snapshot = await buildSnapshotTree(previousContextState.snapshot.entries, blobs);
-
-            /**
-             * Should be removed / updated after issue #2914 is fixed.
-             * There are currently two scenarios where this is called:
-             * 1. When a new code proposal is accepted - This should be set to true before `this.loadContext` is
-             * called which creates and loads the ContainerRuntime. This is because for "read" mode clients this
-             * flag is false which causes ContainerRuntime to create the internal components again.
-             * 2. When the first client connects in "write" mode - This happens when a client does not create the
-             * Container in detached mode. In this case, when the code proposal is accepted, we come here and we
-             * need to create the internal data stores in ContainerRuntime.
-             * Once we move to using detached container everywhere, this can move outside this block.
-             */
-            this._existing = true;
-        }
-
-        if (blobs.size > 0) {
-            this.blobsCacheStorageService =
-                new BlobCacheStorageService(this.storageService, Promise.resolve(blobs));
-        }
-        const attributes: IDocumentAttributes = {
-            branch: this.id,
-            minimumSequenceNumber: this._deltaManager.minimumSequenceNumber,
-            sequenceNumber: this._deltaManager.lastSequenceNumber,
-            term: this._deltaManager.referenceTerm,
-        };
-
-        await this.loadContext(codeDetails, attributes, snapshot, previousContextState);
-
-        this.deltaManager.inbound.systemResume();
-        this.deltaManager.inboundSignal.systemResume();
     }
 
     private async snapshotCore(tagMessage: string, fullTree: boolean = false) {
@@ -1032,8 +938,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
         [this._protocolHandler] = await Promise.all([protocolHandlerP, loadDetailsP]);
 
-        const codeDetails = this.getCodeDetailsFromQuorum();
-        await this.loadContext(codeDetails, attributes, maybeSnapshotTree);
+        await this.loadContext(attributes, maybeSnapshotTree);
 
         // Propagate current connection state through the system.
         this.propagateConnectionState();
@@ -1052,13 +957,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         };
     }
 
-    private async createDetached(source: IFluidCodeDetails) {
-        if (!isFluidCodeDetails(source)) {
-            this.logger.send({
-                    eventName: "DetachCreateNotIFluidCodeDetails",
-                    category: "warning",
-            });
-        }
+    private async createDetached() {
         const attributes: IDocumentAttributes = {
             branch: "",
             sequenceNumber: detachedContainerRefSeqNumber,
@@ -1066,18 +965,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             minimumSequenceNumber: 0,
         };
 
-        // Seed the base quorum to be an empty list with a code quorum set
-        const committedCodeProposal: ICommittedProposal = {
-            key: "code",
-            value: source,
-            approvalSequenceNumber: 0,
-            commitSequenceNumber: 0,
-            sequenceNumber: 0,
-        };
-
         const members: [string, ISequencedClient][] = [];
         const proposals: [number, ISequencedProposal, string[]][] = [];
-        const values: [string, ICommittedProposal][] = [["code", committedCodeProposal]];
+        const values: [string, ICommittedProposal][] = [];
 
         this.attachDeltaManagerOpHandler(attributes);
 
@@ -1241,37 +1131,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
         });
 
-        protocol.quorum.on(
-            "approveProposal",
-            (sequenceNumber, key, value) => {
-                debug(`approved ${key}`);
-                if (key === "code" || key === "code2") {
-                    debug(`codeProposal ${JSON.stringify(value)}`);
-                    if (!isFluidCodeDetails(value)) {
-                        this.logger.send({
-                                eventName: "CodeProposalNotIFluidCodeDetails",
-                                category: "warning",
-                        });
-                    }
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                    this.reloadContext();
-                }
-            });
-
         return protocol;
-    }
-
-    private getCodeDetailsFromQuorum(): IFluidCodeDetails {
-        const quorum = this.protocolHandler.quorum;
-
-        let pkg = quorum.get("code");
-
-        // Back compat
-        if (pkg === undefined) {
-            pkg = quorum.get("code2");
-        }
-
-        return pkg as IFluidCodeDetails;
     }
 
     private get client(): IClient {
@@ -1609,7 +1469,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async loadContext(
-        codeDetails: IFluidCodeDetails,
         attributes: IDocumentAttributes,
         snapshot?: ISnapshotTree,
         previousRuntimeState: IRuntimeState = {},
@@ -1618,12 +1477,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
         // are set. Global requests will still go directly to the loader
         const loader = new RelativeLoader(this.loader, () => this.originalRequest);
-        const previousCodeDetails = this._context?.codeDetails;
         this._context = await ContainerContext.createOrLoad(
             this,
             this.scope,
             this.codeLoader,
-            codeDetails,
             snapshot,
             attributes,
             new DeltaManagerProxy(this._deltaManager),
@@ -1639,19 +1496,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         );
 
         loader.resolveContainer(this);
-        this.emit("contextChanged", codeDetails, previousCodeDetails);
     }
 
     /**
      * Creates a new, unattached container context
      */
     private async createDetachedContext(attributes: IDocumentAttributes, snapshot?: ISnapshotTree) {
-        const codeDetails = this.getCodeDetailsFromQuorum();
-        if (codeDetails === undefined) {
-            throw new Error("pkg should be provided in create flow!!");
-        }
-
-        await this.loadContext(codeDetails, attributes, snapshot);
+        await this.loadContext(attributes, snapshot);
     }
 
     // Please avoid calling it directly.

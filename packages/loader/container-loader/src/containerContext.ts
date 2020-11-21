@@ -9,8 +9,6 @@ import {
     IFluidConfiguration,
     IRequest,
     IResponse,
-    IFluidCodeDetails,
-    IFluidCodeDetailsComparer,
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
@@ -43,7 +41,6 @@ import {
 import { PerformanceEvent } from "@fluidframework/telemetry-utils";
 import { assert, LazyPromise } from "@fluidframework/common-utils";
 import { Container } from "./container";
-import { NullChaincode, NullRuntime } from "./nullRuntime";
 
 const PackageNotFactoryError = "Code package does not implement IRuntimeFactory";
 
@@ -52,7 +49,6 @@ export class ContainerContext implements IContainerContext {
         container: Container,
         scope: IFluidObject,
         codeLoader: ICodeLoader,
-        codeDetails: IFluidCodeDetails,
         baseSnapshot: ISnapshotTree | undefined,
         attributes: IDocumentAttributes,
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
@@ -70,7 +66,6 @@ export class ContainerContext implements IContainerContext {
             container,
             scope,
             codeLoader,
-            codeDetails,
             baseSnapshot,
             attributes,
             deltaManager,
@@ -164,15 +159,8 @@ export class ContainerContext implements IContainerContext {
     }
 
     private readonly fluidModuleP = new LazyPromise<IFluidModule>(async () => {
-        if (this.codeDetails === undefined) {
-            const fluidExport =  new NullChaincode();
-            return {
-                fluidExport,
-            };
-        }
-
         const fluidModule = await PerformanceEvent.timedExecAsync(this.logger, { eventName: "CodeLoad" },
-            async () => this.codeLoader.load(this.codeDetails),
+            async () => this.codeLoader.load(),
         );
 
         return fluidModule;
@@ -182,7 +170,6 @@ export class ContainerContext implements IContainerContext {
         private readonly container: Container,
         public readonly scope: IFluidObject,
         private readonly codeLoader: ICodeLoader,
-        public readonly codeDetails: IFluidCodeDetails,
         private readonly _baseSnapshot: ISnapshotTree | undefined,
         private readonly attributes: IDocumentAttributes,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
@@ -267,51 +254,8 @@ export class ContainerContext implements IContainerContext {
         return this.snapshotFn(tagMessage);
     }
 
-    public async reloadContext(): Promise<void> {
-        return this.container.reloadContext();
-    }
-
-    public hasNullRuntime() {
-        return this.runtime instanceof NullRuntime;
-    }
-
     public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
         return this.container.getAbsoluteUrl(relativeUrl);
-    }
-
-    /**
-     * Determines if the current code details of the context
-     * satisfy the incoming constraint code details
-     */
-    public async satisfies(constraintCodeDetails: IFluidCodeDetails) {
-        const comparers: IFluidCodeDetailsComparer[] = [];
-
-        const maybeCompareCodeLoader = this.codeLoader;
-        if (maybeCompareCodeLoader.IFluidCodeDetailsComparer !== undefined) {
-            comparers.push(maybeCompareCodeLoader.IFluidCodeDetailsComparer);
-        }
-
-        const maybeCompareExport = (await this.fluidModuleP).fluidExport;
-        if (maybeCompareExport?.IFluidCodeDetailsComparer !== undefined) {
-            comparers.push(maybeCompareExport.IFluidCodeDetailsComparer);
-        }
-
-        // if there are not comparers it is not possible to know
-        // if the current satisfy the incoming, so return false,
-        // as assuming they do not satisfy is safer .e.g we will
-        // reload, rather than potentially running with
-        // incompatible code
-        if (comparers.length === 0) {
-            return false;
-        }
-
-        for (const comparer of comparers) {
-            const satisfies = await comparer.satisfies(this.codeDetails, constraintCodeDetails);
-            if (satisfies === false) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private async load() {

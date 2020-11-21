@@ -239,14 +239,13 @@ export class Loader extends EventEmitter implements ILoader {
 
     public get IFluidRouter(): IFluidRouter { return this; }
 
-    public async createDetachedContainer(codeDetails: IFluidCodeDetails): Promise<Container> {
+    public async createDetachedContainer(): Promise<Container> {
         debug(`Container creating in detached state: ${performance.now()} `);
 
         return Container.createDetached(
             this,
             this.services.codeLoader,
-            codeDetails,
-            );
+        );
     }
 
     public async rehydrateDetachedContainerFromSnapshot(snapshot: string): Promise<Container> {
@@ -255,7 +254,8 @@ export class Loader extends EventEmitter implements ILoader {
         return Container.rehydrateDetachedFromSnapshot(
             this,
             this.services.codeLoader,
-            JSON.parse(snapshot));
+            JSON.parse(snapshot),
+        );
     }
 
     public async resolve(request: IRequest): Promise<Container> {

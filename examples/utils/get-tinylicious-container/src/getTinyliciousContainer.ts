@@ -27,7 +27,7 @@ async function getContainer(
     const module = { fluidExport: containerRuntimeFactory };
     const codeLoader = { load: async () => module };
 
-    const loader = new Loader ({
+    const loader = new Loader({
         urlResolver,
         documentServiceFactory,
         codeLoader,
@@ -39,7 +39,7 @@ async function getContainer(
         // We're not actually using the code proposal (our code loader always loads the same module regardless of the
         // proposal), but the Container will only give us a NullRuntime if there's no proposal.  So we'll use a fake
         // proposal.
-        container = await loader.createDetachedContainer({ package: "no-dynamic-package", config: {} });
+        container = await loader.createDetachedContainer();
         await container.attach({ url: documentId });
     } else {
         // Request must be appropriate and parseable by resolver.
