@@ -267,10 +267,6 @@ export class ContainerContext implements IContainerContext {
         return this.snapshotFn(tagMessage);
     }
 
-    public registerTasks(tasks: string[]): any {
-        return;
-    }
-
     public async reloadContext(): Promise<void> {
         return this.container.reloadContext();
     }
