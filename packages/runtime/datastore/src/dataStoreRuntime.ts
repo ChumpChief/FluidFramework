@@ -14,7 +14,6 @@ import {
     IAudience,
     IDeltaManager,
     ContainerWarning,
-    ILoader,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -111,10 +110,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
 
     public get clientId(): string | undefined {
         return this.dataStoreContext.clientId;
-    }
-
-    public get loader(): ILoader {
-        return this.dataStoreContext.loader;
     }
 
     public get isAttached(): boolean {

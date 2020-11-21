@@ -8,7 +8,6 @@ import {
     AttachState,
     ContainerWarning,
     IDeltaManager,
-    ILoader,
 } from "@fluidframework/container-definitions";
 import {
     IRequest,
@@ -79,7 +78,6 @@ export interface IContainerRuntime extends
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly storage: IDocumentStorageService;
     readonly branch: string;
-    readonly loader: ILoader;
     readonly flushMode: FlushMode;
     readonly snapshotFn: (message: string) => Promise<void>;
     readonly scope: IFluidObject;

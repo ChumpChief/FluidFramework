@@ -17,7 +17,6 @@ import {
     IAudience,
     IDeltaManager,
     ContainerWarning,
-    ILoader,
     AttachState,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -274,7 +273,6 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
     readonly storage: IDocumentStorageService;
     readonly branch: string;
     readonly baseSnapshot: ISnapshotTree | undefined;
-    readonly loader: ILoader;
     /**
      * Indicates the attachment state of the data store to a host service.
      */

@@ -15,7 +15,6 @@ import {
     IAudience,
     IDeltaManager,
     ContainerWarning,
-    ILoader,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -143,10 +142,6 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
 
     public get branch(): string {
         return this._containerRuntime.branch;
-    }
-
-    public get loader(): ILoader {
-        return this._containerRuntime.loader;
     }
 
     public get containerRuntime(): IContainerRuntime {
