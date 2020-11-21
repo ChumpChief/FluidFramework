@@ -244,6 +244,7 @@ export class Loader extends EventEmitter implements ILoader {
 
         return Container.createDetached(
             this,
+            this.services.codeLoader,
             codeDetails,
             );
     }
@@ -253,6 +254,7 @@ export class Loader extends EventEmitter implements ILoader {
 
         return Container.rehydrateDetachedFromSnapshot(
             this,
+            this.services.codeLoader,
             JSON.parse(snapshot));
     }
 
@@ -289,6 +291,7 @@ export class Loader extends EventEmitter implements ILoader {
 
         const container = await this.loadContainer(
             parsed.id,
+            this.services.codeLoader,
             request,
             resolvedAsFluid,
         );
@@ -347,12 +350,14 @@ export class Loader extends EventEmitter implements ILoader {
 
     private async loadContainer(
         id: string,
+        codeLoader: ICodeLoader,
         request: IRequest,
         resolved: IFluidResolvedUrl,
     ): Promise<Container> {
         return Container.load(
             id,
             this,
+            codeLoader,
             request,
             resolved);
     }
