@@ -2051,10 +2051,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             this.emit("notleader");
         }
 
-        for (const [, context] of this.contexts) {
-            context.updateLeader(this.leader);
-        }
-
         if (this.leader) {
             this.runTaskAnalyzer();
         }

@@ -132,10 +132,6 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
         return this._containerRuntime.connected;
     }
 
-    public get leader(): boolean {
-        return this._containerRuntime.leader;
-    }
-
     public get snapshotFn(): (message: string) => Promise<void> {
         return this._containerRuntime.snapshotFn;
     }
@@ -443,22 +439,6 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
 
     public raiseContainerWarning(warning: ContainerWarning): void {
         this.containerRuntime.raiseContainerWarning(warning);
-    }
-
-    /**
-     * Updates the leader.
-     * @param leadership - Whether this client is the new leader or not.
-     */
-    public updateLeader(leadership: boolean) {
-        // Leader events are ignored if the store is not yet loaded
-        if (!this.loaded) {
-            return;
-        }
-        if (leadership) {
-            this.emit("leader");
-        } else {
-            this.emit("notleader");
-        }
     }
 
     protected bindRuntime(channel: IFluidDataStoreChannel) {
