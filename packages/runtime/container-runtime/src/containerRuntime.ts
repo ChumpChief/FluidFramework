@@ -4,7 +4,6 @@
  */
 
 import { EventEmitter } from "events";
-import { TaskManagerFactory } from "@fluidframework/agent-scheduler";
 import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
     IFluidObject,
@@ -437,7 +436,6 @@ class ContainerRuntimeDataStoreRegistry extends FluidDataStoreRegistry {
     constructor(namedEntries: NamedFluidDataStoreRegistryEntries) {
         super([
             ...namedEntries,
-            TaskManagerFactory.registryEntry,
         ]);
     }
 }
@@ -497,12 +495,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             runtimeOptions,
             containerScope,
             requestHandler);
-
-        // Create all internal data stores if not already existing on storage or loaded a detached
-        // container from snapshot(ex. draft mode).
-        if (!context.existing) {
-            await runtime.createRootDataStore(TaskManagerFactory.type, taskSchedulerId);
-        }
 
         runtime.subscribeToLeadership();
 
