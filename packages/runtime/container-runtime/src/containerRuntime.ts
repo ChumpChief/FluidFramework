@@ -50,7 +50,6 @@ import {
     readAndParse,
     readAndParseFromBlobs,
 } from "@fluidframework/driver-utils";
-import { CreateContainerError } from "@fluidframework/container-utils";
 import {
     BlobTreeEntry,
     TreeTreeEntry,
@@ -88,8 +87,6 @@ import {
     SummarizeInternalFn,
     CreateChildSummarizerNodeParam,
     CreateSummarizerNodeSource,
-    IAgentScheduler,
-    ITaskManager,
     ISummarizeResult,
 } from "@fluidframework/runtime-definitions";
 import {
@@ -100,7 +97,6 @@ import {
     convertSummaryTreeToITree,
     convertToSummaryTree,
     RequestParser,
-    requestFluidObject,
     convertSnapshotTreeToSummaryTree,
 } from "@fluidframework/runtime-utils";
 import { v4 as uuid } from "uuid";
@@ -260,7 +256,7 @@ export function unpackRuntimeMessage(message: ISequencedDocumentMessage) {
     return message;
 }
 
-export class ScheduleManager {
+class ScheduleManager {
     private readonly deltaScheduler: DeltaScheduler;
     private pauseSequenceNumber: number | undefined;
     private pauseClientId: string | undefined;
@@ -426,8 +422,6 @@ export class ScheduleManager {
     }
 }
 
-export const taskSchedulerId = "_scheduler";
-
 // Wraps the provided list of packages and augments with some system level services.
 class ContainerRuntimeDataStoreRegistry extends FluidDataStoreRegistry {
     constructor(namedEntries: NamedFluidDataStoreRegistryEntries) {
@@ -492,8 +486,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             runtimeOptions,
             containerScope,
             requestHandler);
-
-        runtime.subscribeToLeadership();
 
         return runtime;
     }
@@ -598,17 +590,10 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     private needsFlush = false;
     private flushTrigger = false;
 
-    // Always matched IAgentScheduler.leader property
-    private _leader = false;
-
     private _connected: boolean;
 
     public get connected(): boolean {
         return this._connected;
-    }
-
-    public get leader(): boolean {
-        return this._leader;
     }
 
     public get summarizerClientId(): string | undefined {
@@ -1395,21 +1380,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             isRuntimeMessage(message) === true,
             "Message passed for dirtyable check should be a container runtime message",
         );
-        return this.isContainerMessageDirtyable(message.type as ContainerMessageType, message.contents);
-    }
-
-    private isContainerMessageDirtyable(type: ContainerMessageType, contents: any) {
-        if (type === ContainerMessageType.Attach) {
-            const attachMessage = contents as InboundAttachMessage;
-            if (attachMessage.id === taskSchedulerId) {
-                return false;
-            }
-        } else if (type === ContainerMessageType.FluidDataStoreOp) {
-            const envelope = contents as IEnvelope;
-            if (envelope.address === taskSchedulerId) {
-                return false;
-            }
-        }
         return true;
     }
 
@@ -1864,9 +1834,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
         // Let the PendingStateManager know that a message was submitted.
         this.pendingStateManager.onSubmitMessage(type, clientSequenceNumber, content, localOpMetadata, opMetadata);
-        if (this.isContainerMessageDirtyable(type, content)) {
-            this.updateDocumentDirtyState(true);
-        }
+        this.updateDocumentDirtyState(true);
     }
 
     private submitChunkedMessage(type: ContainerMessageType, content: string, maxOpSize: number): number {
@@ -1977,52 +1945,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         const context = this.getContext(envelope.address);
         assert(!!context, "There should be a store context for the op");
         context.reSubmit(envelope.contents, localOpMetadata);
-    }
-
-    private subscribeToLeadership() {
-        if (this.context.clientDetails.capabilities.interactive) {
-            this.getScheduler().then((scheduler) => {
-                const LeaderTaskId = "leader";
-
-                // Each client expresses interest to be a leader.
-                // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                scheduler.pick(LeaderTaskId, async () => {
-                    assert(!this._leader);
-                    this.updateLeader(true);
-                });
-
-                scheduler.on("lost", (key) => {
-                    if (key === LeaderTaskId) {
-                        assert(this._leader);
-                        this._leader = false;
-                        this.updateLeader(false);
-                    }
-                });
-            }).catch((err) => {
-                this.closeFn(CreateContainerError(err));
-            });
-        }
-    }
-
-    public async getTaskManager(): Promise<ITaskManager> {
-        return requestFluidObject<ITaskManager>(
-            await this.getDataStore(taskSchedulerId, true),
-            "");
-    }
-
-    public async getScheduler(): Promise<IAgentScheduler> {
-        const taskManager = await this.getTaskManager();
-        return taskManager.IAgentScheduler;
-    }
-
-    private updateLeader(leadership: boolean) {
-        this._leader = leadership;
-        if (this.leader) {
-            assert(this.clientId === undefined || this.connected && this.deltaManager && this.deltaManager.active);
-            this.emit("leader");
-        } else {
-            this.emit("notleader");
-        }
     }
 
     /** Implementation of ISummarizerInternalsProvider.refreshLatestSummaryAck */
