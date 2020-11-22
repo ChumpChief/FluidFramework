@@ -21,7 +21,7 @@ import {
     ICriticalContainerError,
     ContainerWarning,
     AttachState,
-    IFluidModule,
+    IRuntimeFactory,
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
@@ -41,8 +41,6 @@ import {
 import { PerformanceEvent } from "@fluidframework/telemetry-utils";
 import { assert, LazyPromise } from "@fluidframework/common-utils";
 import { Container } from "./container";
-
-const PackageNotFactoryError = "Code package does not implement IRuntimeFactory";
 
 export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
@@ -158,12 +156,12 @@ export class ContainerContext implements IContainerContext {
         return this._disposed;
     }
 
-    private readonly fluidModuleP = new LazyPromise<IFluidModule>(async () => {
-        const fluidModule = await PerformanceEvent.timedExecAsync(this.logger, { eventName: "CodeLoad" },
+    private readonly runtimeFactoryP = new LazyPromise<IRuntimeFactory>(async () => {
+        const runtimeFactory = await PerformanceEvent.timedExecAsync(this.logger, { eventName: "CodeLoad" },
             async () => this.codeLoader.load(),
         );
 
-        return fluidModule;
+        return runtimeFactory;
     });
 
     constructor(
@@ -259,10 +257,7 @@ export class ContainerContext implements IContainerContext {
     }
 
     private async load() {
-        const maybeFactory = (await this.fluidModuleP).fluidExport.IRuntimeFactory;
-        if (maybeFactory === undefined) {
-            throw new Error(PackageNotFactoryError);
-        }
+        const maybeFactory = await this.runtimeFactoryP;
         this._runtime = await maybeFactory.instantiateRuntime(this);
     }
 }

@@ -7,14 +7,10 @@ import {
     IRequest,
     IResponse,
     IFluidRouter,
-    IFluidCodeDetails,
-    IFluidPackage,
-    IProvideFluidCodeDetailsComparer,
 } from "@fluidframework/core-interfaces";
 import {
     IClientDetails,
     IDocumentMessage,
-    IPendingProposal,
     IQuorum,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
@@ -22,58 +18,16 @@ import { IResolvedUrl } from "@fluidframework/driver-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
 import { ICriticalContainerError, ContainerWarning } from "./error";
-import { IFluidModule } from "./fluidModule";
-import { AttachState } from "./runtime";
+import { AttachState, IRuntimeFactory } from "./runtime";
 
 /**
  * Code loading interface
  */
-export interface ICodeLoader extends Partial<IProvideFluidCodeDetailsComparer> {
+export interface ICodeLoader {
     /**
      * Loads the package specified by code details and returns a promise to its entry point exports.
      */
-    load(): Promise<IFluidModule>;
-}
-
-/**
-* The interface returned from a IFluidCodeResolver which represents IFluidCodeDetails
- * that have been resolved and are ready to load
- */
-export interface IResolvedFluidCodeDetails extends IFluidCodeDetails {
-    /**
-     * A resolved version of the Fluid package. All Fluid browser file entries should be absolute urls.
-     */
-    readonly resolvedPackage: Readonly<IFluidPackage>;
-    /**
-     * If not undefined, this id will be used to cache the entry point for the code package
-     */
-    readonly resolvedPackageCacheId: string | undefined;
-}
-
-/**
- * Fluid code resolvers take a Fluid code details, and resolve the
- * full Fluid package including absolute urls for the browser file entries.
- * The Fluid code resolver is coupled to a specific cdn and knows how to resolve
- * the code detail for loading from that cdn. This include resolving to the most recent
- * version of package that supports the provided code details.
- */
-export interface IFluidCodeResolver {
-    /**
-     * Resolves a Fluid code details into a form that can be loaded
-     * @param details - The Fluid code details to resolve
-     * @returns - A IResolvedFluidCodeDetails where the
-     *            resolvedPackage's Fluid file entries are absolute urls, and
-     *            an optional resolvedPackageCacheId if the loaded package should be
-     *            cached.
-     */
-    resolveCodeDetails(details: IFluidCodeDetails): Promise<IResolvedFluidCodeDetails>;
-}
-
-/**
- * Code AllowListing Interface
- */
-export interface ICodeAllowList {
-    testSource(source: IResolvedFluidCodeDetails): Promise<boolean>;
+    load(): Promise<IRuntimeFactory>;
 }
 
 /**
@@ -86,9 +40,6 @@ export interface IContainerEvents extends IEvent {
      * @param opsBehind - number of ops this client is behind (if present).
      */
     (event: "connect", listener: (opsBehind?: number) => void);
-    (event: "codeDetailsProposed", listener: (codeDetails: IFluidCodeDetails, proposal: IPendingProposal) => void);
-    (event: "contextDisposed" | "contextChanged",
-        listener: (codeDetails: IFluidCodeDetails, previousCodeDetails: IFluidCodeDetails | undefined) => void);
     (event: "disconnected" | "attaching" | "attached", listener: () => void);
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
     (event: "warning", listener: (error: ContainerWarning) => void);
@@ -176,7 +127,7 @@ export interface ILoader extends IFluidRouter {
      * Creates a new container using the specified chaincode but in an unattached state. While unattached all
      * updates will only be local until the user explicitly attaches the container to a service provider.
      */
-    createDetachedContainer(codeDetails: IFluidCodeDetails): Promise<IContainer>;
+    createDetachedContainer(): Promise<IContainer>;
 
     /**
      * Creates a new container using the specified snapshot but in an unattached state. While unattached all

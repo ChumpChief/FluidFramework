@@ -24,8 +24,7 @@ async function getContainer(
     documentServiceFactory: IDocumentServiceFactory,
     containerRuntimeFactory: IRuntimeFactory,
 ): Promise<Container> {
-    const module = { fluidExport: containerRuntimeFactory };
-    const codeLoader = { load: async () => module };
+    const codeLoader = { load: async () => containerRuntimeFactory };
 
     const loader = new Loader({
         urlResolver,

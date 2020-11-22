@@ -11,7 +11,6 @@ import {
     IRequest,
     IResponse,
     IFluidRouter,
-    IFluidCodeDetails,
 } from "@fluidframework/core-interfaces";
 import {
     ICodeLoader,
@@ -95,7 +94,7 @@ export class RelativeLoader extends EventEmitter implements ILoader {
         return this.loader.request(request);
     }
 
-    public async createDetachedContainer(source: IFluidCodeDetails): Promise<Container> {
+    public async createDetachedContainer(): Promise<Container> {
         throw new Error("Relative loader should not create a detached container");
     }
 
