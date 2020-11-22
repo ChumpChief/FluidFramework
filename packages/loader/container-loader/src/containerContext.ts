@@ -12,7 +12,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    ICodeLoader,
     IContainerContext,
     IDeltaManager,
     ILoader,
@@ -38,15 +37,14 @@ import {
     ISummaryTree,
     IVersion,
 } from "@fluidframework/protocol-definitions";
-import { PerformanceEvent } from "@fluidframework/telemetry-utils";
-import { assert, LazyPromise } from "@fluidframework/common-utils";
+import { assert } from "@fluidframework/common-utils";
 import { Container } from "./container";
 
 export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
         scope: IFluidObject,
-        codeLoader: ICodeLoader,
+        runtimeFactory: IRuntimeFactory,
         baseSnapshot: ISnapshotTree | undefined,
         attributes: IDocumentAttributes,
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
@@ -63,7 +61,7 @@ export class ContainerContext implements IContainerContext {
         const context = new ContainerContext(
             container,
             scope,
-            codeLoader,
+            runtimeFactory,
             baseSnapshot,
             attributes,
             deltaManager,
@@ -156,18 +154,10 @@ export class ContainerContext implements IContainerContext {
         return this._disposed;
     }
 
-    private readonly runtimeFactoryP = new LazyPromise<IRuntimeFactory>(async () => {
-        const runtimeFactory = await PerformanceEvent.timedExecAsync(this.logger, { eventName: "CodeLoad" },
-            async () => this.codeLoader.load(),
-        );
-
-        return runtimeFactory;
-    });
-
     constructor(
         private readonly container: Container,
         public readonly scope: IFluidObject,
-        private readonly codeLoader: ICodeLoader,
+        private readonly runtimeFactory: IRuntimeFactory,
         private readonly _baseSnapshot: ISnapshotTree | undefined,
         private readonly attributes: IDocumentAttributes,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
@@ -257,7 +247,6 @@ export class ContainerContext implements IContainerContext {
     }
 
     private async load() {
-        const maybeFactory = await this.runtimeFactoryP;
-        this._runtime = await maybeFactory.instantiateRuntime(this);
+        this._runtime = await this.runtimeFactory.instantiateRuntime(this);
     }
 }

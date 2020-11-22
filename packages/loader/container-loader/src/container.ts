@@ -27,7 +27,7 @@ import {
     ContainerWarning,
     IThrottlingWarning,
     AttachState,
-    ICodeLoader,
+    IRuntimeFactory,
 } from "@fluidframework/container-definitions";
 import { CreateContainerError, GenericError } from "@fluidframework/container-utils";
 import {
@@ -184,14 +184,14 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async load(
         id: string,
         loader: Loader,
-        codeLoader: ICodeLoader,
+        runtimeFactory: IRuntimeFactory,
         request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
     ): Promise<Container> {
         const [, docId] = id.split("/");
         const container = new Container(
             loader,
-            codeLoader,
+            runtimeFactory,
             {
                 originalRequest: request,
                 id: decodeURI(docId),
@@ -235,11 +235,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public static async createDetached(
         loader: Loader,
-        codeLoader: ICodeLoader,
+        runtimeFactory: IRuntimeFactory,
     ): Promise<Container> {
         const container = new Container(
             loader,
-            codeLoader,
+            runtimeFactory,
             {});
         await container.createDetached();
         return container;
@@ -251,12 +251,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public static async rehydrateDetachedFromSnapshot(
         loader: Loader,
-        codeLoader: ICodeLoader,
+        runtimeFactory: IRuntimeFactory,
         snapshot: ISnapshotTree,
     ): Promise<Container> {
         const container = new Container(
             loader,
-            codeLoader,
+            runtimeFactory,
             {});
         await container.rehydrateDetachedFromSnapshot(snapshot);
         return container;
@@ -421,7 +421,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private get scope() { return this.loader.services.scope;}
     constructor(
         private readonly loader: Loader,
-        private readonly codeLoader: ICodeLoader,
+        private readonly runtimeFactory: IRuntimeFactory,
         config: IContainerConfig,
     ) {
         super();
@@ -1480,7 +1480,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._context = await ContainerContext.createOrLoad(
             this,
             this.scope,
-            this.codeLoader,
+            this.runtimeFactory,
             snapshot,
             attributes,
             new DeltaManagerProxy(this._deltaManager),

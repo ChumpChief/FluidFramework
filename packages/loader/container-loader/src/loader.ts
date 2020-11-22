@@ -13,10 +13,10 @@ import {
     IFluidRouter,
 } from "@fluidframework/core-interfaces";
 import {
-    ICodeLoader,
     IContainer,
     ILoader,
     IProxyLoaderFactory,
+    IRuntimeFactory,
     LoaderHeader,
 } from "@fluidframework/container-definitions";
 import { Deferred, performance } from "@fluidframework/common-utils";
@@ -139,11 +139,8 @@ export interface ILoaderProps {
      * for communication with the container's server.
      */
     readonly documentServiceFactory: IDocumentServiceFactory;
-    /**
-     * The code loader handles loading the necessary code
-     * for running a container once it is loaded.
-     */
-    readonly codeLoader: ICodeLoader;
+
+    readonly runtimeFactory: IRuntimeFactory;
 
     /**
      * A property bag of options used by various layers
@@ -185,11 +182,8 @@ export interface ILoaderServices {
      * for communication with the container's server.
      */
     readonly documentServiceFactory: IDocumentServiceFactory;
-    /**
-     * The code loader handles loading the necessary code
-     * for running a container once it is loaded.
-     */
-    readonly codeLoader: ICodeLoader;
+
+    readonly runtimeFactory: IRuntimeFactory;
 
     /**
      * A property bag of options used by various layers
@@ -227,7 +221,7 @@ export class Loader extends EventEmitter implements ILoader {
         this.services = {
             urlResolver: createCachedResolver(MultiUrlResolver.create(loaderProps.urlResolver)),
             documentServiceFactory: MultiDocumentServiceFactory.create(loaderProps.documentServiceFactory),
-            codeLoader: loaderProps.codeLoader,
+            runtimeFactory: loaderProps.runtimeFactory,
             options: loaderProps.options ?? {},
             scope: loaderProps.scope ?? {},
             subLogger: DebugLogger.mixinDebugLogger("fluid:telemetry", loaderProps.logger, { loaderId: uuid() }),
@@ -243,7 +237,7 @@ export class Loader extends EventEmitter implements ILoader {
 
         return Container.createDetached(
             this,
-            this.services.codeLoader,
+            this.services.runtimeFactory,
         );
     }
 
@@ -252,7 +246,7 @@ export class Loader extends EventEmitter implements ILoader {
 
         return Container.rehydrateDetachedFromSnapshot(
             this,
-            this.services.codeLoader,
+            this.services.runtimeFactory,
             JSON.parse(snapshot),
         );
     }
@@ -290,7 +284,7 @@ export class Loader extends EventEmitter implements ILoader {
 
         const container = await this.loadContainer(
             parsed.id,
-            this.services.codeLoader,
+            this.services.runtimeFactory,
             request,
             resolvedAsFluid,
         );
@@ -349,14 +343,14 @@ export class Loader extends EventEmitter implements ILoader {
 
     private async loadContainer(
         id: string,
-        codeLoader: ICodeLoader,
+        runtimeFactory: IRuntimeFactory,
         request: IRequest,
         resolved: IFluidResolvedUrl,
     ): Promise<Container> {
         return Container.load(
             id,
             this,
-            codeLoader,
+            runtimeFactory,
             request,
             resolved);
     }

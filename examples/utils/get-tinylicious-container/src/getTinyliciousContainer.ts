@@ -24,12 +24,10 @@ async function getContainer(
     documentServiceFactory: IDocumentServiceFactory,
     containerRuntimeFactory: IRuntimeFactory,
 ): Promise<Container> {
-    const codeLoader = { load: async () => containerRuntimeFactory };
-
     const loader = new Loader({
         urlResolver,
         documentServiceFactory,
-        codeLoader,
+        runtimeFactory: containerRuntimeFactory,
     });
 
     let container: Container;
