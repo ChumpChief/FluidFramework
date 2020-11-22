@@ -100,7 +100,7 @@ interface ILocalSequencedClient extends ISequencedClient {
 }
 
 export interface IContainerConfig {
-    resolvedUrl?: IResolvedUrl;
+    resolvedUrl?: IFluidResolvedUrl;
     canReconnect?: boolean;
     originalRequest?: IRequest;
     id?: string;
@@ -339,7 +339,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private readonly connectionTransitionTimes: number[] = [];
     private messageCountAfterDisconnection: number = 0;
     private _loadedFromVersion: IVersion | undefined;
-    private _resolvedUrl: IResolvedUrl | undefined;
+    private _resolvedUrl: IFluidResolvedUrl | undefined;
     private cachedAttachSummary: ISummaryTree | undefined;
     private attachInProgress = false;
 
@@ -608,7 +608,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             const resolvedUrl = this.service.resolvedUrl;
             ensureFluidResolvedUrl(resolvedUrl);
             this._resolvedUrl = resolvedUrl;
-            const url = await this.getAbsoluteUrl("");
+            const url = await this.urlResolver.getAbsoluteUrl(
+                resolvedUrl,
+                "",
+            );
             assert(url !== undefined, "Container url undefined");
             this.originalRequest = { url };
             const parsedUrl = parseUrl(resolvedUrl.url);
@@ -732,17 +735,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.logContainerError(warning);
         }
         this.emit("warning", warning);
-    }
-
-    private async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        if (this.resolvedUrl === undefined) {
-            return undefined;
-        }
-
-        return this.urlResolver.getAbsoluteUrl(
-            this.resolvedUrl,
-            relativeUrl,
-        );
     }
 
     private async snapshotCore(tagMessage: string, fullTree: boolean = false) {
