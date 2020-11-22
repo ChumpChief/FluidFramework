@@ -129,13 +129,6 @@ export interface IContainerRuntime extends
     flush(): void;
 
     /**
-     * Get an absolute url for a provided container-relative request.
-     * Returns undefined if the container isn't attached to storage.
-     * @param relativeUrl - A relative request within the container
-     */
-    getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
-
-    /**
      * Resolves handle URI
      * @param request - request to resolve
      */

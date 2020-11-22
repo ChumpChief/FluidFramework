@@ -242,10 +242,6 @@ export class ContainerContext implements IContainerContext {
         return this.snapshotFn(tagMessage);
     }
 
-    public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        return this.container.getAbsoluteUrl(relativeUrl);
-    }
-
     private async load() {
         this._runtime = await this.runtimeFactory.instantiateRuntime(this);
     }

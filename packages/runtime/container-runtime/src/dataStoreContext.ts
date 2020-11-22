@@ -482,13 +482,6 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
         this._containerRuntime.notifyDataStoreInstantiated(this);
     }
 
-    public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        if (this.attachState !== AttachState.Attached) {
-            return undefined;
-        }
-        return this._containerRuntime.getAbsoluteUrl(relativeUrl);
-    }
-
     public abstract generateAttachMessage(): IAttachMessage;
 
     protected abstract getInitialSnapshotDetails(): Promise<ISnapshotDetails>;

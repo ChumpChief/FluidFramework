@@ -105,13 +105,6 @@ export interface IContainerRuntimeBase extends
      */
     createDetachedDataStore(pkg: Readonly<string[]>): IFluidDataStoreContextDetached;
 
-    /**
-     * Get an absolute url for a provided container-relative request.
-     * Returns undefined if the container or data store isn't attached to storage.
-     * @param relativeUrl - A relative request within the container
-     */
-    getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
-
     uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
 
     /**
@@ -325,13 +318,6 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
      * @param address - The address of the channe that is dirty.
      */
     setChannelDirty(address: string): void;
-
-    /**
-     * Get an absolute url to the container based on the provided relativeUrl.
-     * Returns undefined if the container or data store isn't attached to storage.
-     * @param relativeUrl - A relative request within the container
-     */
-    getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
 
     getCreateChildSummarizerNodeFn(
         /** Initial id or path part of this node */
