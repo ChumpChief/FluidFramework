@@ -96,14 +96,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
     serialize(): string;
 
     /**
-     * Get an absolute url for a provided container-relative request url.
-     * If the container is not attached, this will return undefined.
-     *
-     * @param relativeUrl - A container-relative request URL
-     */
-    getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
-
-    /**
      * Issue a request against the container for a resource.
      * @param request - The request to be issued against the container
      */

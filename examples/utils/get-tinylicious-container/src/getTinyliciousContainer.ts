@@ -9,9 +9,11 @@ import {
 import { Container, Loader } from "@fluidframework/container-loader";
 import { IRequest } from "@fluidframework/core-interfaces";
 import {
+    DriverHeader,
     IDocumentServiceFactory,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
+import { ensureFluidResolvedUrl } from "@fluidframework/driver-utils";
 import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicious-driver";
 import { InsecureTinyliciousTokenProvider } from "./insecureTinyliciousTokenProvider";
 import { InsecureTinyliciousUrlResolver } from "./insecureTinyliciousUrlResolver";
@@ -37,7 +39,10 @@ async function getContainer(
         // proposal), but the Container will only give us a NullRuntime if there's no proposal.  So we'll use a fake
         // proposal.
         container = await loader.createDetachedContainer();
-        await container.attach({ url: documentId });
+        const newRequest = { url: documentId, headers: { [DriverHeader.createNew]: {} } };
+        const createNewResolvedUrl = await urlResolver.resolve(newRequest);
+        ensureFluidResolvedUrl(createNewResolvedUrl);
+        await container.attach(createNewResolvedUrl);
     } else {
         // Request must be appropriate and parseable by resolver.
         container = await loader.resolve(request);

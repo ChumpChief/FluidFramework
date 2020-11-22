@@ -37,7 +37,6 @@ import {
     IDocumentStorageService,
     IFluidResolvedUrl,
     IResolvedUrl,
-    DriverHeader,
     IUrlResolver,
     IDocumentServiceFactory,
 } from "@fluidframework/driver-definitions";
@@ -557,16 +556,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return JSON.stringify(snapshotTree);
     }
 
-    public async attach(request: IRequest): Promise<void> {
+    public async attach(createNewResolvedUrl: IFluidResolvedUrl): Promise<void> {
         assert(this.loaded, "not loaded");
         assert(!this.closed, "closed");
-
-        // LoaderHeader.reconnect when set to false means we are allowing one connection,
-        // but do not allow re-connections. This is not very meaningful for attach process,
-        // plus this._canReconnect is provided to DeltaManager in constructor, so it's a bit too late.
-        // It might be useful to have an option to never connect, i.e. create file and close container,
-        // but that's a new feature to implement, not clear if we want to use same property for that.
-        assert(!(request.headers?.[LoaderHeader.reconnect] === false), "reconnect");
 
         // If container is already attached or attach is in progress, return.
         if (this._attachState === AttachState.Attached || this.attachInProgress) {
@@ -605,15 +597,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             assert(!!this.cachedAttachSummary,
                 "Summary should be there either by this attach call or previous attach call!!");
 
-            if (request.headers?.[DriverHeader.createNew] === undefined) {
-                request.headers = {
-                    ...request.headers,
-                    [DriverHeader.createNew]: {},
-                };
-            }
-
-            const createNewResolvedUrl = await this.urlResolver.resolve(request);
-            ensureFluidResolvedUrl(createNewResolvedUrl);
             // Actually go and create the resolved document
             if (this.service === undefined) {
                 this.service = await this.serviceFactory.createContainer(
@@ -751,40 +734,15 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.emit("warning", warning);
     }
 
-    public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
+    private async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
         if (this.resolvedUrl === undefined) {
             return undefined;
         }
 
-        // TODO: Remove support for legacy requestUrl in 0.20
-        const legacyResolver = this.urlResolver as {
-            requestUrl?(resolvedUrl: IResolvedUrl, request: IRequest): Promise<IResponse>;
-
-            getAbsoluteUrl?(
-                resolvedUrl: IResolvedUrl,
-                relativeUrl: string,
-            ): Promise<string>;
-        };
-
-        if (legacyResolver.getAbsoluteUrl !== undefined) {
-            return this.urlResolver.getAbsoluteUrl(
-                this.resolvedUrl,
-                relativeUrl,
-            );
-        }
-
-        if (legacyResolver.requestUrl !== undefined) {
-            const response = await legacyResolver.requestUrl(
-                this.resolvedUrl,
-                { url: relativeUrl });
-
-            if (response.status === 200) {
-                return response.value as string;
-            }
-            throw new Error(response.value);
-        }
-
-        throw new Error("Url Resolver does not support creating urls");
+        return this.urlResolver.getAbsoluteUrl(
+            this.resolvedUrl,
+            relativeUrl,
+        );
     }
 
     private async snapshotCore(tagMessage: string, fullTree: boolean = false) {
