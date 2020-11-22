@@ -13,6 +13,7 @@ import { assert, performance } from "@fluidframework/common-utils";
 import {
     IRequest,
     IResponse,
+    IFluidObject,
     IFluidRouter,
 } from "@fluidframework/core-interfaces";
 import {
@@ -37,6 +38,8 @@ import {
     IFluidResolvedUrl,
     IResolvedUrl,
     DriverHeader,
+    IUrlResolver,
+    IDocumentServiceFactory,
 } from "@fluidframework/driver-definitions";
 import {
     readAndParse,
@@ -185,6 +188,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         id: string,
         loader: Loader,
         runtimeFactory: IRuntimeFactory,
+        serviceFactory: IDocumentServiceFactory,
+        urlResolver: IUrlResolver,
+        options: any,
+        scope: IFluidObject,
         request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
     ): Promise<Container> {
@@ -192,6 +199,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const container = new Container(
             loader,
             runtimeFactory,
+            serviceFactory,
+            urlResolver,
+            options,
+            scope,
             {
                 originalRequest: request,
                 id: decodeURI(docId),
@@ -236,10 +247,18 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async createDetached(
         loader: Loader,
         runtimeFactory: IRuntimeFactory,
+        serviceFactory: IDocumentServiceFactory,
+        urlResolver: IUrlResolver,
+        options: any,
+        scope: IFluidObject,
     ): Promise<Container> {
         const container = new Container(
             loader,
             runtimeFactory,
+            serviceFactory,
+            urlResolver,
+            options,
+            scope,
             {});
         await container.createDetached();
         return container;
@@ -252,11 +271,19 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async rehydrateDetachedFromSnapshot(
         loader: Loader,
         runtimeFactory: IRuntimeFactory,
+        serviceFactory: IDocumentServiceFactory,
+        urlResolver: IUrlResolver,
+        options: any,
+        scope: IFluidObject,
         snapshot: ISnapshotTree,
     ): Promise<Container> {
         const container = new Container(
             loader,
             runtimeFactory,
+            serviceFactory,
+            urlResolver,
+            options,
+            scope,
             {});
         await container.rehydrateDetachedFromSnapshot(snapshot);
         return container;
@@ -414,14 +441,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._audience;
     }
 
-    private get serviceFactory() {return this.loader.services.documentServiceFactory;}
-    private get urlResolver() {return this.loader.services.urlResolver;}
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    public get options() { return this.loader.services.options;}
-    private get scope() { return this.loader.services.scope;}
     constructor(
         private readonly loader: Loader,
         private readonly runtimeFactory: IRuntimeFactory,
+        private readonly serviceFactory: IDocumentServiceFactory,
+        private readonly urlResolver: IUrlResolver,
+        public readonly options: any,
+        private readonly scope: IFluidObject,
         config: IContainerConfig,
     ) {
         super();
@@ -443,7 +469,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Need to use the property getter for docId because for detached flow we don't have the docId initially.
         // We assign the id later so property getter is used.
         this.subLogger = ChildLogger.create(
-            loader.services.subLogger,
+            undefined,
             undefined,
             {
                 clientType, // Differentiating summarizer container from main container

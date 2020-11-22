@@ -238,6 +238,10 @@ export class Loader extends EventEmitter implements ILoader {
         return Container.createDetached(
             this,
             this.services.runtimeFactory,
+            this.services.documentServiceFactory,
+            this.services.urlResolver,
+            this.services.options,
+            this.services.scope,
         );
     }
 
@@ -247,6 +251,10 @@ export class Loader extends EventEmitter implements ILoader {
         return Container.rehydrateDetachedFromSnapshot(
             this,
             this.services.runtimeFactory,
+            this.services.documentServiceFactory,
+            this.services.urlResolver,
+            this.services.options,
+            this.services.scope,
             JSON.parse(snapshot),
         );
     }
@@ -351,6 +359,10 @@ export class Loader extends EventEmitter implements ILoader {
             id,
             this,
             runtimeFactory,
+            this.services.documentServiceFactory,
+            this.services.urlResolver,
+            this.services.options,
+            this.services.scope,
             request,
             resolved);
     }
