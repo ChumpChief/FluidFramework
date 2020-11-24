@@ -360,8 +360,9 @@ export class Loader extends EventEmitter implements ILoader {
         request: IRequest,
         resolved: IFluidResolvedUrl,
     ): Promise<Container> {
+        const [, docId] = id.split("/");
         return Container.load(
-            id,
+            docId,
             this,
             runtimeFactory,
             this.services.documentServiceFactory,

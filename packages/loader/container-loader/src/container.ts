@@ -182,7 +182,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Load an existing container.
      */
     public static async load(
-        id: string,
+        docId: string,
         loader: Loader,
         runtimeFactory: IRuntimeFactory,
         serviceFactory: IDocumentServiceFactory,
@@ -192,7 +192,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         request: IRequest,
         resolvedUrl: IFluidResolvedUrl,
     ): Promise<Container> {
-        const [, docId] = id.split("/");
         const container = new Container(
             loader,
             runtimeFactory,
