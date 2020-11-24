@@ -93,8 +93,6 @@ import { pkgVersion } from "./packageVersion";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 import { parseUrl, convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
 
-const detachedContainerRefSeqNumber = 0;
-
 interface ILocalSequencedClient extends ISequencedClient {
     shouldHaveLeft?: boolean;
 }
@@ -238,54 +236,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                         });
             });
         });
-    }
-
-    /**
-     * Create a new container in a detached state.
-     */
-    public static async createDetached(
-        loader: Loader,
-        runtimeFactory: IRuntimeFactory,
-        serviceFactory: IDocumentServiceFactory,
-        urlResolver: IUrlResolver,
-        options: any,
-        scope: IFluidObject,
-    ): Promise<Container> {
-        const container = new Container(
-            loader,
-            runtimeFactory,
-            serviceFactory,
-            urlResolver,
-            options,
-            scope,
-            {});
-        await container.createDetached();
-        return container;
-    }
-
-    /**
-     * Create a new container in a detached state that is initialized with a
-     * snapshot from a previous detached container.
-     */
-    public static async rehydrateDetachedFromSnapshot(
-        loader: Loader,
-        runtimeFactory: IRuntimeFactory,
-        serviceFactory: IDocumentServiceFactory,
-        urlResolver: IUrlResolver,
-        options: any,
-        scope: IFluidObject,
-        snapshot: ISnapshotTree,
-    ): Promise<Container> {
-        const container = new Container(
-            loader,
-            runtimeFactory,
-            serviceFactory,
-            urlResolver,
-            options,
-            scope,
-            {});
-        await container.rehydrateDetachedFromSnapshot(snapshot);
-        return container;
     }
 
     public subLogger: TelemetryLogger;
@@ -571,11 +521,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // Only take a summary if the container is in detached state, otherwise we could have local changes.
             // In failed attach call, we would already have a summary cached.
             if (this._attachState === AttachState.Detached) {
-                // 0.24 back-compat attachingBeforeSummary
-                if (this.context.runtimeVersion === undefined || this.context.runtimeVersion < "0.25") {
-                    this._attachState = AttachState.Attaching;
-                    this.emit("attaching");
-                }
                 // Get the document state post attach - possibly can just call attach but we need to change the
                 // semantics around what the attach means as far as async code goes.
                 const appSummary: ISummaryTree = this.context.createSummary();
@@ -589,7 +534,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 // This should be fired after taking the summary because it is the place where we are
                 // starting to attach the container to storage.
                 // Also, this should only be fired in detached container.
-                if (this.context.runtimeVersion !== undefined && this.context.runtimeVersion >= "0.25") {
+                if (this.context.runtimeVersion !== undefined) {
                     this._attachState = AttachState.Attaching;
                     this.emit("attaching");
                 }
@@ -933,10 +878,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         };
     }
 
-    private async createDetached() {
+    public async initializeDetached() {
         const attributes: IDocumentAttributes = {
             branch: "",
-            sequenceNumber: detachedContainerRefSeqNumber,
+            sequenceNumber: 0,
             term: 1,
             minimumSequenceNumber: 0,
         };
@@ -965,7 +910,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.loaded = true;
     }
 
-    private async rehydrateDetachedFromSnapshot(snapshotTree: ISnapshotTree) {
+    public async initializeDetachedFromSnapshot(snapshotTree: ISnapshotTree) {
         const attributes = await this.getDocumentAttributes(undefined, snapshotTree);
         assert(attributes.sequenceNumber === 0, "Seq number in detached container should be 0!!");
         this.attachDeltaManagerOpHandler(attributes);
