@@ -20,7 +20,6 @@ import {
 } from "@fluidframework/driver-utils";
 import Axios from "axios";
 import { DocumentService } from "./documentService";
-import { DocumentService2 } from "./documentService2";
 import { DefaultErrorTracking } from "./errorTracking";
 import { ITokenProvider } from "./tokens";
 
@@ -32,7 +31,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
     public readonly protocolName = "fluid:";
     constructor(
         private readonly tokenProvider: ITokenProvider,
-        private readonly useDocumentService2: boolean = false,
         private readonly errorTracking: IErrorTrackingService = new DefaultErrorTracking(),
         private readonly disableCache: boolean = false,
         private readonly historianApi: boolean = true,
@@ -99,33 +97,19 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
                 `Couldn't parse documentId and/or tenantId. [documentId:${documentId}][tenantId:${tenantId}]`);
         }
 
-        if (this.useDocumentService2) {
-            return new DocumentService2(
-                fluidResolvedUrl,
-                ordererUrl,
-                deltaStorageUrl,
-                storageUrl,
-                this.errorTracking,
-                this.disableCache,
-                this.historianApi,
-                this.credentials,
-                this.tokenProvider,
-                tenantId,
-                documentId);
-        } else {
-            return new DocumentService(
-                fluidResolvedUrl,
-                ordererUrl,
-                deltaStorageUrl,
-                storageUrl,
-                this.errorTracking,
-                this.disableCache,
-                this.historianApi,
-                this.credentials,
-                this.gitCache,
-                this.tokenProvider,
-                tenantId,
-                documentId);
-        }
+        return new DocumentService(
+            fluidResolvedUrl,
+            ordererUrl,
+            deltaStorageUrl,
+            storageUrl,
+            this.errorTracking,
+            this.disableCache,
+            this.historianApi,
+            this.credentials,
+            this.gitCache,
+            this.tokenProvider,
+            tenantId,
+            documentId,
+        );
     }
 }
