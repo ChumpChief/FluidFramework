@@ -27,10 +27,6 @@ import {
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
-import {
-    MultiUrlResolver,
-    MultiDocumentServiceFactory,
-} from "@fluidframework/driver-utils";
 import { Container } from "./container";
 import { debug } from "./debug";
 import { IParsedUrl, parseUrl } from "./utils";
@@ -103,22 +99,6 @@ export class RelativeLoader extends EventEmitter implements ILoader {
     public resolveContainer(container: Container) {
         this.containerDeferred.resolve(container);
     }
-}
-
-function createCachedResolver(resolver: IUrlResolver) {
-    const cacheResolver = Object.create(resolver) as IUrlResolver;
-    const resolveCache = new Map<string, Promise<IFluidResolvedUrl | undefined>>();
-    cacheResolver.resolve = async (request: IRequest): Promise<IFluidResolvedUrl | undefined> => {
-        if (!canUseCache(request)) {
-            return resolver.resolve(request);
-        }
-        if (!resolveCache.has(request.url)) {
-            resolveCache.set(request.url, resolver.resolve(request));
-        }
-
-        return resolveCache.get(request.url);
-    };
-    return cacheResolver;
 }
 
 /**
@@ -217,8 +197,8 @@ export class Loader extends EventEmitter implements ILoader {
     constructor(loaderProps: ILoaderProps) {
         super();
         this.services = {
-            urlResolver: createCachedResolver(MultiUrlResolver.create(loaderProps.urlResolver)),
-            documentServiceFactory: MultiDocumentServiceFactory.create(loaderProps.documentServiceFactory),
+            urlResolver: loaderProps.urlResolver,
+            documentServiceFactory: loaderProps.documentServiceFactory,
             runtimeFactory: loaderProps.runtimeFactory,
             options: loaderProps.options ?? {},
             scope: loaderProps.scope ?? {},
