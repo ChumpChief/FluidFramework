@@ -198,9 +198,6 @@ export interface IDocumentServicePolicies {
 }
 
 export interface IDocumentService {
-
-    resolvedUrl: IFluidResolvedUrl;
-
     /**
      * Policies implemented/instructed by driver.
      */

@@ -93,7 +93,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         }
 
         return new DocumentService(
-            fluidResolvedUrl,
             ordererUrl,
             deltaStorageUrl,
             storageUrl,

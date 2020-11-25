@@ -19,7 +19,6 @@ import { ITokenProvider } from "./tokens";
  */
 export class DocumentService implements api.IDocumentService {
     constructor(
-        public readonly resolvedUrl: api.IFluidResolvedUrl,
         protected ordererUrl: string,
         private readonly deltaStorageUrl: string,
         private readonly gitUrl: string,
