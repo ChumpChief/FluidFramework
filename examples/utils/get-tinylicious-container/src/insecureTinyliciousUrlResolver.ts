@@ -23,19 +23,15 @@ export class InsecureTinyliciousUrlResolver implements IUrlResolver {
         const encodedDocId = encodeURIComponent(documentId);
         const documentRelativePath = request.url.slice(documentId.length);
 
-        const documentUrl = `fluid://localhost:3000/tinylicious/${encodedDocId}${documentRelativePath}`;
-        const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${encodedDocId}`;
-        const storageUrl = `http://localhost:3000/repos/tinylicious`;
-
         const response: IFluidResolvedUrl = {
             endpoints: {
-                deltaStorageUrl,
+                deltaStorageUrl: `http://localhost:3000/deltas/tinylicious/${encodedDocId}`,
                 ordererUrl: "http://localhost:3000",
-                storageUrl,
+                storageUrl: `http://localhost:3000/repos/tinylicious`,
             },
             tokens: { jwt: this.auth(documentId) },
             type: "fluid",
-            url: documentUrl,
+            url: `fluid://localhost:3000/tinylicious/${encodedDocId}${documentRelativePath}`,
         };
         return response;
     }
