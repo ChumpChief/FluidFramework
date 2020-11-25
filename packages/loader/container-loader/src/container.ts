@@ -179,7 +179,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Load an existing container.
      */
     public static async load(
-        docId: string,
+        documentId: string,
         loader: Loader,
         runtimeFactory: IRuntimeFactory,
         serviceFactory: IDocumentServiceFactory,
@@ -195,8 +195,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             options,
             scope,
             {
-                originalRequest: request,
-                id: decodeURI(docId),
+                originalRequest: { url: documentId },
+                id: documentId,
                 resolvedUrl,
                 canReconnect: !(request.headers?.[LoaderHeader.reconnect] === false),
             });
@@ -292,10 +292,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private _closed = false;
 
     public get IFluidRouter(): IFluidRouter { return this; }
-
-    public get resolvedUrl(): IFluidResolvedUrl | undefined {
-        return this._resolvedUrl;
-    }
 
     public get loadedFromVersion(): IVersion | undefined {
         return this._loadedFromVersion;
