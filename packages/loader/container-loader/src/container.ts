@@ -94,12 +94,6 @@ interface ILocalSequencedClient extends ISequencedClient {
     shouldHaveLeft?: boolean;
 }
 
-export interface IContainerConfig {
-    canReconnect?: boolean;
-    originalRequest?: IRequest;
-    id?: string;
-}
-
 export enum ConnectionState {
     /**
      * The document is no longer connected to the delta server
@@ -185,7 +179,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         serviceFactory: IDocumentServiceFactory,
         options: any,
         scope: IFluidObject,
-        request: IRequest,
+        canReconnect: boolean,
         storageUrl: string,
         ordererUrl: string,
         deltaStorageUrl: string,
@@ -196,11 +190,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             serviceFactory,
             options,
             scope,
-            {
-                originalRequest: { url: documentId },
-                id: documentId,
-                canReconnect: !(request.headers?.[LoaderHeader.reconnect] === false),
-            });
+            canReconnect,
+            documentId,
+            { url: documentId }, // originalRequest
+        );
 
         return PerformanceEvent.timedExecAsync(container.logger, { eventName: "Load" }, async (event) => {
             return new Promise<Container>((res, rej) => {
@@ -238,10 +231,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public subLogger: TelemetryLogger;
 
-    // Tells if container can reconnect on losing fist connection
-    // If false, container gets closed on loss of connection.
-    private readonly _canReconnect: boolean = true;
-
     private readonly logger: ITelemetryLogger;
 
     private pendingClientId: string | undefined;
@@ -258,8 +247,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private _clientId: string | undefined;
-    private _id: string | undefined;
-    private originalRequest: IRequest | undefined;
     private readonly _deltaManager: DeltaManager;
     private _existing: boolean | undefined;
     private service: IDocumentService | undefined;
@@ -389,17 +376,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private readonly serviceFactory: IDocumentServiceFactory,
         public readonly options: any,
         private readonly scope: IFluidObject,
-        config: IContainerConfig,
+        private readonly _canReconnect: boolean,
+        private _id: string | undefined,
+        private originalRequest: IRequest | undefined,
     ) {
         super();
         this._audience = new Audience();
-
-        // Initialize from config
-        this.originalRequest = config.originalRequest;
-        this._id = config.id;
-        if (config.canReconnect !== undefined) {
-            this._canReconnect = config.canReconnect;
-        }
 
         // Create logger for data stores to use
         const type = this.client.details.type;

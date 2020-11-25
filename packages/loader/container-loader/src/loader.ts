@@ -204,7 +204,9 @@ export class Loader extends EventEmitter implements ILoader {
             this.services.documentServiceFactory,
             this.services.options,
             this.services.scope,
-            {},
+            true, // canReconnect
+            undefined, // documentId
+            undefined, // originalRequest
         );
         await container.initializeDetached();
         return container;
@@ -219,7 +221,9 @@ export class Loader extends EventEmitter implements ILoader {
             this.services.documentServiceFactory,
             this.services.options,
             this.services.scope,
-            {},
+            true, // canReconnect
+            undefined, // documentId
+            undefined, // originalRequest
         );
         await container.initializeDetachedFromSnapshot(JSON.parse(snapshot));
         return container;
@@ -292,6 +296,7 @@ export class Loader extends EventEmitter implements ILoader {
         ordererUrl: string,
         deltaStorageUrl: string,
     ): Promise<Container> {
+        const canReconnect = !(request.headers?.[LoaderHeader.reconnect] === false);
         return Container.load(
             tenantId,
             documentId,
@@ -300,7 +305,7 @@ export class Loader extends EventEmitter implements ILoader {
             this.services.documentServiceFactory,
             this.services.options,
             this.services.scope,
-            request,
+            canReconnect,
             storageUrl,
             ordererUrl,
             deltaStorageUrl,
