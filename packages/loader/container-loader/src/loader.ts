@@ -15,7 +15,6 @@ import {
 import {
     IContainer,
     ILoader,
-    IProxyLoaderFactory,
     IRuntimeFactory,
     LoaderHeader,
 } from "@fluidframework/container-definitions";
@@ -133,12 +132,6 @@ export interface ILoaderProps {
     readonly scope?: IFluidObject;
 
     /**
-     * Proxy loader factories for loading containers via proxy in other contexts,
-     * like web workers, or worker threads.
-     */
-    readonly proxyLoaderFactories?: Map<string, IProxyLoaderFactory>;
-
-    /**
      * The logger that all telemetry should be pushed to.
      */
     readonly logger?: ITelemetryBaseLogger;
@@ -176,12 +169,6 @@ export interface ILoaderServices {
     readonly scope: IFluidObject;
 
     /**
-     * Proxy loader factories for loading containers via proxy in other contexts,
-     * like web workers, or worker threads.
-     */
-    readonly proxyLoaderFactories: Map<string, IProxyLoaderFactory>;
-
-    /**
      * The logger downstream consumers should construct their loggers from
      */
     readonly subLogger: ITelemetryLogger;
@@ -203,7 +190,6 @@ export class Loader extends EventEmitter implements ILoader {
             options: loaderProps.options ?? {},
             scope: loaderProps.scope ?? {},
             subLogger: DebugLogger.mixinDebugLogger("fluid:telemetry", loaderProps.logger, { loaderId: uuid() }),
-            proxyLoaderFactories: loaderProps.proxyLoaderFactories ?? new Map<string, IProxyLoaderFactory>(),
         };
         this.logger = ChildLogger.create(this.services.subLogger, "Loader");
     }

@@ -20,5 +20,4 @@ export * from "./legacy/chaincode";
 export * from "./deltas";
 export * from "./error";
 export * from "./loader";
-export * from "./proxyLoader";
 export * from "./runtime";
