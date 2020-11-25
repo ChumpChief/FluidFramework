@@ -22,7 +22,6 @@ import { Deferred, performance } from "@fluidframework/common-utils";
 import { ChildLogger, DebugLogger, PerformanceEvent } from "@fluidframework/telemetry-utils";
 import {
     IDocumentServiceFactory,
-    IFluidResolvedUrl,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
@@ -263,7 +262,9 @@ export class Loader extends EventEmitter implements ILoader {
             parsed.id,
             this.services.runtimeFactory,
             request,
-            resolvedAsFluid,
+            resolvedAsFluid.endpoints.storageUrl,
+            resolvedAsFluid.endpoints.ordererUrl,
+            resolvedAsFluid.endpoints.deltaStorageUrl,
         );
 
         if (container.deltaManager.lastSequenceNumber <= fromSequenceNumber) {
@@ -322,7 +323,9 @@ export class Loader extends EventEmitter implements ILoader {
         id: string,
         runtimeFactory: IRuntimeFactory,
         request: IRequest,
-        resolved: IFluidResolvedUrl,
+        storageUrl: string,
+        ordererUrl: string,
+        deltaStorageUrl: string,
     ): Promise<Container> {
         const [tenantId, documentId] = id.split("/");
         return Container.load(
@@ -334,6 +337,9 @@ export class Loader extends EventEmitter implements ILoader {
             this.services.options,
             this.services.scope,
             request,
-            resolved);
+            storageUrl,
+            ordererUrl,
+            deltaStorageUrl,
+        );
     }
 }

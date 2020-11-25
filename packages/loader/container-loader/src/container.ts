@@ -95,7 +95,6 @@ interface ILocalSequencedClient extends ISequencedClient {
 }
 
 export interface IContainerConfig {
-    resolvedUrl?: IFluidResolvedUrl;
     canReconnect?: boolean;
     originalRequest?: IRequest;
     id?: string;
@@ -187,7 +186,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         options: any,
         scope: IFluidObject,
         request: IRequest,
-        resolvedUrl: IFluidResolvedUrl,
+        storageUrl: string,
+        ordererUrl: string,
+        deltaStorageUrl: string,
     ): Promise<Container> {
         const container = new Container(
             loader,
@@ -198,7 +199,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             {
                 originalRequest: { url: documentId },
                 id: documentId,
-                resolvedUrl,
                 canReconnect: !(request.headers?.[LoaderHeader.reconnect] === false),
             });
 
@@ -217,7 +217,15 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 };
                 container.on("closed", onClosed);
 
-                container.load(version, tenantId, documentId, pause === true)
+                container.load(
+                    version,
+                    tenantId,
+                    documentId,
+                    storageUrl,
+                    ordererUrl,
+                    deltaStorageUrl,
+                    pause === true,
+                )
                     .finally(() => {
                         container.removeListener("closed", onClosed);
                     })
@@ -284,7 +292,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private readonly connectionTransitionTimes: number[] = [];
     private messageCountAfterDisconnection: number = 0;
     private _loadedFromVersion: IVersion | undefined;
-    private _resolvedUrl: IFluidResolvedUrl | undefined;
     private cachedAttachSummary: ISummaryTree | undefined;
     private attachInProgress = false;
 
@@ -395,7 +402,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Initialize from config
         this.originalRequest = config.originalRequest;
         this._id = config.id;
-        this._resolvedUrl = config.resolvedUrl;
         if (config.canReconnect !== undefined) {
             this._canReconnect = config.canReconnect;
         }
@@ -547,7 +553,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     this.cachedAttachSummary,
                 );
             }
-            this._resolvedUrl = createNewResolvedUrl;
             this.originalRequest = { url: documentId };
 
             this._id = documentId;
@@ -784,14 +789,14 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         specifiedVersion: string | null | undefined,
         tenantId: string,
         documentId: string,
+        storageUrl: string,
+        ordererUrl: string,
+        deltaStorageUrl: string,
         pause: boolean) {
-        if (this._resolvedUrl === undefined) {
-            throw new Error("Attempting to load without a resolved url");
-        }
         this.service = await this.serviceFactory.createDocumentService(
-            this._resolvedUrl.endpoints.storageUrl,
-            this._resolvedUrl.endpoints.ordererUrl,
-            this._resolvedUrl.endpoints.deltaStorageUrl,
+            storageUrl,
+            ordererUrl,
+            deltaStorageUrl,
             tenantId,
             documentId,
             this.subLogger,
