@@ -133,23 +133,9 @@ export enum LoaderHeader {
      * true) if the reconnect header is false or the pause header is true, since these containers should not be cached.
      */
     cache = "fluid-cache",
-
     clientDetails = "fluid-client-details",
-
-    /**
-     * Start the container in a paused, unconnected state. Defaults to false
-     */
-    pause = "pause",
     reconnect = "fluid-reconnect",
     sequenceNumber = "fluid-sequence-number",
-
-    /**
-     * One of the following:
-     * null or "null": use ops, no snapshots
-     * undefined: fetch latest snapshot
-     * otherwise, version sha to load snapshot
-     */
-    version = "version",
 }
 
 /**

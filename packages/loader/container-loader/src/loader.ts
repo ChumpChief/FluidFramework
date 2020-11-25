@@ -256,8 +256,10 @@ export class Loader extends EventEmitter implements ILoader {
         request.headers = request.headers ?? {};
         const fromSequenceNumber = request.headers[LoaderHeader.sequenceNumber] ?? -1;
 
+        const [tenantId, documentId] = parsed.id.split("/");
         const container = await this.loadContainer(
-            parsed.id,
+            tenantId,
+            documentId,
             this.services.runtimeFactory,
             request,
             resolvedAsFluid.endpoints.storageUrl,
@@ -282,14 +284,14 @@ export class Loader extends EventEmitter implements ILoader {
     }
 
     private async loadContainer(
-        id: string,
+        tenantId: string,
+        documentId: string,
         runtimeFactory: IRuntimeFactory,
         request: IRequest,
         storageUrl: string,
         ordererUrl: string,
         deltaStorageUrl: string,
     ): Promise<Container> {
-        const [tenantId, documentId] = id.split("/");
         return Container.load(
             tenantId,
             documentId,
