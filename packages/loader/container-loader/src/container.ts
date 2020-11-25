@@ -36,7 +36,6 @@ import {
     IDocumentService,
     IDocumentStorageService,
     IFluidResolvedUrl,
-    IUrlResolver,
     IDocumentServiceFactory,
 } from "@fluidframework/driver-definitions";
 import {
@@ -89,7 +88,7 @@ import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { Loader, RelativeLoader } from "./loader";
 import { pkgVersion } from "./packageVersion";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
-import { parseUrl, convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
+import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
 
 interface ILocalSequencedClient extends ISequencedClient {
     shouldHaveLeft?: boolean;
@@ -184,7 +183,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         loader: Loader,
         runtimeFactory: IRuntimeFactory,
         serviceFactory: IDocumentServiceFactory,
-        urlResolver: IUrlResolver,
         options: any,
         scope: IFluidObject,
         request: IRequest,
@@ -194,7 +192,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             loader,
             runtimeFactory,
             serviceFactory,
-            urlResolver,
             options,
             scope,
             {
@@ -391,7 +388,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private readonly loader: Loader,
         private readonly runtimeFactory: IRuntimeFactory,
         private readonly serviceFactory: IDocumentServiceFactory,
-        private readonly urlResolver: IUrlResolver,
         public readonly options: any,
         private readonly scope: IFluidObject,
         config: IContainerConfig,
@@ -503,7 +499,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return JSON.stringify(snapshotTree);
     }
 
-    public async attach(createNewResolvedUrl: IFluidResolvedUrl): Promise<void> {
+    public async attach(createNewResolvedUrl: IFluidResolvedUrl, documentId: string): Promise<void> {
         assert(this.loaded, "not loaded");
         assert(!this.closed, "closed");
 
@@ -547,21 +543,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     this.subLogger,
                 );
             }
-            const resolvedUrl = this.service.resolvedUrl;
-            this._resolvedUrl = resolvedUrl;
-            const url = await this.urlResolver.getAbsoluteUrl(
-                resolvedUrl,
-                "",
-            );
-            assert(url !== undefined, "Container url undefined");
-            this.originalRequest = { url };
-            const parsedUrl = parseUrl(resolvedUrl.url);
-            if (parsedUrl === undefined) {
-                throw new Error("Unable to parse Url");
-            }
+            this._resolvedUrl = createNewResolvedUrl;
+            this.originalRequest = { url: documentId };
 
-            const [, docId] = parsedUrl.id.split("/");
-            this._id = decodeURI(docId);
+            this._id = documentId;
 
             if (this._storageService === undefined) {
                 this._storageService = await this.getDocumentStorageService();

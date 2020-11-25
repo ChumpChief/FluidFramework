@@ -43,7 +43,7 @@ async function getContainer(
         if (createNewResolvedUrl === undefined) {
             throw new Error("Could not resolve");
         }
-        await container.attach(createNewResolvedUrl);
+        await container.attach(createNewResolvedUrl, documentId);
     } else {
         // Request must be appropriate and parseable by resolver.
         container = await loader.resolve(request);

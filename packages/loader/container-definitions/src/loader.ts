@@ -88,7 +88,7 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
      * TODO - in the case of failure options should give a retry policy. Or some continuation function
      * that allows attachment to a secondary document.
      */
-    attach(request: IRequest): Promise<void>;
+    attach(request: IRequest, documentId: string): Promise<void>;
 
     /**
      * Extract the snapshot from the detached container.
