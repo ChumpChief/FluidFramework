@@ -158,7 +158,6 @@ export enum LoaderHeader {
 export interface ILoaderHeader {
     [LoaderHeader.cache]: boolean;
     [LoaderHeader.clientDetails]: IClientDetails;
-    [LoaderHeader.pause]: boolean;
     [LoaderHeader.sequenceNumber]: number;
     [LoaderHeader.reconnect]: boolean;
 }

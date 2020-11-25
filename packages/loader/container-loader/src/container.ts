@@ -204,8 +204,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         return PerformanceEvent.timedExecAsync(container.logger, { eventName: "Load" }, async (event) => {
             return new Promise<Container>((res, rej) => {
-                const pause = request.headers?.[LoaderHeader.pause];
-
                 const onClosed = (err?: ICriticalContainerError) => {
                     // Depending where error happens, we can be attempting to connect to web socket
                     // and continuously retrying (consider offline mode)
@@ -222,7 +220,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     storageUrl,
                     ordererUrl,
                     deltaStorageUrl,
-                    pause === true,
                 )
                     .finally(() => {
                         container.removeListener("closed", onClosed);
@@ -789,7 +786,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         storageUrl: string,
         ordererUrl: string,
         deltaStorageUrl: string,
-        pause: boolean) {
+    ) {
         this.service = await this.serviceFactory.createDocumentService(
             storageUrl,
             ordererUrl,
@@ -798,8 +795,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             documentId,
             this.subLogger,
         );
-
-        let startConnectionP: Promise<IConnectionDetails> | undefined;
 
         // Ideally we always connect as "read" by default.
         // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.
@@ -814,10 +809,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-        if (!pause) {
-            startConnectionP = this.connectToDeltaStream(connectionArgs);
-            startConnectionP.catch((error) => { });
-        }
+        const startConnectionP = this.connectToDeltaStream(connectionArgs);
+        startConnectionP.catch((error) => { });
 
         this._storageService = await this.getDocumentStorageService();
         this._attachState = AttachState.Attached;
@@ -843,9 +836,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this._existing = true;
             loadDetailsP = Promise.resolve();
         } else {
-            if (startConnectionP === undefined) {
-                startConnectionP = this.connectToDeltaStream(connectionArgs);
-            }
             // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
             loadDetailsP = startConnectionP.then((details) => {
                 this._existing = details.existing;
@@ -861,9 +851,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Propagate current connection state through the system.
         this.propagateConnectionState();
 
-        if (!pause) {
-            this.resume();
-        }
+        this.resume();
 
         // Internal context is fully loaded at this point
         this.loaded = true;

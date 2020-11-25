@@ -288,8 +288,7 @@ export class Loader extends EventEmitter implements ILoader {
 
         const noCache =
             request.headers[LoaderHeader.cache] === false ||
-            request.headers[LoaderHeader.reconnect] === false ||
-            request.headers[LoaderHeader.pause] === true;
+            request.headers[LoaderHeader.reconnect] === false;
 
         return !noCache;
     }
