@@ -70,7 +70,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
             fluidResolvedUrl.endpoints.deltaStorageUrl,
             tenantId,
             documentId,
-            logger,
         );
     }
 
@@ -86,7 +85,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         deltaStorageUrl: string,
         tenantId: string,
         documentId: string,
-        logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService> {
         if (!ordererUrl || !deltaStorageUrl) {
             throw new Error(
