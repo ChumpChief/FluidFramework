@@ -261,11 +261,13 @@ export class Loader extends EventEmitter implements ILoader {
         const fromSequenceNumber = request.headers[LoaderHeader.sequenceNumber] ?? -1;
 
         const [tenantId, documentId] = parsed.id.split("/");
+        const canReconnect = !(request.headers?.[LoaderHeader.reconnect] === false);
+
         const container = await this.loadContainer(
             tenantId,
             documentId,
             this.services.runtimeFactory,
-            request,
+            canReconnect,
             resolvedAsFluid.endpoints.storageUrl,
             resolvedAsFluid.endpoints.ordererUrl,
             resolvedAsFluid.endpoints.deltaStorageUrl,
@@ -291,12 +293,11 @@ export class Loader extends EventEmitter implements ILoader {
         tenantId: string,
         documentId: string,
         runtimeFactory: IRuntimeFactory,
-        request: IRequest,
+        canReconnect: boolean,
         storageUrl: string,
         ordererUrl: string,
         deltaStorageUrl: string,
     ): Promise<Container> {
-        const canReconnect = !(request.headers?.[LoaderHeader.reconnect] === false);
         return Container.load(
             tenantId,
             documentId,
