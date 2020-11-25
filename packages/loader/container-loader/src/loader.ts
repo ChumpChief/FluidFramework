@@ -4,8 +4,6 @@
  */
 
 import { EventEmitter } from "events";
-import uuid from "uuid";
-import { ITelemetryBaseLogger, ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
     IFluidObject,
     IRequest,
@@ -19,7 +17,6 @@ import {
     LoaderHeader,
 } from "@fluidframework/container-definitions";
 import { Deferred, performance } from "@fluidframework/common-utils";
-import { ChildLogger, DebugLogger, PerformanceEvent } from "@fluidframework/telemetry-utils";
 import {
     IDocumentServiceFactory,
     IUrlResolver,
@@ -117,80 +114,23 @@ export interface ILoaderProps {
     readonly documentServiceFactory: IDocumentServiceFactory;
 
     readonly runtimeFactory: IRuntimeFactory;
-
-    /**
-     * A property bag of options used by various layers
-     * to control features
-     */
-    readonly options?: any;
-
-    /**
-     * Scope is provided to all container and is a set of shared
-     * services for container's to integrate with their host environment.
-     */
-    readonly scope?: IFluidObject;
-
-    /**
-     * The logger that all telemetry should be pushed to.
-     */
-    readonly logger?: ITelemetryBaseLogger;
-}
-
-/**
- * Services and properties used by and exposed by the loader
- */
-export interface ILoaderServices {
-    /**
-     * The url resolver used by the loader for resolving external urls
-     * into Fluid urls such that the container specified by the
-     * external url can be loaded.
-     */
-    readonly urlResolver: IUrlResolver;
-    /**
-     * The document service factory take the Fluid url provided
-     * by the resolved url and constucts all the necessary services
-     * for communication with the container's server.
-     */
-    readonly documentServiceFactory: IDocumentServiceFactory;
-
-    readonly runtimeFactory: IRuntimeFactory;
-
-    /**
-     * A property bag of options used by various layers
-     * to control features
-     */
-    readonly options: any;
-
-    /**
-     * Scope is provided to all container and is a set of shared
-     * services for container's to integrate with their host environment.
-     */
-    readonly scope: IFluidObject;
-
-    /**
-     * The logger downstream consumers should construct their loggers from
-     */
-    readonly subLogger: ITelemetryLogger;
 }
 
 /**
  * Manages Fluid resource loading
  */
 export class Loader extends EventEmitter implements ILoader {
-    private readonly services: ILoaderServices;
-    private readonly logger: ITelemetryLogger;
+    private readonly urlResolver: IUrlResolver;
+    private readonly documentServiceFactory: IDocumentServiceFactory;
+    private readonly runtimeFactory: IRuntimeFactory;
+    private readonly options: any = {};
+    private readonly scope: IFluidObject = {};
 
     constructor(loaderProps: ILoaderProps) {
         super();
-        this.services = {
-            urlResolver: loaderProps.urlResolver,
-            documentServiceFactory: loaderProps.documentServiceFactory,
-            runtimeFactory: loaderProps.runtimeFactory,
-            options: loaderProps.options ?? {},
-            scope: loaderProps.scope ?? {},
-            subLogger: DebugLogger.mixinDebugLogger("fluid:telemetry", loaderProps.logger, { loaderId: uuid() }),
-        };
-        this.logger = ChildLogger.create(this.services.subLogger, "Loader");
+        this.urlResolver = loaderProps.urlResolver;
+        this.documentServiceFactory = loaderProps.documentServiceFactory;
+        this.runtimeFactory = loaderProps.runtimeFactory;
     }
 
     public get IFluidRouter(): IFluidRouter { return this; }
@@ -200,10 +140,10 @@ export class Loader extends EventEmitter implements ILoader {
 
         const container = new Container(
             this,
-            this.services.runtimeFactory,
-            this.services.documentServiceFactory,
-            this.services.options,
-            this.services.scope,
+            this.runtimeFactory,
+            this.documentServiceFactory,
+            this.options,
+            this.scope,
             true, // canReconnect
             undefined, // documentId
             undefined, // originalRequest
@@ -217,10 +157,10 @@ export class Loader extends EventEmitter implements ILoader {
 
         const container = new Container(
             this,
-            this.services.runtimeFactory,
-            this.services.documentServiceFactory,
-            this.services.options,
-            this.services.scope,
+            this.runtimeFactory,
+            this.documentServiceFactory,
+            this.options,
+            this.scope,
             true, // canReconnect
             undefined, // documentId
             undefined, // originalRequest
@@ -230,23 +170,19 @@ export class Loader extends EventEmitter implements ILoader {
     }
 
     public async resolve(request: IRequest): Promise<Container> {
-        return PerformanceEvent.timedExecAsync(this.logger, { eventName: "Resolve" }, async () => {
-            const resolved = await this.resolveCore(request);
-            return resolved.container;
-        });
+        const resolved = await this.resolveCore(request);
+        return resolved.container;
     }
 
     public async request(request: IRequest): Promise<IResponse> {
-        return PerformanceEvent.timedExecAsync(this.logger, { eventName: "Request" }, async () => {
-            const resolved = await this.resolveCore(request);
-            return resolved.container.request({ url: resolved.parsed.path });
-        });
+        const resolved = await this.resolveCore(request);
+        return resolved.container.request({ url: resolved.parsed.path });
     }
 
     private async resolveCore(
         request: IRequest,
     ): Promise<{ container: Container; parsed: IParsedUrl }> {
-        const resolvedAsFluid = await this.services.urlResolver.resolve(request);
+        const resolvedAsFluid = await this.urlResolver.resolve(request);
         if (resolvedAsFluid === undefined) {
             throw new Error("Could not resolve");
         }
@@ -266,7 +202,7 @@ export class Loader extends EventEmitter implements ILoader {
         const container = await this.loadContainer(
             tenantId,
             documentId,
-            this.services.runtimeFactory,
+            this.runtimeFactory,
             canReconnect,
             resolvedAsFluid.endpoints.storageUrl,
             resolvedAsFluid.endpoints.ordererUrl,
@@ -303,9 +239,9 @@ export class Loader extends EventEmitter implements ILoader {
             documentId,
             this,
             runtimeFactory,
-            this.services.documentServiceFactory,
-            this.services.options,
-            this.services.scope,
+            this.documentServiceFactory,
+            this.options,
+            this.scope,
             canReconnect,
             storageUrl,
             ordererUrl,
