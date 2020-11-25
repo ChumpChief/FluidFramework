@@ -254,7 +254,7 @@ export class Loader extends EventEmitter implements ILoader {
         }
 
         request.headers = request.headers ?? {};
-        const { fromSequenceNumber } = this.parseHeader(request);
+        const fromSequenceNumber = request.headers[LoaderHeader.sequenceNumber] ?? -1;
 
         const container = await this.loadContainer(
             parsed.id,
@@ -279,34 +279,6 @@ export class Loader extends EventEmitter implements ILoader {
         }
 
         return { container, parsed };
-    }
-
-    private canUseCache(request: IRequest): boolean {
-        if (request.headers === undefined) {
-            return true;
-        }
-
-        const noCache =
-            request.headers[LoaderHeader.cache] === false ||
-            request.headers[LoaderHeader.reconnect] === false;
-
-        return !noCache;
-    }
-
-    private parseHeader(request: IRequest) {
-        let fromSequenceNumber = -1;
-
-        request.headers = request.headers ?? {};
-
-        const headerSeqNum = request.headers[LoaderHeader.sequenceNumber];
-        if (headerSeqNum !== undefined) {
-            fromSequenceNumber = headerSeqNum;
-        }
-
-        return {
-            canCache: this.canUseCache(request),
-            fromSequenceNumber,
-        };
     }
 
     private async loadContainer(
