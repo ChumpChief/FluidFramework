@@ -177,7 +177,7 @@ export interface ILoaderServices {
  * Manages Fluid resource loading
  */
 export class Loader extends EventEmitter implements ILoader {
-    public readonly services: ILoaderServices;
+    private readonly services: ILoaderServices;
     private readonly logger: ITelemetryLogger;
 
     constructor(loaderProps: ILoaderProps) {
