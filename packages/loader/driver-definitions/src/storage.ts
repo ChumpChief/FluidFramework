@@ -235,7 +235,9 @@ export interface IDocumentServiceFactory {
      * Returns an instance of IDocumentService
      */
     createDocumentService(
-        resolvedUrl: IFluidResolvedUrl,
+        storageUrl: string,
+        ordererUrl: string,
+        deltaStorageUrl: string,
         tenantId: string,
         documentId: string,
         logger?: ITelemetryBaseLogger,

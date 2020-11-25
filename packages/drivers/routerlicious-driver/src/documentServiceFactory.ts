@@ -64,7 +64,14 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
                 sequenceNumber: documentAttributes.sequenceNumber,
                 values: quorumValues,
             });
-        return this.createDocumentService(fluidResolvedUrl, tenantId, documentId, logger);
+        return this.createDocumentService(
+            fluidResolvedUrl.endpoints.storageUrl,
+            fluidResolvedUrl.endpoints.ordererUrl,
+            fluidResolvedUrl.endpoints.deltaStorageUrl,
+            tenantId,
+            documentId,
+            logger,
+        );
     }
 
     /**
@@ -74,14 +81,13 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
      * @returns Routerlicious document service.
      */
     public async createDocumentService(
-        fluidResolvedUrl: IFluidResolvedUrl,
+        storageUrl: string,
+        ordererUrl: string,
+        deltaStorageUrl: string,
         tenantId: string,
         documentId: string,
         logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService> {
-        const storageUrl = fluidResolvedUrl.endpoints.storageUrl;
-        const ordererUrl = fluidResolvedUrl.endpoints.ordererUrl;
-        const deltaStorageUrl = fluidResolvedUrl.endpoints.deltaStorageUrl;
         if (!ordererUrl || !deltaStorageUrl) {
             throw new Error(
                 `All endpoints urls must be provided. [ordererUrl:${ordererUrl}][deltaStorageUrl:${deltaStorageUrl}]`);

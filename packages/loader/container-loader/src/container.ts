@@ -782,7 +782,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             throw new Error("Attempting to load without a resolved url");
         }
         this.service = await this.serviceFactory.createDocumentService(
-            this._resolvedUrl,
+            this._resolvedUrl.endpoints.storageUrl,
+            this._resolvedUrl.endpoints.ordererUrl,
+            this._resolvedUrl.endpoints.deltaStorageUrl,
             tenantId,
             documentId,
             this.subLogger,
