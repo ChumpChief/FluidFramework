@@ -8,7 +8,7 @@ import {
     IDocumentDeltaStorageService,
     IDocumentService,
     IDocumentStorageService,
-    IResolvedUrl,
+    IFluidResolvedUrl,
 } from "@fluidframework/driver-definitions";
 import {
     IClient,
@@ -36,7 +36,7 @@ export class MockDocumentService implements IDocumentService {
     ) { }
 
     // TODO: Issue-2109 Implement detach container api or put appropriate comment.
-    public get resolvedUrl(): IResolvedUrl {
+    public get resolvedUrl(): IFluidResolvedUrl {
         throw new Error("Not implemented");
     }
 

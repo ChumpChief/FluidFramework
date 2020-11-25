@@ -7,13 +7,12 @@ import { parse } from "url";
 import {
     IDocumentService,
     IDocumentServiceFactory,
-    IResolvedUrl,
+    IFluidResolvedUrl,
 } from "@fluidframework/driver-definitions";
 import { ITelemetryBaseLogger } from "@fluidframework/common-definitions";
 import { DefaultTokenProvider } from "@fluidframework/routerlicious-driver";
 import { ILocalDeltaConnectionServer, LocalDeltaConnectionServer } from "@fluidframework/server-local-server";
 import {
-    ensureFluidResolvedUrl,
     getDocAttributesFromProtocolSummary,
     getQuorumValuesFromProtocolSummary,
 } from "@fluidframework/driver-utils";
@@ -39,10 +38,9 @@ export class LocalDocumentServiceFactory implements IDocumentServiceFactory {
 
     public async createContainer(
         createNewSummary: ISummaryTree,
-        resolvedUrl: IResolvedUrl,
+        resolvedUrl: IFluidResolvedUrl,
         logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService> {
-        ensureFluidResolvedUrl(resolvedUrl);
         const pathName = new URL(resolvedUrl.url).pathname;
         const pathArr = pathName.split("/");
         const tenantId = pathArr[pathArr.length - 2];
@@ -77,11 +75,9 @@ export class LocalDocumentServiceFactory implements IDocumentServiceFactory {
      * @param resolvedUrl - resolved URL of document
      */
     public async createDocumentService(
-        resolvedUrl: IResolvedUrl,
+        resolvedUrl: IFluidResolvedUrl,
         logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService> {
-        ensureFluidResolvedUrl(resolvedUrl);
-
         const parsedUrl = parse(resolvedUrl.url);
         const [, tenantId, documentId] = parsedUrl.path ? parsedUrl.path.split("/") : [];
         if (!documentId || !tenantId) {

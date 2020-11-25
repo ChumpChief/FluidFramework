@@ -4,7 +4,6 @@
  */
 
 import { strict as assert } from "assert";
-import { ensureFluidResolvedUrl } from "@fluidframework/driver-utils";
 import { IRequest } from "@fluidframework/core-interfaces";
 import { InsecureTinyliciousUrlResolver } from "../insecureTinyliciousUrlResolver";
 
@@ -24,7 +23,7 @@ describe("Insecure Url Resolver Test", () => {
         };
 
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `${hostUrl}/tinylicious/${documentId}`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");
@@ -37,7 +36,7 @@ describe("Insecure Url Resolver Test", () => {
         };
 
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `${hostUrl}/tinylicious/${documentId}/${path}`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");
@@ -49,7 +48,7 @@ describe("Insecure Url Resolver Test", () => {
         };
 
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `${hostUrl}/tinylicious/${documentId}/`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");
@@ -61,7 +60,7 @@ describe("Insecure Url Resolver Test", () => {
         };
 
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `${hostUrl}/tinylicious/${documentId}//`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");
@@ -75,7 +74,7 @@ describe("Insecure Url Resolver Test", () => {
         };
 
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `${hostUrl}/tinylicious/${encodeURIComponent(testDocumentId)}/${path}`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");

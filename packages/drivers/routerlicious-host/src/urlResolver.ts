@@ -10,18 +10,17 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IFluidResolvedUrl,
-    IResolvedUrl,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
 import { default as Axios, AxiosInstance } from "axios";
 
 export class ContainerUrlResolver implements IUrlResolver {
-    private readonly cache = new PromiseCache<string, IResolvedUrl>();
+    private readonly cache = new PromiseCache<string, IFluidResolvedUrl>();
 
     constructor(
         private readonly baseUrl: string,
         private readonly jwt: string,
-        cache?: Map<string, IResolvedUrl>,
+        cache?: Map<string, IFluidResolvedUrl>,
         private readonly axios: AxiosInstance = Axios,
     ) {
         if (cache !== undefined) {
@@ -31,12 +30,12 @@ export class ContainerUrlResolver implements IUrlResolver {
         }
     }
 
-    public async resolve(request: IRequest): Promise<IResolvedUrl> {
+    public async resolve(request: IRequest): Promise<IFluidResolvedUrl> {
         const fetchResolvedUrl = async () => {
             const headers = {
                 Authorization: `Bearer ${this.jwt}`,
             };
-            const resolvedUrl = await this.axios.post<IResolvedUrl>(
+            const resolvedUrl = await this.axios.post<IFluidResolvedUrl>(
                 `${this.baseUrl}/api/v1/load`,
                 {
                     url: request.url,
@@ -52,11 +51,9 @@ export class ContainerUrlResolver implements IUrlResolver {
     }
 
     public async getAbsoluteUrl(
-        resolvedUrl: IResolvedUrl,
+        fluidResolvedUrl: IFluidResolvedUrl,
         relativeUrl: string,
     ): Promise<string> {
-        const fluidResolvedUrl = resolvedUrl as IFluidResolvedUrl;
-
         const parsedUrl = parse(fluidResolvedUrl.url);
         assert(parsedUrl.pathname !== undefined, "Pathname should be defined");
         const [, tenantId, documentId] = parsedUrl.pathname.split("/");

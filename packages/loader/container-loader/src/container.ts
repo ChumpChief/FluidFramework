@@ -36,7 +36,6 @@ import {
     IDocumentService,
     IDocumentStorageService,
     IFluidResolvedUrl,
-    IResolvedUrl,
     IUrlResolver,
     IDocumentServiceFactory,
 } from "@fluidframework/driver-definitions";
@@ -44,7 +43,6 @@ import {
     readAndParse,
     OnlineStatus,
     isOnline,
-    ensureFluidResolvedUrl,
     combineAppAndProtocolSummary,
     readAndParseFromBlobs,
 } from "@fluidframework/driver-utils";
@@ -298,7 +296,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get IFluidRouter(): IFluidRouter { return this; }
 
-    public get resolvedUrl(): IResolvedUrl | undefined {
+    public get resolvedUrl(): IFluidResolvedUrl | undefined {
         return this._resolvedUrl;
     }
 
@@ -550,7 +548,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 );
             }
             const resolvedUrl = this.service.resolvedUrl;
-            ensureFluidResolvedUrl(resolvedUrl);
             this._resolvedUrl = resolvedUrl;
             const url = await this.urlResolver.getAbsoluteUrl(
                 resolvedUrl,

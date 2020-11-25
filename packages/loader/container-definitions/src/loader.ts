@@ -14,7 +14,7 @@ import {
     IQuorum,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
-import { IResolvedUrl } from "@fluidframework/driver-definitions";
+import { IFluidResolvedUrl } from "@fluidframework/driver-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
 import { ICriticalContainerError, ContainerWarning } from "./error";
@@ -65,7 +65,7 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
     /**
      * Represents the resolved url to the Container
      */
-    resolvedUrl: IResolvedUrl | undefined;
+    resolvedUrl: IFluidResolvedUrl | undefined;
 
     /**
      * Indicates the attachment state of the container to a host service.

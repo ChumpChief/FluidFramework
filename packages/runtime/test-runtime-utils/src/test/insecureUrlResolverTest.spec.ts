@@ -4,8 +4,7 @@
  */
 
 import { strict as assert } from "assert";
-import { DriverHeader, IFluidResolvedUrl } from "@fluidframework/driver-definitions";
-import { ensureFluidResolvedUrl } from "@fluidframework/driver-utils";
+import { DriverHeader } from "@fluidframework/driver-definitions";
 import { IRequest } from "@fluidframework/core-interfaces";
 import { InsecureUrlResolver } from "../insecureUrlResolver";
 
@@ -32,7 +31,7 @@ describe("Insecure Url Resolver Test", () => {
     });
 
     it("Resolved CreateNew Request", async () => {
-        const resolvedUrl = await resolver.resolve(request) as IFluidResolvedUrl;
+        const resolvedUrl = await resolver.resolve(request);
         const documentUrl = `fluid://${new URL(ordererUrl).host}/${tenantId}/${fileName}`;
         assert.strictEqual(resolvedUrl.endpoints.ordererUrl, ordererUrl, "Orderer url should match");
         assert.strictEqual(resolvedUrl.url, documentUrl, "Document url should match");
@@ -40,7 +39,7 @@ describe("Insecure Url Resolver Test", () => {
 
     it("Test RequestUrl for a data store", async () => {
         const resolvedUrl = await resolver.resolve(request);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `fluid://${new URL(ordererUrl).host}/${tenantId}/${fileName}`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");
@@ -63,7 +62,7 @@ describe("Insecure Url Resolver Test", () => {
             global["window"] = { location: { host:"localhost" } };
         }
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `fluid://${new URL(ordererUrl).host}/${tenantId}/${fileName}`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");
@@ -81,7 +80,7 @@ describe("Insecure Url Resolver Test", () => {
         }
 
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `fluid://${new URL(ordererUrl).host}/${tenantId}/${fileName}/dataStore1/dataStore2`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");
@@ -104,7 +103,7 @@ describe("Insecure Url Resolver Test", () => {
             global["window"] = { location: { host:"localhost" } };
         }
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `fluid://${new URL(ordererUrl).host}/${tenantId}/${fileName}/`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");
@@ -121,7 +120,7 @@ describe("Insecure Url Resolver Test", () => {
             global["window"] = { location: { host:"localhost" } };
         }
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `fluid://${new URL(ordererUrl).host}/${tenantId}/${fileName}//`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");
@@ -138,7 +137,7 @@ describe("Insecure Url Resolver Test", () => {
             global["window"] = { location: { host:"localhost" } };
         }
         const resolvedUrl = await resolver.resolve(testRequest);
-        ensureFluidResolvedUrl(resolvedUrl);
+        assert.notStrictEqual(resolvedUrl, undefined, "Could not resolve");
 
         const expectedResolvedUrl = `fluid://${new URL(ordererUrl).host}/${tenantId}/${fileName}/!@$123/dataStore!@$`;
         assert.strictEqual(resolvedUrl.url, expectedResolvedUrl, "resolved url is wrong");

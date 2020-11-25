@@ -8,7 +8,6 @@ import { assert } from "@fluidframework/common-utils";
 import { IRequest } from "@fluidframework/core-interfaces";
 import {
     IFluidResolvedUrl,
-    IResolvedUrl,
     IUrlResolver,
     DriverHeader,
 } from "@fluidframework/driver-definitions";
@@ -29,7 +28,7 @@ import Axios from "axios";
  * works or a router inside of a single page app framework.
  */
 export class InsecureUrlResolver implements IUrlResolver {
-    private readonly cache = new Map<string, Promise<IResolvedUrl>>();
+    private readonly cache = new Map<string, Promise<IFluidResolvedUrl>>();
 
     constructor(
         private readonly hostUrl: string,
@@ -40,7 +39,7 @@ export class InsecureUrlResolver implements IUrlResolver {
         private readonly isForNodeTest: boolean = false,
     ) { }
 
-    public async resolve(request: IRequest): Promise<IResolvedUrl> {
+    public async resolve(request: IRequest): Promise<IFluidResolvedUrl> {
         if (request.headers?.[DriverHeader.createNew]) {
             const [, queryString] = request.url.split("?");
 
@@ -72,7 +71,7 @@ export class InsecureUrlResolver implements IUrlResolver {
             const headers = {
                 Authorization: `Bearer ${this.bearer}`,
             };
-            const resolvedP = Axios.post<IResolvedUrl>(
+            const resolvedP = Axios.post<IFluidResolvedUrl>(
                 `${this.hostUrl}/api/v1/load`,
                 {
                     url: request.url,
@@ -108,9 +107,7 @@ export class InsecureUrlResolver implements IUrlResolver {
         return response;
     }
 
-    public async getAbsoluteUrl(resolvedUrl: IResolvedUrl, relativeUrl: string): Promise<string> {
-        const fluidResolvedUrl = resolvedUrl as IFluidResolvedUrl;
-
+    public async getAbsoluteUrl(fluidResolvedUrl: IFluidResolvedUrl, relativeUrl: string): Promise<string> {
         const parsedUrl = parse(fluidResolvedUrl.url);
         const [, , documentId] = parsedUrl.pathname?.split("/");
         assert(!!documentId);

@@ -6,7 +6,6 @@
 import { IRequest } from "@fluidframework/core-interfaces";
 import {
     IFluidResolvedUrl,
-    IResolvedUrl,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
 import { ITokenClaims } from "@fluidframework/protocol-definitions";
@@ -19,7 +18,7 @@ import { v4 as uuid } from "uuid";
  * documentId/containerRelativePathing
  */
 export class InsecureTinyliciousUrlResolver implements IUrlResolver {
-    public async resolve(request: IRequest): Promise<IResolvedUrl> {
+    public async resolve(request: IRequest): Promise<IFluidResolvedUrl> {
         const documentId = request.url.split("/")[0];
         const encodedDocId = encodeURIComponent(documentId);
         const documentRelativePath = request.url.slice(documentId.length);

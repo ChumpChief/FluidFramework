@@ -6,12 +6,11 @@
 import { parse } from "url";
 import {
     IDocumentServiceFactory,
-    IResolvedUrl,
     IDocumentService,
+    IFluidResolvedUrl,
 } from "@fluidframework/driver-definitions";
 import { ISummaryTree } from "@fluidframework/protocol-definitions";
 import { ITelemetryBaseLogger } from "@fluidframework/common-definitions";
-import { ensureFluidResolvedUrl } from "./fluidResolvedUrl";
 
 export class MultiDocumentServiceFactory implements IDocumentServiceFactory {
     public static create(documentServiceFactory: IDocumentServiceFactory | IDocumentServiceFactory[]) {
@@ -42,9 +41,11 @@ export class MultiDocumentServiceFactory implements IDocumentServiceFactory {
         });
     }
     public readonly protocolName = "none:";
-    async createDocumentService(resolvedUrl: IResolvedUrl, logger?: ITelemetryBaseLogger): Promise<IDocumentService> {
-        ensureFluidResolvedUrl(resolvedUrl);
-        const urlObj = parse(resolvedUrl.url);
+    async createDocumentService(
+        fluidResolvedUrl: IFluidResolvedUrl,
+        logger?: ITelemetryBaseLogger,
+    ): Promise<IDocumentService> {
+        const urlObj = parse(fluidResolvedUrl.url);
         if (urlObj.protocol === undefined) {
             throw new Error("No protocol provided");
         }
@@ -53,15 +54,14 @@ export class MultiDocumentServiceFactory implements IDocumentServiceFactory {
             throw new Error("Unknown Fluid protocol");
         }
 
-        return factory.createDocumentService(resolvedUrl, logger);
+        return factory.createDocumentService(fluidResolvedUrl, logger);
     }
 
     public async createContainer(
         createNewSummary: ISummaryTree,
-        createNewResolvedUrl: IResolvedUrl,
+        createNewResolvedUrl: IFluidResolvedUrl,
         logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService> {
-        ensureFluidResolvedUrl(createNewResolvedUrl);
         const urlObj = parse(createNewResolvedUrl.url);
         if (urlObj.protocol === undefined) {
             throw new Error("No protocol provided");

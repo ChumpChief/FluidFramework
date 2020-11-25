@@ -8,7 +8,6 @@ import { assert } from "@fluidframework/common-utils";
 import { IRequest } from "@fluidframework/core-interfaces";
 import {
     IFluidResolvedUrl,
-    IResolvedUrl,
     IUrlResolver,
     DriverHeader,
 } from "@fluidframework/driver-definitions";
@@ -31,7 +30,7 @@ export class LocalResolver implements IUrlResolver {
      * remaining relative URL can still be parsed.
      * @param request - request to handle
      */
-    public async resolve(request: IRequest): Promise<IResolvedUrl> {
+    public async resolve(request: IRequest): Promise<IFluidResolvedUrl> {
         const parsedUrl = new URL(request.url);
         const fullPath = parsedUrl.pathname.substr(1);
         const documentId = fullPath.split("/")[0];
@@ -50,13 +49,11 @@ export class LocalResolver implements IUrlResolver {
         return resolved;
     }
 
-    public async getAbsoluteUrl(resolvedUrl: IResolvedUrl, relativeUrl: string): Promise<string> {
+    public async getAbsoluteUrl(fluidResolvedUrl: IFluidResolvedUrl, relativeUrl: string): Promise<string> {
         let url = relativeUrl;
         if (url.startsWith("/")) {
             url = url.substr(1);
         }
-        const fluidResolvedUrl = resolvedUrl as IFluidResolvedUrl;
-
         const parsedUrl = parse(fluidResolvedUrl.url);
         if (parsedUrl.pathname === undefined) {
             throw new Error("Url should contain tenant and docId!!");

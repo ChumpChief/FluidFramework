@@ -13,7 +13,6 @@ import {
     IDocumentServiceFactory,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
-import { ensureFluidResolvedUrl } from "@fluidframework/driver-utils";
 import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicious-driver";
 import { InsecureTinyliciousTokenProvider } from "./insecureTinyliciousTokenProvider";
 import { InsecureTinyliciousUrlResolver } from "./insecureTinyliciousUrlResolver";
@@ -41,7 +40,9 @@ async function getContainer(
         container = await loader.createDetachedContainer();
         const newRequest = { url: documentId, headers: { [DriverHeader.createNew]: {} } };
         const createNewResolvedUrl = await urlResolver.resolve(newRequest);
-        ensureFluidResolvedUrl(createNewResolvedUrl);
+        if (createNewResolvedUrl === undefined) {
+            throw new Error("Could not resolve");
+        }
         await container.attach(createNewResolvedUrl);
     } else {
         // Request must be appropriate and parseable by resolver.

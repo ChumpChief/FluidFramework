@@ -22,7 +22,7 @@ import {
     ITree,
     IVersion,
 } from "@fluidframework/protocol-definitions";
-import { IFluidResolvedUrl, IResolvedUrl } from "./urlResolver";
+import { IFluidResolvedUrl } from "./urlResolver";
 
 /**
  * Interface to provide access to stored deltas for a shared object
@@ -199,7 +199,7 @@ export interface IDocumentServicePolicies {
 
 export interface IDocumentService {
 
-    resolvedUrl: IResolvedUrl;
+    resolvedUrl: IFluidResolvedUrl;
 
     /**
      * Policies implemented/instructed by driver.

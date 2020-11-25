@@ -22,7 +22,7 @@ export class LocalDocumentService implements api.IDocumentService {
      * @param documentId - ID of document
      */
     constructor(
-        public readonly resolvedUrl: api.IResolvedUrl,
+        public readonly resolvedUrl: api.IFluidResolvedUrl,
         private readonly localDeltaConnectionServer: ILocalDeltaConnectionServer,
         private readonly tokenProvider: socketStorage.ITokenProvider,
         private readonly tenantId: string,
@@ -99,7 +99,7 @@ export class LocalDocumentService implements api.IDocumentService {
  */
 // eslint-disable-next-line prefer-arrow/prefer-arrow-functions
 export function createLocalDocumentService(
-    resolvedUrl: api.IResolvedUrl,
+    resolvedUrl: api.IFluidResolvedUrl,
     localDeltaConnectionServer: ILocalDeltaConnectionServer,
     tokenProvider: socketStorage.ITokenProvider,
     tenantId: string,

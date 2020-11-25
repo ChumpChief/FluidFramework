@@ -24,12 +24,10 @@ import { ChildLogger, DebugLogger, PerformanceEvent } from "@fluidframework/tele
 import {
     IDocumentServiceFactory,
     IFluidResolvedUrl,
-    IResolvedUrl,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 import {
-    ensureFluidResolvedUrl,
     MultiUrlResolver,
     MultiDocumentServiceFactory,
 } from "@fluidframework/driver-utils";
@@ -109,8 +107,8 @@ export class RelativeLoader extends EventEmitter implements ILoader {
 
 function createCachedResolver(resolver: IUrlResolver) {
     const cacheResolver = Object.create(resolver) as IUrlResolver;
-    const resolveCache = new Map<string, Promise<IResolvedUrl | undefined>>();
-    cacheResolver.resolve = async (request: IRequest): Promise<IResolvedUrl | undefined> => {
+    const resolveCache = new Map<string, Promise<IFluidResolvedUrl | undefined>>();
+    cacheResolver.resolve = async (request: IRequest): Promise<IFluidResolvedUrl | undefined> => {
         if (!canUseCache(request)) {
             return resolver.resolve(request);
         }
@@ -282,7 +280,9 @@ export class Loader extends EventEmitter implements ILoader {
         request: IRequest,
     ): Promise<{ container: Container; parsed: IParsedUrl }> {
         const resolvedAsFluid = await this.services.urlResolver.resolve(request);
-        ensureFluidResolvedUrl(resolvedAsFluid);
+        if (resolvedAsFluid === undefined) {
+            throw new Error("Could not resolve");
+        }
 
         // Parse URL into data stores
         const parsed = parseUrl(resolvedAsFluid.url);

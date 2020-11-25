@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IDocumentService, IResolvedUrl } from "@fluidframework/driver-definitions";
+import { IDocumentService, IFluidResolvedUrl } from "@fluidframework/driver-definitions";
 import { IErrorTrackingService } from "@fluidframework/protocol-definitions";
 import { IGitCache } from "@fluidframework/server-services-client";
 import { DocumentService } from "./documentService";
@@ -17,7 +17,7 @@ import { ITokenProvider } from "./tokens";
  *  the associated document service.
  */
 export function createDocumentService(
-    resolvedUrl: IResolvedUrl,
+    resolvedUrl: IFluidResolvedUrl,
     ordererUrl: string,
     deltaStorageUrl: string,
     gitUrl: string,

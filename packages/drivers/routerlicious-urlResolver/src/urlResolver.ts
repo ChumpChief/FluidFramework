@@ -9,7 +9,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IFluidResolvedUrl,
-    IResolvedUrl,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
 import { IUser } from "@fluidframework/protocol-definitions";
@@ -30,7 +29,7 @@ export class RouterliciousUrlResolver implements IUrlResolver {
     /**
      * Handles a request and returns the relevant endpoints for the environment
      */
-    public async resolve(request: IRequest): Promise<IResolvedUrl | undefined> {
+    public async resolve(request: IRequest): Promise<IFluidResolvedUrl | undefined> {
         let requestedUrl = request.url;
 
         // If we know the original hostname, reinsert it
@@ -126,7 +125,7 @@ export class RouterliciousUrlResolver implements IUrlResolver {
     }
 
     public async getAbsoluteUrl(
-        resolvedUrl: IResolvedUrl,
+        resolvedUrl: IFluidResolvedUrl,
         relativeUrl: string,
     ): Promise<string> {
         throw new Error("Not implmented");
