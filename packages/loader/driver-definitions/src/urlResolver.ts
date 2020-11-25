@@ -31,14 +31,11 @@ export interface IUrlResolver {
  * Additional key in the loader request header
  */
 export enum DriverHeader {
-    // Key to indicate whether the request for summarizer
-    summarizingClient = "fluid-client-summarizer",
     // createNew information, specific to each driver
     createNew = "createNew",
 }
 
 export interface IDriverHeader {
-    [DriverHeader.summarizingClient]: boolean;
     [DriverHeader.createNew]: any;
 }
 

@@ -16,10 +16,10 @@ import { ChildLogger, PerformanceEvent } from "@fluidframework/telemetry-utils";
 import { IFluidObject, IRequest } from "@fluidframework/core-interfaces";
 import {
     IContainerContext,
+    ILoader,
     LoaderHeader,
 } from "@fluidframework/container-definitions";
 import { ISequencedClient } from "@fluidframework/protocol-definitions";
-import { DriverHeader } from "@fluidframework/driver-definitions";
 import { ISummarizer, Summarizer, createSummarizingWarning, ISummarizingWarning } from "./summarizer";
 
 export const summarizerClientType = "summarizer";
@@ -165,9 +165,9 @@ export class SummaryManager extends EventEmitter implements IDisposable {
     }
 
     constructor(
+        private readonly loader: ILoader,
         private readonly context: IContainerContext,
         private readonly summariesEnabled: boolean,
-        private readonly enableWorker: boolean,
         parentLogger: ITelemetryLogger,
         private readonly setNextSummarizer: (summarizer: Promise<Summarizer>) => void,
         private nextSummarizerP?: Promise<Summarizer>,
@@ -418,8 +418,6 @@ export class SummaryManager extends EventEmitter implements IDisposable {
             return this.nextSummarizerP;
         }
 
-        const loader = this.context.loader;
-
         // TODO eventually we may wish to spawn an execution context from which to run this
         const request: IRequest = {
             headers: {
@@ -428,15 +426,13 @@ export class SummaryManager extends EventEmitter implements IDisposable {
                     capabilities: { interactive: false },
                     type: summarizerClientType,
                 },
-                [DriverHeader.summarizingClient]: true,
                 [LoaderHeader.reconnect]: false,
                 [LoaderHeader.sequenceNumber]: this.context.deltaManager.lastSequenceNumber,
-                [LoaderHeader.executionContext]: this.enableWorker ? "worker" : undefined,
             },
             url: "/_summarizer",
         };
 
-        const response = await loader.request(request);
+        const response = await this.loader.request(request);
 
         if (response.status !== 200
             || (response.mimeType !== "fluid/object" && response.mimeType !== "fluid/component")) {
