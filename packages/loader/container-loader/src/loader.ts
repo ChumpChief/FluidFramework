@@ -254,9 +254,7 @@ export class Loader extends EventEmitter implements ILoader {
         }
 
         request.headers = request.headers ?? {};
-        const { canCache, fromSequenceNumber } = this.parseHeader(parsed, request);
-
-        debug(`${canCache} ${request.headers[LoaderHeader.pause]} ${request.headers[LoaderHeader.version]}`);
+        const { fromSequenceNumber } = this.parseHeader(request);
 
         const container = await this.loadContainer(
             parsed.id,
@@ -296,7 +294,7 @@ export class Loader extends EventEmitter implements ILoader {
         return !noCache;
     }
 
-    private parseHeader(parsed: IParsedUrl, request: IRequest) {
+    private parseHeader(request: IRequest) {
         let fromSequenceNumber = -1;
 
         request.headers = request.headers ?? {};
@@ -306,13 +304,6 @@ export class Loader extends EventEmitter implements ILoader {
             fromSequenceNumber = headerSeqNum;
         }
 
-        // If set in both query string and headers, use query string
-        request.headers[LoaderHeader.version] = parsed.version ?? request.headers[LoaderHeader.version];
-
-        // Version === null means not use any snapshot.
-        if (request.headers[LoaderHeader.version] === "null") {
-            request.headers[LoaderHeader.version] = null;
-        }
         return {
             canCache: this.canUseCache(request),
             fromSequenceNumber,

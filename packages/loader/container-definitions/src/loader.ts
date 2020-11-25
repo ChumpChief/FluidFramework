@@ -161,7 +161,6 @@ export interface ILoaderHeader {
     [LoaderHeader.pause]: boolean;
     [LoaderHeader.sequenceNumber]: number;
     [LoaderHeader.reconnect]: boolean;
-    [LoaderHeader.version]: string | undefined | null;
 }
 
 declare module "@fluidframework/core-interfaces" {

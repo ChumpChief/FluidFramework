@@ -22,7 +22,7 @@ import {
 import { ISequencedClient } from "@fluidframework/protocol-definitions";
 import { ISummarizer, Summarizer, createSummarizingWarning, ISummarizingWarning } from "./summarizer";
 
-export const summarizerClientType = "summarizer";
+const summarizerClientType = "summarizer";
 
 interface ITrackedClient {
     clientId: string;
@@ -229,7 +229,6 @@ export class SummaryManager extends EventEmitter implements IDisposable {
         }
     }
 
-    public on(event: "summarizer", listener: (clientId: string) => void): this;
     public on(event: string | symbol, listener: (...args: any[]) => void): this {
         return super.on(event, listener);
     }
@@ -269,7 +268,6 @@ export class SummaryManager extends EventEmitter implements IDisposable {
         const newSummarizerClientId = this.quorumHeap.getFirstClientId();
         if (newSummarizerClientId !== this.summarizerClientId) {
             this.summarizerClientId = newSummarizerClientId;
-            this.emit("summarizer", newSummarizerClientId);
         }
 
         // Transition states depending on shouldSummarize, which is a calculated
