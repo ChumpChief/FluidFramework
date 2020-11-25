@@ -179,6 +179,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Load an existing container.
      */
     public static async load(
+        tenantId: string,
         documentId: string,
         loader: Loader,
         runtimeFactory: IRuntimeFactory,
@@ -216,7 +217,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 };
                 container.on("closed", onClosed);
 
-                container.load(version, pause === true)
+                container.load(version, tenantId, documentId, pause === true)
                     .finally(() => {
                         container.removeListener("closed", onClosed);
                     })
@@ -772,11 +773,20 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      *   - otherwise, version sha to load snapshot
      * @param pause - start the container in a paused state
      */
-    private async load(specifiedVersion: string | null | undefined, pause: boolean) {
+    private async load(
+        specifiedVersion: string | null | undefined,
+        tenantId: string,
+        documentId: string,
+        pause: boolean) {
         if (this._resolvedUrl === undefined) {
             throw new Error("Attempting to load without a resolved url");
         }
-        this.service = await this.serviceFactory.createDocumentService(this._resolvedUrl, this.subLogger);
+        this.service = await this.serviceFactory.createDocumentService(
+            this._resolvedUrl,
+            tenantId,
+            documentId,
+            this.subLogger,
+        );
 
         let startConnectionP: Promise<IConnectionDetails> | undefined;
 

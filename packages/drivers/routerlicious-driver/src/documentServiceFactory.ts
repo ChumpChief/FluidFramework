@@ -48,7 +48,7 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         if (!parsedUrl.pathname) {
             throw new Error("Parsed url should contain tenant and doc Id!!");
         }
-        const [, tenantId, id] = parsedUrl.pathname.split("/");
+        const [, tenantId, documentId] = parsedUrl.pathname.split("/");
         const protocolSummary = createNewSummary.tree[".protocol"] as ISummaryTree;
         const appSummary = createNewSummary.tree[".app"] as ISummaryTree;
         if (!(protocolSummary && appSummary)) {
@@ -59,12 +59,12 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         await Axios.post(
             `${fluidResolvedUrl.endpoints.ordererUrl}/documents/${tenantId}`,
             {
-                id,
+                id: documentId,
                 summary: appSummary,
                 sequenceNumber: documentAttributes.sequenceNumber,
                 values: quorumValues,
             });
-        return this.createDocumentService(fluidResolvedUrl, logger);
+        return this.createDocumentService(fluidResolvedUrl, tenantId, documentId, logger);
     }
 
     /**
@@ -75,6 +75,8 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
      */
     public async createDocumentService(
         fluidResolvedUrl: IFluidResolvedUrl,
+        tenantId: string,
+        documentId: string,
         logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService> {
         const storageUrl = fluidResolvedUrl.endpoints.storageUrl;
@@ -83,13 +85,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         if (!ordererUrl || !deltaStorageUrl) {
             throw new Error(
                 `All endpoints urls must be provided. [ordererUrl:${ordererUrl}][deltaStorageUrl:${deltaStorageUrl}]`);
-        }
-
-        const parsedUrl = parse(fluidResolvedUrl.url);
-        const [, tenantId, documentId] = parsedUrl.pathname!.split("/");
-        if (!documentId || !tenantId) {
-            throw new Error(
-                `Couldn't parse documentId and/or tenantId. [documentId:${documentId}][tenantId:${tenantId}]`);
         }
 
         return new DocumentService(

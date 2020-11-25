@@ -234,7 +234,12 @@ export interface IDocumentServiceFactory {
     /**
      * Returns an instance of IDocumentService
      */
-    createDocumentService(resolvedUrl: IFluidResolvedUrl, logger?: ITelemetryBaseLogger): Promise<IDocumentService>;
+    createDocumentService(
+        resolvedUrl: IFluidResolvedUrl,
+        tenantId: string,
+        documentId: string,
+        logger?: ITelemetryBaseLogger,
+    ): Promise<IDocumentService>;
 
     // Creates a new document on the host with the provided options. Returns the document service.
     createContainer(
