@@ -8,13 +8,12 @@ import { assert } from "@fluidframework/common-utils";
 import {
     IDocumentService,
     IDocumentServiceFactory,
-    IResolvedUrl,
+    IFluidResolvedUrl,
 } from "@fluidframework/driver-definitions";
 import { ITelemetryBaseLogger } from "@fluidframework/common-definitions";
 import { IErrorTrackingService, ISummaryTree } from "@fluidframework/protocol-definitions";
 import { ICredentials, IGitCache } from "@fluidframework/server-services-client";
 import {
-    ensureFluidResolvedUrl,
     getDocAttributesFromProtocolSummary,
     getQuorumValuesFromProtocolSummary,
 } from "@fluidframework/driver-utils";
@@ -41,12 +40,11 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
 
     public async createContainer(
         createNewSummary: ISummaryTree,
-        resolvedUrl: IResolvedUrl,
+        fluidResolvedUrl: IFluidResolvedUrl,
         logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService> {
-        ensureFluidResolvedUrl(resolvedUrl);
-        assert(!!resolvedUrl.endpoints.ordererUrl);
-        const parsedUrl = parse(resolvedUrl.url);
+        assert(!!fluidResolvedUrl.endpoints.ordererUrl);
+        const parsedUrl = parse(fluidResolvedUrl.url);
         if (!parsedUrl.pathname) {
             throw new Error("Parsed url should contain tenant and doc Id!!");
         }
@@ -59,29 +57,26 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         const documentAttributes = getDocAttributesFromProtocolSummary(protocolSummary);
         const quorumValues = getQuorumValuesFromProtocolSummary(protocolSummary);
         await Axios.post(
-            `${resolvedUrl.endpoints.ordererUrl}/documents/${tenantId}`,
+            `${fluidResolvedUrl.endpoints.ordererUrl}/documents/${tenantId}`,
             {
                 id,
                 summary: appSummary,
                 sequenceNumber: documentAttributes.sequenceNumber,
                 values: quorumValues,
             });
-        return this.createDocumentService(resolvedUrl, logger);
+        return this.createDocumentService(fluidResolvedUrl, logger);
     }
 
     /**
      * Creates the document service after extracting different endpoints URLs from a resolved URL.
      *
-     * @param resolvedUrl - URL containing different endpoint URLs.
+     * @param fluidResolvedUrl - URL containing different endpoint URLs.
      * @returns Routerlicious document service.
      */
     public async createDocumentService(
-        resolvedUrl: IResolvedUrl,
+        fluidResolvedUrl: IFluidResolvedUrl,
         logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService> {
-        ensureFluidResolvedUrl(resolvedUrl);
-
-        const fluidResolvedUrl = resolvedUrl;
         const storageUrl = fluidResolvedUrl.endpoints.storageUrl;
         const ordererUrl = fluidResolvedUrl.endpoints.ordererUrl;
         const deltaStorageUrl = fluidResolvedUrl.endpoints.deltaStorageUrl;
