@@ -3,14 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import { parse } from "url";
-import { assert } from "@fluidframework/common-utils";
 import {
     IDocumentService,
     IDocumentServiceFactory,
-    IFluidResolvedUrl,
 } from "@fluidframework/driver-definitions";
-import { ITelemetryBaseLogger } from "@fluidframework/common-definitions";
 import { IErrorTrackingService, ISummaryTree } from "@fluidframework/protocol-definitions";
 import { ICredentials, IGitCache } from "@fluidframework/server-services-client";
 import {
@@ -39,16 +35,13 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
     }
 
     public async createContainer(
+        tenantId: string,
+        documentId: string,
+        storageUrl: string,
+        ordererUrl: string,
+        deltaStorageUrl: string,
         createNewSummary: ISummaryTree,
-        fluidResolvedUrl: IFluidResolvedUrl,
-        logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService> {
-        assert(!!fluidResolvedUrl.endpoints.ordererUrl);
-        const parsedUrl = parse(fluidResolvedUrl.url);
-        if (!parsedUrl.pathname) {
-            throw new Error("Parsed url should contain tenant and doc Id!!");
-        }
-        const [, tenantId, documentId] = parsedUrl.pathname.split("/");
         const protocolSummary = createNewSummary.tree[".protocol"] as ISummaryTree;
         const appSummary = createNewSummary.tree[".app"] as ISummaryTree;
         if (!(protocolSummary && appSummary)) {
@@ -57,7 +50,7 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
         const documentAttributes = getDocAttributesFromProtocolSummary(protocolSummary);
         const quorumValues = getQuorumValuesFromProtocolSummary(protocolSummary);
         await Axios.post(
-            `${fluidResolvedUrl.endpoints.ordererUrl}/documents/${tenantId}`,
+            `${ordererUrl}/documents/${tenantId}`,
             {
                 id: documentId,
                 summary: appSummary,
@@ -65,9 +58,9 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
                 values: quorumValues,
             });
         return this.createDocumentService(
-            fluidResolvedUrl.endpoints.storageUrl,
-            fluidResolvedUrl.endpoints.ordererUrl,
-            fluidResolvedUrl.endpoints.deltaStorageUrl,
+            storageUrl,
+            ordererUrl,
+            deltaStorageUrl,
             tenantId,
             documentId,
         );

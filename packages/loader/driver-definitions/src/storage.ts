@@ -22,7 +22,6 @@ import {
     ITree,
     IVersion,
 } from "@fluidframework/protocol-definitions";
-import { IFluidResolvedUrl } from "./urlResolver";
 
 /**
  * Interface to provide access to stored deltas for a shared object
@@ -245,9 +244,12 @@ export interface IDocumentServiceFactory {
 
     // Creates a new document on the host with the provided options. Returns the document service.
     createContainer(
+        tenantId: string,
+        documentId: string,
+        storageUrl: string,
+        ordererUrl: string,
+        deltaStorageUrl: string,
         createNewSummary: ISummaryTree,
-        createNewResolvedUrl: IFluidResolvedUrl,
-        logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService>;
 }
 

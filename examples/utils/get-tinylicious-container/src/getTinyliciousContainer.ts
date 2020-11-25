@@ -18,6 +18,7 @@ import { InsecureTinyliciousTokenProvider } from "./insecureTinyliciousTokenProv
 import { InsecureTinyliciousUrlResolver } from "./insecureTinyliciousUrlResolver";
 
 async function getContainer(
+    tenantId: string,
     documentId: string,
     createNew: boolean,
     request: IRequest,
@@ -43,7 +44,7 @@ async function getContainer(
         if (createNewResolvedUrl === undefined) {
             throw new Error("Could not resolve");
         }
-        await container.attach(createNewResolvedUrl, documentId);
+        await container.attach(createNewResolvedUrl, tenantId, documentId);
     } else {
         // Request must be appropriate and parseable by resolver.
         container = await loader.resolve(request);
@@ -73,6 +74,7 @@ export async function getTinyliciousContainer(
     const urlResolver = new InsecureTinyliciousUrlResolver();
 
     return getContainer(
+        "tinylicious", // tenantId
         documentId,
         createNew,
         { url: documentId },

@@ -496,7 +496,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return JSON.stringify(snapshotTree);
     }
 
-    public async attach(createNewResolvedUrl: IFluidResolvedUrl, documentId: string): Promise<void> {
+    public async attach(
+        createNewResolvedUrl: IFluidResolvedUrl,
+        tenantId: string,
+        documentId: string,
+    ): Promise<void> {
         assert(this.loaded, "not loaded");
         assert(!this.closed, "closed");
 
@@ -535,9 +539,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // Actually go and create the resolved document
             if (this.service === undefined) {
                 this.service = await this.serviceFactory.createContainer(
+                    tenantId,
+                    documentId,
+                    createNewResolvedUrl.endpoints.storageUrl,
+                    createNewResolvedUrl.endpoints.ordererUrl,
+                    createNewResolvedUrl.endpoints.deltaStorageUrl,
                     this.cachedAttachSummary,
-                    createNewResolvedUrl,
-                    this.subLogger,
                 );
             }
             this._resolvedUrl = createNewResolvedUrl;
