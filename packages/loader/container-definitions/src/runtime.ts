@@ -137,14 +137,6 @@ export interface IContainerContext extends IDisposable {
     requestSnapshot(tagMessage: string): Promise<void>;
 
     /**
-     * Get an absolute url for a provided container-relative request.
-     * @param relativeUrl - A relative request within the container
-     *
-     * TODO: Optional for backwards compatibility. Make non-optional in version 0.19
-     */
-    getAbsoluteUrl?(relativeUrl: string): Promise<string | undefined>;
-
-    /**
      * Indicates the attachment state of the container to a host service.
      */
     readonly attachState: AttachState;

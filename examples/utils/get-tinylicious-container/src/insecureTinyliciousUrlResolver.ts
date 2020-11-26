@@ -36,17 +36,6 @@ export class InsecureTinyliciousUrlResolver implements IUrlResolver {
         return response;
     }
 
-    public async getAbsoluteUrl(resolvedUrl: IFluidResolvedUrl, relativeUrl: string): Promise<string> {
-        const documentId = decodeURIComponent(resolvedUrl.url.replace("fluid://localhost:3000/tinylicious/", ""));
-        /*
-         * The detached container flow will ultimately call getAbsoluteUrl() with the resolved.url produced by
-         * resolve().  The container expects getAbsoluteUrl's return value to be a URL that can then be roundtripped
-         * back through resolve() again, and get the same result again.  So we'll return a "URL" with the same format
-         * described above.
-         */
-        return `${documentId}/${relativeUrl}`;
-    }
-
     private auth(documentId: string) {
         const claims: ITokenClaims = {
             documentId,
