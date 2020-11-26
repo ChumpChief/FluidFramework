@@ -6,7 +6,6 @@
 import { EventEmitter } from "events";
 import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
-    IFluidObject,
     IFluidRouter,
     IFluidHandleContext,
     IFluidSerializer,
@@ -459,7 +458,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         registryEntries: NamedFluidDataStoreRegistryEntries,
         requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
         runtimeOptions?: IContainerRuntimeOptions,
-        containerScope: IFluidObject = context.scope,
     ): Promise<ContainerRuntime> {
         const registry = new ContainerRuntimeDataStoreRegistry(registryEntries);
 
@@ -473,7 +471,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             registry,
             chunks,
             runtimeOptions,
-            containerScope,
             requestHandler);
 
         return runtime;
@@ -534,10 +531,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
     public get flushMode(): FlushMode {
         return this._flushMode;
-    }
-
-    public get scope(): IFluidObject {
-        return this.containerScope;
     }
 
     public get IFluidDataStoreRegistry(): IFluidDataStoreRegistry {
@@ -624,7 +617,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         private readonly runtimeOptions: IContainerRuntimeOptions = {
             generateSummaries: true,
         },
-        private readonly containerScope: IFluidObject,
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ) {
         super();
@@ -693,7 +685,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
                     typeof value === "string" ? value : Promise.resolve(value),
                     this,
                     this.storage,
-                    this.containerScope,
                     this.summaryTracker.createOrGetChild(key, this.summaryTracker.referenceSequenceNumber),
                     this.getCreateChildSummarizerNodeFn(key, { type: CreateSummarizerNodeSource.FromSummary }));
             } else {
@@ -727,7 +718,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
                     pkgFromSnapshot,
                     this,
                     this.storage,
-                    this.containerScope,
                     this.summaryTracker.createOrGetChild(key, this.deltaManager.lastSequenceNumber),
                     this.getCreateChildSummarizerNodeFn(key, { type: CreateSummarizerNodeSource.FromSummary }),
                     (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
@@ -1285,7 +1275,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             pkg,
             this,
             this.storage,
-            this.containerScope,
             this.summaryTracker.createOrGetChild(id, this.deltaManager.lastSequenceNumber),
             this.getCreateChildSummarizerNodeFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
@@ -1314,7 +1303,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             pkg,
             this,
             this.storage,
-            this.containerScope,
             this.summaryTracker.createOrGetChild(id, this.deltaManager.lastSequenceNumber),
             this.getCreateChildSummarizerNodeFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
@@ -1458,7 +1446,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             snapshotTreeP,
             this,
             new BlobCacheStorageService(this.storage, flatBlobsP),
-            this.containerScope,
             this.summaryTracker.createOrGetChild(attachMessage.id, message.sequenceNumber),
             this.getCreateChildSummarizerNodeFn(
                 attachMessage.id,

@@ -13,7 +13,6 @@ import { assert, performance } from "@fluidframework/common-utils";
 import {
     IRequest,
     IResponse,
-    IFluidObject,
     IFluidRouter,
 } from "@fluidframework/core-interfaces";
 import {
@@ -178,7 +177,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         runtimeFactory: IRuntimeFactory,
         serviceFactory: IDocumentServiceFactory,
         options: any,
-        scope: IFluidObject,
         canReconnect: boolean,
         storageUrl: string,
         ordererUrl: string,
@@ -189,7 +187,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             runtimeFactory,
             serviceFactory,
             options,
-            scope,
             canReconnect,
             documentId,
             { url: documentId }, // originalRequest
@@ -375,7 +372,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         private readonly runtimeFactory: IRuntimeFactory,
         private readonly serviceFactory: IDocumentServiceFactory,
         public readonly options: any,
-        private readonly scope: IFluidObject,
         private readonly _canReconnect: boolean,
         private _id: string | undefined,
         private originalRequest: IRequest | undefined,
@@ -1363,7 +1359,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const loader = new RelativeLoader(this.loader, () => this.originalRequest);
         this._context = await ContainerContext.createOrLoad(
             this,
-            this.scope,
             this.runtimeFactory,
             snapshot,
             attributes,

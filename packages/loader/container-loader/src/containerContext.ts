@@ -5,7 +5,6 @@
 
 import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
-    IFluidObject,
     IFluidConfiguration,
     IRequest,
     IResponse,
@@ -43,7 +42,6 @@ import { Container } from "./container";
 export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
-        scope: IFluidObject,
         runtimeFactory: IRuntimeFactory,
         baseSnapshot: ISnapshotTree | undefined,
         attributes: IDocumentAttributes,
@@ -60,7 +58,6 @@ export class ContainerContext implements IContainerContext {
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
             container,
-            scope,
             runtimeFactory,
             baseSnapshot,
             attributes,
@@ -156,7 +153,6 @@ export class ContainerContext implements IContainerContext {
 
     constructor(
         private readonly container: Container,
-        public readonly scope: IFluidObject,
         private readonly runtimeFactory: IRuntimeFactory,
         private readonly _baseSnapshot: ISnapshotTree | undefined,
         private readonly attributes: IDocumentAttributes,

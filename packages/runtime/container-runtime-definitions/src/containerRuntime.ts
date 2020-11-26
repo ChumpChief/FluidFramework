@@ -12,7 +12,6 @@ import {
 import {
     IRequest,
     IResponse,
-    IFluidObject,
     IFluidRouter,
     IFluidCodeDetails,
 } from "@fluidframework/core-interfaces";
@@ -79,7 +78,6 @@ export interface IContainerRuntime extends
     readonly branch: string;
     readonly flushMode: FlushMode;
     readonly snapshotFn: (message: string) => Promise<void>;
-    readonly scope: IFluidObject;
     /**
      * Indicates the attachment state of the container to a host service.
      */

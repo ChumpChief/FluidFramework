@@ -5,7 +5,6 @@
 
 import { ITelemetryLogger, IDisposable, IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import {
-    IFluidObject,
     IFluidRouter,
     IProvideFluidHandleContext,
     IFluidHandle,
@@ -269,10 +268,6 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
     readonly routeContext: IFluidHandleContext;
     readonly snapshotFn: (message: string) => Promise<void>;
 
-    /**
-     * Ambient services provided with the context
-     */
-    readonly scope: IFluidObject;
     readonly summaryTracker: ISummaryTracker;
 
     /**

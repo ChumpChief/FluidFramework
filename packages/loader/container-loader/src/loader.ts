@@ -5,7 +5,6 @@
 
 import { EventEmitter } from "events";
 import {
-    IFluidObject,
     IRequest,
     IResponse,
     IFluidRouter,
@@ -124,7 +123,6 @@ export class Loader extends EventEmitter implements ILoader {
     private readonly documentServiceFactory: IDocumentServiceFactory;
     private readonly runtimeFactory: IRuntimeFactory;
     private readonly options: any = {};
-    private readonly scope: IFluidObject = {};
 
     constructor(loaderProps: ILoaderProps) {
         super();
@@ -143,7 +141,6 @@ export class Loader extends EventEmitter implements ILoader {
             this.runtimeFactory,
             this.documentServiceFactory,
             this.options,
-            this.scope,
             true, // canReconnect
             undefined, // documentId
             undefined, // originalRequest
@@ -160,7 +157,6 @@ export class Loader extends EventEmitter implements ILoader {
             this.runtimeFactory,
             this.documentServiceFactory,
             this.options,
-            this.scope,
             true, // canReconnect
             undefined, // documentId
             undefined, // originalRequest
@@ -241,7 +237,6 @@ export class Loader extends EventEmitter implements ILoader {
             runtimeFactory,
             this.documentServiceFactory,
             this.options,
-            this.scope,
             canReconnect,
             storageUrl,
             ordererUrl,
