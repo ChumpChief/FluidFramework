@@ -26,11 +26,11 @@ async function getContainer(
     documentServiceFactory: IDocumentServiceFactory,
     containerRuntimeFactory: IRuntimeFactory,
 ): Promise<Container> {
-    const loader = new Loader({
+    const loader = new Loader(
         urlResolver,
         documentServiceFactory,
-        runtimeFactory: containerRuntimeFactory,
-    });
+        containerRuntimeFactory,
+    );
 
     let container: Container;
 

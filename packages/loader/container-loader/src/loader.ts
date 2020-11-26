@@ -96,39 +96,15 @@ export class RelativeLoader extends EventEmitter implements ILoader {
 }
 
 /**
- * Services and properties necessary for creating a loader
- */
-export interface ILoaderProps {
-    /**
-     * The url resolver used by the loader for resolving external urls
-     * into Fluid urls such that the container specified by the
-     * external url can be loaded.
-     */
-    readonly urlResolver: IUrlResolver;
-    /**
-     * The document service factory take the Fluid url provided
-     * by the resolved url and constucts all the necessary services
-     * for communication with the container's server.
-     */
-    readonly documentServiceFactory: IDocumentServiceFactory;
-
-    readonly runtimeFactory: IRuntimeFactory;
-}
-
-/**
  * Manages Fluid resource loading
  */
 export class Loader extends EventEmitter implements ILoader {
-    private readonly urlResolver: IUrlResolver;
-    private readonly documentServiceFactory: IDocumentServiceFactory;
-    private readonly runtimeFactory: IRuntimeFactory;
-    private readonly options: any = {};
-
-    constructor(loaderProps: ILoaderProps) {
+    constructor(
+        private readonly urlResolver: IUrlResolver,
+        private readonly documentServiceFactory: IDocumentServiceFactory,
+        private readonly runtimeFactory: IRuntimeFactory,
+    ) {
         super();
-        this.urlResolver = loaderProps.urlResolver;
-        this.documentServiceFactory = loaderProps.documentServiceFactory;
-        this.runtimeFactory = loaderProps.runtimeFactory;
     }
 
     public get IFluidRouter(): IFluidRouter { return this; }
@@ -140,7 +116,7 @@ export class Loader extends EventEmitter implements ILoader {
             this,
             this.runtimeFactory,
             this.documentServiceFactory,
-            this.options,
+            {}, // options
             true, // canReconnect
             undefined, // documentId
             undefined, // originalRequest
@@ -156,7 +132,7 @@ export class Loader extends EventEmitter implements ILoader {
             this,
             this.runtimeFactory,
             this.documentServiceFactory,
-            this.options,
+            {}, // options
             true, // canReconnect
             undefined, // documentId
             undefined, // originalRequest
@@ -236,7 +212,7 @@ export class Loader extends EventEmitter implements ILoader {
             this,
             runtimeFactory,
             this.documentServiceFactory,
-            this.options,
+            {}, // options
             canReconnect,
             storageUrl,
             ordererUrl,
