@@ -109,8 +109,6 @@ export interface ILoader extends IFluidRouter {
      */
     resolve(request: IRequest): Promise<IContainer>;
 
-    recreateContainer(request: IRequest): Promise<IContainer>;
-
     /**
      * Creates a new container using the specified chaincode but in an unattached state. While unattached all
      * updates will only be local until the user explicitly attaches the container to a service provider.

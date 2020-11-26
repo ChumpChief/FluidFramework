@@ -10,7 +10,6 @@ import {
     IFluidRouter,
 } from "@fluidframework/core-interfaces";
 import {
-    IContainer,
     ILoader,
     IRuntimeFactory,
     LoaderHeader,
@@ -79,10 +78,6 @@ export class Loader extends EventEmitter implements ILoader {
     public async request(request: IRequest): Promise<IResponse> {
         const resolved = await this.resolveCore(request);
         return resolved.container.request({ url: resolved.parsed.path });
-    }
-
-    public async recreateContainer(request: IRequest): Promise<IContainer> {
-        throw new Error("Can't recreate from main Loader");
     }
 
     private async resolveCore(

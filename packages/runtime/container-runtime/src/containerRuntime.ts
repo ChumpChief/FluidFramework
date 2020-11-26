@@ -774,7 +774,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
         // Create the SummaryManager and mark the initial state
         this.summaryManager = new SummaryManager(
-            this.context.recreateContainer,
+            this.context.createSummaryContainer,
             context,
             this.runtimeOptions.generateSummaries !== false,
             this.logger,

@@ -13,11 +13,10 @@ import {
     IPromiseTimerResult,
 } from "@fluidframework/common-utils";
 import { ChildLogger, PerformanceEvent } from "@fluidframework/telemetry-utils";
-import { IFluidObject, IRequest } from "@fluidframework/core-interfaces";
+import { IFluidObject } from "@fluidframework/core-interfaces";
 import {
     IContainer,
     IContainerContext,
-    LoaderHeader,
 } from "@fluidframework/container-definitions";
 import { ISequencedClient } from "@fluidframework/protocol-definitions";
 import { ISummarizer, Summarizer, createSummarizingWarning, ISummarizingWarning } from "./summarizer";
@@ -165,7 +164,7 @@ export class SummaryManager extends EventEmitter implements IDisposable {
     }
 
     constructor(
-        private readonly recreateContainer: (request: IRequest) => Promise<IContainer>,
+        private readonly createSummaryContainer: () => Promise<IContainer>,
         private readonly context: IContainerContext,
         private readonly summariesEnabled: boolean,
         parentLogger: ITelemetryLogger,
@@ -416,22 +415,8 @@ export class SummaryManager extends EventEmitter implements IDisposable {
             return this.nextSummarizerP;
         }
 
-        // TODO eventually we may wish to spawn an execution context from which to run this
-        const request: IRequest = {
-            headers: {
-                [LoaderHeader.cache]: false,
-                [LoaderHeader.clientDetails]: {
-                    capabilities: { interactive: false },
-                    type: summarizerClientType,
-                },
-                [LoaderHeader.reconnect]: false,
-                [LoaderHeader.sequenceNumber]: this.context.deltaManager.lastSequenceNumber,
-            },
-            url: "/_summarizer",
-        };
-
-        const container = await this.recreateContainer(request);
-        const response = await container.request(request);
+        const container = await this.createSummaryContainer();
+        const response = await container.request({ url: "/_summarizer" });
 
         if (response.status !== 200
             || (response.mimeType !== "fluid/object" && response.mimeType !== "fluid/component")) {

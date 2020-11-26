@@ -127,7 +127,7 @@ export interface IContainerContext extends IDisposable {
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly quorum: IQuorum;
     readonly audience: IAudience | undefined;
-    readonly recreateContainer: (request: IRequest) => Promise<IContainer>,
+    readonly createSummaryContainer: () => Promise<IContainer>,
     readonly logger: ITelemetryLogger;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
     readonly version: string;

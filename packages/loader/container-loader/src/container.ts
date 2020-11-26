@@ -1354,11 +1354,18 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         previousRuntimeState: IRuntimeState = {},
     ) {
         assert(this._context?.disposed !== false, "Existing context not disposed");
-        const recreateContainer = async (request: IRequest): Promise<IContainer> => {
+        const createSummaryContainer = async (): Promise<IContainer> => {
+            const headers = {
+                [LoaderHeader.clientDetails]: {
+                    capabilities: { interactive: false },
+                    type: "summarizer",
+                },
+                [LoaderHeader.sequenceNumber]: this.context.deltaManager.lastSequenceNumber,
+            };
             if (this.originalRequest === undefined) {
                 throw new Error("No originalRequest yet");
             }
-            return this.loader.resolve({ url: this.originalRequest.url, headers: request.headers });
+            return this.loader.resolve({ url: this.originalRequest.url, headers });
         };
         this._context = await ContainerContext.createOrLoad(
             this,
@@ -1367,7 +1374,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             attributes,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
-            recreateContainer,
+            createSummaryContainer,
             (warning: ContainerWarning) => this.raiseContainerWarning(warning),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
