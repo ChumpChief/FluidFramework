@@ -15,7 +15,7 @@ import {
     IRuntimeFactory,
     LoaderHeader,
 } from "@fluidframework/container-definitions";
-import { Deferred, performance } from "@fluidframework/common-utils";
+import { performance } from "@fluidframework/common-utils";
 import {
     IDocumentServiceFactory,
     IUrlResolver,
@@ -24,53 +24,6 @@ import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions"
 import { Container } from "./container";
 import { debug } from "./debug";
 import { IParsedUrl, parseUrl } from "./utils";
-
-export class RelativeLoader extends EventEmitter implements ILoader {
-    // Because the loader is passed to the container during construction we need to resolve the target container
-    // after construction.
-    private readonly containerDeferred = new Deferred<Container>();
-
-    /**
-     * BaseRequest is the original request that triggered the load. This URL is used in case credentials need
-     * to be fetched again.
-     */
-    constructor(
-        private readonly loader: ILoader,
-        private readonly baseRequest: () => IRequest | undefined,
-    ) {
-        super();
-    }
-
-    public get IFluidRouter(): IFluidRouter { return this; }
-
-    public async resolve(request: IRequest): Promise<IContainer> {
-        throw new Error("Not allowed");
-    }
-
-    public async request(request: IRequest): Promise<IResponse> {
-        throw new Error("Not allowed");
-    }
-
-    public async recreateContainer(request: IRequest): Promise<IContainer> {
-        const baseRequest = this.baseRequest();
-        if (baseRequest === undefined) {
-            throw new Error("Base Request is not provided");
-        }
-        return this.loader.resolve({ url: baseRequest.url, headers: request.headers });
-    }
-
-    public async createDetachedContainer(): Promise<Container> {
-        throw new Error("Relative loader should not create a detached container");
-    }
-
-    public async rehydrateDetachedContainerFromSnapshot(source: string): Promise<Container> {
-        throw new Error("Relative loader should not create a detached container from snapshot");
-    }
-
-    public resolveContainer(container: Container) {
-        this.containerDeferred.resolve(container);
-    }
-}
 
 /**
  * Manages Fluid resource loading

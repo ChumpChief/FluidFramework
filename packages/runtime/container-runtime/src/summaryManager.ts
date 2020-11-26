@@ -15,8 +15,8 @@ import {
 import { ChildLogger, PerformanceEvent } from "@fluidframework/telemetry-utils";
 import { IFluidObject, IRequest } from "@fluidframework/core-interfaces";
 import {
+    IContainer,
     IContainerContext,
-    ILoader,
     LoaderHeader,
 } from "@fluidframework/container-definitions";
 import { ISequencedClient } from "@fluidframework/protocol-definitions";
@@ -165,7 +165,7 @@ export class SummaryManager extends EventEmitter implements IDisposable {
     }
 
     constructor(
-        private readonly loader: ILoader,
+        private readonly recreateContainer: (request: IRequest) => Promise<IContainer>,
         private readonly context: IContainerContext,
         private readonly summariesEnabled: boolean,
         parentLogger: ITelemetryLogger,
@@ -430,7 +430,7 @@ export class SummaryManager extends EventEmitter implements IDisposable {
             url: "/_summarizer",
         };
 
-        const container = await this.loader.recreateContainer(request);
+        const container = await this.recreateContainer(request);
         const response = await container.request(request);
 
         if (response.status !== 200

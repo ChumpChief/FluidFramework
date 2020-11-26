@@ -84,7 +84,7 @@ import { Audience } from "./audience";
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager, ReconnectMode } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
-import { Loader, RelativeLoader } from "./loader";
+import { Loader } from "./loader";
 import { pkgVersion } from "./packageVersion";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
@@ -1354,9 +1354,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         previousRuntimeState: IRuntimeState = {},
     ) {
         assert(this._context?.disposed !== false, "Existing context not disposed");
-        // The relative loader will proxy requests to '/' to the loader itself assuming no non-cache flags
-        // are set. Global requests will still go directly to the loader
-        const loader = new RelativeLoader(this.loader, () => this.originalRequest);
+        const recreateContainer = async (request: IRequest): Promise<IContainer> => {
+            if (this.originalRequest === undefined) {
+                throw new Error("No originalRequest yet");
+            }
+            return this.loader.resolve({ url: this.originalRequest.url, headers: request.headers });
+        };
         this._context = await ContainerContext.createOrLoad(
             this,
             this.runtimeFactory,
@@ -1364,7 +1367,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             attributes,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
-            loader,
+            recreateContainer,
             (warning: ContainerWarning) => this.raiseContainerWarning(warning),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
@@ -1373,8 +1376,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             Container.version,
             previousRuntimeState,
         );
-
-        loader.resolveContainer(this);
     }
 
     /**
