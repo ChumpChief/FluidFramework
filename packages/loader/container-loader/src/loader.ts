@@ -25,18 +25,6 @@ import { Container } from "./container";
 import { debug } from "./debug";
 import { IParsedUrl, parseUrl } from "./utils";
 
-function canUseCache(request: IRequest): boolean {
-    if (request.headers === undefined) {
-        return true;
-    }
-
-    const noCache =
-        request.headers[LoaderHeader.cache] === false ||
-        request.headers[LoaderHeader.reconnect] === false;
-
-    return !noCache;
-}
-
 export class RelativeLoader extends EventEmitter implements ILoader {
     // Because the loader is passed to the container during construction we need to resolve the target container
     // after construction.
@@ -56,30 +44,19 @@ export class RelativeLoader extends EventEmitter implements ILoader {
     public get IFluidRouter(): IFluidRouter { return this; }
 
     public async resolve(request: IRequest): Promise<IContainer> {
-        if (request.url.startsWith("/")) {
-            // If no headers are set that require a reload make use of the same object
-            const container = await this.containerDeferred.promise;
-            return container;
-        }
-
-        return this.loader.resolve(request);
+        throw new Error("Not allowed");
     }
 
     public async request(request: IRequest): Promise<IResponse> {
-        const baseRequest = this.baseRequest();
-        if (request.url.startsWith("/")) {
-            let container: IContainer;
-            if (canUseCache(request)) {
-                container = await this.containerDeferred.promise;
-            } else if (baseRequest === undefined) {
-                throw new Error("Base Request is not provided");
-            } else {
-                container = await this.loader.resolve({ url: baseRequest.url, headers: request.headers });
-            }
-            return container.request(request);
-        }
+        throw new Error("Not allowed");
+    }
 
-        return this.loader.request(request);
+    public async recreateContainer(request: IRequest): Promise<IContainer> {
+        const baseRequest = this.baseRequest();
+        if (baseRequest === undefined) {
+            throw new Error("Base Request is not provided");
+        }
+        return this.loader.resolve({ url: baseRequest.url, headers: request.headers });
     }
 
     public async createDetachedContainer(): Promise<Container> {
@@ -149,6 +126,10 @@ export class Loader extends EventEmitter implements ILoader {
     public async request(request: IRequest): Promise<IResponse> {
         const resolved = await this.resolveCore(request);
         return resolved.container.request({ url: resolved.parsed.path });
+    }
+
+    public async recreateContainer(request: IRequest): Promise<IContainer> {
+        throw new Error("Can't recreate from main Loader");
     }
 
     private async resolveCore(

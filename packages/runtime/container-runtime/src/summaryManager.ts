@@ -430,7 +430,8 @@ export class SummaryManager extends EventEmitter implements IDisposable {
             url: "/_summarizer",
         };
 
-        const response = await this.loader.request(request);
+        const container = await this.loader.recreateContainer(request);
+        const response = await container.request(request);
 
         if (response.status !== 200
             || (response.mimeType !== "fluid/object" && response.mimeType !== "fluid/component")) {
