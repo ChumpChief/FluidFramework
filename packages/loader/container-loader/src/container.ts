@@ -184,38 +184,15 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             documentId,
         );
 
-        return PerformanceEvent.timedExecAsync(container.logger, { eventName: "Load" }, async (event) => {
-            return new Promise<Container>((res, rej) => {
-                const onClosed = (err?: ICriticalContainerError) => {
-                    // Depending where error happens, we can be attempting to connect to web socket
-                    // and continuously retrying (consider offline mode)
-                    // Host has no container to close, so it's prudent to do it here
-                    const error = err ?? CreateContainerError("Container closed without an error");
-                    container.close(error);
-                    rej(error);
-                };
-                container.on("closed", onClosed);
+        await container.load(
+            tenantId,
+            documentId,
+            storageUrl,
+            ordererUrl,
+            deltaStorageUrl,
+        );
 
-                container.load(
-                    tenantId,
-                    documentId,
-                    storageUrl,
-                    ordererUrl,
-                    deltaStorageUrl,
-                )
-                    .finally(() => {
-                        container.removeListener("closed", onClosed);
-                    })
-                    .then((props) => {
-                        event.end(props);
-                        res(container);
-                    },
-                        (error) => {
-                            const err = CreateContainerError(error);
-                            onClosed(err);
-                        });
-            });
-        });
+        return container;
     }
 
     public subLogger: TelemetryLogger;
