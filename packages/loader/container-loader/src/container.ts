@@ -170,8 +170,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         documentId: string,
         runtimeFactory: IRuntimeFactory,
         serviceFactory: IDocumentServiceFactory,
-        options: any,
-        canReconnect: boolean,
         storageUrl: string,
         ordererUrl: string,
         deltaStorageUrl: string,
@@ -179,8 +177,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const container = new Container(
             runtimeFactory,
             serviceFactory,
-            options,
-            canReconnect,
             documentId,
         );
 
@@ -339,8 +335,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     constructor(
         private readonly runtimeFactory: IRuntimeFactory,
         private readonly serviceFactory: IDocumentServiceFactory,
-        public readonly options: any,
-        private readonly _canReconnect: boolean,
         private _id: string | undefined,
     ) {
         super();
@@ -708,7 +702,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.recordConnectStartTime();
 
         // All agents need "write" access, including summarizer.
-        if (!this._canReconnect || !this.client.details.capabilities.interactive) {
+        if (!this.client.details.capabilities.interactive) {
             args.mode = "write";
         }
 
@@ -985,9 +979,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private get client(): IClient {
-        const client: IClient = this.options?.client !== undefined
-            ? (this.options.client as IClient)
-            : {
+        const client: IClient = {
                 details: {
                     capabilities: { interactive: true },
                 },
@@ -1005,7 +997,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             () => this.service,
             this.client,
             ChildLogger.create(this.subLogger, "DeltaManager"),
-            this._canReconnect,
+            true, // reconnectAllowed
         );
 
         deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {

@@ -33,8 +33,6 @@ async function getContainer(
         container = new Container(
             containerRuntimeFactory,
             documentServiceFactory,
-            {}, // options
-            true, // canReconnect
             undefined, // documentId
         );
         await container.initializeDetached();
@@ -49,8 +47,6 @@ async function getContainer(
         container = new Container(
             containerRuntimeFactory,
             documentServiceFactory,
-            {},
-            true, // canReconnect
             documentId,
         );
 

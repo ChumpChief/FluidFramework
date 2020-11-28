@@ -15,7 +15,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IFluidTokenProvider,
     IContainerContext,
     IDeltaManager,
     IDeltaSender,
@@ -455,11 +454,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return this.context.existing!;
     }
 
-    public get options(): any {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return this.context.options;
-    }
-
     public get clientId(): string | undefined {
         return this.context.clientId;
     }
@@ -784,12 +778,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     }
 
     public get IFluidTokenProvider() {
-        if (this.options && this.options.intelligence) {
-            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-            return {
-                intelligence: this.options.intelligence,
-            } as IFluidTokenProvider;
-        }
         return undefined;
     }
 
