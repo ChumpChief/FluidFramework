@@ -103,7 +103,6 @@ export interface IContainerContext extends IDisposable {
     readonly baseSnapshot: ISnapshotTree | undefined;
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
-    readonly snapshotFn: (message: string) => Promise<void>;
     readonly closeFn: (error?: ICriticalContainerError) => void;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly quorum: IQuorum;
@@ -113,7 +112,6 @@ export interface IContainerContext extends IDisposable {
     readonly version: string;
 
     raiseContainerWarning(warning: ContainerWarning): void;
-    requestSnapshot(tagMessage: string): Promise<void>;
 
     /**
      * Indicates the attachment state of the container to a host service.

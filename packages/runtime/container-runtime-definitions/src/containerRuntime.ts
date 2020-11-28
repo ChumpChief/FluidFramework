@@ -76,7 +76,6 @@ export interface IContainerRuntime extends
     readonly storage: IDocumentStorageService;
     readonly branch: string;
     readonly flushMode: FlushMode;
-    readonly snapshotFn: (message: string) => Promise<void>;
     /**
      * Indicates the attachment state of the container to a host service.
      */

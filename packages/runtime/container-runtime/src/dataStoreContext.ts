@@ -126,10 +126,6 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
         return this._containerRuntime.connected;
     }
 
-    public get snapshotFn(): (message: string) => Promise<void> {
-        return this._containerRuntime.snapshotFn;
-    }
-
     public get branch(): string {
         return this._containerRuntime.branch;
     }

@@ -475,10 +475,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return this.context.branch;
     }
 
-    public get snapshotFn(): (message: string) => Promise<void> {
-        return this.context.snapshotFn;
-    }
-
     public get reSubmitFn(): (
         type: ContainerMessageType,
         content: any,
@@ -904,10 +900,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         }
         const blobsTree = convertToSummaryTree(this.blobManager.snapshot(), false);
         summaryTreeBuilder.addWithStats(blobsTreeName, blobsTree);
-    }
-
-    public async requestSnapshot(tagMessage: string): Promise<void> {
-        return this.context.requestSnapshot(tagMessage);
     }
 
     private replayPendingStates() {

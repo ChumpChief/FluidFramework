@@ -265,7 +265,6 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
 
     readonly containerRuntime: IContainerRuntimeBase;
     readonly routeContext: IFluidHandleContext;
-    readonly snapshotFn: (message: string) => Promise<void>;
 
     readonly summaryTracker: ISummaryTracker;
 
