@@ -162,35 +162,6 @@ export async function waitContainerToCatchUp(container: Container) {
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
     public static version = "^0.1.0";
 
-    /**
-     * Load an existing container.
-     */
-    public static async load(
-        tenantId: string,
-        documentId: string,
-        runtimeFactory: IRuntimeFactory,
-        serviceFactory: IDocumentServiceFactory,
-        storageUrl: string,
-        ordererUrl: string,
-        deltaStorageUrl: string,
-    ): Promise<Container> {
-        const container = new Container(
-            runtimeFactory,
-            serviceFactory,
-            documentId,
-        );
-
-        await container.load(
-            tenantId,
-            documentId,
-            storageUrl,
-            ordererUrl,
-            deltaStorageUrl,
-        );
-
-        return container;
-    }
-
     public subLogger: TelemetryLogger;
 
     private readonly logger: ITelemetryLogger;
@@ -333,7 +304,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     constructor(
-        private readonly runtimeFactory: IRuntimeFactory,
         private readonly serviceFactory: IDocumentServiceFactory,
         private _id: string | undefined,
     ) {
@@ -719,6 +689,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @param pause - start the container in a paused state
      */
     public async load(
+        runtimeFactory: IRuntimeFactory,
         tenantId: string,
         documentId: string,
         storageUrl: string,
@@ -784,7 +755,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
         [this._protocolHandler] = await Promise.all([protocolHandlerP, loadDetailsP]);
 
-        await this.loadContext(attributes, maybeSnapshotTree);
+        await this.loadContext(runtimeFactory, attributes, maybeSnapshotTree);
 
         // Propagate current connection state through the system.
         this.propagateConnectionState();
@@ -801,7 +772,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         };
     }
 
-    public async initializeDetached() {
+    public async initializeDetached(runtimeFactory: IRuntimeFactory) {
         const attributes: IDocumentAttributes = {
             branch: "",
             sequenceNumber: 0,
@@ -826,31 +797,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             values);
 
         // The load context - given we seeded the quorum - will be great
-        await this.createDetachedContext(attributes);
+        await this.createDetachedContext(runtimeFactory, attributes);
 
         this.propagateConnectionState();
 
         this.loaded = true;
-    }
-
-    public async initializeDetachedFromSnapshot(snapshotTree: ISnapshotTree) {
-        const attributes = await this.getDocumentAttributes(undefined, snapshotTree);
-        assert(attributes.sequenceNumber === 0, "Seq number in detached container should be 0!!");
-        this.attachDeltaManagerOpHandler(attributes);
-
-        // We know this is create detached flow with snapshot.
-        this._existing = true;
-
-        // ...load in the existing quorum
-        // Initialize the protocol handler
-        this._protocolHandler =
-            await this.loadAndInitializeProtocolState(attributes, undefined, snapshotTree);
-
-        await this.createDetachedContext(attributes, snapshotTree);
-
-        this.loaded = true;
-
-        this.propagateConnectionState();
     }
 
     private async getDocumentStorageService(): Promise<IDocumentStorageService> {
@@ -1300,6 +1251,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async loadContext(
+        runtimeFactory: IRuntimeFactory,
         attributes: IDocumentAttributes,
         snapshot?: ISnapshotTree,
         previousRuntimeState: IRuntimeState = {},
@@ -1307,7 +1259,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         assert(this._context?.disposed !== false, "Existing context not disposed");
         this._context = await ContainerContext.createOrLoad(
             this,
-            this.runtimeFactory,
+            runtimeFactory,
             snapshot,
             attributes,
             new DeltaManagerProxy(this._deltaManager),
@@ -1325,8 +1277,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     /**
      * Creates a new, unattached container context
      */
-    private async createDetachedContext(attributes: IDocumentAttributes, snapshot?: ISnapshotTree) {
-        await this.loadContext(attributes, snapshot);
+    private async createDetachedContext(
+        runtimeFactory: IRuntimeFactory,
+        attributes: IDocumentAttributes,
+        snapshot?: ISnapshotTree,
+    ) {
+        await this.loadContext(runtimeFactory, attributes, snapshot);
     }
 
     // Please avoid calling it directly.

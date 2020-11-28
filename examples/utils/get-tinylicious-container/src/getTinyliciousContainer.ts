@@ -27,15 +27,11 @@ async function getContainer(
     let container: Container;
 
     if (createNew) {
-        // We're not actually using the code proposal (our code loader always loads the same module regardless of the
-        // proposal), but the Container will only give us a NullRuntime if there's no proposal.  So we'll use a fake
-        // proposal.
         container = new Container(
-            containerRuntimeFactory,
             documentServiceFactory,
             undefined, // documentId
         );
-        await container.initializeDetached();
+        await container.initializeDetached(containerRuntimeFactory);
         await container.attach(
             storageUrl,
             ordererUrl,
@@ -45,12 +41,12 @@ async function getContainer(
         );
     } else {
         container = new Container(
-            containerRuntimeFactory,
             documentServiceFactory,
             documentId,
         );
 
         await container.load(
+            containerRuntimeFactory,
             tenantId,
             documentId,
             storageUrl,
