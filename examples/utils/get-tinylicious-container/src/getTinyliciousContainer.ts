@@ -36,7 +36,6 @@ async function getContainer(
             {}, // options
             true, // canReconnect
             undefined, // documentId
-            undefined, // originalRequest
         );
         await container.initializeDetached();
         await container.attach(

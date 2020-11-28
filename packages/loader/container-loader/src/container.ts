@@ -3,8 +3,6 @@
  * Licensed under the MIT License.
  */
 
-// eslint-disable-next-line import/no-internal-modules
-import merge from "lodash/merge";
 import uuid from "uuid";
 import {
     ITelemetryLogger,
@@ -21,7 +19,6 @@ import {
     IContainer,
     IContainerEvents,
     IDeltaManager,
-    LoaderHeader,
     IRuntimeState,
     ICriticalContainerError,
     ContainerWarning,
@@ -185,7 +182,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             options,
             canReconnect,
             documentId,
-            { url: documentId }, // originalRequest
         );
 
         return PerformanceEvent.timedExecAsync(container.logger, { eventName: "Load" }, async (event) => {
@@ -369,7 +365,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         public readonly options: any,
         private readonly _canReconnect: boolean,
         private _id: string | undefined,
-        private originalRequest: IRequest | undefined,
     ) {
         super();
         this._audience = new Audience();
@@ -521,7 +516,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     this.cachedAttachSummary,
                 );
             }
-            this.originalRequest = { url: documentId };
 
             this._id = documentId;
 
@@ -1025,13 +1019,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 scopes: [],
                 user: { id: "" },
             };
-
-        // Client info from headers overrides client info from loader options
-        const headerClientDetails = this.originalRequest?.headers?.[LoaderHeader.clientDetails];
-
-        if (headerClientDetails !== undefined) {
-            merge(client.details, headerClientDetails);
-        }
 
         return client;
     }

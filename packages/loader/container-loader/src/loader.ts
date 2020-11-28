@@ -47,7 +47,6 @@ export class Loader extends EventEmitter implements ILoader {
             {}, // options
             true, // canReconnect
             undefined, // documentId
-            undefined, // originalRequest
         );
         await container.initializeDetached();
         return container;
@@ -62,7 +61,6 @@ export class Loader extends EventEmitter implements ILoader {
             {}, // options
             true, // canReconnect
             undefined, // documentId
-            undefined, // originalRequest
         );
         await container.initializeDetachedFromSnapshot(JSON.parse(snapshot));
         return container;
