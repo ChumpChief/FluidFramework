@@ -507,10 +507,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 // This should be fired after taking the summary because it is the place where we are
                 // starting to attach the container to storage.
                 // Also, this should only be fired in detached container.
-                if (this.context.runtimeVersion !== undefined) {
-                    this._attachState = AttachState.Attaching;
-                    this.emit("attaching");
-                }
+                this._attachState = AttachState.Attaching;
+                this.emit("attaching");
             }
             assert(!!this.cachedAttachSummary,
                 "Summary should be there either by this attach call or previous attach call!!");

@@ -418,9 +418,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     public get IContainerRuntimeDirtyable() { return this; }
     public get IFluidRouter() { return this; }
 
-    // 0.24 back-compat attachingBeforeSummary
-    public readonly runtimeVersion = pkgVersion;
-
     /**
      * Load the stores from a snapshot and returns the runtime.
      * @param context - Context of the container.
