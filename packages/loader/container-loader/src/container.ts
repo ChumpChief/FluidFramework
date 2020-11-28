@@ -84,7 +84,6 @@ import { Audience } from "./audience";
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager, ReconnectMode } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
-import { Loader } from "./loader";
 import { pkgVersion } from "./packageVersion";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
@@ -173,7 +172,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async load(
         tenantId: string,
         documentId: string,
-        loader: Loader,
         runtimeFactory: IRuntimeFactory,
         serviceFactory: IDocumentServiceFactory,
         options: any,
@@ -183,7 +181,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         deltaStorageUrl: string,
     ): Promise<Container> {
         const container = new Container(
-            loader,
             runtimeFactory,
             serviceFactory,
             options,
@@ -368,7 +365,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     constructor(
-        private readonly loader: Loader,
         private readonly runtimeFactory: IRuntimeFactory,
         private readonly serviceFactory: IDocumentServiceFactory,
         public readonly options: any,
@@ -1352,19 +1348,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         previousRuntimeState: IRuntimeState = {},
     ) {
         assert(this._context?.disposed !== false, "Existing context not disposed");
-        const createSummaryContainer = async (): Promise<IContainer> => {
-            const headers = {
-                [LoaderHeader.clientDetails]: {
-                    capabilities: { interactive: false },
-                    type: "summarizer",
-                },
-                [LoaderHeader.sequenceNumber]: this.context.deltaManager.lastSequenceNumber,
-            };
-            if (this.originalRequest === undefined) {
-                throw new Error("No originalRequest yet");
-            }
-            return this.loader.resolve({ url: this.originalRequest.url, headers });
-        };
         this._context = await ContainerContext.createOrLoad(
             this,
             this.runtimeFactory,
@@ -1372,7 +1355,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             attributes,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
-            createSummaryContainer,
             (warning: ContainerWarning) => this.raiseContainerWarning(warning),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),

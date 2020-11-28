@@ -42,7 +42,6 @@ export class Loader extends EventEmitter implements ILoader {
         debug(`Container creating in detached state: ${performance.now()} `);
 
         const container = new Container(
-            this,
             this.runtimeFactory,
             this.documentServiceFactory,
             {}, // options
@@ -58,7 +57,6 @@ export class Loader extends EventEmitter implements ILoader {
         debug(`Container creating in detached state: ${performance.now()} `);
 
         const container = new Container(
-            this,
             this.runtimeFactory,
             this.documentServiceFactory,
             {}, // options
@@ -138,7 +136,6 @@ export class Loader extends EventEmitter implements ILoader {
         return Container.load(
             tenantId,
             documentId,
-            this,
             runtimeFactory,
             this.documentServiceFactory,
             {}, // options
