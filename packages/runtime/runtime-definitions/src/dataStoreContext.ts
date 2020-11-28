@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { ITelemetryLogger, IDisposable, IEvent, IEventProvider } from "@fluidframework/common-definitions";
+import { IDisposable, IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import {
     IFluidRouter,
     IProvideFluidHandleContext,
@@ -62,8 +62,6 @@ export interface IContainerRuntimeBase extends
     IEventProvider<IContainerRuntimeBaseEvents>,
     IProvideFluidHandleContext
 {
-
-    readonly logger: ITelemetryLogger;
     readonly clientDetails: IClientDetails;
 
     /**

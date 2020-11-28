@@ -821,7 +821,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const deltaManager = new DeltaManager(
             () => this.service,
             this.client,
-            ChildLogger.create(this.subLogger, "DeltaManager"),
             true, // reconnectAllowed
         );
 
@@ -1015,7 +1014,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.context.setConnectionState(state, this.clientId);
         }
         this.protocolHandler.quorum.setConnectionState(state, this.clientId);
-        raiseConnectedEvent(this.logger, this, state, this.clientId);
+        raiseConnectedEvent(this, state, this.clientId);
 
         if (logOpsOnReconnect) {
             this.logger.sendTelemetryEvent(

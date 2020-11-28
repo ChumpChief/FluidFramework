@@ -24,7 +24,6 @@ import { mergeStats, SummaryTreeBuilder, convertToSummaryTree, calculateStats } 
 
 const baseSummaryTreeKey = "_baseSummary";
 const outstandingOpsBlobKey = "_outstandingOps";
-const maxDecodeDepth = 100;
 
 /** Reads a blob from storage and parses it from JSON. */
 export type ReadAndParseBlob = <T>(id: string) => Promise<T>;
@@ -123,18 +122,12 @@ interface IDecodedSummary {
  * their base path when necessary.
  * @param snapshot - snapshot tree to decode
  */
-function decodeSummary(snapshot: ISnapshotTree, logger: Pick<ITelemetryLogger, "sendTelemetryEvent">): IDecodedSummary {
+function decodeSummary(snapshot: ISnapshotTree): IDecodedSummary {
     let baseSummary = snapshot;
     const pathParts: string[] = [];
     const opsBlobs: string[] = [];
 
     for (let i = 0; ; i++) {
-        if (i > maxDecodeDepth) {
-            logger.sendTelemetryEvent({
-                eventName: "DecodeSummaryMaxDepth",
-                maxDecodeDepth,
-            });
-        }
         const outstandingOpsBlob = baseSummary.blobs[outstandingOpsBlobKey];
         const newBaseSummary = baseSummary.trees[baseSummaryTreeKey];
         if (outstandingOpsBlob === undefined && newBaseSummary === undefined) {
@@ -149,12 +142,6 @@ function decodeSummary(snapshot: ISnapshotTree, logger: Pick<ITelemetryLogger, "
                             const latestSeq = outstandingOps[outstandingOps.length - 1].sequenceNumber;
                             const newEarliestSeq = newOutstandingOps[0].sequenceNumber;
                             if (newEarliestSeq <= latestSeq) {
-                                logger.sendTelemetryEvent({
-                                    eventName:"DuplicateOutstandingOps",
-                                    category: "generic",
-                                    // eslint-disable-next-line max-len
-                                    message: `newEarliestSeq <= latestSeq in decodeSummary: ${newEarliestSeq} <= ${latestSeq}`,
-                                });
                                 while (newOutstandingOps.length > 0
                                     && newOutstandingOps[0].sequenceNumber <= latestSeq) {
                                     newOutstandingOps.shift();
@@ -433,7 +420,6 @@ export class SummarizerNode implements ISummarizerNode {
         proposalHandle: string | undefined,
         getSnapshot: () => Promise<ISnapshotTree>,
         readAndParseBlob: ReadAndParseBlob,
-        correlatedSummaryLogger: ITelemetryLogger,
     ): Promise<void> {
         if (proposalHandle !== undefined) {
             const maybeSummaryNode = this.pendingSummaries.get(proposalHandle);
@@ -451,7 +437,6 @@ export class SummarizerNode implements ISummarizerNode {
             snapshotTree,
             undefined,
             EscapedPath.create(""),
-            correlatedSummaryLogger,
         );
     }
 
@@ -493,11 +478,10 @@ export class SummarizerNode implements ISummarizerNode {
         snapshotTree: ISnapshotTree,
         basePath: EscapedPath | undefined,
         localPath: EscapedPath,
-        correlatedSummaryLogger: ITelemetryLogger,
     ): void {
         this.refreshLatestSummaryCore(referenceSequenceNumber);
 
-        const { baseSummary, pathParts } = decodeSummary(snapshotTree, correlatedSummaryLogger);
+        const { baseSummary, pathParts } = decodeSummary(snapshotTree);
 
         this.latestSummary = new SummaryNode({
             referenceSequenceNumber,
@@ -520,7 +504,6 @@ export class SummarizerNode implements ISummarizerNode {
                     subtree,
                     pathForChildren,
                     EscapedPath.create(id),
-                    correlatedSummaryLogger,
                 );
             }
         }
@@ -546,7 +529,7 @@ export class SummarizerNode implements ISummarizerNode {
         snapshot: ISnapshotTree,
         readAndParseBlob: ReadAndParseBlob,
     ): Promise<{ baseSummary: ISnapshotTree, outstandingOps: ISequencedDocumentMessage[] }> {
-        const decodedSummary = decodeSummary(snapshot, this.defaultLogger);
+        const decodedSummary = decodeSummary(snapshot);
         const outstandingOps = await decodedSummary.getOutstandingOps(readAndParseBlob);
 
         if (outstandingOps.length > 0) {
@@ -595,7 +578,6 @@ export class SummarizerNode implements ISummarizerNode {
     private readonly throwOnError: boolean;
     private trackingSequenceNumber: number;
     private constructor(
-        private readonly defaultLogger: ITelemetryLogger,
         private readonly summarizeInternalFn: (fullTree: boolean) => Promise<ISummarizeInternalResult>,
         config: ISummarizerNodeConfig,
         private _changeSequenceNumber: number,
@@ -613,7 +595,6 @@ export class SummarizerNode implements ISummarizerNode {
     }
 
     public static createRoot(
-        logger: ITelemetryLogger,
         /** Summarize function */
         summarizeInternalFn: (fullTree: boolean) => Promise<ISummarizeInternalResult>,
         /** Sequence number of latest change to new node/subtree */
@@ -631,7 +612,6 @@ export class SummarizerNode implements ISummarizerNode {
             localPath: EscapedPath.create(""), // root hard-coded to ""
         });
         return new SummarizerNode(
-            logger,
             summarizeInternalFn,
             config,
             changeSequenceNumber,
@@ -675,13 +655,11 @@ export class SummarizerNode implements ISummarizerNode {
                     };
                 }
                 child = new SummarizerNode(
-                    this.defaultLogger,
                     summarizeInternalFn,
                     config,
                     createParam.sequenceNumber,
                     summaryNode,
                     initialSummary,
-                    this.wipSummaryLogger,
                 );
                 break;
             }
@@ -718,13 +696,11 @@ export class SummarizerNode implements ISummarizerNode {
                     };
                 }
                 child = new SummarizerNode(
-                    this.defaultLogger,
                     summarizeInternalFn,
                     config,
                     latestSummary?.referenceSequenceNumber ?? -1,
                     latestSummary?.createForChild(id),
                     childInitialSummary,
-                    this.wipSummaryLogger,
                 );
                 break;
             }

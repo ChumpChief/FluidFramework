@@ -4,7 +4,6 @@
  */
 
 import { EventEmitter } from "events";
-import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
     IFluidRouter,
     IFluidHandleContext,
@@ -35,7 +34,6 @@ import {
     unreachableCase,
 } from "@fluidframework/common-utils";
 import {
-    ChildLogger,
     raiseConnectedEvent,
 } from "@fluidframework/telemetry-utils";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -104,9 +102,7 @@ import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { debug } from "./debug";
 import { DeltaScheduler } from "./deltaScheduler";
-import { ReportOpPerfTelemetry } from "./connectionTelemetry";
 import { PendingStateManager } from "./pendingStateManager";
-import { pkgVersion } from "./packageVersion";
 import { BlobManager } from "./blobManager";
 
 const chunksBlobName = ".chunks";
@@ -212,11 +208,9 @@ class ScheduleManager {
     constructor(
         private readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         private readonly emitter: EventEmitter,
-        private readonly logger: ITelemetryLogger,
     ) {
         this.deltaScheduler = new DeltaScheduler(
             this.deltaManager,
-            ChildLogger.create(this.logger, "DeltaScheduler"),
         );
 
         // Listen for delta manager sends and add batch metadata to messages
@@ -266,12 +260,6 @@ class ScheduleManager {
             if (this.batchClientId) {
                 this.emitter.emit("batchEnd", "Did not receive real batchEnd message", undefined);
                 this.deltaScheduler.batchEnd();
-
-                this.logger.sendTelemetryEvent({
-                    eventName: "BatchEndNotReceived",
-                    clientId: this.batchClientId,
-                    sequenceNumber: message.sequenceNumber,
-                });
             }
 
             // This could be the beginning of a new batch or an individual message.
@@ -476,10 +464,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
     public readonly IFluidHandleContext: IFluidHandleContext;
 
-    // internal logger for ContainerRuntime
-    private readonly _logger: ITelemetryLogger;
-    // publicly visible logger, to be used by stores, summarize, etc.
-    public readonly logger: ITelemetryLogger;
     // back-compat: summarizerNode - remove all summary trackers
     private readonly summaryTracker: SummaryTracker;
 
@@ -533,12 +517,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
         this.IFluidSerializer = new FluidSerializer(this.IFluidHandleContext);
 
-        this.logger = ChildLogger.create(undefined, undefined, {
-            runtimeVersion: pkgVersion,
-        });
-
-        this._logger = ChildLogger.create(this.logger, "ContainerRuntime");
-
         this.summaryTracker = new SummaryTracker(
             "", // fullPath - the root is unnamed
             this.deltaManager.initialSequenceNumber, // referenceSequenceNumber - last acked summary ref seq number
@@ -547,7 +525,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
         const loadedFromSequenceNumber = this.deltaManager.initialSequenceNumber;
         this.summarizerNode = SummarizerNode.createRoot(
-            this.logger,
             // Summarize function to call when summarize is called. Summarizer node always tracks summary state.
             async (fullTree: boolean) => this.summarizeInternal(fullTree, true /* trackState */),
             // Latest change sequence number, no changes since summary applied yet
@@ -639,7 +616,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         this.scheduleManager = new ScheduleManager(
             context.deltaManager,
             this,
-            ChildLogger.create(this.logger, "ScheduleManager"),
         );
 
         this.deltaSender = this.deltaManager;
@@ -677,8 +653,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
             this.replayPendingStates();
         });
-
-        ReportOpPerfTelemetry(this.context.clientId, this.deltaManager, this.logger);
     }
 
     public dispose(error?: Error): void {
@@ -687,26 +661,11 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         }
         this._disposed = true;
 
-        this.logger.sendTelemetryEvent({
-            eventName: "ContainerRuntimeDisposed",
-            category: "generic",
-            isDirty: this.isDocumentDirty(),
-            lastSequenceNumber: this.deltaManager.lastSequenceNumber,
-            attachState: this.attachState,
-            message: error?.message,
-        });
-
         // close/stop all store contexts
-        for (const [fluidDataStoreId, contextD] of this.contextsDeferred) {
+        for (const [, contextD] of this.contextsDeferred) {
             contextD.promise.then((context) => {
                 context.dispose();
-            }).catch((contextError) => {
-                this._logger.sendErrorEvent({
-                    eventName: "FluidDataStoreContextDisposeError",
-                    fluidDataStoreId,
-                },
-                    contextError);
-            });
+            }).catch(() => { });
         }
 
         this.emit("dispose");
@@ -870,19 +829,11 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
            this.replayPendingStates();
         }
 
-        for (const [fluidDataStore, context] of this.contexts) {
-            try {
-                context.setConnectionState(connected, clientId);
-            } catch (error) {
-                this._logger.sendErrorEvent({
-                    eventName: "SetConnectionStateError",
-                    clientId,
-                    fluidDataStore,
-                }, error);
-            }
+        for (const [, context] of this.contexts) {
+            context.setConnectionState(connected, clientId);
         }
 
-        raiseConnectedEvent(this._logger, this, connected, clientId);
+        raiseConnectedEvent(this, connected, clientId);
 
         if (connected) {
             assert(!!clientId);
@@ -973,10 +924,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         if (!context) {
             // Attach message may not have been processed yet
             assert(!local);
-            this._logger.sendTelemetryEvent({
-                eventName: "SignalFluidDataStoreNotFound",
-                fluidDataStoreId: envelope.address,
-            });
             return;
         }
 
@@ -1234,14 +1181,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
          // If a non-local operation then go and create the object, otherwise mark it as officially attached.
         if (this.contexts.has(attachMessage.id)) {
-            const error = new Error("DataCorruption: Duplicate data store created with existing ID");
-            this.logger.sendErrorEvent({
-                eventName: "DuplicateDataStoreId",
-                sequenceNumber: message.sequenceNumber,
-                clientId: message.clientId,
-                referenceSequenceNumber: message.referenceSequenceNumber,
-            }, error);
-            throw error;
+            throw new Error("DataCorruption: Duplicate data store created with existing ID");
         }
 
         const flatBlobs = new Map<string, string>();
