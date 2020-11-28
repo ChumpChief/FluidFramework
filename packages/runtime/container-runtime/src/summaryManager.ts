@@ -19,7 +19,7 @@ import {
     IContainerContext,
 } from "@fluidframework/container-definitions";
 import { ISequencedClient } from "@fluidframework/protocol-definitions";
-import { ISummarizer, createSummarizingWarning, ISummarizingWarning } from "./summarizer";
+import { ISummarizer } from "./summarizer";
 
 const summarizerClientType = "summarizer";
 
@@ -85,7 +85,6 @@ enum SummaryManagerState {
 }
 
 const defaultInitialDelayMs = 5000;
-const opsToBypassInitialDelay = 4000;
 
 // Please note that all reasons  in this list are not errors,
 // and thus they are not raised today to parent container as error.
@@ -153,7 +152,6 @@ export class SummaryManager extends EventEmitter implements IDisposable {
         defaultThrottleMaxDelayMs,
         defaultThrottleDelayFunction,
     );
-    private opsUntilFirstConnect = -1;
 
     public get summarizer() {
         return this.summarizerClientId;
@@ -165,7 +163,7 @@ export class SummaryManager extends EventEmitter implements IDisposable {
 
     constructor(
         private readonly createSummaryContainer: () => Promise<IContainer>,
-        private readonly context: IContainerContext,
+        context: IContainerContext,
         parentLogger: ITelemetryLogger,
     ) {
         super();
@@ -187,9 +185,6 @@ export class SummaryManager extends EventEmitter implements IDisposable {
         }
 
         context.quorum.on("addMember", (clientId: string, details: ISequencedClient) => {
-            if (this.opsUntilFirstConnect === -1 && clientId === this.clientId) {
-                this.opsUntilFirstConnect = details.sequenceNumber - this.context.deltaManager.initialSequenceNumber;
-            }
             this.quorumHeap.addClient(clientId, details);
             this.refreshSummarizer();
         });
@@ -297,30 +292,13 @@ export class SummaryManager extends EventEmitter implements IDisposable {
         }
     }
 
-    private raiseContainerWarning(warning: ISummarizingWarning) {
-        this.context.raiseContainerWarning(warning);
-    }
-
     private start() {
-        if (this.context.clientDetails.type === summarizerClientType) {
-            // Make sure that the summarizer client does not load another summarizer.
-            this.state = SummaryManagerState.Disabled;
-            return;
-        }
-
         this.state = SummaryManagerState.Starting;
 
         // throttle creation of new summarizer containers to prevent spamming the server with websocket connections
         const delayMs = this.startThrottler.getDelay();
-        if (delayMs >= defaultThrottleMaxDelayMs) {
-            // we can't create a summarizer for some reason; raise error on container
-            this.raiseContainerWarning(
-                createSummarizingWarning("SummaryManager: CreateSummarizer Max Throttle Delay", false));
-        }
 
         this.createSummarizer(delayMs).then((summarizer) => {
-            summarizer.on("summarizingError",
-                (warning: ISummarizingWarning) => this.raiseContainerWarning(warning));
             this.run(summarizer);
         }, (error) => {
             this.logger.sendErrorEvent({
@@ -377,22 +355,11 @@ export class SummaryManager extends EventEmitter implements IDisposable {
     }
 
     private async createSummarizer(delayMs: number): Promise<ISummarizer> {
-        // We have been elected the summarizer. Some day we may be able to summarize with a live document but for
-        // now we play it safe and launch a second copy.
-        this.logger.sendTelemetryEvent({
-            eventName: "CreatingSummarizer",
-            delayMs,
-            opsUntilFirstConnect: this.opsUntilFirstConnect,
-        });
-
         const shouldDelay = delayMs > 0;
-        const shouldInitialDelay = this.opsUntilFirstConnect < opsToBypassInitialDelay;
-        if (shouldDelay || shouldInitialDelay) {
-            await Promise.all([
-                shouldInitialDelay ? this.initialDelayP : Promise.resolve(),
-                shouldDelay ? new Promise((resolve) => setTimeout(resolve, delayMs)) : Promise.resolve(),
-            ]);
-        }
+        await Promise.all([
+            this.initialDelayP,
+            shouldDelay ? new Promise((resolve) => setTimeout(resolve, delayMs)) : Promise.resolve(),
+        ]);
 
         const container = await this.createSummaryContainer();
         const response = await container.request({ url: "/_summarizer" });
