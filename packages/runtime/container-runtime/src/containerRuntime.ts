@@ -31,16 +31,14 @@ import {
 import {
     assert,
     Deferred,
-    Trace,
     TypedEventEmitter,
     unreachableCase,
 } from "@fluidframework/common-utils";
 import {
     ChildLogger,
     raiseConnectedEvent,
-    PerformanceEvent,
 } from "@fluidframework/telemetry-utils";
-import { IDocumentStorageService, ISummaryContext } from "@fluidframework/driver-definitions";
+import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     BlobCacheStorageService,
     buildSnapshotTree,
@@ -58,11 +56,9 @@ import {
     ISequencedDocumentMessage,
     ISignalMessage,
     ISnapshotTree,
-    ISummaryContent,
     ISummaryTree,
     ITree,
     MessageType,
-    IVersion,
     SummaryType,
 } from "@fluidframework/protocol-definitions";
 import {
@@ -77,7 +73,6 @@ import {
     IInboundSignalMessage,
     ISignalEnvelop,
     NamedFluidDataStoreRegistryEntries,
-    ISummaryTreeWithStats,
     ISummaryStats,
     ISummarizeInternalResult,
     SummarizeInternalFn,
@@ -108,7 +103,6 @@ import {
 import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { debug } from "./debug";
-import { ISummarizerRuntime, ISummarizerInternalsProvider } from "./summarizer";
 import { DeltaScheduler } from "./deltaScheduler";
 import { ReportOpPerfTelemetry } from "./connectionTelemetry";
 import { PendingStateManager } from "./pendingStateManager";
@@ -169,8 +163,6 @@ export interface ISubmittedSummaryData extends IGeneratedSummaryData, IUploadedS
     readonly clientSequenceNumber: number;
     readonly submitOpDuration?: number;
 }
-
-export type GenerateSummaryData = IUnsubmittedSummaryData | ISubmittedSummaryData;
 
 interface IRuntimeMessageMetadata {
     batch?: boolean;
@@ -393,9 +385,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     implements
         IContainerRuntime,
         IContainerRuntimeDirtyable,
-        IRuntime,
-        ISummarizerRuntime,
-        ISummarizerInternalsProvider
+        IRuntime
 {
     public get IContainerRuntime() { return this; }
     public get IContainerRuntimeDirtyable() { return this; }
@@ -498,7 +488,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     private readonly _logger: ITelemetryLogger;
     // publicly visible logger, to be used by stores, summarize, etc.
     public readonly logger: ITelemetryLogger;
-    private latestSummaryAck: ISummaryContext;
     // back-compat: summarizerNode - remove all summary trackers
     private readonly summaryTracker: SummaryTracker;
 
@@ -558,10 +547,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
         this._logger = ChildLogger.create(this.logger, "ContainerRuntime");
 
-        this.latestSummaryAck = {
-            proposalHandle: undefined,
-            ackHandle: this.context.getLoadedFromVersion()?.id,
-        };
         this.summaryTracker = new SummaryTracker(
             "", // fullPath - the root is unnamed
             this.deltaManager.initialSequenceNumber, // referenceSequenceNumber - last acked summary ref seq number
@@ -1226,19 +1211,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return this.context.submitSignalFn(envelope);
     }
 
-    /**
-     * Returns a summary of the runtime at the current sequence number.
-     * @param fullTree - true to bypass optimizations and force a full summary tree.
-     * @param trackState - This tells whether we should track state from this summary.
-     */
-    private async summarize(fullTree: boolean = false, trackState: boolean = true): Promise<ISummaryTreeWithStats> {
-        // Summarizer node tracks the state from the summary. If trackState is true, use summarizer node to get
-        // the summary. Else, get the summary tree directly.
-        return trackState
-            ? await this.summarizerNode.summarize(fullTree) as ISummaryTreeWithStats
-            : await this.summarizeInternal(fullTree, false /* trackState */) as ISummaryTreeWithStats;
-    }
-
     private async summarizeInternal(fullTree: boolean, trackState: boolean): Promise<ISummarizeInternalResult> {
         const builder = new SummaryTreeBuilder();
 
@@ -1436,112 +1408,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return builder.summary;
     }
 
-    /** Implementation of ISummarizerInternalsProvider.generateSummary */
-    public async generateSummary(
-        fullTree: boolean = false,
-        safe: boolean = false,
-        summaryLogger: ITelemetryLogger,
-    ): Promise<GenerateSummaryData | undefined> {
-        const summaryRefSeqNum = this.deltaManager.lastSequenceNumber;
-        const message =
-            `Summary @${summaryRefSeqNum}:${this.deltaManager.minimumSequenceNumber}`;
-
-        this.summarizerNode.startSummary(summaryRefSeqNum, summaryLogger);
-
-        try {
-            await this.deltaManager.inbound.pause();
-
-            const attemptData: Omit<IUnsubmittedSummaryData, "reason"> = {
-                referenceSequenceNumber: summaryRefSeqNum,
-                submitted: false,
-            };
-
-            if (!this.connected) {
-                // If summarizer loses connection it will never reconnect
-                return { ...attemptData, reason: "disconnected" };
-            }
-
-            const trace = Trace.start();
-            const treeWithStats = await this.summarize(fullTree || safe, true /* trackState */);
-
-            const generateData: IGeneratedSummaryData = {
-                summaryStats: treeWithStats.stats,
-                generateDuration: trace.trace().duration,
-            };
-
-            if (!this.connected) {
-                return { ...attemptData, ...generateData, reason: "disconnected" };
-            }
-
-            // Ensure that lastSequenceNumber has not changed after pausing
-            const lastSequenceNumber = this.deltaManager.lastSequenceNumber;
-            assert(
-                lastSequenceNumber === summaryRefSeqNum,
-                `lastSequenceNumber changed while paused. ${lastSequenceNumber} !== ${summaryRefSeqNum}`,
-            );
-
-            const handle = await this.storage.uploadSummaryWithContext(
-                treeWithStats.summary,
-                this.latestSummaryAck);
-
-            // safe mode refreshes the latest summary ack
-            if (safe) {
-                const version = await this.getVersionFromStorage(this.id);
-                await this.refreshLatestSummaryAck(
-                    undefined,
-                    version.id,
-                    this.summaryTracker.referenceSequenceNumber,
-                    new ChildLogger(summaryLogger, undefined, { safeSummary: true }),
-                    version,
-                );
-            }
-
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const parent = this.latestSummaryAck.ackHandle!;
-            const summaryMessage: ISummaryContent = {
-                handle,
-                head: parent,
-                message,
-                parents: parent ? [parent] : [],
-            };
-            const uploadData: IUploadedSummaryData = {
-                handle,
-                uploadDuration: trace.trace().duration,
-            };
-
-            if (!this.connected) {
-                return { ...attemptData, ...generateData, ...uploadData, reason: "disconnected" };
-            }
-
-            // We need the summary op's reference sequence number to match our summary sequence number
-            // Otherwise we'll get the wrong sequence number stamped on the summary's .protocol attributes
-            assert(
-                this.deltaManager.lastSequenceNumber === summaryRefSeqNum,
-                `lastSequenceNumber changed before the summary op could be submitted. `
-                + `${this.deltaManager.lastSequenceNumber} !== ${summaryRefSeqNum}`,
-            );
-
-            const clientSequenceNumber =
-                this.submitSystemMessage(MessageType.Summarize, summaryMessage);
-
-            this.summarizerNode.completeSummary(handle);
-
-            return {
-                ...attemptData,
-                ...generateData,
-                ...uploadData,
-                submitted: true,
-                clientSequenceNumber,
-                submitOpDuration: trace.trace().duration,
-            };
-        } finally {
-            // Cleanup wip summary in case of failure
-            this.summarizerNode.clearSummary();
-            // Restart the delta manager
-            this.deltaManager.inbound.resume();
-        }
-    }
-
     private processRemoteChunkedMessage(message: ISequencedDocumentMessage) {
         if (message.type !== ContainerMessageType.ChunkedOp) {
             return message;
@@ -1674,26 +1540,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return clientSequenceNumber;
     }
 
-    private submitSystemMessage(
-        type: MessageType,
-        contents: any) {
-        this.verifyNotClosed();
-        assert(this.connected);
-
-        // System message should not be sent in the middle of the batch.
-        // That said, we can preserve existing behavior by not flushing existing buffer.
-        // That might be not what caller hopes to get, but we can look deeper if telemetry tells us it's a problem.
-        const middleOfBatch = this.flushMode === FlushMode.Manual && this.needsFlush;
-        if (middleOfBatch) {
-            this._logger.sendErrorEvent({ eventName: "submitSystemMessageError", type });
-        }
-
-        return this.context.submitFn(
-            type,
-            contents,
-            middleOfBatch);
-    }
-
     private submitRuntimeMessage(
         type: ContainerMessageType,
         contents: any,
@@ -1761,66 +1607,5 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         const context = this.getContext(envelope.address);
         assert(!!context, "There should be a store context for the op");
         context.reSubmit(envelope.contents, localOpMetadata);
-    }
-
-    /** Implementation of ISummarizerInternalsProvider.refreshLatestSummaryAck */
-    public async refreshLatestSummaryAck(
-        proposalHandle: string | undefined,
-        ackHandle: string,
-        trackerRefSeqNum: number, // back-compat summarizerNode - remove when fully enabled
-        summaryLogger: ITelemetryLogger,
-        version?: IVersion,
-    ) {
-        if (trackerRefSeqNum < this.summaryTracker.referenceSequenceNumber) {
-            return;
-        }
-
-        this.latestSummaryAck = { proposalHandle, ackHandle };
-
-        // back-compat summarizerNode - remove all summary trackers when fully enabled
-        this.summaryTracker.refreshLatestSummary(trackerRefSeqNum);
-
-        const getSnapshot = async () => {
-            const perfEvent = PerformanceEvent.start(summaryLogger, {
-                eventName: "RefreshLatestSummaryGetSnapshot",
-                hasVersion: !!version, // expected in this case
-            });
-            const stats: { getVersionDuration?: number; getSnapshotDuration?: number } = {};
-            let snapshot: ISnapshotTree | undefined;
-            try {
-                const trace = Trace.start();
-
-                const versionToUse = version ?? await this.getVersionFromStorage(ackHandle);
-                stats.getVersionDuration = trace.trace().duration;
-
-                snapshot = await this.getSnapshotFromStorage(versionToUse);
-                stats.getSnapshotDuration = trace.trace().duration;
-            } catch (error) {
-                perfEvent.cancel(stats, error);
-                throw error;
-            }
-
-            perfEvent.end(stats);
-            return snapshot;
-        };
-
-        await this.summarizerNode.refreshLatestSummary(
-                proposalHandle,
-                getSnapshot,
-                async <T>(id: string) => readAndParse<T>(this.storage, id),
-                summaryLogger,
-            );
-        }
-
-    private async getVersionFromStorage(versionId: string): Promise<IVersion> {
-        const versions = await this.storage.getVersions(versionId, 1);
-        assert(!!versions && !!versions[0], "Failed to get version from storage");
-        return versions[0];
-    }
-
-    private async getSnapshotFromStorage(version: IVersion): Promise<ISnapshotTree> {
-        const snapshot = await this.storage.getSnapshotTree(version);
-        assert(!!snapshot, "Failed to get snapshot from storage");
-        return snapshot;
     }
 }
