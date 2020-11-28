@@ -13,14 +13,12 @@ import {
     IRequest,
     IResponse,
     IFluidRouter,
-    IFluidCodeDetails,
 } from "@fluidframework/core-interfaces";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     IClientDetails,
     IDocumentMessage,
     IHelpMessage,
-    IPendingProposal,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import {
@@ -30,7 +28,6 @@ import {
     IFluidDataStoreContextDetached,
     IProvideFluidDataStoreRegistry,
  } from "@fluidframework/runtime-definitions";
-import { IProvideContainerRuntimeDirtyable } from "./containerRuntimeDirtyable";
 
 declare module "@fluidframework/core-interfaces" {
     // eslint-disable-next-line @typescript-eslint/no-empty-interface
@@ -45,7 +42,7 @@ export interface IProvideContainerRuntime {
 
 export interface IContainerRuntimeEvents extends IContainerRuntimeBaseEvents{
     (
-        event: "dirtyDocument" | "disconnected" | "dispose" | "savedDocument",
+        event: "disconnected" | "dispose" | "savedDocument",
         listener: () => void);
     (event: "connected", listener: (clientId: string) => void);
     (event: "localHelp", listener: (message: IHelpMessage) => void);
@@ -63,7 +60,6 @@ export type IContainerRuntimeBaseWithCombinedEvents =
  */
 export interface IContainerRuntime extends
     IProvideContainerRuntime,
-    Partial<IProvideContainerRuntimeDirtyable>,
     IProvideFluidDataStoreRegistry,
     IContainerRuntimeBaseWithCombinedEvents {
     readonly existing: boolean;
@@ -109,12 +105,6 @@ export interface IContainerRuntime extends
      * Used to raise an unrecoverable error on the runtime.
      */
     raiseContainerWarning(warning: ContainerWarning): void;
-
-    /**
-     * Returns true of document is dirty, i.e. there are some pending local changes that
-     * either were not sent out to delta stream or were not yet acknowledged.
-     */
-    isDocumentDirty(): boolean;
 
     /**
      * Flushes any ops currently being batched to the loader

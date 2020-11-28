@@ -56,7 +56,6 @@ import {
     IVersion,
     MessageType,
     ISummaryTree,
-    IPendingProposal,
 } from "@fluidframework/protocol-definitions";
 import {
     EventEmitterWithErrorHandling,

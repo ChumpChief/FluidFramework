@@ -24,7 +24,6 @@ import {
 } from "@fluidframework/container-definitions";
 import {
     IContainerRuntime,
-    IContainerRuntimeDirtyable,
     IContainerRuntimeEvents,
 } from "@fluidframework/container-runtime-definitions";
 import {
@@ -370,13 +369,9 @@ class ContainerRuntimeDataStoreRegistry extends FluidDataStoreRegistry {
  * It will define the store level mappings.
  */
 export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
-    implements
-        IContainerRuntime,
-        IContainerRuntimeDirtyable,
-        IRuntime
+    implements IContainerRuntime, IRuntime
 {
     public get IContainerRuntime() { return this; }
-    public get IContainerRuntimeDirtyable() { return this; }
     public get IFluidRouter() { return this; }
 
     /**
@@ -487,8 +482,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
     // Stores tracked by the Domain
     private readonly pendingAttach = new Map<string, IAttachMessage>();
-    private dirtyDocument = false;
-    private emitDirtyDocumentEvent = true;
     private readonly deltaSender: IDeltaSender | undefined;
     private readonly scheduleManager: ScheduleManager;
     private readonly blobManager: BlobManager;
@@ -791,25 +784,8 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         // We need to be able to send ops to replay states
         if (!this.canSendOps()) { return; }
 
-        // We need to temporary clear the dirty flags and disable
-        // dirty state change events to detect whether replaying ops
-        // has any effect.
-
-        // Save the old state, reset to false, disable event emit
-        const oldState = this.dirtyDocument;
-        this.dirtyDocument = false;
-        this.emitDirtyDocumentEvent = false;
-
         // replay the ops
         this.pendingStateManager.replayPendingStates();
-
-        // Save the new start and restore the old state, re-enable event emit
-        const newState = this.dirtyDocument;
-        this.dirtyDocument = oldState;
-        this.emitDirtyDocumentEvent = true;
-
-        // Officially transition from the old state to the new state.
-        this.updateDocumentDirtyState(newState);
     }
 
     public setConnectionState(connected: boolean, clientId?: string) {
@@ -868,12 +844,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
                 // Do not process local chunked ops until all pieces are available.
                 if (message.type !== ContainerMessageType.ChunkedOp) {
                     localMessageMetadata = this.pendingStateManager.processPendingLocalMessage(message);
-                }
-
-                // If there are no more pending messages after processing a local message,
-                // the document is no longer dirty.
-                if (!this.pendingStateManager.hasPendingMessages()) {
-                    this.updateDocumentDirtyState(false);
                 }
             }
 
@@ -1103,29 +1073,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
     public raiseContainerWarning(warning: ContainerWarning) {
         this.context.raiseContainerWarning(warning);
-    }
-
-    /**
-     * Returns true of document is dirty, i.e. there are some pending local changes that
-     * either were not sent out to delta stream or were not yet acknowledged.
-     */
-    public isDocumentDirty(): boolean {
-        return this.dirtyDocument;
-    }
-
-    /**
-     * Will return true for any message that affect the dirty state of this document
-     * This function can be used to filter out any runtime operations that should not be affecting whether or not
-     * the IFluidDataStoreRuntime.isDocumentDirty call returns true/false
-     * @param type - The type of ContainerRuntime message that is being checked
-     * @param contents - The contents of the message that is being verified
-     */
-    public isMessageDirtyable(message: ISequencedDocumentMessage) {
-        assert(
-            isRuntimeMessage(message) === true,
-            "Message passed for dirtyable check should be a container runtime message",
-        );
-        return true;
     }
 
     /**
@@ -1370,17 +1317,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         }
     }
 
-    private updateDocumentDirtyState(dirty: boolean) {
-        if (this.dirtyDocument === dirty) {
-            return;
-        }
-
-        this.dirtyDocument = dirty;
-        if (this.emitDirtyDocumentEvent) {
-            this.emit(dirty ? "dirtyDocument" : "savedDocument");
-        }
-    }
-
     public submitDataStoreOp(
         id: string,
         contents: any,
@@ -1442,7 +1378,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
         // Let the PendingStateManager know that a message was submitted.
         this.pendingStateManager.onSubmitMessage(type, clientSequenceNumber, content, localOpMetadata, opMetadata);
-        this.updateDocumentDirtyState(true);
     }
 
     private submitChunkedMessage(type: ContainerMessageType, content: string, maxOpSize: number): number {
