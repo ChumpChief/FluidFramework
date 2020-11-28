@@ -34,7 +34,6 @@ import {
     LoaderCachingPolicy,
     IDocumentService,
     IDocumentStorageService,
-    IFluidResolvedUrl,
     IDocumentServiceFactory,
 } from "@fluidframework/driver-definitions";
 import {
@@ -472,7 +471,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public async attach(
-        createNewResolvedUrl: IFluidResolvedUrl,
+        storageUrl: string,
+        ordererUrl: string,
+        deltaStorageUrl: string,
         tenantId: string,
         documentId: string,
     ): Promise<void> {
@@ -514,9 +515,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 this.service = await this.serviceFactory.createContainer(
                     tenantId,
                     documentId,
-                    createNewResolvedUrl.endpoints.storageUrl,
-                    createNewResolvedUrl.endpoints.ordererUrl,
-                    createNewResolvedUrl.endpoints.deltaStorageUrl,
+                    storageUrl,
+                    ordererUrl,
+                    deltaStorageUrl,
                     this.cachedAttachSummary,
                 );
             }

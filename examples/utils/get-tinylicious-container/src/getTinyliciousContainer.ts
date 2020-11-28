@@ -8,19 +8,15 @@ import {
 } from "@fluidframework/container-definitions";
 import { Container } from "@fluidframework/container-loader";
 import {
-    DriverHeader,
     IDocumentServiceFactory,
-    IUrlResolver,
 } from "@fluidframework/driver-definitions";
 import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicious-driver";
 import { InsecureTinyliciousTokenProvider } from "./insecureTinyliciousTokenProvider";
-import { InsecureTinyliciousUrlResolver } from "./insecureTinyliciousUrlResolver";
 
 async function getContainer(
     tenantId: string,
     documentId: string,
     createNew: boolean,
-    urlResolver: IUrlResolver,
     documentServiceFactory: IDocumentServiceFactory,
     containerRuntimeFactory: IRuntimeFactory,
 ): Promise<Container> {
@@ -43,12 +39,13 @@ async function getContainer(
             undefined, // originalRequest
         );
         await container.initializeDetached();
-        const newRequest = { url: documentId, headers: { [DriverHeader.createNew]: {} } };
-        const createNewResolvedUrl = await urlResolver.resolve(newRequest);
-        if (createNewResolvedUrl === undefined) {
-            throw new Error("Could not resolve");
-        }
-        await container.attach(createNewResolvedUrl, tenantId, documentId);
+        await container.attach(
+            storageUrl,
+            ordererUrl,
+            deltaStorageUrl,
+            tenantId,
+            documentId,
+        );
     } else {
         container = await Container.load(
             tenantId,
@@ -84,13 +81,10 @@ export async function getTinyliciousContainer(
     const tokenProvider = new InsecureTinyliciousTokenProvider(documentId);
     const documentServiceFactory = new RouterliciousDocumentServiceFactory(tokenProvider);
 
-    const urlResolver = new InsecureTinyliciousUrlResolver();
-
     return getContainer(
         "tinylicious", // tenantId
         documentId,
         createNew,
-        urlResolver,
         documentServiceFactory,
         containerRuntimeFactory,
     );
