@@ -19,7 +19,6 @@ import {
     IContainer,
     IContainerEvents,
     IDeltaManager,
-    IRuntimeState,
     ICriticalContainerError,
     ContainerWarning,
     IThrottlingWarning,
@@ -1254,7 +1253,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         runtimeFactory: IRuntimeFactory,
         attributes: IDocumentAttributes,
         snapshot?: ISnapshotTree,
-        previousRuntimeState: IRuntimeState = {},
     ) {
         assert(this._context?.disposed !== false, "Existing context not disposed");
         this._context = await ContainerContext.createOrLoad(
@@ -1270,7 +1268,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             async (message) => this.snapshot(message),
             (error?: ICriticalContainerError) => this.close(error),
             Container.version,
-            previousRuntimeState,
         );
     }
 

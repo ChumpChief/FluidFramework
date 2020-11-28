@@ -14,7 +14,6 @@ import {
     IContainerContext,
     IDeltaManager,
     IRuntime,
-    IRuntimeState,
     ICriticalContainerError,
     ContainerWarning,
     AttachState,
@@ -52,7 +51,6 @@ export class ContainerContext implements IContainerContext {
         snapshotFn: (message: string) => Promise<void>,
         closeFn: (error?: ICriticalContainerError) => void,
         version: string,
-        previousRuntimeState: IRuntimeState,
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
             container,
@@ -67,7 +65,7 @@ export class ContainerContext implements IContainerContext {
             snapshotFn,
             closeFn,
             version,
-            previousRuntimeState);
+        );
         await context.load();
         return context;
     }
@@ -152,7 +150,6 @@ export class ContainerContext implements IContainerContext {
         public readonly snapshotFn: (message: string) => Promise<void>,
         public readonly closeFn: (error?: ICriticalContainerError) => void,
         public readonly version: string,
-        public readonly previousRuntimeState: IRuntimeState,
     ) {
         this.logger = container.subLogger;
         this.attachListener();

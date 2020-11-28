@@ -41,14 +41,6 @@ export enum BindState {
 }
 
 /**
- * Represents the data that will be preserved from the previous IRuntime during a context reload.
- */
-export interface IRuntimeState {
-    snapshot?: ITree,
-    state?: unknown,
-}
-
-/**
  * The IRuntime represents an instantiation of a code package within a Container.
  * Primarily held by the ContainerContext to be able to interact with the running instance of the Container.
  */
@@ -119,7 +111,6 @@ export interface IContainerContext extends IDisposable {
     readonly logger: ITelemetryLogger;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
     readonly version: string;
-    readonly previousRuntimeState: IRuntimeState;
 
     raiseContainerWarning(warning: ContainerWarning): void;
     requestSnapshot(tagMessage: string): Promise<void>;
