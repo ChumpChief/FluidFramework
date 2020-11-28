@@ -724,7 +724,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      *   - otherwise, version sha to load snapshot
      * @param pause - start the container in a paused state
      */
-    private async load(
+    public async load(
         tenantId: string,
         documentId: string,
         storageUrl: string,

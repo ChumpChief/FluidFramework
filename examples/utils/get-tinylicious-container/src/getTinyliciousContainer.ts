@@ -46,17 +46,22 @@ async function getContainer(
             documentId,
         );
     } else {
-        container = await Container.load(
-            tenantId,
-            documentId,
+        container = new Container(
             containerRuntimeFactory,
             documentServiceFactory,
-            {}, // options
+            {},
             true, // canReconnect
+            documentId,
+        );
+
+        await container.load(
+            tenantId,
+            documentId,
             storageUrl,
             ordererUrl,
             deltaStorageUrl,
         );
+
         // If we didn't create the container properly, then it won't function correctly.  So we'll throw if we got a
         // new container here, where we expect this to be loading an existing container.
         // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
