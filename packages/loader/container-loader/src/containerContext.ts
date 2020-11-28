@@ -199,13 +199,6 @@ export class ContainerContext implements IContainerContext {
         return this.container.loadedFromVersion;
     }
 
-    /**
-     * Snapshot and close the runtime, and return its state if available
-     */
-    public async snapshotRuntimeState(): Promise<IRuntimeState> {
-        return this.runtime.stop();
-    }
-
     public get attachState(): AttachState {
         return this.container.attachState;
     }

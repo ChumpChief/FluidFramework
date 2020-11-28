@@ -20,7 +20,6 @@ import {
     IDeltaManager,
     IDeltaSender,
     IRuntime,
-    IRuntimeState,
     ContainerWarning,
     ICriticalContainerError,
     AttachState,
@@ -985,22 +984,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
     public async requestSnapshot(tagMessage: string): Promise<void> {
         return this.context.requestSnapshot(tagMessage);
-    }
-
-    public async stop(): Promise<IRuntimeState> {
-        this.verifyNotClosed();
-
-        const snapshot = await this.snapshot();
-        const state: IPreviousState = {
-            reload: true,
-            summaryCollection: this.summarizer.summaryCollection,
-            nextSummarizerP: this.nextSummarizerP,
-            nextSummarizerD: this.nextSummarizerD,
-        };
-
-        this.dispose(new Error("ContainerRuntimeStopped"));
-
-        return { snapshot, state };
     }
 
     private replayPendingStates() {
