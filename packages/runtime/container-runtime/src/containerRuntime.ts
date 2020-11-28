@@ -533,7 +533,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
         this.IFluidSerializer = new FluidSerializer(this.IFluidHandleContext);
 
-        this.logger = ChildLogger.create(context.logger, undefined, {
+        this.logger = ChildLogger.create(undefined, undefined, {
             runtimeVersion: pkgVersion,
         });
 

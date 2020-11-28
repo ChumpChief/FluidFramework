@@ -155,9 +155,7 @@ export async function waitContainerToCatchUp(container: Container) {
 }
 
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
-    public static version = "^0.1.0";
-
-    public subLogger: TelemetryLogger;
+    private readonly subLogger: TelemetryLogger;
 
     private readonly logger: ITelemetryLogger;
 
@@ -1141,7 +1139,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
             (error?: ICriticalContainerError) => this.close(error),
-            Container.version,
         );
     }
 
