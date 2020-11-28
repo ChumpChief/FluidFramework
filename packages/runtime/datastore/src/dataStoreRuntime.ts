@@ -149,7 +149,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
     private boundhandles: Set<IFluidHandle> | undefined;
     private _attachState: AttachState;
 
-    public readonly documentId: string;
     public readonly id: string;
     public existing: boolean;
     public readonly options: any;
@@ -165,7 +164,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
         super();
 
         this.logger = ChildLogger.create(undefined, undefined, { dataStoreId: uuid() });
-        this.documentId = dataStoreContext.documentId;
         this.id = dataStoreContext.id;
         this.existing = dataStoreContext.existing;
         this.options = {}; // TODO remove

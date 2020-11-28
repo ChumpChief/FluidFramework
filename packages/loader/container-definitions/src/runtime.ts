@@ -92,7 +92,6 @@ export interface IRuntime extends IDisposable {
  * and the Container has created a new ContainerContext.
  */
 export interface IContainerContext extends IDisposable {
-    readonly id: string;
     readonly existing: boolean | undefined;
     readonly configuration: IFluidConfiguration;
     readonly clientId: string | undefined;

@@ -70,10 +70,6 @@ export class ContainerContext implements IContainerContext {
 
     public readonly logger: ITelemetryLogger;
 
-    public get id(): string {
-        return this.container.id;
-    }
-
     public get clientId(): string | undefined {
         return this.container.clientId;
     }

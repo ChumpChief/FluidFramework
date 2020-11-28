@@ -575,12 +575,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     /**
      * Load container.
-     *
-     * @param specifiedVersion - one of the following
-     *   - null: use ops, no snapshots
-     *   - undefined - fetch latest snapshot
-     *   - otherwise, version sha to load snapshot
-     * @param pause - start the container in a paused state
      */
     public async load(
         runtimeFactory: IRuntimeFactory,

@@ -67,7 +67,6 @@ export interface IContainerRuntime extends
     Partial<IProvideContainerRuntimeDirtyable>,
     IProvideFluidDataStoreRegistry,
     IContainerRuntimeBaseWithCombinedEvents {
-    readonly id: string;
     readonly existing: boolean;
     readonly clientId: string | undefined;
     readonly clientDetails: IClientDetails;
