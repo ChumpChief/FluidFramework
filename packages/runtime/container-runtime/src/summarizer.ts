@@ -100,10 +100,6 @@ export interface ISummarizerEvents extends IEvent {
 }
 export interface ISummarizer
     extends IEventProvider<ISummarizerEvents>, IFluidRouter, IFluidRunnable, IFluidLoadable {
-    /**
-     * Returns a promise that will be resolved with the next Summarizer after context reload
-     */
-    setSummarizer(): Promise<Summarizer>;
     stop(reason?: string): void;
     run(onBehalfOf: string): Promise<void>;
     updateOnBehalfOf(onBehalfOf: string): void;
@@ -114,7 +110,6 @@ export interface ISummarizerRuntime extends IConnectableRuntime {
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly previousState: IPreviousState;
     readonly summarizerClientId: string | undefined;
-    nextSummarizerD?: Deferred<Summarizer>;
     closeFn(): void;
     on(event: "batchEnd", listener: (error: any, op: ISequencedDocumentMessage) => void): this;
     on(event: "disconnected", listener: () => void): this;
@@ -643,7 +638,6 @@ export class Summarizer extends EventEmitter implements ISummarizer {
         this.runtime.deltaManager.inbound.on("op",
             (op) => this.summaryCollection.handleOp(op));
 
-        this.runtime.previousState.nextSummarizerD?.resolve(this);
         this.innerHandle = new SummarizerHandle(this, url, handleContext);
     }
 
@@ -815,11 +809,6 @@ export class Summarizer extends EventEmitter implements ISummarizer {
         if (this.opListener) {
             this.runtime.removeListener("batchEnd", this.opListener);
         }
-    }
-
-    public async setSummarizer(): Promise<Summarizer> {
-        this.runtime.nextSummarizerD = new Deferred<Summarizer>();
-        return this.runtime.nextSummarizerD.promise;
     }
 
     /** Implementation of SummarizerInternalsProvider.generateSummary */

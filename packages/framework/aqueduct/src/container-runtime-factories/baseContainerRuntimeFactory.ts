@@ -5,7 +5,6 @@
 
 import { IContainerContext, IRuntime, IRuntimeFactory } from "@fluidframework/container-definitions";
 import {
-    IContainerRuntimeOptions,
     FluidDataStoreRegistry,
     ContainerRuntime,
 } from "@fluidframework/container-runtime";
@@ -22,7 +21,6 @@ import {
     IProvideFluidDataStoreRegistry,
     NamedFluidDataStoreRegistryEntries,
 } from "@fluidframework/runtime-definitions";
-import { DependencyContainerRegistry } from "@fluidframework/synthesize";
 
 /**
  * BaseContainerRuntimeFactory produces container runtimes with a given data store and service registry, as well as
@@ -44,9 +42,7 @@ export class BaseContainerRuntimeFactory implements
      */
     constructor(
         private readonly registryEntries: NamedFluidDataStoreRegistryEntries,
-        providerEntries: DependencyContainerRegistry = [],
         private readonly requestHandlers: RuntimeRequestHandler[] = [],
-        private readonly runtimeOptions?: IContainerRuntimeOptions,
     ) {
         this.registry = new FluidDataStoreRegistry(registryEntries);
     }
@@ -63,7 +59,6 @@ export class BaseContainerRuntimeFactory implements
             buildRuntimeRequestHandler(
                 ...this.requestHandlers,
                 innerRequestHandler),
-            this.runtimeOptions,
         );
 
         if (!runtime.existing) {

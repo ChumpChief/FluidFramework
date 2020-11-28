@@ -154,11 +154,6 @@ export interface ContainerRuntimeMessage {
 export interface IPreviousState {
     summaryCollection?: SummaryCollection,
     reload?: boolean,
-
-    // only one (or zero) of these will be defined. the summarizing Summarizer will resolve the deferred promise, and
-    // the SummaryManager that spawned it will have that deferred's promise
-    nextSummarizerP?: Promise<Summarizer>,
-    nextSummarizerD?: Deferred<Summarizer>,
 }
 
 export interface IGeneratedSummaryData {
@@ -200,18 +195,6 @@ const DefaultSummaryConfiguration: ISummaryConfiguration = {
     // Wait 2 minutes for summary ack
     maxAckWaitTime: 120000,
 };
-
-/**
- * Options for container runtime.
- */
-export interface IContainerRuntimeOptions {
-    // Flag that will generate summaries if connected to a service that supports them.
-    // This defaults to true and must be explicitly set to false to disable.
-    generateSummaries?: boolean;
-
-    // Delay before first attempt to spawn summarizing container
-    initialSummarizerDelayMs?: number;
-}
 
 interface IRuntimeMessageMetadata {
     batch?: boolean;
@@ -456,7 +439,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         context: IContainerContext,
         registryEntries: NamedFluidDataStoreRegistryEntries,
         requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
-        runtimeOptions?: IContainerRuntimeOptions,
     ): Promise<ContainerRuntime> {
         const registry = new ContainerRuntimeDataStoreRegistry(registryEntries);
 
@@ -469,7 +451,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             context,
             registry,
             chunks,
-            runtimeOptions,
             requestHandler);
 
         return runtime;
@@ -544,9 +525,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return (this.context as any).isAttached() ? AttachState.Attached : AttachState.Detached;
     }
 
-    public nextSummarizerP?: Promise<Summarizer>;
-    public nextSummarizerD?: Deferred<Summarizer>;
-
     // Back compat: 0.28, can be removed in 0.29
     public readonly IFluidSerializer: IFluidSerializer;
 
@@ -613,9 +591,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         private readonly context: IContainerContext,
         private readonly registry: IFluidDataStoreRegistry,
         chunks: [string, string[]][],
-        private readonly runtimeOptions: IContainerRuntimeOptions = {
-            generateSummaries: true,
-        },
         private readonly requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>,
     ) {
         super();
@@ -775,12 +750,10 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         this.summaryManager = new SummaryManager(
             this.context.createSummaryContainer,
             context,
-            this.runtimeOptions.generateSummaries !== false,
+            true,
             this.logger,
-            (summarizer) => { this.nextSummarizerP = summarizer; },
-            this.previousState.nextSummarizerP,
             !!this.previousState.reload,
-            this.runtimeOptions.initialSummarizerDelayMs);
+        );
 
         if (this.connected) {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
