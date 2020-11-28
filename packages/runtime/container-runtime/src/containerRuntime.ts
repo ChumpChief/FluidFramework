@@ -58,7 +58,6 @@ import {
     ISequencedDocumentMessage,
     ISignalMessage,
     ISnapshotTree,
-    ISummaryConfiguration,
     ISummaryContent,
     ISummaryTree,
     ITree,
@@ -109,7 +108,7 @@ import {
 import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { debug } from "./debug";
-import { ISummarizerRuntime, ISummarizerInternalsProvider, Summarizer } from "./summarizer";
+import { ISummarizerRuntime, ISummarizerInternalsProvider } from "./summarizer";
 import { DeltaScheduler } from "./deltaScheduler";
 import { ReportOpPerfTelemetry } from "./connectionTelemetry";
 import { PendingStateManager } from "./pendingStateManager";
@@ -172,21 +171,6 @@ export interface ISubmittedSummaryData extends IGeneratedSummaryData, IUploadedS
 }
 
 export type GenerateSummaryData = IUnsubmittedSummaryData | ISubmittedSummaryData;
-
-// Consider idle 5s of no activity. And snapshot if a minute has gone by with no snapshot.
-const IdleDetectionTime = 5000;
-
-const DefaultSummaryConfiguration: ISummaryConfiguration = {
-    idleTime: IdleDetectionTime,
-
-    maxTime: IdleDetectionTime * 12,
-
-    // Snapshot if 1000 ops received since last snapshot.
-    maxOps: 1000,
-
-    // Wait 2 minutes for summary ack
-    maxAckWaitTime: 120000,
-};
 
 interface IRuntimeMessageMetadata {
     batch?: boolean;
@@ -533,12 +517,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return this._connected;
     }
 
-    private get summaryConfiguration() {
-        return this.context.serviceConfiguration
-            ? { ...DefaultSummaryConfiguration, ...this.context.serviceConfiguration.summary }
-            : DefaultSummaryConfiguration;
-    }
-
     private _disposed = false;
     public get disposed() { return this._disposed; }
 
@@ -546,7 +524,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     private readonly pendingAttach = new Map<string, IAttachMessage>();
     private dirtyDocument = false;
     private emitDirtyDocumentEvent = true;
-    private readonly summarizer: Summarizer;
     private readonly deltaSender: IDeltaSender | undefined;
     private readonly scheduleManager: ScheduleManager;
     private readonly blobManager: BlobManager;
@@ -702,18 +679,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             }
         });
 
-        // We always create the summarizer in the case that we are asked to generate summaries. But this may
-        // want to be on demand instead.
-        // Don't use optimizations when generating summaries with a document loaded using snapshots.
-        // This will ensure we correctly convert old documents.
-        this.summarizer = new Summarizer(
-            "/_summarizer",
-            this /* ISummarizerRuntime */,
-            () => this.summaryConfiguration,
-            this /* ISummarizerInternalsProvider */,
-            this.IFluidHandleContext,
-        );
-
         this.deltaManager.on("readonly", (readonly: boolean) => {
             // we accumulate ops while being in read-only state.
             // once user gets write permissions and we have active connection, flush all pending ops.
@@ -754,8 +719,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             message: error?.message,
         });
 
-        this.summarizer.dispose();
-
         // close/stop all store contexts
         for (const [fluidDataStoreId, contextD] of this.contextsDeferred) {
             contextD.promise.then((context) => {
@@ -787,15 +750,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
      */
     public async request(request: IRequest): Promise<IResponse> {
         const parser = RequestParser.create(request);
-        const id = parser.pathParts[0];
 
-        if (id === "_summarizer" && parser.pathParts.length === 1) {
-            return {
-                status: 200,
-                mimeType: "fluid/object",
-                value: this.summarizer,
-            };
-        }
         if (this.requestHandler !== undefined) {
             return this.requestHandler(parser, this);
         }
