@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IEventProvider, IErrorEvent, ITelemetryBaseLogger } from "@fluidframework/common-definitions";
+import { IEventProvider, IErrorEvent } from "@fluidframework/common-definitions";
 import {
     ConnectionMode,
     IClient,
@@ -239,7 +239,6 @@ export interface IDocumentServiceFactory {
         deltaStorageUrl: string,
         tenantId: string,
         documentId: string,
-        logger?: ITelemetryBaseLogger,
     ): Promise<IDocumentService>;
 
     // Creates a new document on the host with the provided options. Returns the document service.
