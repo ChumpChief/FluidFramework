@@ -140,7 +140,7 @@ export class SummaryManager extends EventEmitter implements IDisposable {
     private readonly logger: ITelemetryLogger;
     private readonly quorumHeap = new QuorumHeap();
     private readonly initialDelayP: Promise<IPromiseTimerResult | void>;
-    private readonly initialDelayTimer?: PromiseTimer;
+    private readonly initialDelayTimer: PromiseTimer;
     private summarizerClientId?: string;
     private clientId?: string;
     private latestClientId?: string;
@@ -166,10 +166,7 @@ export class SummaryManager extends EventEmitter implements IDisposable {
     constructor(
         private readonly createSummaryContainer: () => Promise<IContainer>,
         private readonly context: IContainerContext,
-        private readonly summariesEnabled: boolean,
         parentLogger: ITelemetryLogger,
-        immediateSummary: boolean = false,
-        initialDelayMs: number = defaultInitialDelayMs,
     ) {
         super();
 
@@ -202,8 +199,8 @@ export class SummaryManager extends EventEmitter implements IDisposable {
             this.refreshSummarizer();
         });
 
-        this.initialDelayTimer = immediateSummary ? undefined : new PromiseTimer(initialDelayMs, () => { });
-        this.initialDelayP = this.initialDelayTimer?.start() ?? Promise.resolve();
+        this.initialDelayTimer = new PromiseTimer(defaultInitialDelayMs, () => { });
+        this.initialDelayP = this.initialDelayTimer.start();
 
         this.refreshSummarizer();
     }
@@ -305,12 +302,6 @@ export class SummaryManager extends EventEmitter implements IDisposable {
     }
 
     private start() {
-        if (!this.summariesEnabled) {
-            // If we should never summarize, lock in disabled state
-            this.logger.sendTelemetryEvent({ eventName: "SummariesDisabled" });
-            this.state = SummaryManagerState.Disabled;
-            return;
-        }
         if (this.context.clientDetails.type === summarizerClientType) {
             // Make sure that the summarizer client does not load another summarizer.
             this.state = SummaryManagerState.Disabled;
