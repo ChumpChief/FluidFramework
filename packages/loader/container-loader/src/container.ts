@@ -690,12 +690,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
         });
 
-        protocol.quorum.on("addProposal",(proposal: IPendingProposal) => {
-            if (proposal.key === "code" || proposal.key === "code2") {
-                this.emit("codeDetailsProposed", proposal.value, proposal);
-            }
-        });
-
         return protocol;
     }
 

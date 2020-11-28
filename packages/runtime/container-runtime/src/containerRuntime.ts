@@ -626,12 +626,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             this.clearPartialChunks(clientId);
         });
 
-        this.context.quorum.on("addProposal", (proposal) => {
-            if (proposal.key === "code" || proposal.key === "code2") {
-                this.emit("codeDetailsProposed", proposal.value, proposal);
-            }
-        });
-
         this.deltaManager.on("readonly", (readonly: boolean) => {
             // we accumulate ops while being in read-only state.
             // once user gets write permissions and we have active connection, flush all pending ops.
