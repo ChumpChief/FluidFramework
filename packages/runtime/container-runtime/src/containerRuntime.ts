@@ -111,7 +111,6 @@ import { ContainerFluidHandleContext } from "./containerHandleContext";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { debug } from "./debug";
 import { ISummarizerRuntime, ISummarizerInternalsProvider, Summarizer } from "./summarizer";
-import { SummaryManager } from "./summaryManager";
 import { DeltaScheduler } from "./deltaScheduler";
 import { ReportOpPerfTelemetry } from "./connectionTelemetry";
 import { PendingStateManager } from "./pendingStateManager";
@@ -528,7 +527,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     private readonly _logger: ITelemetryLogger;
     // publicly visible logger, to be used by stores, summarize, etc.
     public readonly logger: ITelemetryLogger;
-    private readonly summaryManager: SummaryManager;
     private latestSummaryAck: ISummaryContext;
     // back-compat: summarizerNode - remove all summary trackers
     private readonly summaryTracker: SummaryTracker;
@@ -546,10 +544,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
     public get connected(): boolean {
         return this._connected;
-    }
-
-    public get summarizerClientId(): string | undefined {
-        return this.summaryManager.summarizer;
     }
 
     private get summaryConfiguration() {
@@ -733,18 +727,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             this.IFluidHandleContext,
         );
 
-        // Create the SummaryManager and mark the initial state
-        this.summaryManager = new SummaryManager(
-            this.context.createSummaryContainer,
-            context,
-            this.logger,
-        );
-
-        if (this.connected) {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            this.summaryManager.setConnected(this.context.clientId!);
-        }
-
         this.deltaManager.on("readonly", (readonly: boolean) => {
             // we accumulate ops while being in read-only state.
             // once user gets write permissions and we have active connection, flush all pending ops.
@@ -785,7 +767,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             message: error?.message,
         });
 
-        this.summaryManager.dispose();
         this.summarizer.dispose();
 
         // close/stop all store contexts
@@ -996,9 +977,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
         if (connected) {
             assert(!!clientId);
-            this.summaryManager.setConnected(clientId);
-        } else {
-            this.summaryManager.setDisconnected();
         }
     }
 

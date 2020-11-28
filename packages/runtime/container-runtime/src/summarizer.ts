@@ -108,7 +108,6 @@ export interface ISummarizer
 export interface ISummarizerRuntime extends IConnectableRuntime {
     readonly logger: ITelemetryLogger;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-    readonly summarizerClientId: string | undefined;
     closeFn(): void;
     on(event: "batchEnd", listener: (error: any, op: ISequencedDocumentMessage) => void): this;
     on(event: "disconnected", listener: () => void): this;
@@ -710,25 +709,6 @@ export class Summarizer extends EventEmitter implements ISummarizer {
             return;
         }
 
-        if (this.runtime.summarizerClientId !== this.onBehalfOfClientId
-            && this.runtime.summarizerClientId !== this.runtime.clientId) {
-            // Verify that this client's computed summarizer matches the client this was spawned
-            // on behalf of.  If not, fallback on the following logic before stopping:
-            // If we are not oldest client in quorum, another client will take over as summarizer.
-            // We want to make sure we at least try to summarize in case server is rejecting ops,
-            // so if we are the oldest client, we will still go through and try to summarize at least once.
-            // We also don't want to end up with two summarizer clients running at the same time,
-            // so we bypass running altogether if this client isn't the oldest.
-            this.logger.sendTelemetryEvent({
-                eventName: "NotStarted",
-                reason: "DifferentComputedSummarizer",
-                computedSummarizer: this.runtime.summarizerClientId,
-                onBehalfOf,
-                clientId: this.runtime.clientId,
-            });
-            return;
-        }
-
         // Initialize values and first ack (time is not exact)
         this.logger.sendTelemetryEvent({
             eventName: "RunningSummarizer",
@@ -809,13 +789,6 @@ export class Summarizer extends EventEmitter implements ISummarizer {
         safe: boolean,
         summaryLogger: ITelemetryLogger,
     ): Promise<GenerateSummaryData | undefined> {
-        if (this.onBehalfOfClientId !== this.runtime.summarizerClientId
-            && this.runtime.clientId !== this.runtime.summarizerClientId) {
-            // We are no longer the summarizer; a different client is, so we should stop ourself
-            this.stop("parentNoLongerSummarizer");
-            return undefined;
-        }
-
         return this.internalsProvider.generateSummary(full, safe, summaryLogger);
     }
 
