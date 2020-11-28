@@ -203,7 +203,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private messageCountAfterDisconnection: number = 0;
     private _loadedFromVersion: IVersion | undefined;
     private cachedAttachSummary: ISummaryTree | undefined;
-    private attachInProgress = false;
 
     private lastVisible: number | undefined;
 
@@ -412,65 +411,60 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         assert(!this.closed, "closed");
 
         // If container is already attached or attach is in progress, return.
-        if (this._attachState === AttachState.Attached || this.attachInProgress) {
+        if (this._attachState === AttachState.Attached) {
             return;
         }
 
-        this.attachInProgress = true;
-        try {
-            assert(this.deltaManager.inbound.length === 0, "Inbound queue should be empty when attaching");
-            // Only take a summary if the container is in detached state, otherwise we could have local changes.
-            // In failed attach call, we would already have a summary cached.
-            if (this._attachState === AttachState.Detached) {
-                // Get the document state post attach - possibly can just call attach but we need to change the
-                // semantics around what the attach means as far as async code goes.
-                const appSummary: ISummaryTree = this.context.createSummary();
-                if (this.protocolHandler === undefined) {
-                    throw new Error("Protocol Handler is undefined");
-                }
-                const protocolSummary = this.protocolHandler.captureSummary();
-                this.cachedAttachSummary = combineAppAndProtocolSummary(appSummary, protocolSummary);
-
-                // Set the state as attaching as we are starting the process of attaching container.
-                // This should be fired after taking the summary because it is the place where we are
-                // starting to attach the container to storage.
-                // Also, this should only be fired in detached container.
-                this._attachState = AttachState.Attaching;
-                this.emit("attaching");
+        assert(this.deltaManager.inbound.length === 0, "Inbound queue should be empty when attaching");
+        // Only take a summary if the container is in detached state, otherwise we could have local changes.
+        // In failed attach call, we would already have a summary cached.
+        if (this._attachState === AttachState.Detached) {
+            // Get the document state post attach - possibly can just call attach but we need to change the
+            // semantics around what the attach means as far as async code goes.
+            const appSummary: ISummaryTree = this.context.createSummary();
+            if (this.protocolHandler === undefined) {
+                throw new Error("Protocol Handler is undefined");
             }
-            assert(!!this.cachedAttachSummary,
-                "Summary should be there either by this attach call or previous attach call!!");
+            const protocolSummary = this.protocolHandler.captureSummary();
+            this.cachedAttachSummary = combineAppAndProtocolSummary(appSummary, protocolSummary);
 
-            // Actually go and create the resolved document
-            if (this.service === undefined) {
-                this.service = await this.serviceFactory.createContainer(
-                    tenantId,
-                    documentId,
-                    storageUrl,
-                    ordererUrl,
-                    deltaStorageUrl,
-                    this.cachedAttachSummary,
-                );
-            }
-
-            this._id = documentId;
-
-            if (this._storageService === undefined) {
-                this._storageService = await this.getDocumentStorageService();
-            }
-
-            // This we can probably just pass the storage service to the blob manager - although ideally
-            // there just isn't a blob manager
-            this._attachState = AttachState.Attached;
-            this.emit("attached");
-            this.cachedAttachSummary = undefined;
-
-            // Propagate current connection state through the system.
-            this.propagateConnectionState();
-            this.resumeInternal({ fetchOpsFromStorage: false, reason: "createDetached" });
-        } finally {
-            this.attachInProgress = false;
+            // Set the state as attaching as we are starting the process of attaching container.
+            // This should be fired after taking the summary because it is the place where we are
+            // starting to attach the container to storage.
+            // Also, this should only be fired in detached container.
+            this._attachState = AttachState.Attaching;
+            this.emit("attaching");
         }
+        assert(!!this.cachedAttachSummary,
+            "Summary should be there either by this attach call or previous attach call!!");
+
+        // Actually go and create the resolved document
+        if (this.service === undefined) {
+            this.service = await this.serviceFactory.createContainer(
+                tenantId,
+                documentId,
+                storageUrl,
+                ordererUrl,
+                deltaStorageUrl,
+                this.cachedAttachSummary,
+            );
+        }
+
+        this._id = documentId;
+
+        if (this._storageService === undefined) {
+            this._storageService = await this.getDocumentStorageService();
+        }
+
+        // This we can probably just pass the storage service to the blob manager - although ideally
+        // there just isn't a blob manager
+        this._attachState = AttachState.Attached;
+        this.emit("attached");
+        this.cachedAttachSummary = undefined;
+
+        // Propagate current connection state through the system.
+        this.propagateConnectionState();
+        this.resumeInternal({ fetchOpsFromStorage: false, reason: "createDetached" });
     }
 
     public async request(path: IRequest): Promise<IResponse> {
@@ -652,12 +646,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Internal context is fully loaded at this point
         this.loaded = true;
-
-        return {
-            existing: this._existing,
-            sequenceNumber: attributes.sequenceNumber,
-            version: maybeSnapshotTree?.id ?? undefined,
-        };
     }
 
     public async initializeDetached(runtimeFactory: IRuntimeFactory) {
