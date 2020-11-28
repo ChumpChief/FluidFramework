@@ -441,10 +441,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return this.context.storage!;
     }
 
-    public get branch(): string {
-        return this.context.branch;
-    }
-
     public get reSubmitFn(): (
         type: ContainerMessageType,
         content: any,

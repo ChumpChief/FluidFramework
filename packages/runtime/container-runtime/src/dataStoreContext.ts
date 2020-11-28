@@ -122,10 +122,6 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
         return this._containerRuntime.connected;
     }
 
-    public get branch(): string {
-        return this._containerRuntime.branch;
-    }
-
     public get containerRuntime(): IContainerRuntime {
         return this._containerRuntime;
     }

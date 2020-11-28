@@ -255,7 +255,6 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
     readonly connected: boolean;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly storage: IDocumentStorageService;
-    readonly branch: string;
     readonly baseSnapshot: ISnapshotTree | undefined;
     /**
      * Indicates the attachment state of the data store to a host service.

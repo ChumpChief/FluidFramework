@@ -643,7 +643,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
         [this._protocolHandler] = await Promise.all([protocolHandlerP, loadDetailsP]);
 
-        await this.loadContext(runtimeFactory, attributes, maybeSnapshotTree);
+        await this.loadContext(runtimeFactory, maybeSnapshotTree);
 
         // Propagate current connection state through the system.
         this.propagateConnectionState();
@@ -685,7 +685,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             values);
 
         // The load context - given we seeded the quorum - will be great
-        await this.createDetachedContext(runtimeFactory, attributes);
+        await this.createDetachedContext(runtimeFactory);
 
         this.propagateConnectionState();
 
@@ -778,7 +778,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         values: [string, any][],
     ): ProtocolOpHandler {
         const protocol = new ProtocolOpHandler(
-            attributes.branch,
+            "", // branchId
             attributes.minimumSequenceNumber,
             attributes.sequenceNumber,
             attributes.term,
@@ -1140,7 +1140,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private async loadContext(
         runtimeFactory: IRuntimeFactory,
-        attributes: IDocumentAttributes,
         snapshot?: ISnapshotTree,
     ) {
         assert(this._context?.disposed !== false, "Existing context not disposed");
@@ -1148,7 +1147,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this,
             runtimeFactory,
             snapshot,
-            attributes,
             new DeltaManagerProxy(this._deltaManager),
             new QuorumProxy(this.protocolHandler.quorum),
             (warning: ContainerWarning) => this.raiseContainerWarning(warning),
@@ -1164,10 +1162,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     private async createDetachedContext(
         runtimeFactory: IRuntimeFactory,
-        attributes: IDocumentAttributes,
         snapshot?: ISnapshotTree,
     ) {
-        await this.loadContext(runtimeFactory, attributes, snapshot);
+        await this.loadContext(runtimeFactory, snapshot);
     }
 
     // Please avoid calling it directly.

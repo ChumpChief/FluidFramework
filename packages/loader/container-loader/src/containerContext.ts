@@ -22,7 +22,6 @@ import {
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     IClientDetails,
-    IDocumentAttributes,
     IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
@@ -42,7 +41,6 @@ export class ContainerContext implements IContainerContext {
         container: Container,
         runtimeFactory: IRuntimeFactory,
         baseSnapshot: ISnapshotTree | undefined,
-        attributes: IDocumentAttributes,
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         quorum: IQuorum,
         raiseContainerWarning: (warning: ContainerWarning) => void,
@@ -55,7 +53,6 @@ export class ContainerContext implements IContainerContext {
             container,
             runtimeFactory,
             baseSnapshot,
-            attributes,
             deltaManager,
             quorum,
             raiseContainerWarning,
@@ -80,10 +77,6 @@ export class ContainerContext implements IContainerContext {
 
     public get existing(): boolean | undefined {
         return this.container.existing;
-    }
-
-    public get branch(): string {
-        return this.attributes.branch;
     }
 
     public get connected(): boolean {
@@ -135,7 +128,6 @@ export class ContainerContext implements IContainerContext {
         private readonly container: Container,
         private readonly runtimeFactory: IRuntimeFactory,
         private readonly _baseSnapshot: ISnapshotTree | undefined,
-        private readonly attributes: IDocumentAttributes,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         public readonly quorum: IQuorum,
         public readonly raiseContainerWarning: (warning: ContainerWarning) => void,

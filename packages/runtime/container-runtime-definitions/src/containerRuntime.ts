@@ -73,7 +73,6 @@ export interface IContainerRuntime extends
     readonly connected: boolean;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly storage: IDocumentStorageService;
-    readonly branch: string;
     readonly flushMode: FlushMode;
     /**
      * Indicates the attachment state of the container to a host service.
