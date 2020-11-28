@@ -6,8 +6,7 @@
 import {
     IRuntimeFactory,
 } from "@fluidframework/container-definitions";
-import { Container, Loader } from "@fluidframework/container-loader";
-import { IRequest } from "@fluidframework/core-interfaces";
+import { Container } from "@fluidframework/container-loader";
 import {
     DriverHeader,
     IDocumentServiceFactory,
@@ -21,16 +20,13 @@ async function getContainer(
     tenantId: string,
     documentId: string,
     createNew: boolean,
-    request: IRequest,
     urlResolver: IUrlResolver,
     documentServiceFactory: IDocumentServiceFactory,
     containerRuntimeFactory: IRuntimeFactory,
 ): Promise<Container> {
-    const loader = new Loader(
-        urlResolver,
-        documentServiceFactory,
-        containerRuntimeFactory,
-    );
+    const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${documentId}`;
+    const ordererUrl = "http://localhost:3000";
+    const storageUrl = `http://localhost:3000/repos/tinylicious`;
 
     let container: Container;
 
@@ -38,7 +34,15 @@ async function getContainer(
         // We're not actually using the code proposal (our code loader always loads the same module regardless of the
         // proposal), but the Container will only give us a NullRuntime if there's no proposal.  So we'll use a fake
         // proposal.
-        container = await loader.createDetachedContainer();
+        container = new Container(
+            containerRuntimeFactory,
+            documentServiceFactory,
+            {}, // options
+            true, // canReconnect
+            undefined, // documentId
+            undefined, // originalRequest
+        );
+        await container.initializeDetached();
         const newRequest = { url: documentId, headers: { [DriverHeader.createNew]: {} } };
         const createNewResolvedUrl = await urlResolver.resolve(newRequest);
         if (createNewResolvedUrl === undefined) {
@@ -46,8 +50,17 @@ async function getContainer(
         }
         await container.attach(createNewResolvedUrl, tenantId, documentId);
     } else {
-        // Request must be appropriate and parseable by resolver.
-        container = await loader.resolve(request);
+        container = await Container.load(
+            tenantId,
+            documentId,
+            containerRuntimeFactory,
+            documentServiceFactory,
+            {}, // options
+            true, // canReconnect
+            storageUrl,
+            ordererUrl,
+            deltaStorageUrl,
+        );
         // If we didn't create the container properly, then it won't function correctly.  So we'll throw if we got a
         // new container here, where we expect this to be loading an existing container.
         // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
@@ -77,7 +90,6 @@ export async function getTinyliciousContainer(
         "tinylicious", // tenantId
         documentId,
         createNew,
-        { url: documentId }, // request
         urlResolver,
         documentServiceFactory,
         containerRuntimeFactory,
