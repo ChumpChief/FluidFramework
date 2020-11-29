@@ -13,7 +13,6 @@ import {
 import {
     IAudience,
     IDeltaManager,
-    ContainerWarning,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -116,9 +115,4 @@ export interface IFluidDataStoreRuntime extends
      * Resolves when a local data store is attached.
      */
     waitAttached(): Promise<void>;
-
-    /**
-     * Errors raised by distributed data structures
-     */
-    raiseContainerWarning(warning: ContainerWarning): void;
 }

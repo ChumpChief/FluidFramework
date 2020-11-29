@@ -13,7 +13,6 @@ import {
 import {
     IAudience,
     IDeltaManager,
-    ContainerWarning,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -619,10 +618,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
      */
     public async waitAttached(): Promise<void> {
         return this.deferredAttached.promise;
-    }
-
-    public raiseContainerWarning(warning: ContainerWarning): void {
-        this.dataStoreContext.raiseContainerWarning(warning);
     }
 
     /**

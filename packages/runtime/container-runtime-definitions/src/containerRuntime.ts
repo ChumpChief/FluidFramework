@@ -6,7 +6,6 @@
 import { IEventProvider } from "@fluidframework/common-definitions";
 import {
     AttachState,
-    ContainerWarning,
     IDeltaManager,
 } from "@fluidframework/container-definitions";
 import {
@@ -100,11 +99,6 @@ export interface IContainerRuntime extends
      * @param rootDataStoreId - data store ID (unique name)
      */
     createDetachedRootDataStore(pkg: Readonly<string[]>, rootDataStoreId: string): IFluidDataStoreContextDetached;
-
-    /**
-     * Used to raise an unrecoverable error on the runtime.
-     */
-    raiseContainerWarning(warning: ContainerWarning): void;
 
     /**
      * Flushes any ops currently being batched to the loader

@@ -21,7 +21,7 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { IAudience } from "./audience";
 import { IDeltaManager } from "./deltas";
-import { ICriticalContainerError, ContainerWarning } from "./error";
+import { ICriticalContainerError } from "./error";
 
 // Represents the attachment state of the entity.
 export enum AttachState {
@@ -94,8 +94,6 @@ export interface IContainerContext extends IDisposable {
     readonly quorum: IQuorum;
     readonly audience: IAudience | undefined;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
-
-    raiseContainerWarning(warning: ContainerWarning): void;
 
     /**
      * Indicates the attachment state of the container to a host service.

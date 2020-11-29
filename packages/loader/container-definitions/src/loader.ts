@@ -16,7 +16,7 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDeltaManager } from "./deltas";
-import { ICriticalContainerError, ContainerWarning } from "./error";
+import { ICriticalContainerError } from "./error";
 import { AttachState, IRuntimeFactory } from "./runtime";
 
 /**
@@ -41,7 +41,6 @@ export interface IContainerEvents extends IEvent {
     (event: "connect", listener: (opsBehind?: number) => void);
     (event: "disconnected" | "attaching" | "attached", listener: () => void);
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
-    (event: "warning", listener: (error: ContainerWarning) => void);
     (event: "op", listener: (message: ISequencedDocumentMessage) => void);
 }
 

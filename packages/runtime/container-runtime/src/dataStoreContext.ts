@@ -13,7 +13,6 @@ import {
 import {
     IAudience,
     IDeltaManager,
-    ContainerWarning,
     BindState,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -412,10 +411,6 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
         this.verifyNotClosed();
         assert(!!this.channel);
         return this._containerRuntime.submitDataStoreSignal(this.id, type, content);
-    }
-
-    public raiseContainerWarning(warning: ContainerWarning): void {
-        this.containerRuntime.raiseContainerWarning(warning);
     }
 
     protected bindRuntime(channel: IFluidDataStoreChannel) {
