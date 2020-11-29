@@ -656,10 +656,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return undefined;
     }
 
-    public get IFluidConfiguration() {
-        return this.context.configuration;
-    }
-
     /**
      * Notifies this object about the request made to the container.
      * @param request - Request made to the handler.

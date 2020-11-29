@@ -4,7 +4,6 @@
  */
 
 import {
-    IFluidConfiguration,
     IRequest,
     IResponse,
 } from "@fluidframework/core-interfaces";
@@ -76,23 +75,12 @@ export class ContainerContext implements IContainerContext {
         return this.container.connected;
     }
 
-    public get canSummarize(): boolean {
-        return "summarize" in this.runtime;
-    }
-
     public get serviceConfiguration(): IServiceConfiguration | undefined {
         return this.container.serviceConfiguration;
     }
 
     public get audience(): IAudience {
         return this.container.audience;
-    }
-
-    public get configuration(): IFluidConfiguration {
-        const config: Partial<IFluidConfiguration> = {
-            scopes: this.container.scopes,
-        };
-        return config as IFluidConfiguration;
     }
 
     public get baseSnapshot() {
