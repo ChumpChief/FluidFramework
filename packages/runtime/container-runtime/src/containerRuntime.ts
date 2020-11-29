@@ -43,10 +43,6 @@ import {
     readAndParseFromBlobs,
 } from "@fluidframework/driver-utils";
 import {
-    BlobTreeEntry,
-    TreeTreeEntry,
-} from "@fluidframework/protocol-base";
-import {
     IClientDetails,
     IDocumentMessage,
     IQuorum,
@@ -54,9 +50,7 @@ import {
     ISignalMessage,
     ISnapshotTree,
     ISummaryTree,
-    ITree,
     MessageType,
-    SummaryType,
 } from "@fluidframework/protocol-definitions";
 import {
     FlushMode,
@@ -82,7 +76,6 @@ import {
     SummaryTracker,
     SummaryTreeBuilder,
     SummarizerNode,
-    convertSummaryTreeToITree,
     convertToSummaryTree,
     RequestParser,
     convertSnapshotTreeToSummaryTree,
@@ -726,49 +719,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             mimeType: "text/plain",
             value: "resource not found",
         };
-    }
-
-    /**
-     * Notifies this object to take the snapshot of the container.
-     * @deprecated - Use summarize to get summary of the container runtime.
-     */
-    public async snapshot(): Promise<ITree> {
-        // Iterate over each store and ask it to snapshot
-        const fluidDataStoreSnapshotsP = Array.from(this.contexts).map(async ([fluidDataStoreId, value]) => {
-            const summaryTree = await value.summarize(true /* fullTree */, false /* trackState */);
-            assert(
-                summaryTree.summary.type === SummaryType.Tree,
-                "summarize should always return a tree when fullTree is true");
-            // back-compat summary - Remove this once snapshot is removed.
-            const snapshot = convertSummaryTreeToITree(summaryTree.summary);
-
-            // If ID exists then previous commit is still valid
-            return {
-                fluidDataStoreId,
-                snapshot,
-            };
-        });
-
-        const root: ITree = { entries: [], id: null };
-
-        // Add in module references to the store snapshots
-        const fluidDataStoreSnapshots = await Promise.all(fluidDataStoreSnapshotsP);
-
-        // Sort for better diffing of snapshots (in replay tool, used to find bugs in snapshotting logic)
-        fluidDataStoreSnapshots.sort((a, b) => a.fluidDataStoreId.localeCompare(b.fluidDataStoreId));
-
-        for (const fluidDataStoreSnapshot of fluidDataStoreSnapshots) {
-            root.entries.push(new TreeTreeEntry(
-                fluidDataStoreSnapshot.fluidDataStoreId,
-                fluidDataStoreSnapshot.snapshot,
-            ));
-        }
-
-        if (this.chunkMap.size > 0) {
-            root.entries.push(new BlobTreeEntry(chunksBlobName, JSON.stringify([...this.chunkMap])));
-        }
-
-        return root;
     }
 
     protected serializeContainerBlobs(summaryTreeBuilder: SummaryTreeBuilder) {
