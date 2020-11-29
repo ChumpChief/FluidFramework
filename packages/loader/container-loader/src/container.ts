@@ -181,16 +181,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private resumedOpProcessingAfterLoad = false;
     private readonly connectionTransitionTimes: number[] = [];
-    private _loadedFromVersion: IVersion | undefined;
     private cachedAttachSummary: ISummaryTree | undefined;
 
     private _closed = false;
 
     public get IFluidRouter(): IFluidRouter { return this; }
-
-    public get loadedFromVersion(): IVersion | undefined {
-        return this._loadedFromVersion;
-    }
 
     /**
      * {@inheritDoc DeltaManager.readonly}
@@ -915,7 +910,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const version = await this.getVersion(this.id);
 
         if (version !== undefined) {
-            this._loadedFromVersion = version;
             return await this.storageService.getSnapshotTree(version) ?? undefined;
         }
 

@@ -18,7 +18,6 @@ import {
     ISnapshotTree,
     MessageType,
     ISummaryTree,
-    IVersion,
     IDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IAudience } from "./audience";
@@ -72,9 +71,6 @@ export interface IRuntime extends IDisposable {
      * @param attachState - State of the container.
      */
     setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void;
-
-    // 0.24 back-compat attachingBeforeSummary
-    readonly runtimeVersion?: string;
 }
 
 /**
@@ -107,8 +103,6 @@ export interface IContainerContext extends IDisposable {
      * Indicates the attachment state of the container to a host service.
      */
     readonly attachState: AttachState;
-
-    getLoadedFromVersion(): IVersion | undefined;
 
     createSummary(): ISummaryTree;
 }
