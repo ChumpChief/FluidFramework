@@ -24,13 +24,9 @@ async function getContainer(
     const ordererUrl = "http://localhost:3000";
     const storageUrl = `http://localhost:3000/repos/tinylicious`;
 
-    let container: Container;
+    const container = new Container(documentServiceFactory);
 
     if (createNew) {
-        container = new Container(
-            documentServiceFactory,
-            undefined, // documentId
-        );
         await container.initializeDetached(containerRuntimeFactory);
         await container.attach(
             storageUrl,
@@ -40,11 +36,6 @@ async function getContainer(
             documentId,
         );
     } else {
-        container = new Container(
-            documentServiceFactory,
-            documentId,
-        );
-
         await container.load(
             containerRuntimeFactory,
             tenantId,

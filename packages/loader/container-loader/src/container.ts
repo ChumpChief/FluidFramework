@@ -127,10 +127,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._closed;
     }
 
-    private get id(): string {
-        return this._id ?? "";
-    }
-
     private get connectionState(): ConnectionState {
         return this._connectionState;
     }
@@ -156,7 +152,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     constructor(
         private readonly serviceFactory: IDocumentServiceFactory,
-        private _id: string | undefined,
     ) {
         super();
 
@@ -251,8 +246,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 this.cachedAttachSummary,
             );
         }
-
-        this._id = documentId;
 
         if (this._storageService === undefined) {
             this._storageService = await this.getDocumentStorageService();
@@ -356,9 +349,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._attachState = AttachState.Attached;
 
         // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null
-        const maybeSnapshotTree = await this.fetchSnapshotTree();
+        const maybeSnapshotTree = await this.fetchSnapshotTree(documentId);
 
-        const attributes = await this.getDocumentAttributes(this.storageService, maybeSnapshotTree);
+        const attributes = await this.getDocumentAttributes(documentId, this.storageService, maybeSnapshotTree);
 
         // Attach op handlers to start processing ops
         this.attachDeltaManagerOpHandler(attributes);
@@ -444,12 +437,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async getDocumentAttributes(
+        documentId: string,
         storage: IDocumentStorageService | undefined,
         tree: ISnapshotTree | undefined,
     ): Promise<IDocumentAttributes> {
         if (tree === undefined) {
             return {
-                branch: this.id,
+                branch: documentId,
                 minimumSequenceNumber: 0,
                 sequenceNumber: 0,
                 term: 1,
@@ -737,8 +731,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Get the most recent snapshot, or a specific version.
      * @returns The snapshot requested, or the latest snapshot if no version was specified
      */
-    private async fetchSnapshotTree(): Promise<ISnapshotTree | undefined> {
-        const version = await this.getVersion(this.id);
+    private async fetchSnapshotTree(documentId: string): Promise<ISnapshotTree | undefined> {
+        const version = await this.getVersion(documentId);
 
         if (version !== undefined) {
             return await this.storageService.getSnapshotTree(version) ?? undefined;
