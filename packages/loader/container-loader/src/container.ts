@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { assert, performance } from "@fluidframework/common-utils";
+import { assert } from "@fluidframework/common-utils";
 import {
     IRequest,
     IResponse,
@@ -115,7 +115,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private resumedOpProcessingAfterLoad = false;
-    private readonly connectionTransitionTimes: number[] = [];
     private cachedAttachSummary: ISummaryTree | undefined;
 
     private _closed = false;
@@ -283,15 +282,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return versions[0];
     }
 
-    private recordConnectStartTime() {
-        if (this.connectionTransitionTimes[ConnectionState.Disconnected] === undefined) {
-            this.connectionTransitionTimes[ConnectionState.Disconnected] = performance.now();
-        }
-    }
-
     private async connectToDeltaStream(args: IConnectionArgs = {}) {
-        this.recordConnectStartTime();
-
         // All agents need "write" access, including summarizer.
         if (!this.client.details.capabilities.interactive) {
             args.mode = "write";
