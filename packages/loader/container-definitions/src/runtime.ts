@@ -13,7 +13,6 @@ import {
     IClientDetails,
     IQuorum,
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ISnapshotTree,
     MessageType,
     ISummaryTree,
@@ -91,7 +90,6 @@ export interface IContainerContext extends IDisposable {
     readonly closeFn: (error?: ICriticalContainerError) => void;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly quorum: IQuorum;
-    readonly serviceConfiguration: IServiceConfiguration | undefined;
 
     /**
      * Indicates the attachment state of the container to a host service.

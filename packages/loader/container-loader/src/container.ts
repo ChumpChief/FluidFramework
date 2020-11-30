@@ -44,7 +44,6 @@ import {
     ISequencedClient,
     ISequencedDocumentMessage,
     ISequencedProposal,
-    IServiceConfiguration,
     ISignalMessage,
     ISnapshotTree,
     IVersion,
@@ -139,14 +138,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get connected(): boolean {
         return this.connectionState === ConnectionState.Connected;
-    }
-
-    /**
-     * Service configuration details. If running in offline mode will be undefined otherwise will contain service
-     * configuration details returned as part of the initial connection.
-     */
-    public get serviceConfiguration(): IServiceConfiguration | undefined {
-        return this._deltaManager.serviceConfiguration;
     }
 
     /**

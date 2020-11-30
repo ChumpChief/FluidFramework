@@ -21,7 +21,6 @@ import {
     IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
-    IServiceConfiguration,
     ISignalMessage,
     ISnapshotTree,
     MessageType,
@@ -69,10 +68,6 @@ export class ContainerContext implements IContainerContext {
 
     public get connected(): boolean {
         return this.container.connected;
-    }
-
-    public get serviceConfiguration(): IServiceConfiguration | undefined {
-        return this.container.serviceConfiguration;
     }
 
     public get baseSnapshot() {
