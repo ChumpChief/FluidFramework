@@ -127,11 +127,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._closed;
     }
 
-    public get id(): string {
+    private get id(): string {
         return this._id ?? "";
     }
 
-    public get connectionState(): ConnectionState {
+    private get connectionState(): ConnectionState {
         return this._connectionState;
     }
 
