@@ -3,11 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import { IsoBuffer, Uint8ArrayToString } from "@fluidframework/common-utils";
+import { IsoBuffer } from "@fluidframework/common-utils";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import { buildHierarchy } from "@fluidframework/protocol-base";
 import {
-    ICreateBlobResponse,
     ISnapshotTree,
     ITree,
     IVersion,
@@ -59,15 +58,6 @@ export class DocumentStorageService implements IDocumentStorageService {
         const branch = ref ? `datastores/${this.id}/${ref}` : this.id;
         const commit = await this.manager.write(branch, tree, parents, message);
         return { date: commit.committer.date, id: commit.sha, treeId: commit.tree.sha };
-    }
-
-    public async createBlob(file: ArrayBufferLike): Promise<ICreateBlobResponse> {
-        const response = this.manager.createBlob(
-            Uint8ArrayToString(
-                new Uint8Array(file), "base64"),
-            "base64");
-
-        return response.then((r) => ({ id: r.sha, url: r.url }));
     }
 
     public async readBlob(blobId: string): Promise<ArrayBufferLike> {

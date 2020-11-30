@@ -27,9 +27,6 @@ export class NullBlobStorageService implements IDocumentStorageService {
         return Promise.reject(new Error("Null blob storage can not write commit"));
     }
 
-    public async createBlob(file: ArrayBufferLike): Promise<api.ICreateBlobResponse> {
-        return Promise.reject(new Error("Null blob storage can not create blob"));
-    }
     public async readBlob(blobId: string): Promise<ArrayBufferLike> {
         return Promise.reject(new Error("Null blob storage can not read blob"));
     }

@@ -587,7 +587,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         this.blobManager = new BlobManager(
             this.IFluidHandleContext,
             () => this.storage,
-            (blobId) => this.submit(ContainerMessageType.BlobAttach, undefined, undefined, { blobId }),
         );
         this.blobManager.load(context.baseSnapshot?.trees[blobsTreeName]);
 

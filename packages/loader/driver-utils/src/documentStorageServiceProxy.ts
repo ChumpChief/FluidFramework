@@ -7,7 +7,6 @@ import {
     IDocumentStorageService,
 } from "@fluidframework/driver-definitions";
 import {
-    ICreateBlobResponse,
     ISnapshotTree,
     ITree,
     IVersion,
@@ -30,10 +29,6 @@ export class DocumentStorageServiceProxy implements IDocumentStorageService {
 
     public async write(tree: ITree, parents: string[], message: string, ref: string): Promise<IVersion> {
         return this.internalStorageService.write(tree, parents, message, ref);
-    }
-
-    public async createBlob(file: ArrayBufferLike): Promise<ICreateBlobResponse> {
-        return this.internalStorageService.createBlob(file);
     }
 
     public async readBlob(blobId: string): Promise<ArrayBufferLike> {

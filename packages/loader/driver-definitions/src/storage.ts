@@ -7,7 +7,6 @@ import { IEventProvider, IErrorEvent } from "@fluidframework/common-definitions"
 import {
     ConnectionMode,
     IClient,
-    ICreateBlobResponse,
     IDocumentMessage,
     IErrorTrackingService,
     INack,
@@ -69,11 +68,6 @@ export interface IDocumentStorageService {
      * Writes to the object with the given ID
      */
     write(root: ITree, parents: string[], message: string, ref: string): Promise<IVersion>;
-
-    /**
-     * Creates a blob out of the given buffer
-     */
-    createBlob(file: ArrayBufferLike): Promise<ICreateBlobResponse>;
 
     readBlob(id: string): Promise<ArrayBufferLike>;
 }
