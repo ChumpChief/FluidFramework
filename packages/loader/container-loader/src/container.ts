@@ -148,14 +148,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     /**
-     * The server provided claims of the client.
-     * Set once this.connected is true, otherwise undefined
-     */
-    public get scopes(): string[] | undefined {
-        return this._deltaManager.scopes;
-    }
-
-    /**
      * Flag indicating whether the document already existed at the time of load
      */
     public get existing(): boolean | undefined {
