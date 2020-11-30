@@ -309,7 +309,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Propagate current connection state through the system.
         this.propagateConnectionState();
-        this.resumeInternal({ fetchOpsFromStorage: false, reason: "createDetached" });
+        this.resume({ fetchOpsFromStorage: false, reason: "createDetached" });
     }
 
     public async request(path: IRequest): Promise<IResponse> {
@@ -331,11 +331,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
     }
 
-    public resume() {
-        this.resumeInternal();
-    }
-
-    protected resumeInternal(args: IConnectionArgs = {}) {
+    private resume(args: IConnectionArgs = {}) {
         if (this.closed) {
             throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
         }
