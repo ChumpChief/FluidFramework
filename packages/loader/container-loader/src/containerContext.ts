@@ -8,7 +8,6 @@ import {
     IResponse,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     IContainerContext,
     IDeltaManager,
     IRuntime,
@@ -74,10 +73,6 @@ export class ContainerContext implements IContainerContext {
 
     public get serviceConfiguration(): IServiceConfiguration | undefined {
         return this.container.serviceConfiguration;
-    }
-
-    public get audience(): IAudience {
-        return this.container.audience;
     }
 
     public get baseSnapshot() {

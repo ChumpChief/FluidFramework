@@ -19,7 +19,6 @@ import {
     ISummaryTree,
     IDocumentMessage,
 } from "@fluidframework/protocol-definitions";
-import { IAudience } from "./audience";
 import { IDeltaManager } from "./deltas";
 import { ICriticalContainerError } from "./error";
 
@@ -92,7 +91,6 @@ export interface IContainerContext extends IDisposable {
     readonly closeFn: (error?: ICriticalContainerError) => void;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly quorum: IQuorum;
-    readonly audience: IAudience | undefined;
     readonly serviceConfiguration: IServiceConfiguration | undefined;
 
     /**

@@ -13,7 +13,6 @@ import {
     IFluidHandle,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     IContainerContext,
     IDeltaManager,
     IDeltaSender,
@@ -1009,11 +1008,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
     public getQuorum(): IQuorum {
         return this.context.quorum;
-    }
-
-    public getAudience(): IAudience {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        return this.context.audience!;
     }
 
     /**

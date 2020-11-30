@@ -11,7 +11,6 @@ import {
     IFluidHandle,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     IDeltaManager,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -105,11 +104,6 @@ export interface IFluidDataStoreRuntime extends
      * Returns the current quorum.
      */
     getQuorum(): IQuorum;
-
-    /**
-     * Returns the current audience.
-     */
-    getAudience(): IAudience;
 
     /**
      * Resolves when a local data store is attached.

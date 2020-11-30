@@ -13,7 +13,6 @@ import {
     IResponse,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     IDeltaManager,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -107,11 +106,6 @@ export interface IContainerRuntimeBase extends
      * Returns the current quorum.
      */
     getQuorum(): IQuorum;
-
-    /**
-     * Returns the current audience.
-     */
-    getAudience(): IAudience;
 }
 
 /**
@@ -267,11 +261,6 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
      * Returns the current quorum.
      */
     getQuorum(): IQuorum;
-
-    /**
-     * Returns the current audience.
-     */
-    getAudience(): IAudience;
 
     /**
      * Submits the message to be sent to other clients.

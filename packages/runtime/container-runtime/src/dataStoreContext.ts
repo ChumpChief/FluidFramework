@@ -11,7 +11,6 @@ import {
     IFluidHandleContext,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     IDeltaManager,
     BindState,
     AttachState,
@@ -325,10 +324,6 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
 
     public getQuorum(): IQuorum {
         return this._containerRuntime.getQuorum();
-    }
-
-    public getAudience(): IAudience {
-        return this._containerRuntime.getAudience();
     }
 
     /**

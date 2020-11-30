@@ -11,7 +11,6 @@ import {
     IResponse,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     IDeltaManager,
     BindState,
     AttachState,
@@ -153,7 +152,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
     public readonly options: any;
     public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     private readonly quorum: IQuorum;
-    private readonly audience: IAudience;
     public readonly logger: ITelemetryLogger;
 
     public constructor(
@@ -168,7 +166,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
         this.options = {}; // TODO remove
         this.deltaManager = dataStoreContext.deltaManager;
         this.quorum = dataStoreContext.getQuorum();
-        this.audience = dataStoreContext.getAudience();
 
         const tree = dataStoreContext.baseSnapshot;
 
@@ -434,10 +431,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
 
     public getQuorum(): IQuorum {
         return this.quorum;
-    }
-
-    public getAudience(): IAudience {
-        return this.audience;
     }
 
     public async uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>> {
