@@ -57,7 +57,6 @@ import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
-import { convertProtocolAndAppSummaryToSnapshotTree } from "./utils";
 
 interface ILocalSequencedClient extends ISequencedClient {
     shouldHaveLeft?: boolean;
@@ -186,15 +185,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get attachState(): AttachState {
         return this._attachState;
-    }
-
-    public serialize(): string {
-        assert(this.attachState === AttachState.Detached, "Should only be called in detached container");
-
-        const appSummary: ISummaryTree = this.context.createSummary();
-        const protocolSummary = this.protocolHandler.captureSummary();
-        const snapshotTree = convertProtocolAndAppSummaryToSnapshotTree(protocolSummary, appSummary);
-        return JSON.stringify(snapshotTree);
     }
 
     public async attach(

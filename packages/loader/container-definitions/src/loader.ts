@@ -71,11 +71,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
     ): Promise<void>;
 
     /**
-     * Extract the snapshot from the detached container.
-     */
-    serialize(): string;
-
-    /**
      * Issue a request against the container for a resource.
      * @param request - The request to be issued against the container
      */
