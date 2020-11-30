@@ -14,7 +14,6 @@ import {
     IConnectionDetails,
     IContainer,
     IContainerEvents,
-    IDeltaManager,
     ICriticalContainerError,
     AttachState,
     IRuntimeFactory,
@@ -41,7 +40,6 @@ import {
     IClientDetails,
     ICommittedProposal,
     IDocumentAttributes,
-    IDocumentMessage,
     IProcessMessageResult,
     IQuorum,
     ISequencedClient,
@@ -160,10 +158,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._id ?? "";
     }
 
-    public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {
-        return this._deltaManager;
-    }
-
     public get connectionState(): ConnectionState {
         return this._connectionState;
     }
@@ -278,7 +272,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             return;
         }
 
-        assert(this.deltaManager.inbound.length === 0, "Inbound queue should be empty when attaching");
+        assert(this._deltaManager.inbound.length === 0, "Inbound queue should be empty when attaching");
         // Only take a summary if the container is in detached state, otherwise we could have local changes.
         // In failed attach call, we would already have a summary cached.
         if (this._attachState === AttachState.Detached) {

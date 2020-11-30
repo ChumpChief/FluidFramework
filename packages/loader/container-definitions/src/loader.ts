@@ -10,12 +10,10 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IClientDetails,
-    IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
-import { IDeltaManager } from "./deltas";
 import { ICriticalContainerError } from "./error";
 import { AttachState, IRuntimeFactory } from "./runtime";
 
@@ -48,12 +46,6 @@ export interface IContainerEvents extends IEvent {
  * The Host's view of the Container and its connection to storage
  */
 export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRouter {
-
-    /**
-     * The Delta Manager supporting the op stream for this Container
-     */
-    deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-
     /**
      * The collection of write clients which were connected as of the current sequence number.
      * Also contains a map of key-value pairs that must be agreed upon by all clients before being accepted.
