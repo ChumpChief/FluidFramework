@@ -3,13 +3,14 @@
  * Licensed under the MIT License.
  */
 
+import { IErrorEvent } from "@fluidframework/common-definitions";
 import {
     IFluidDataStoreRuntime,
     IChannelServices,
     IChannelAttributes,
     IChannelFactory,
 } from "@fluidframework/datastore-definitions";
-import { ISharedObject, ISharedObjectEvents } from "@fluidframework/shared-object-base";
+import { ISharedObject } from "@fluidframework/shared-object-base";
 
 export enum ConsensusResult {
     Release,
@@ -41,7 +42,7 @@ export interface IConsensusOrderedCollectionFactory extends IChannelFactory {
 /**
  * Events notifying about addition, acquisition, release and completion of items
  */
-export interface IConsensusOrderedCollectionEvents<T> extends ISharedObjectEvents {
+export interface IConsensusOrderedCollectionEvents<T> extends IErrorEvent {
 
     /**
      * Event fires when new item is added to the queue or

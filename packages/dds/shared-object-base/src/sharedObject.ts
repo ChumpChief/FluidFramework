@@ -4,7 +4,7 @@
  */
 
 import { assert } from "@fluidframework/common-utils";
-import { ITelemetryErrorEvent, ITelemetryLogger } from "@fluidframework/common-definitions";
+import { IErrorEvent, ITelemetryErrorEvent, ITelemetryLogger } from "@fluidframework/common-definitions";
 import { IFluidHandle } from "@fluidframework/core-interfaces";
 import { ChildLogger, EventEmitterWithErrorHandling } from "@fluidframework/telemetry-utils";
 import { ISequencedDocumentMessage, ITree } from "@fluidframework/protocol-definitions";
@@ -17,12 +17,12 @@ import {
 import { AttachState } from "@fluidframework/container-definitions";
 import { v4 as uuid } from "uuid";
 import { SharedObjectHandle } from "./handle";
-import { ISharedObject, ISharedObjectEvents } from "./types";
+import { ISharedObject } from "./types";
 
 /**
  *  Base class from which all shared objects derive
  */
-export abstract class SharedObject<TEvent extends ISharedObjectEvents = ISharedObjectEvents>
+export abstract class SharedObject<TEvent extends IErrorEvent = IErrorEvent>
     extends EventEmitterWithErrorHandling<TEvent> implements ISharedObject<TEvent> {
     /**
      * @param obj - The thing to check if it is a SharedObject
@@ -369,9 +369,7 @@ export abstract class SharedObject<TEvent extends ISharedObjectEvents = ISharedO
      * For messages from a remote client, this will be undefined.
      */
     private process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {
-        this.emit("pre-op", message, local, this);
         this.processCore(message, local, localOpMetadata);
-        this.emit("op", message, local, this);
     }
 
     /**

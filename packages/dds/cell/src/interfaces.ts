@@ -3,10 +3,11 @@
  * Licensed under the MIT License.
  */
 
-import { ISharedObject, ISharedObjectEvents } from "@fluidframework/shared-object-base";
+import { ISharedObject } from "@fluidframework/shared-object-base";
+import { IErrorEvent } from "@fluidframework/common-definitions";
 import { Serializable } from "@fluidframework/datastore-definitions";
 
-export interface ISharedCellEvents<T extends Serializable> extends ISharedObjectEvents {
+export interface ISharedCellEvents<T extends Serializable> extends IErrorEvent {
     (event: "valueChanged", listener: (value: T) => void);
     (event: "delete", listener: () => void);
 }

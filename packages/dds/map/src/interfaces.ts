@@ -4,8 +4,8 @@
  */
 
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
-import { ISharedObject, ISharedObjectEvents } from "@fluidframework/shared-object-base";
-import { IEventThisPlaceHolder } from "@fluidframework/common-definitions";
+import { ISharedObject } from "@fluidframework/shared-object-base";
+import { IErrorEvent, IEventThisPlaceHolder } from "@fluidframework/common-definitions";
 
 /**
  * Type of "valueChanged" event parameter.
@@ -191,7 +191,7 @@ export interface IDirectory extends Map<string, any> {
     getWorkingDirectory(relativePath: string): IDirectory;
 }
 
-export interface ISharedDirectoryEvents extends ISharedObjectEvents {
+export interface ISharedDirectoryEvents extends IErrorEvent {
     (event: "valueChanged", listener: (
         changed: IDirectoryValueChanged,
         local: boolean,
@@ -216,7 +216,7 @@ export interface IDirectoryValueChanged extends IValueChanged {
     path: string;
 }
 
-export interface ISharedMapEvents extends ISharedObjectEvents {
+export interface ISharedMapEvents extends IErrorEvent {
     (event: "valueChanged", listener: (
         changed: IDirectoryValueChanged,
         local: boolean,

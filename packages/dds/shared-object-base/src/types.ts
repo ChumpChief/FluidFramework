@@ -3,19 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import { ITree, ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
+import { ITree } from "@fluidframework/protocol-definitions";
 import { IChannel, IChannelServices } from "@fluidframework/datastore-definitions";
-import { IErrorEvent, IEventProvider, IEventThisPlaceHolder } from "@fluidframework/common-definitions";
-
-export interface ISharedObjectEvents extends IErrorEvent {
-    (event: "pre-op" | "op",
-        listener: (op: ISequencedDocumentMessage, local: boolean, target: IEventThisPlaceHolder) => void);
-}
+import { IErrorEvent, IEventProvider } from "@fluidframework/common-definitions";
 
 /**
  * Base interface for shared objects from which other interfaces derive. Implemented by SharedObject
  */
-export interface ISharedObject<TEvent extends ISharedObjectEvents = ISharedObjectEvents>
+export interface ISharedObject<TEvent extends IErrorEvent = IErrorEvent>
     extends IChannel, IEventProvider<TEvent> {
     /**
      * Binds the given shared object to its containing data store runtime, causing it to attach once

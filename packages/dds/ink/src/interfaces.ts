@@ -3,7 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { ISharedObject, ISharedObjectEvents } from "@fluidframework/shared-object-base";
+import { IErrorEvent } from "@fluidframework/common-definitions";
+import { ISharedObject } from "@fluidframework/shared-object-base";
 
 /**
  * Data about a single point in an ink stroke
@@ -55,7 +56,7 @@ export interface IColor {
     a: number;
 }
 
-export interface IInkEvents extends ISharedObjectEvents {
+export interface IInkEvents extends IErrorEvent {
     (event: "stylus", listener: (operation: IStylusOperation) => void);
     (event: "clear", listener: () => void);
 }

@@ -3,9 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import { ISharedObject, ISharedObjectEvents } from "@fluidframework/shared-object-base";
+import { IErrorEvent } from "@fluidframework/common-definitions";
+import { ISharedObject } from "@fluidframework/shared-object-base";
 
-export interface ISharedCounterEvents extends ISharedObjectEvents {
+export interface ISharedCounterEvents extends IErrorEvent {
     (event: "incremented", listener: (incrementAmount: number, newValue: number) => void);
 }
 
