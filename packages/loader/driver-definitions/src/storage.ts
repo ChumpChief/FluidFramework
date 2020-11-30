@@ -16,7 +16,6 @@ import {
     ISignalClient,
     ISignalMessage,
     ISnapshotTree,
-    ISummaryHandle,
     ISummaryTree,
     ITokenClaims,
     ITree,
@@ -51,8 +50,6 @@ export interface IDocumentDeltaStorageService {
  * Interface to provide access to snapshots saved for a shared object
  */
 export interface IDocumentStorageService {
-    repositoryUrl: string;
-
     /**
      * Returns the snapshot tree.
      */
@@ -79,20 +76,6 @@ export interface IDocumentStorageService {
     createBlob(file: ArrayBufferLike): Promise<ICreateBlobResponse>;
 
     readBlob(id: string): Promise<ArrayBufferLike>;
-
-    /**
-     * Uploads a summary tree to storage using the given context for reference of previous summary handle.
-     * The ISummaryHandles in the uploaded tree should have paths to indicate which summary object they are
-     * referencing from the previously acked summary.
-     * Returns the uploaded summary handle.
-     */
-    uploadSummaryWithContext(summary: ISummaryTree, context: ISummaryContext): Promise<string>;
-
-    /**
-     * Retrieves the commit that matches the packfile handle. If the packfile has already been committed and the
-     * server has deleted it this call may result in a broken promise.
-     */
-    downloadSummary(handle: ISummaryHandle): Promise<ISummaryTree>;
 }
 
 export interface IDocumentDeltaConnectionEvents extends IErrorEvent {

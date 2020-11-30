@@ -4,14 +4,13 @@
  */
 
 import { assert, gitHashFile, IsoBuffer, Uint8ArrayToString } from "@fluidframework/common-utils";
-import { IDocumentStorageService, ISummaryContext } from "@fluidframework/driver-definitions";
+import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import * as resources from "@fluidframework/gitresources";
 import { buildHierarchy } from "@fluidframework/protocol-base";
 import {
     FileMode,
     ICreateBlobResponse,
     ISnapshotTree,
-    ISummaryHandle,
     ISummaryTree,
     ITree,
     IVersion,
@@ -27,9 +26,6 @@ export class DocumentStorageService implements IDocumentStorageService {
     // The values of this cache is useless. We only need the keys. So we are always putting
     // empty strings as values.
     private readonly blobsShaCache = new Map<string, string>();
-    public get repositoryUrl(): string {
-        return "";
-    }
 
     constructor(private readonly id: string, private readonly manager: gitStorage.GitManager) {
     }
@@ -68,22 +64,6 @@ export class DocumentStorageService implements IDocumentStorageService {
         const branch = ref ? `datastores/${this.id}/${ref}` : this.id;
         const commit = await this.manager.write(branch, tree, parents, message);
         return { date: commit.committer.date, id: commit.sha, treeId: commit.tree.sha };
-    }
-
-    public async uploadSummaryWithContext(summary: ISummaryTree, context: ISummaryContext): Promise<string> {
-        const snapshot = context.ackHandle
-            ? await this.getVersions(context.ackHandle, 1)
-                .then(async (versions) => {
-                    // Clear the cache as the getSnapshotTree call will fill the cache.
-                    this.blobsShaCache.clear();
-                    return this.getSnapshotTree(versions[0]);
-                })
-            : undefined;
-        return this.writeSummaryTree(summary, snapshot ?? undefined);
-    }
-
-    public async downloadSummary(handle: ISummaryHandle): Promise<ISummaryTree> {
-        throw new Error("NOT IMPLEMENTED!");
     }
 
     public async createBlob(file: ArrayBufferLike): Promise<ICreateBlobResponse> {
