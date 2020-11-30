@@ -57,16 +57,6 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
     readonly attachState: AttachState;
 
     /**
-     * Returns true if the container has been closed, otherwise false
-     */
-    readonly closed: boolean;
-
-    /**
-     * Closes the container
-     */
-    close(error?: ICriticalContainerError): void;
-
-    /**
      * Attaches the Container to the Container specified by the given Request.
      *
      * TODO - in the case of failure options should give a retry policy. Or some continuation function

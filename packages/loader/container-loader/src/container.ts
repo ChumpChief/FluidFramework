@@ -123,7 +123,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get IFluidRouter(): IFluidRouter { return this; }
 
-    public get closed(): boolean {
+    private get closed(): boolean {
         return this._closed;
     }
 
@@ -170,7 +170,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.protocolHandler.quorum;
     }
 
-    public close(error?: ICriticalContainerError) {
+    private close(error?: ICriticalContainerError) {
         if (this._closed) {
             return;
         }
