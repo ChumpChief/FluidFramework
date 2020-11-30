@@ -230,6 +230,13 @@ export interface IDocumentServiceFactory {
      */
     protocolName: string;
 
+    postNewContainer(
+        tenantId: string,
+        documentId: string,
+        ordererUrl: string,
+        createNewSummary: ISummaryTree,
+    ): Promise<void>;
+
     /**
      * Returns an instance of IDocumentService
      */
@@ -239,16 +246,6 @@ export interface IDocumentServiceFactory {
         deltaStorageUrl: string,
         tenantId: string,
         documentId: string,
-    ): Promise<IDocumentService>;
-
-    // Creates a new document on the host with the provided options. Returns the document service.
-    createContainer(
-        tenantId: string,
-        documentId: string,
-        storageUrl: string,
-        ordererUrl: string,
-        deltaStorageUrl: string,
-        createNewSummary: ISummaryTree,
     ): Promise<IDocumentService>;
 }
 

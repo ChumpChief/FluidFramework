@@ -226,13 +226,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Actually go and create the resolved document
         if (this.service === undefined) {
-            this.service = await this.serviceFactory.createContainer(
-                tenantId,
-                documentId,
+            await this.serviceFactory.postNewContainer(tenantId, documentId, ordererUrl, this.cachedAttachSummary);
+            this.service = await this.serviceFactory.createDocumentService(
                 storageUrl,
                 ordererUrl,
                 deltaStorageUrl,
-                this.cachedAttachSummary,
+                tenantId,
+                documentId,
             );
         }
 

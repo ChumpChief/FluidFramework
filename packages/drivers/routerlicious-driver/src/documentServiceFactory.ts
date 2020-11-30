@@ -34,14 +34,12 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
     ) {
     }
 
-    public async createContainer(
+    public async postNewContainer(
         tenantId: string,
         documentId: string,
-        storageUrl: string,
         ordererUrl: string,
-        deltaStorageUrl: string,
         createNewSummary: ISummaryTree,
-    ): Promise<IDocumentService> {
+    ): Promise<void> {
         const protocolSummary = createNewSummary.tree[".protocol"] as ISummaryTree;
         const appSummary = createNewSummary.tree[".app"] as ISummaryTree;
         if (!(protocolSummary && appSummary)) {
@@ -57,13 +55,6 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
                 sequenceNumber: documentAttributes.sequenceNumber,
                 values: quorumValues,
             });
-        return this.createDocumentService(
-            storageUrl,
-            ordererUrl,
-            deltaStorageUrl,
-            tenantId,
-            documentId,
-        );
     }
 
     /**
