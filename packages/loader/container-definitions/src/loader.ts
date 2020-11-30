@@ -31,7 +31,6 @@ export interface ICodeLoader {
  * Events emitted by the Container "upwards" to the Loader and Host
  */
 export interface IContainerEvents extends IEvent {
-    (event: "readonly", listener: (readonly: boolean) => void): void;
     (event: "connected", listener: (clientId: string) => void);
     /**
      * @param opsBehind - number of ops this client is behind (if present).

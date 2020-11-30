@@ -672,10 +672,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.setConnectionState(ConnectionState.Disconnected, reason);
         });
 
-        deltaManager.on("readonly", (readonly) => {
-            this.emit("readonly", readonly);
-        });
-
         return deltaManager;
     }
 
