@@ -52,7 +52,6 @@ export class DeltaStorageService implements IDeltaStorageService {
         const ops = await Axios.get<api.ISequencedDocumentMessage[]>(
             `${this.url}?${query}`, { headers });
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return ops.data;
     }
 }
