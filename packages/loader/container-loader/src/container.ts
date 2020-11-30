@@ -316,24 +316,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.context.request(path);
     }
 
-    public setAutoReconnect(reconnect: boolean) {
-        if (reconnect && this.closed) {
-            throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
-        }
-
-        this._deltaManager.setAutomaticReconnect(reconnect);
-
-        // If container state is not attached and resumed, then don't connect to delta stream. Also don't set the
-        // manual reconnection flag to true as we haven't made the initial connection yet.
-        if (reconnect && this._attachState === AttachState.Attached && this.resumedOpProcessingAfterLoad) {
-            // Ensure connection to web socket
-            this.connectToDeltaStream({ reason: "autoReconnect" }).catch((error) => { });
-        }
-    }
-
     private resume(args: IConnectionArgs = {}) {
         if (this.closed) {
-            throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
+            throw new Error("Attempting to resume() a closed DeltaManager");
         }
 
         // Resume processing ops
