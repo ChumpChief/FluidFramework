@@ -87,60 +87,6 @@ export enum ConnectionState {
     Connected,
 }
 
-/**
- * Waits until container connects to delta storage and gets up-to-date
- * Useful when resolving URIs and hitting 404, due to container being loaded from (stale) snapshot and not being
- * up to date. Host may chose to wait in such case and retry resolving URI.
- * Warning: Will wait infinitely for connection to establish if there is no connection.
- * May result in deadlock if Container.setAutoReconnect(false) is called and never switched back to auto-reconnect.
- * @returns true: container is up to date, it processed all the ops that were know at the time of first connection
- *          false: storage does not provide indication of how far the client is. Container processed
- *          all the ops known to it, but it maybe still behind.
- */
-export async function waitContainerToCatchUp(container: Container) {
-    // Make sure we stop waiting if container is closed.
-    if (container.closed) {
-        throw new Error("Container is closed");
-    }
-
-    return new Promise<boolean>((accept, reject) => {
-        const deltaManager = container.deltaManager;
-
-        container.on("closed", reject);
-
-        const waitForOps = () => {
-            assert(container.connectionState !== ConnectionState.Disconnected);
-            const hasCheckpointSequenceNumber = deltaManager.hasCheckpointSequenceNumber;
-
-            const connectionOpSeqNumber = deltaManager.lastKnownSeqNumber;
-            if (deltaManager.lastSequenceNumber === connectionOpSeqNumber) {
-                accept(hasCheckpointSequenceNumber);
-                return;
-            }
-            const callbackOps = (message) => {
-                if (connectionOpSeqNumber <= message.sequenceNumber) {
-                    accept(hasCheckpointSequenceNumber);
-                    deltaManager.off("op", callbackOps);
-                }
-            };
-            deltaManager.on("op", callbackOps);
-        };
-
-        if (container.connectionState !== ConnectionState.Disconnected) {
-            waitForOps();
-            return;
-        }
-
-        const callback = () => {
-            deltaManager.off("connect", callback);
-            waitForOps();
-        };
-        deltaManager.on("connect", callback);
-
-        container.resume();
-    });
-}
-
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
     private pendingClientId: string | undefined;
     private loaded = false;
