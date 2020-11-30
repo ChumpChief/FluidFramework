@@ -8,7 +8,6 @@ import {
     IFluidHandleContext,
     IFluidSerializer,
     IFluidRouter,
-    IFluidHandle,
 } from "@fluidframework/core-interfaces";
 import {
     IDeltaManager,
@@ -85,13 +84,6 @@ export interface IFluidDataStoreRuntime extends
      * is attached then we attach the channel to make it live.
      */
     bindChannel(channel: IChannel): void;
-
-    // Blob related calls
-    /**
-     * Api to upload a blob of data.
-     * @param blob - blob to be uploaded.
-     */
-    uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
 
     /**
      * Submits the signal to be sent to other clients.

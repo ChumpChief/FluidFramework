@@ -7,7 +7,6 @@ import { IDisposable } from "@fluidframework/common-definitions";
 import {
     IRequest,
     IResponse,
-    IFluidHandle,
     IFluidHandleContext,
 } from "@fluidframework/core-interfaces";
 import {
@@ -473,10 +472,6 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
             // DDS will not create failure summaries
             { throwOnFailure: true },
         );
-    }
-
-    public async uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>> {
-        return this.containerRuntime.uploadBlob(blob);
     }
 }
 

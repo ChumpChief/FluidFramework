@@ -10,7 +10,6 @@ import {
     IFluidSerializer,
     IRequest,
     IResponse,
-    IFluidHandle,
 } from "@fluidframework/core-interfaces";
 import {
     IContainerContext,
@@ -1256,10 +1255,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             contents,
         };
         this.submit(ContainerMessageType.FluidDataStoreOp, envelope, localOpMetadata);
-    }
-
-    public async uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>> {
-        return this.blobManager.createBlob(blob);
     }
 
     private submit(

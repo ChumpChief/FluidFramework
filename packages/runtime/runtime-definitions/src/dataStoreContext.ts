@@ -7,7 +7,6 @@ import { IDisposable, IEvent, IEventProvider } from "@fluidframework/common-defi
 import {
     IFluidRouter,
     IProvideFluidHandleContext,
-    IFluidHandle,
     IFluidHandleContext,
     IRequest,
     IResponse,
@@ -96,8 +95,6 @@ export interface IContainerRuntimeBase extends
      * data store initialization is considered compete.
      */
     createDetachedDataStore(pkg: Readonly<string[]>): IFluidDataStoreContextDetached;
-
-    uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
 
     /**
      * Returns the current quorum.
@@ -298,8 +295,6 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
          */
         createParam: CreateChildSummarizerNodeParam,
     ): CreateChildSummarizerNodeFn;
-
-    uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
 }
 
 export interface IFluidDataStoreContextDetached extends IFluidDataStoreContext {

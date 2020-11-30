@@ -453,10 +453,6 @@ export class MockFluidDataStoreRuntime extends EventEmitter
         return null;
     }
 
-    public async uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>> {
-        return null;
-    }
-
     public async getBlob(blobId: string): Promise<any> {
         return null;
     }
