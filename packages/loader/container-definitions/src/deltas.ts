@@ -6,7 +6,6 @@
 import { IDisposable, IEventProvider, IEvent, IErrorEvent } from "@fluidframework/common-definitions";
 import {
     ConnectionMode,
-    IClientDetails,
     IDocumentMessage,
     IProcessMessageResult,
     ISequencedDocumentMessage,
@@ -128,9 +127,6 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
      * I.e. we know how far behind the client was at the time of establishing connection
      */
     readonly hasCheckpointSequenceNumber: boolean;
-
-    /** Details of client */
-    readonly clientDetails: IClientDetails;
 
     /** Protocol version being used to communicate with the service */
     readonly version: string;

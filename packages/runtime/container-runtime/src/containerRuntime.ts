@@ -41,7 +41,6 @@ import {
     readAndParseFromBlobs,
 } from "@fluidframework/driver-utils";
 import {
-    IClientDetails,
     IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
@@ -400,10 +399,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
     public get clientId(): string | undefined {
         return this.context.clientId;
-    }
-
-    public get clientDetails(): IClientDetails {
-        return this.context.clientDetails;
     }
 
     public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {

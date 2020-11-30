@@ -10,7 +10,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    IClientDetails,
     IQuorum,
     ISequencedDocumentMessage,
     ISnapshotTree,
@@ -81,7 +80,6 @@ export interface IRuntime extends IDisposable {
 export interface IContainerContext extends IDisposable {
     readonly existing: boolean | undefined;
     readonly clientId: string | undefined;
-    readonly clientDetails: IClientDetails;
     readonly storage: IDocumentStorageService | undefined | null;
     readonly connected: boolean;
     readonly baseSnapshot: ISnapshotTree | undefined;

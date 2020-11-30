@@ -113,7 +113,7 @@ export class DeltaManager
 {
     public get disposed() { return this.isDisposed; }
 
-    public readonly clientDetails: IClientDetails;
+    private readonly clientDetails: IClientDetails;
     public get IDeltaSender() { return this; }
 
     /**

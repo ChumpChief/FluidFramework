@@ -36,7 +36,6 @@ import {
 } from "@fluidframework/protocol-base";
 import {
     IClient,
-    IClientDetails,
     ICommittedProposal,
     IDocumentAttributes,
     IProcessMessageResult,
@@ -154,10 +153,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public get scopes(): string[] | undefined {
         return this._deltaManager.scopes;
-    }
-
-    public get clientDetails(): IClientDetails {
-        return this._deltaManager.clientDetails;
     }
 
     /**

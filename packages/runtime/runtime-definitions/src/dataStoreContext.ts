@@ -18,7 +18,6 @@ import {
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    IClientDetails,
     IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
@@ -60,8 +59,6 @@ export interface IContainerRuntimeBase extends
     IEventProvider<IContainerRuntimeBaseEvents>,
     IProvideFluidHandleContext
 {
-    readonly clientDetails: IClientDetails;
-
     /**
      * Invokes the given callback and guarantees that all operations generated within the callback will be ordered
      * sequentially. Total size of all messages must be less than maxOpSize.

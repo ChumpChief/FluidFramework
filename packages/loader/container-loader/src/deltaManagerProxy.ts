@@ -12,7 +12,6 @@ import {
 } from "@fluidframework/container-definitions";
 import { EventForwarder } from "@fluidframework/common-utils";
 import {
-    IClientDetails,
     IDocumentMessage,
     ISequencedDocumentMessage,
     IServiceConfiguration,
@@ -102,10 +101,6 @@ export class DeltaManagerProxy
 
     public get hasCheckpointSequenceNumber() {
         return this.deltaManager.hasCheckpointSequenceNumber;
-    }
-
-    public get clientDetails(): IClientDetails {
-        return this.deltaManager.clientDetails;
     }
 
     public get version(): string {

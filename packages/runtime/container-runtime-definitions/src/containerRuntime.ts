@@ -15,7 +15,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    IClientDetails,
     IDocumentMessage,
     IHelpMessage,
     ISequencedDocumentMessage,
@@ -63,7 +62,6 @@ export interface IContainerRuntime extends
     IContainerRuntimeBaseWithCombinedEvents {
     readonly existing: boolean;
     readonly clientId: string | undefined;
-    readonly clientDetails: IClientDetails;
     readonly connected: boolean;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     readonly storage: IDocumentStorageService;

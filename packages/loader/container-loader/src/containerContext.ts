@@ -17,7 +17,6 @@ import {
 } from "@fluidframework/container-definitions";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    IClientDetails,
     IDocumentMessage,
     IQuorum,
     ISequencedDocumentMessage,
@@ -56,10 +55,6 @@ export class ContainerContext implements IContainerContext {
 
     public get clientId(): string | undefined {
         return this.container.clientId;
-    }
-
-    public get clientDetails(): IClientDetails {
-        return this.container.clientDetails;
     }
 
     public get existing(): boolean | undefined {
