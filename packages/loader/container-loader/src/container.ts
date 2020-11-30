@@ -125,27 +125,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get IFluidRouter(): IFluidRouter { return this; }
 
-    /**
-     * {@inheritDoc DeltaManager.readonly}
-     */
-    public get readonly() {
-        return this._deltaManager.readonly;
-    }
-
-    /**
-     * {@inheritDoc DeltaManager.readonlyPermissions}
-     */
-    public get readonlyPermissions() {
-        return this._deltaManager.readonlyPermissions;
-    }
-
-    /**
-     * {@inheritDoc DeltaManager.forceReadonly}
-     */
-    public forceReadonly(readonly: boolean) {
-        this._deltaManager.forceReadonly(readonly);
-    }
-
     public get closed(): boolean {
         return this._closed;
     }
