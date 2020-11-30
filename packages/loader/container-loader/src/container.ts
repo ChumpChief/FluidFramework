@@ -10,7 +10,6 @@ import {
     IFluidRouter,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     IConnectionDetails,
     IContainer,
     IContainerEvents,
@@ -46,7 +45,6 @@ import {
     ISequencedDocumentMessage,
     ISequencedProposal,
     IServiceConfiguration,
-    ISignalClient,
     ISignalMessage,
     ISnapshotTree,
     IVersion,
@@ -57,7 +55,6 @@ import {
     EventEmitterWithErrorHandling,
     raiseConnectedEvent,
 } from "@fluidframework/telemetry-utils";
-import { Audience } from "./audience";
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
@@ -104,7 +101,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private _existing: boolean | undefined;
     private service: IDocumentService | undefined;
     private _connectionState = ConnectionState.Disconnected;
-    private readonly _audience: Audience;
 
     private _context: ContainerContext | undefined;
     private get context() {
@@ -201,19 +197,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._existing;
     }
 
-    /**
-     * Retrieves the audience associated with the document
-     */
-    public get audience(): IAudience {
-        return this._audience;
-    }
-
     constructor(
         private readonly serviceFactory: IDocumentServiceFactory,
         private _id: string | undefined,
     ) {
         super();
-        this._audience = new Audience();
 
         this._deltaManager = this.createDeltaManager();
     }
@@ -659,13 +647,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     || deltaManager.connectionMode === "read") {
                 this.setConnectionState(ConnectionState.Connected);
             }
-
-            // Back-compat for new client and old server.
-            this._audience.clear();
-
-            for (const priorClient of details.initialClients ?? []) {
-                this._audience.addMember(priorClient.clientId, priorClient.client);
-            }
         });
 
         deltaManager.on("disconnect", (reason: string) => {
@@ -808,16 +789,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private processSignal(message: ISignalMessage) {
         // No clientId indicates a system signal message.
-        if (message.clientId === null) {
-            const innerContent = message.content as { content: any; type: string };
-            if (innerContent.type === MessageType.ClientJoin) {
-                const newClient = innerContent.content as ISignalClient;
-                this._audience.addMember(newClient.clientId, newClient.client);
-            } else if (innerContent.type === MessageType.ClientLeave) {
-                const leftClientId = innerContent.content as string;
-                this._audience.removeMember(leftClientId);
-            }
-        } else {
+        if (message.clientId !== null) {
             const local = this._clientId === message.clientId;
             this.context.processSignal(message, local);
         }

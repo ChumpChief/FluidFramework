@@ -16,7 +16,6 @@ import {
     IResponse,
 } from "@fluidframework/core-interfaces";
 import {
-    IAudience,
     ILoader,
     AttachState,
 } from "@fluidframework/container-definitions";
@@ -444,10 +443,6 @@ export class MockFluidDataStoreRuntime extends EventEmitter
 
     public getQuorum(): IQuorum {
         return this.quorum;
-    }
-
-    public getAudience(): IAudience {
-        return null;
     }
 
     public save(message: string) {
