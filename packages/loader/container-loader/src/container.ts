@@ -19,7 +19,6 @@ import {
 } from "@fluidframework/container-definitions";
 import { CreateContainerError, GenericError } from "@fluidframework/container-utils";
 import {
-    LoaderCachingPolicy,
     IDocumentService,
     IDocumentStorageService,
 } from "@fluidframework/driver-definitions";
@@ -55,7 +54,6 @@ import {
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
-import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 
 interface ILocalSequencedClient extends ISequencedClient {
     shouldHaveLeft?: boolean;
@@ -193,7 +191,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return combineAppAndProtocolSummary(appSummary, protocolSummary);
     }
 
-    public async attach(documentService: IDocumentService): Promise<void> {
+    public async attach(
+        documentService: IDocumentService,
+        documentStorageService: IDocumentStorageService,
+    ): Promise<void> {
         assert(this.loaded, "not loaded");
         assert(!this.closed, "closed");
 
@@ -220,7 +221,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
 
         if (this._storageService === undefined) {
-            this._storageService = await this.getDocumentStorageService();
+            this._storageService = documentStorageService;
         }
 
         // This we can probably just pass the storage service to the blob manager - although ideally
@@ -280,6 +281,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         runtimeFactory: IRuntimeFactory,
         documentId: string,
         documentService: IDocumentService,
+        documentStorageService: IDocumentStorageService,
     ) {
         this.service = documentService;
 
@@ -299,7 +301,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const startConnectionP = this.connectToDeltaStream(connectionArgs);
         startConnectionP.catch((error) => { });
 
-        this._storageService = await this.getDocumentStorageService();
+        this._storageService = documentStorageService;
         this._attachState = AttachState.Attached;
 
         // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null
@@ -374,20 +376,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.propagateConnectionState();
 
         this.loaded = true;
-    }
-
-    private async getDocumentStorageService(): Promise<IDocumentStorageService> {
-        if (this.service === undefined) {
-            throw new Error("Not attached");
-        }
-        const storageService = await this.service.connectToStorage();
-
-        // Enable prefetching for the service unless it has a caching policy set otherwise:
-        const service = new PrefetchDocumentStorageService(storageService);
-        if (this.service.policies?.caching === LoaderCachingPolicy.NoCaching) {
-            service.stopPrefetch();
-        }
-        return service;
     }
 
     private async getDocumentAttributes(

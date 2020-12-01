@@ -10,6 +10,7 @@ import { Container } from "@fluidframework/container-loader";
 import {
     IDocumentService,
     IDocumentServiceFactory,
+    IDocumentStorageService,
 } from "@fluidframework/driver-definitions";
 import {
     DefaultErrorTracking,
@@ -24,6 +25,7 @@ async function getContainer(
     createNew: boolean,
     documentServiceFactory: IDocumentServiceFactory,
     documentService: IDocumentService,
+    documentStorageService: IDocumentStorageService,
     containerRuntimeFactory: IRuntimeFactory,
 ): Promise<Container> {
     const ordererUrl = "http://localhost:3000";
@@ -35,13 +37,14 @@ async function getContainer(
         // here would be any initial drafting before submitting the new container
         const createNewSummary = container.generateCreateNewSummary();
         await documentServiceFactory.postNewContainer(tenantId, documentId, ordererUrl, createNewSummary);
-        await container.attach(documentService);
+        await container.attach(documentService, documentStorageService);
         // after this block we can start using the container normally
     } else {
         await container.load(
             containerRuntimeFactory,
             documentId,
             documentService,
+            documentStorageService,
         );
 
         // If we didn't create the container properly, then it won't function correctly.  So we'll throw if we got a
@@ -88,12 +91,15 @@ export async function getTinyliciousContainer(
         documentId,
     );
 
+    const documentStorageService = await documentService.connectToStorage();
+
     return getContainer(
         tenantId,
         documentId,
         createNew,
         documentServiceFactory,
         documentService,
+        documentStorageService,
         containerRuntimeFactory,
     );
 }
