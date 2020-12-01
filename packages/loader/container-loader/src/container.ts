@@ -198,11 +198,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public async attach(
-        storageUrl: string,
         ordererUrl: string,
-        deltaStorageUrl: string,
         tenantId: string,
         documentId: string,
+        documentService: IDocumentService,
     ): Promise<void> {
         assert(this.loaded, "not loaded");
         assert(!this.closed, "closed");
@@ -231,13 +230,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Actually go and create the resolved document
         if (this.service === undefined) {
             await this.serviceFactory.postNewContainer(tenantId, documentId, ordererUrl, this.cachedAttachSummary);
-            this.service = await this.serviceFactory.createDocumentService(
-                storageUrl,
-                ordererUrl,
-                deltaStorageUrl,
-                tenantId,
-                documentId,
-            );
+            this.service = documentService;
         }
 
         if (this._storageService === undefined) {
@@ -300,19 +293,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public async load(
         runtimeFactory: IRuntimeFactory,
-        tenantId: string,
         documentId: string,
-        storageUrl: string,
-        ordererUrl: string,
-        deltaStorageUrl: string,
+        documentService: IDocumentService,
     ) {
-        this.service = await this.serviceFactory.createDocumentService(
-            storageUrl,
-            ordererUrl,
-            deltaStorageUrl,
-            tenantId,
-            documentId,
-        );
+        this.service = documentService;
 
         // Ideally we always connect as "read" by default.
         // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.

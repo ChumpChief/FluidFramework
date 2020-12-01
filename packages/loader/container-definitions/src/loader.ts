@@ -14,6 +14,7 @@ import {
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
+import { IDocumentService } from "@fluidframework/driver-definitions";
 import { ICriticalContainerError } from "./error";
 import { AttachState, IRuntimeFactory } from "./runtime";
 
@@ -63,12 +64,11 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
      * that allows attachment to a secondary document.
      */
     attach(
-        storageUrl: string,
         ordererUrl: string,
-        deltaStorageUrl: string,
         tenantId: string,
         documentId: string,
-    ): Promise<void>;
+        documentService: IDocumentService,
+    ): Promise<void>
 
     /**
      * Issue a request against the container for a resource.

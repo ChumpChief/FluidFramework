@@ -8,9 +8,14 @@ import {
 } from "@fluidframework/container-definitions";
 import { Container } from "@fluidframework/container-loader";
 import {
+    IDocumentService,
     IDocumentServiceFactory,
 } from "@fluidframework/driver-definitions";
-import { RouterliciousDocumentServiceFactory } from "@fluidframework/routerlicious-driver";
+import {
+    DefaultErrorTracking,
+    DocumentService,
+    RouterliciousDocumentServiceFactory,
+} from "@fluidframework/routerlicious-driver";
 import { InsecureTinyliciousTokenProvider } from "./insecureTinyliciousTokenProvider";
 
 async function getContainer(
@@ -18,31 +23,26 @@ async function getContainer(
     documentId: string,
     createNew: boolean,
     documentServiceFactory: IDocumentServiceFactory,
+    documentService: IDocumentService,
     containerRuntimeFactory: IRuntimeFactory,
 ): Promise<Container> {
-    const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${documentId}`;
     const ordererUrl = "http://localhost:3000";
-    const storageUrl = `http://localhost:3000/repos/tinylicious`;
 
     const container = new Container(documentServiceFactory);
 
     if (createNew) {
         await container.initializeDetached(containerRuntimeFactory);
         await container.attach(
-            storageUrl,
             ordererUrl,
-            deltaStorageUrl,
             tenantId,
             documentId,
+            documentService,
         );
     } else {
         await container.load(
             containerRuntimeFactory,
-            tenantId,
             documentId,
-            storageUrl,
-            ordererUrl,
-            deltaStorageUrl,
+            documentService,
         );
 
         // If we didn't create the container properly, then it won't function correctly.  So we'll throw if we got a
@@ -67,12 +67,34 @@ export async function getTinyliciousContainer(
 ): Promise<Container> {
     const tokenProvider = new InsecureTinyliciousTokenProvider(documentId);
     const documentServiceFactory = new RouterliciousDocumentServiceFactory(tokenProvider);
+    const tenantId = "tinylicious";
+
+    const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${documentId}`;
+    const ordererUrl = "http://localhost:3000";
+    const storageUrl = `http://localhost:3000/repos/tinylicious`;
+
+    const errorTracking = new DefaultErrorTracking();
+
+    const documentService = new DocumentService(
+        ordererUrl,
+        deltaStorageUrl,
+        storageUrl,
+        errorTracking,
+        false, // disableCache
+        true, // historianApi
+        undefined, // credentials
+        undefined, // gitCache
+        tokenProvider,
+        tenantId,
+        documentId,
+    );
 
     return getContainer(
-        "tinylicious", // tenantId
+        tenantId,
         documentId,
         createNew,
         documentServiceFactory,
+        documentService,
         containerRuntimeFactory,
     );
 }
