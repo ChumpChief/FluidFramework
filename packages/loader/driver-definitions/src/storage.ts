@@ -202,11 +202,6 @@ export interface IDocumentService {
 }
 
 export interface IDocumentServiceFactory {
-    /**
-     * Name of the protocol used by factory
-     */
-    protocolName: string;
-
     postNewContainer(
         tenantId: string,
         documentId: string,

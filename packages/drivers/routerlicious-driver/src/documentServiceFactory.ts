@@ -24,7 +24,6 @@ const errorTracking = new DefaultErrorTracking();
  * use the routerlicious implementation.
  */
 export class RouterliciousDocumentServiceFactory implements IDocumentServiceFactory {
-    public readonly protocolName = "fluid:";
     constructor(private readonly tokenProvider: ITokenProvider) { }
 
     public async postNewContainer(
