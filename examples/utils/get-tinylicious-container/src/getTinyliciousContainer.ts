@@ -28,16 +28,15 @@ async function getContainer(
 ): Promise<Container> {
     const ordererUrl = "http://localhost:3000";
 
-    const container = new Container(documentServiceFactory);
+    const container = new Container();
 
     if (createNew) {
         await container.initializeDetached(containerRuntimeFactory);
-        await container.attach(
-            ordererUrl,
-            tenantId,
-            documentId,
-            documentService,
-        );
+        // here would be any initial drafting before submitting the new container
+        const createNewSummary = container.generateCreateNewSummary();
+        await documentServiceFactory.postNewContainer(tenantId, documentId, ordererUrl, createNewSummary);
+        await container.attach(documentService);
+        // after this block we can start using the container normally
     } else {
         await container.load(
             containerRuntimeFactory,

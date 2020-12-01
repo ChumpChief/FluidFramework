@@ -63,12 +63,7 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
      * TODO - in the case of failure options should give a retry policy. Or some continuation function
      * that allows attachment to a secondary document.
      */
-    attach(
-        ordererUrl: string,
-        tenantId: string,
-        documentId: string,
-        documentService: IDocumentService,
-    ): Promise<void>
+    attach(documentService: IDocumentService): Promise<void>
 
     /**
      * Issue a request against the container for a resource.

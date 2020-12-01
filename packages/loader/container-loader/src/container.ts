@@ -22,7 +22,6 @@ import {
     LoaderCachingPolicy,
     IDocumentService,
     IDocumentStorageService,
-    IDocumentServiceFactory,
 } from "@fluidframework/driver-definitions";
 import {
     readAndParse,
@@ -115,7 +114,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private resumedOpProcessingAfterLoad = false;
-    private cachedAttachSummary: ISummaryTree | undefined;
 
     private _closed = false;
 
@@ -148,9 +146,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._existing;
     }
 
-    constructor(
-        private readonly serviceFactory: IDocumentServiceFactory,
-    ) {
+    constructor() {
         super();
 
         this._deltaManager = this.createDeltaManager();
@@ -197,12 +193,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return combineAppAndProtocolSummary(appSummary, protocolSummary);
     }
 
-    public async attach(
-        ordererUrl: string,
-        tenantId: string,
-        documentId: string,
-        documentService: IDocumentService,
-    ): Promise<void> {
+    public async attach(documentService: IDocumentService): Promise<void> {
         assert(this.loaded, "not loaded");
         assert(!this.closed, "closed");
 
@@ -215,8 +206,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Only take a summary if the container is in detached state, otherwise we could have local changes.
         // In failed attach call, we would already have a summary cached.
         if (this._attachState === AttachState.Detached) {
-            this.cachedAttachSummary = this.generateCreateNewSummary();
-
             // Set the state as attaching as we are starting the process of attaching container.
             // This should be fired after taking the summary because it is the place where we are
             // starting to attach the container to storage.
@@ -224,12 +213,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this._attachState = AttachState.Attaching;
             this.emit("attaching");
         }
-        assert(!!this.cachedAttachSummary,
-            "Summary should be there either by this attach call or previous attach call!!");
 
         // Actually go and create the resolved document
         if (this.service === undefined) {
-            await this.serviceFactory.postNewContainer(tenantId, documentId, ordererUrl, this.cachedAttachSummary);
             this.service = documentService;
         }
 
@@ -241,7 +227,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // there just isn't a blob manager
         this._attachState = AttachState.Attached;
         this.emit("attached");
-        this.cachedAttachSummary = undefined;
 
         // Propagate current connection state through the system.
         this.propagateConnectionState();
