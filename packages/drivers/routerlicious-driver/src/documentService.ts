@@ -3,7 +3,12 @@
  * Licensed under the MIT License.
  */
 
-import * as api from "@fluidframework/driver-definitions";
+import {
+    IDocumentDeltaConnection,
+    IDocumentDeltaStorageService,
+    IDocumentService,
+    IDocumentStorageService,
+} from "@fluidframework/driver-definitions";
 import { IClient } from "@fluidframework/protocol-definitions";
 import { GitManager, Historian } from "@fluidframework/server-services-client";
 import io from "socket.io-client";
@@ -17,14 +22,14 @@ import { ITokenProvider } from "./tokens";
  * The DocumentService manages the Socket.IO connection and manages routing requests to connected
  * clients
  */
-export class DocumentService implements api.IDocumentService {
+export class DocumentService implements IDocumentService {
     constructor(
-        protected ordererUrl: string,
+        private readonly ordererUrl: string,
         private readonly deltaStorageUrl: string,
-        private readonly gitUrl: string,
-        protected tokenProvider: ITokenProvider,
-        protected tenantId: string,
-        protected documentId: string,
+        private readonly storageUrl: string,
+        private readonly tokenProvider: ITokenProvider,
+        private readonly tenantId: string,
+        private readonly documentId: string,
     ) {
     }
 
@@ -33,8 +38,8 @@ export class DocumentService implements api.IDocumentService {
      *
      * @returns returns the document storage service for routerlicious driver.
      */
-    public async connectToStorage(): Promise<api.IDocumentStorageService> {
-        if (this.gitUrl === undefined) {
+    public async connectToStorage(): Promise<IDocumentStorageService> {
+        if (this.storageUrl === undefined) {
             return new NullBlobStorageService();
         }
 
@@ -45,7 +50,7 @@ export class DocumentService implements api.IDocumentService {
         };
 
         const historian = new Historian(
-            this.gitUrl,
+            this.storageUrl,
             true, // historianApi
             false, // disableCache
             credentials);
@@ -59,7 +64,7 @@ export class DocumentService implements api.IDocumentService {
      *
      * @returns returns the document delta storage service for routerlicious driver.
      */
-    public async connectToDeltaStorage(): Promise<api.IDocumentDeltaStorageService> {
+    public async connectToDeltaStorage(): Promise<IDocumentDeltaStorageService> {
         const deltaStorage = new DeltaStorageService(this.deltaStorageUrl, this.tokenProvider);
         return new DocumentDeltaStorageService(this.tenantId, this.documentId, deltaStorage);
     }
@@ -69,7 +74,7 @@ export class DocumentService implements api.IDocumentService {
      *
      * @returns returns the document delta stream service for routerlicious driver.
      */
-    public async connectToDeltaStream(client: IClient): Promise<api.IDocumentDeltaConnection> {
+    public async connectToDeltaStream(client: IClient): Promise<IDocumentDeltaConnection> {
         const ordererToken = await this.tokenProvider.fetchOrdererToken();
         return R11sDocumentDeltaConnection.create(
             this.tenantId,
