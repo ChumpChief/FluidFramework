@@ -17,7 +17,6 @@ import {
 } from "@fluidframework/driver-utils";
 import { ISummaryTree } from "@fluidframework/protocol-definitions";
 import {
-    DefaultErrorTracking,
     DocumentService,
 } from "@fluidframework/routerlicious-driver";
 import Axios from "axios";
@@ -97,13 +96,10 @@ export async function getTinyliciousContainer(
     const ordererUrl = "http://localhost:3000";
     const storageUrl = `http://localhost:3000/repos/tinylicious`;
 
-    const errorTracking = new DefaultErrorTracking();
-
     const documentService = new DocumentService(
         ordererUrl,
         deltaStorageUrl,
         storageUrl,
-        errorTracking,
         tokenProvider,
         tenantId,
         documentId,

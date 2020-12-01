@@ -4,7 +4,7 @@
  */
 
 import * as api from "@fluidframework/driver-definitions";
-import { IClient, IErrorTrackingService } from "@fluidframework/protocol-definitions";
+import { IClient } from "@fluidframework/protocol-definitions";
 import { GitManager, Historian } from "@fluidframework/server-services-client";
 import io from "socket.io-client";
 import { DeltaStorageService, DocumentDeltaStorageService } from "./deltaStorageService";
@@ -22,7 +22,6 @@ export class DocumentService implements api.IDocumentService {
         protected ordererUrl: string,
         private readonly deltaStorageUrl: string,
         private readonly gitUrl: string,
-        private readonly errorTracking: IErrorTrackingService,
         protected tokenProvider: ITokenProvider,
         protected tenantId: string,
         protected documentId: string,
@@ -79,9 +78,5 @@ export class DocumentService implements api.IDocumentService {
             io,
             client,
             this.ordererUrl);
-    }
-
-    public getErrorTrackingService() {
-        return this.errorTracking;
     }
 }
