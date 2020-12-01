@@ -186,6 +186,17 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._attachState;
     }
 
+    public generateCreateNewSummary() {
+         // Get the document state post attach - possibly can just call attach but we need to change the
+        // semantics around what the attach means as far as async code goes.
+        const appSummary: ISummaryTree = this.context.createSummary();
+        if (this.protocolHandler === undefined) {
+            throw new Error("Protocol Handler is undefined");
+        }
+        const protocolSummary = this.protocolHandler.captureSummary();
+        return combineAppAndProtocolSummary(appSummary, protocolSummary);
+    }
+
     public async attach(
         storageUrl: string,
         ordererUrl: string,
@@ -205,14 +216,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Only take a summary if the container is in detached state, otherwise we could have local changes.
         // In failed attach call, we would already have a summary cached.
         if (this._attachState === AttachState.Detached) {
-            // Get the document state post attach - possibly can just call attach but we need to change the
-            // semantics around what the attach means as far as async code goes.
-            const appSummary: ISummaryTree = this.context.createSummary();
-            if (this.protocolHandler === undefined) {
-                throw new Error("Protocol Handler is undefined");
-            }
-            const protocolSummary = this.protocolHandler.captureSummary();
-            this.cachedAttachSummary = combineAppAndProtocolSummary(appSummary, protocolSummary);
+            this.cachedAttachSummary = this.generateCreateNewSummary();
 
             // Set the state as attaching as we are starting the process of attaching container.
             // This should be fired after taking the summary because it is the place where we are
