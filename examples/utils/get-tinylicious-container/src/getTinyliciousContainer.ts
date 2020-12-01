@@ -104,10 +104,6 @@ export async function getTinyliciousContainer(
         deltaStorageUrl,
         storageUrl,
         errorTracking,
-        false, // disableCache
-        true, // historianApi
-        undefined, // credentials
-        undefined, // gitCache
         tokenProvider,
         tenantId,
         documentId,

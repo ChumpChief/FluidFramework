@@ -5,7 +5,7 @@
 
 import * as api from "@fluidframework/driver-definitions";
 import { IClient, IErrorTrackingService } from "@fluidframework/protocol-definitions";
-import { GitManager, Historian, ICredentials, IGitCache } from "@fluidframework/server-services-client";
+import { GitManager, Historian } from "@fluidframework/server-services-client";
 import io from "socket.io-client";
 import { DeltaStorageService, DocumentDeltaStorageService } from "./deltaStorageService";
 import { DocumentStorageService } from "./documentStorageService";
@@ -23,10 +23,6 @@ export class DocumentService implements api.IDocumentService {
         private readonly deltaStorageUrl: string,
         private readonly gitUrl: string,
         private readonly errorTracking: IErrorTrackingService,
-        private readonly disableCache: boolean,
-        private readonly historianApi: boolean,
-        private readonly directCredentials: ICredentials | undefined,
-        private readonly gitCache: IGitCache | undefined,
         protected tokenProvider: ITokenProvider,
         protected tenantId: string,
         protected documentId: string,
@@ -44,43 +40,17 @@ export class DocumentService implements api.IDocumentService {
         }
 
         const storageToken = await this.tokenProvider.fetchStorageToken();
-        // Craft credentials - either use the direct credentials (i.e. a GitHub user + PAT) - or make use of our
-        // tenant token
-        let credentials: ICredentials | undefined;
-        if (this.directCredentials) {
-            credentials = this.directCredentials;
-        } else {
-            credentials = {
-                password: storageToken.jwt,
-                user: this.tenantId,
-            };
-        }
+        const credentials = {
+            password: storageToken.jwt,
+            user: this.tenantId,
+        };
 
         const historian = new Historian(
             this.gitUrl,
-            this.historianApi,
-            this.disableCache,
+            true, // historianApi
+            false, // disableCache
             credentials);
         const gitManager = new GitManager(historian);
-
-        // Insert cached seed data
-        if (this.gitCache !== undefined) {
-            for (const ref of Object.keys(this.gitCache.refs)) {
-                gitManager.addRef(ref, this.gitCache.refs[ref]);
-            }
-
-            for (const commit of this.gitCache.commits) {
-                gitManager.addCommit(commit);
-            }
-
-            for (const tree of this.gitCache.trees) {
-                gitManager.addTree(tree);
-            }
-
-            for (const blob of this.gitCache.blobs) {
-                gitManager.addBlob(blob);
-            }
-        }
 
         return new DocumentStorageService(this.documentId, gitManager);
     }
