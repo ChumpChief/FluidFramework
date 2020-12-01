@@ -65,7 +65,7 @@ export class DocumentDeltaConnection
      * Create a DocumentDeltaConnection
      *
      * @param tenantId - the ID of the tenant
-     * @param id - document ID
+     * @param documentId - document ID
      * @param token - authorization token for storage service
      * @param io - websocket library
      * @param client - information about the client
@@ -75,7 +75,7 @@ export class DocumentDeltaConnection
      */
     public static async create(
         tenantId: string,
-        id: string,
+        documentId: string,
         token: string | null,
         io: SocketIOClientStatic,
         client: IClient,
@@ -85,7 +85,7 @@ export class DocumentDeltaConnection
             url,
             {
                 query: {
-                    documentId: id,
+                    documentId,
                     tenantId,
                 },
                 reconnection: false,
@@ -95,14 +95,14 @@ export class DocumentDeltaConnection
 
         const connectMessage: IConnect = {
             client,
-            id,
+            id: documentId,
             mode: client.mode,
             tenantId,
             token,  // Token is going to indicate tenant level information, etc...
             versions: protocolVersions,
         };
 
-        const deltaConnection = new DocumentDeltaConnection(socket, id);
+        const deltaConnection = new DocumentDeltaConnection(socket, documentId);
 
         await deltaConnection.initialize(connectMessage, timeoutMs);
         return deltaConnection;

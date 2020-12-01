@@ -56,7 +56,7 @@ const errorObjectFromSocketError = (socketError: any, canRetry: boolean) => {
 export class R11sDocumentDeltaConnection extends DocumentDeltaConnection implements IDocumentDeltaConnection {
     public static async create(
         tenantId: string,
-        id: string,
+        documentId: string,
         token: string | null,
         io: SocketIOClientStatic,
         client: IClient,
@@ -64,7 +64,7 @@ export class R11sDocumentDeltaConnection extends DocumentDeltaConnection impleme
         try {
             const connection = await DocumentDeltaConnection.create(
                 tenantId,
-                id,
+                documentId,
                 token,
                 io,
                 client,

@@ -7,8 +7,7 @@ import {
     IDocumentService,
     IDocumentServiceFactory,
 } from "@fluidframework/driver-definitions";
-import { IErrorTrackingService, ISummaryTree } from "@fluidframework/protocol-definitions";
-import { ICredentials, IGitCache } from "@fluidframework/server-services-client";
+import { ISummaryTree } from "@fluidframework/protocol-definitions";
 import {
     getDocAttributesFromProtocolSummary,
     getQuorumValuesFromProtocolSummary,
@@ -18,21 +17,15 @@ import { DocumentService } from "./documentService";
 import { DefaultErrorTracking } from "./errorTracking";
 import { ITokenProvider } from "./tokens";
 
+const errorTracking = new DefaultErrorTracking();
+
 /**
  * Factory for creating the routerlicious document service. Use this if you want to
  * use the routerlicious implementation.
  */
 export class RouterliciousDocumentServiceFactory implements IDocumentServiceFactory {
     public readonly protocolName = "fluid:";
-    constructor(
-        private readonly tokenProvider: ITokenProvider,
-        private readonly errorTracking: IErrorTrackingService = new DefaultErrorTracking(),
-        private readonly disableCache: boolean = false,
-        private readonly historianApi: boolean = true,
-        private readonly gitCache: IGitCache | undefined = undefined,
-        private readonly credentials?: ICredentials,
-    ) {
-    }
+    constructor(private readonly tokenProvider: ITokenProvider) { }
 
     public async postNewContainer(
         tenantId: string,
@@ -79,11 +72,11 @@ export class RouterliciousDocumentServiceFactory implements IDocumentServiceFact
             ordererUrl,
             deltaStorageUrl,
             storageUrl,
-            this.errorTracking,
-            this.disableCache,
-            this.historianApi,
-            this.credentials,
-            this.gitCache,
+            errorTracking,
+            false, // disableCache
+            true, // historianApi
+            undefined, // credentials
+            undefined, // gitCache
             this.tokenProvider,
             tenantId,
             documentId,
