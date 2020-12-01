@@ -9,21 +9,44 @@ import {
 import { Container } from "@fluidframework/container-loader";
 import {
     IDocumentService,
-    IDocumentServiceFactory,
     IDocumentStorageService,
 } from "@fluidframework/driver-definitions";
 import {
+    getDocAttributesFromProtocolSummary,
+    getQuorumValuesFromProtocolSummary,
+} from "@fluidframework/driver-utils";
+import { ISummaryTree } from "@fluidframework/protocol-definitions";
+import {
     DefaultErrorTracking,
     DocumentService,
-    RouterliciousDocumentServiceFactory,
 } from "@fluidframework/routerlicious-driver";
+import Axios from "axios";
 import { InsecureTinyliciousTokenProvider } from "./insecureTinyliciousTokenProvider";
+
+async function postNewContainer(
+    tenantId: string,
+    documentId: string,
+    ordererUrl: string,
+    createNewSummary: ISummaryTree,
+): Promise<void> {
+    const protocolSummary = createNewSummary.tree[".protocol"] as ISummaryTree;
+    const appSummary = createNewSummary.tree[".app"] as ISummaryTree;
+    const documentAttributes = getDocAttributesFromProtocolSummary(protocolSummary);
+    const quorumValues = getQuorumValuesFromProtocolSummary(protocolSummary);
+    await Axios.post(
+        `${ordererUrl}/documents/${tenantId}`,
+        {
+            id: documentId,
+            summary: appSummary,
+            sequenceNumber: documentAttributes.sequenceNumber,
+            values: quorumValues,
+        });
+}
 
 async function getContainer(
     tenantId: string,
     documentId: string,
     createNew: boolean,
-    documentServiceFactory: IDocumentServiceFactory,
     documentService: IDocumentService,
     documentStorageService: IDocumentStorageService,
     containerRuntimeFactory: IRuntimeFactory,
@@ -36,7 +59,7 @@ async function getContainer(
         await container.initializeDetached(containerRuntimeFactory);
         // here would be any initial drafting before submitting the new container
         const createNewSummary = container.generateCreateNewSummary();
-        await documentServiceFactory.postNewContainer(tenantId, documentId, ordererUrl, createNewSummary);
+        await postNewContainer(tenantId, documentId, ordererUrl, createNewSummary);
         await container.attach(documentService, documentStorageService);
         // after this block we can start using the container normally
     } else {
@@ -68,7 +91,6 @@ export async function getTinyliciousContainer(
     createNew: boolean,
 ): Promise<Container> {
     const tokenProvider = new InsecureTinyliciousTokenProvider(documentId);
-    const documentServiceFactory = new RouterliciousDocumentServiceFactory(tokenProvider);
     const tenantId = "tinylicious";
 
     const deltaStorageUrl = `http://localhost:3000/deltas/tinylicious/${documentId}`;
@@ -97,7 +119,6 @@ export async function getTinyliciousContainer(
         tenantId,
         documentId,
         createNew,
-        documentServiceFactory,
         documentService,
         documentStorageService,
         containerRuntimeFactory,
