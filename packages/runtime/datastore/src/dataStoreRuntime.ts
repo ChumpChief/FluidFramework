@@ -28,7 +28,6 @@ import {
 import { buildSnapshotTree, readAndParseFromBlobs } from "@fluidframework/driver-utils";
 import {
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
     ITreeEntry,
     SummaryType,
@@ -151,7 +150,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
     public existing: boolean;
     public readonly options: any;
     public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-    private readonly quorum: IQuorum;
     public readonly logger: ITelemetryLogger;
 
     public constructor(
@@ -165,7 +163,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
         this.existing = dataStoreContext.existing;
         this.options = {}; // TODO remove
         this.deltaManager = dataStoreContext.deltaManager;
-        this.quorum = dataStoreContext.getQuorum();
 
         const tree = dataStoreContext.baseSnapshot;
 
@@ -427,10 +424,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
         }
 
         raiseConnectedEvent(this, connected, clientId);
-    }
-
-    public getQuorum(): IQuorum {
-        return this.quorum;
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {

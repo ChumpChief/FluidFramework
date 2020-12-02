@@ -18,7 +18,6 @@ import {
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
     ISnapshotTree,
     ITreeEntry,
@@ -95,11 +94,6 @@ export interface IContainerRuntimeBase extends
      * data store initialization is considered compete.
      */
     createDetachedDataStore(pkg: Readonly<string[]>): IFluidDataStoreContextDetached;
-
-    /**
-     * Returns the current quorum.
-     */
-    getQuorum(): IQuorum;
 }
 
 /**
@@ -250,11 +244,6 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
     readonly routeContext: IFluidHandleContext;
 
     readonly summaryTracker: ISummaryTracker;
-
-    /**
-     * Returns the current quorum.
-     */
-    getQuorum(): IQuorum;
 
     /**
      * Submits the message to be sent to other clients.

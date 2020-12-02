@@ -15,7 +15,6 @@ import {
 } from "@fluidframework/container-definitions";
 import {
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IInboundSignalMessage, IProvideFluidDataStoreRegistry } from "@fluidframework/runtime-definitions";
@@ -91,11 +90,6 @@ export interface IFluidDataStoreRuntime extends
      * @param content - Content of the signal.
      */
     submitSignal(type: string, content: any): void;
-
-    /**
-     * Returns the current quorum.
-     */
-    getQuorum(): IQuorum;
 
     /**
      * Resolves when a local data store is attached.

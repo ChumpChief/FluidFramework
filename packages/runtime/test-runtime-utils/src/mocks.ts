@@ -441,10 +441,6 @@ export class MockFluidDataStoreRuntime extends EventEmitter
         return;
     }
 
-    public getQuorum(): IQuorum {
-        return this.quorum;
-    }
-
     public save(message: string) {
         return;
     }

@@ -37,7 +37,6 @@ import {
     ICommittedProposal,
     IDocumentAttributes,
     IProcessMessageResult,
-    IQuorum,
     ISequencedClient,
     ISequencedDocumentMessage,
     ISequencedProposal,
@@ -148,13 +147,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         super();
 
         this._deltaManager = this.createDeltaManager();
-    }
-
-    /**
-     * Retrieves the quorum associated with the document
-     */
-    public getQuorum(): IQuorum {
-        return this.protocolHandler.quorum;
     }
 
     private close(error?: ICriticalContainerError) {
@@ -617,7 +609,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         if (message.clientId != null) {
             let errorMsg: string | undefined;
             const client: ILocalSequencedClient | undefined =
-                this.getQuorum().getMember(message.clientId);
+                this.protocolHandler.quorum.getMember(message.clientId);
             if (client === undefined && message.type !== MessageType.ClientJoin) {
                 errorMsg = "messageClientIdMissingFromQuorum";
             } else if (client?.shouldHaveLeft === true) {

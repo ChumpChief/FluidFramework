@@ -41,7 +41,6 @@ import {
 } from "@fluidframework/driver-utils";
 import {
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
     ISignalMessage,
     ISnapshotTree,
@@ -997,10 +996,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         const deferred = new Deferred<FluidDataStoreContext>();
         this.contextsDeferred.set(id, deferred);
         this.contexts.set(id, context);
-    }
-
-    public getQuorum(): IQuorum {
-        return this.context.quorum;
     }
 
     /**
