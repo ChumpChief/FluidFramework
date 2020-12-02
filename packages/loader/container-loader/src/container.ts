@@ -496,7 +496,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const deltaManager = new DeltaManager(
             () => this.service,
             this.client,
-            true, // reconnectAllowed
         );
 
         deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {

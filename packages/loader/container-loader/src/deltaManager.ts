@@ -363,13 +363,12 @@ export class DeltaManager
     constructor(
         private readonly serviceProvider: () => IDocumentService | undefined,
         private client: IClient,
-        reconnectAllowed: boolean,
     ) {
         super();
 
         this.clientDetails = this.client.details;
         this.defaultReconnectionMode = this.client.mode;
-        this._reconnectMode = reconnectAllowed ? ReconnectMode.Enabled : ReconnectMode.Never;
+        this._reconnectMode = ReconnectMode.Enabled;
 
         this._inbound = new DeltaQueue<ISequencedDocumentMessage>(
             (op) => {

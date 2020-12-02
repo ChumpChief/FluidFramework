@@ -22,7 +22,7 @@ import {
 import Axios from "axios";
 import { InsecureTinyliciousTokenProvider } from "./insecureTinyliciousTokenProvider";
 
-async function postNewContainer(
+async function uploadNewContainer(
     tenantId: string,
     documentId: string,
     ordererUrl: string,
@@ -58,7 +58,7 @@ async function getContainer(
         await container.initializeDetached(containerRuntimeFactory);
         // here would be any initial drafting before submitting the new container
         const createNewSummary = container.generateCreateNewSummary();
-        await postNewContainer(tenantId, documentId, ordererUrl, createNewSummary);
+        await uploadNewContainer(tenantId, documentId, ordererUrl, createNewSummary);
         await container.attach(documentService, documentStorageService);
         // after this block we can start using the container normally
     } else {
