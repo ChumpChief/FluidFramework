@@ -100,7 +100,7 @@ export interface IDeltaManagerEvents extends IEvent {
 /**
  * Manages the transmission of ops between the runtime and storage.
  */
-export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>, IDeltaSender, IDisposable {
+export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>, IDeltaSender {
     /** The queue of inbound delta messages */
     readonly inbound: IDeltaQueue<T>;
 

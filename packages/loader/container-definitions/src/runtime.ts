@@ -77,7 +77,7 @@ export interface IRuntime extends IDisposable {
  * so the old IRuntime is no longer valid, as its ContainerContext has been revoked,
  * and the Container has created a new ContainerContext.
  */
-export interface IContainerContext extends IDisposable {
+export interface IContainerContext {
     readonly existing: boolean | undefined;
     readonly clientId: string | undefined;
     readonly storage: IDocumentStorageService | undefined | null;

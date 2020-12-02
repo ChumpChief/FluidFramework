@@ -81,12 +81,6 @@ export class ContainerContext implements IContainerContext {
         return this._runtime;
     }
 
-    private _disposed = false;
-
-    public get disposed() {
-        return this._disposed;
-    }
-
     constructor(
         private readonly container: Container,
         private readonly runtimeFactory: IRuntimeFactory,
@@ -107,17 +101,6 @@ export class ContainerContext implements IContainerContext {
         this.container.once("attached", () => {
             this._runtime?.setAttachState?.(AttachState.Attached);
         });
-    }
-
-    public dispose(error?: Error): void {
-        if (this._disposed) {
-            return;
-        }
-        this._disposed = true;
-
-        this.runtime.dispose(error);
-        this.quorum.dispose();
-        this.deltaManager.dispose();
     }
 
     public get attachState(): AttachState {

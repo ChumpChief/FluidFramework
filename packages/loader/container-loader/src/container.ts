@@ -167,8 +167,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this._protocolHandler?.close();
 
-        this._context?.dispose(error !== undefined ? new Error(error.message) : undefined);
-
         assert(this.connectionState === ConnectionState.Disconnected, "disconnect event was not raised!");
 
         this.emit("closed", error);
@@ -586,9 +584,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private propagateConnectionState() {
         const state = this._connectionState === ConnectionState.Connected;
-        if (!this.context.disposed) {
-            this.context.setConnectionState(state, this.clientId);
-        }
+        this.context.setConnectionState(state, this.clientId);
         this.protocolHandler.quorum.setConnectionState(state, this.clientId);
         raiseConnectedEvent(this, state, this.clientId);
     }
@@ -686,7 +682,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         runtimeFactory: IRuntimeFactory,
         snapshot?: ISnapshotTree,
     ) {
-        assert(this._context?.disposed !== false, "Existing context not disposed");
         this._context = await ContainerContext.createOrLoad(
             this,
             runtimeFactory,
