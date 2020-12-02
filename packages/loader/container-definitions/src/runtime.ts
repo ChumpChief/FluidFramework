@@ -10,7 +10,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
-    IQuorum,
     ISequencedDocumentMessage,
     ISnapshotTree,
     MessageType,
@@ -87,7 +86,6 @@ export interface IContainerContext {
     readonly submitSignalFn: (contents: any) => void;
     readonly closeFn: (error?: ICriticalContainerError) => void;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
-    readonly quorum: IQuorum;
 
     /**
      * Indicates the attachment state of the container to a host service.

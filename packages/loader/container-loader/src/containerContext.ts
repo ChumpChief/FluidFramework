@@ -18,7 +18,6 @@ import {
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     IDocumentMessage,
-    IQuorum,
     ISequencedDocumentMessage,
     ISignalMessage,
     ISnapshotTree,
@@ -34,7 +33,6 @@ export class ContainerContext implements IContainerContext {
         runtimeFactory: IRuntimeFactory,
         baseSnapshot: ISnapshotTree | undefined,
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
-        quorum: IQuorum,
         submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         submitSignalFn: (contents: any) => void,
         closeFn: (error?: ICriticalContainerError) => void,
@@ -44,7 +42,6 @@ export class ContainerContext implements IContainerContext {
             runtimeFactory,
             baseSnapshot,
             deltaManager,
-            quorum,
             submitFn,
             submitSignalFn,
             closeFn,
@@ -86,7 +83,6 @@ export class ContainerContext implements IContainerContext {
         private readonly runtimeFactory: IRuntimeFactory,
         private readonly _baseSnapshot: ISnapshotTree | undefined,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
-        public readonly quorum: IQuorum,
         public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
         public readonly closeFn: (error?: ICriticalContainerError) => void,
