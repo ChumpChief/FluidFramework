@@ -15,7 +15,6 @@ import {
     ContainerErrorType,
 } from "@fluidframework/container-definitions";
 import { assert, TypedEventEmitter } from "@fluidframework/common-utils";
-import { safeRaiseEvent } from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
     IDocumentService,
@@ -287,7 +286,7 @@ export class DeltaManager
                 // the ContainerRuntime constructor
                 reconnect = this.disconnectFromDeltaStream("Force readonly");
             }
-            safeRaiseEvent(this, "readonly", this.readonly);
+            this.emit("readonly", this.readonly);
             if (reconnect) {
                 // reconnect if we disconnected from before.
                 this.triggerConnect({ mode: "read", fetchOpsFromStorage: false });
@@ -299,7 +298,7 @@ export class DeltaManager
         const oldValue = this.readonly;
         this._readonlyPermissions = readonly;
         if (oldValue !== this.readonly) {
-            safeRaiseEvent(this, "readonly", this.readonly);
+            this.emit("readonly", this.readonly);
         }
     }
 

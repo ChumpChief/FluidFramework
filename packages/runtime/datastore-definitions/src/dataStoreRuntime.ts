@@ -22,11 +22,10 @@ import { IChannel } from ".";
 
 export interface IFluidDataStoreRuntimeEvents extends IEvent {
     (
-        event: "disconnected" | "dispose" | "attaching" | "attached",
+        event: "dispose" | "attaching" | "attached",
         listener: () => void,
     );
     (event: "signal", listener: (message: IInboundSignalMessage, local: boolean) => void);
-    (event: "connected", listener: (clientId: string) => void);
 }
 
 /**

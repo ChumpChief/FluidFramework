@@ -40,9 +40,8 @@ export interface IProvideContainerRuntime {
 
 export interface IContainerRuntimeEvents extends IContainerRuntimeBaseEvents{
     (
-        event: "disconnected" | "dispose" | "savedDocument",
+        event: "dispose" | "savedDocument",
         listener: () => void);
-    (event: "connected", listener: (clientId: string) => void);
     (event: "localHelp", listener: (message: IHelpMessage) => void);
     (
         event: "fluidDataStoreInstantiated",

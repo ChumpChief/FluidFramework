@@ -46,7 +46,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import {
     EventEmitterWithErrorHandling,
-    raiseConnectedEvent,
 } from "@fluidframework/telemetry-utils";
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
@@ -541,7 +540,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const state = this._connectionState === ConnectionState.Connected;
         this.context.setConnectionState(state, this.clientId);
         this.protocolHandler.quorum.setConnectionState(state, this.clientId);
-        raiseConnectedEvent(this, state, this.clientId);
     }
 
     private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {

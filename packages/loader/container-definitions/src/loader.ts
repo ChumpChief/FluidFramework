@@ -30,8 +30,7 @@ export interface ICodeLoader {
  * Events emitted by the Container "upwards" to the Loader and Host
  */
 export interface IContainerEvents extends IEvent {
-    (event: "connected", listener: (clientId: string) => void);
-    (event: "disconnected" | "attaching" | "attached", listener: () => void);
+    (event: "attaching" | "attached", listener: () => void);
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
 }
 

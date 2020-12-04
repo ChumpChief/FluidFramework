@@ -28,9 +28,6 @@ import {
     TypedEventEmitter,
     unreachableCase,
 } from "@fluidframework/common-utils";
-import {
-    raiseConnectedEvent,
-} from "@fluidframework/telemetry-utils";
 import { IDocumentStorageService } from "@fluidframework/driver-definitions";
 import {
     BlobCacheStorageService,
@@ -674,8 +671,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         for (const [, context] of this.contexts) {
             context.setConnectionState(connected, clientId);
         }
-
-        raiseConnectedEvent(this, connected, clientId);
 
         if (connected) {
             assert(!!clientId);

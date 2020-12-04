@@ -23,7 +23,6 @@ import {
 } from "@fluidframework/common-utils";
 import {
     ChildLogger,
-    raiseConnectedEvent,
 } from "@fluidframework/telemetry-utils";
 import { buildSnapshotTree, readAndParseFromBlobs } from "@fluidframework/driver-utils";
 import {
@@ -412,8 +411,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
         for (const [, object] of this.contexts) {
             object.setConnectionState(connected, clientId);
         }
-
-        raiseConnectedEvent(this, connected, clientId);
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {
