@@ -175,20 +175,6 @@ export class DeltaManager
     private deltaStorageDelay: number = 0;
     private deltaStreamDelay: number = 0;
 
-    // True if current connection has checkpoint information
-    // I.e. we know how far behind the client was at the time of establishing connection
-    private _hasCheckpointSequenceNumber = false;
-
-    /**
-     * Tells if  current connection has checkpoint information.
-     * I.e. we know how far behind the client was at the time of establishing connection
-     */
-    public get hasCheckpointSequenceNumber() {
-        // Valid to be called only if we have active connection.
-        assert(this.connection !== undefined);
-        return this._hasCheckpointSequenceNumber;
-    }
-
     public get inbound(): IDeltaQueue<ISequencedDocumentMessage> {
         return this._inbound;
     }
@@ -207,10 +193,6 @@ export class DeltaManager
 
     public get lastSequenceNumber(): number {
         return this.lastProcessedSequenceNumber;
-    }
-
-    public get lastKnownSeqNumber() {
-        return this.lastObservedSeqNumber;
     }
 
     public get minimumSequenceNumber(): number {
@@ -236,10 +218,6 @@ export class DeltaManager
 
     public get scopes(): string[] | undefined {
         return this.connection?.claims.scopes;
-    }
-
-    public get socketDocumentId(): string | undefined {
-        return this.connection?.claims.documentId;
     }
 
     /**
@@ -933,11 +911,8 @@ export class DeltaManager
 
         const initialMessages = connection.initialMessages;
 
-        this._hasCheckpointSequenceNumber = false;
-
         // Some storages may provide checkpointSequenceNumber to identify how far client is behind.
         if (connection.checkpointSequenceNumber !== undefined) {
-            this._hasCheckpointSequenceNumber = true;
             this.updateLatestKnownOpSeqNumber(connection.checkpointSequenceNumber);
         }
 
@@ -945,7 +920,6 @@ export class DeltaManager
         // This is duplication of what enqueueMessages() does, but we have to raise event before we get there,
         // so duplicating update logic here as well.
         if (initialMessages.length > 0) {
-            this._hasCheckpointSequenceNumber = true;
             this.updateLatestKnownOpSeqNumber(initialMessages[initialMessages.length - 1].sequenceNumber);
         }
 

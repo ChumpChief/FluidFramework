@@ -116,17 +116,8 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
     /** The last sequence number processed by the delta manager */
     readonly lastSequenceNumber: number;
 
-    /** The latest sequence number the delta manager is aware of */
-    readonly lastKnownSeqNumber: number;
-
     /** The initial sequence number set when attaching the op handler */
     readonly initialSequenceNumber: number;
-
-    /**
-     * Tells if  current connection has checkpoint information.
-     * I.e. we know how far behind the client was at the time of establishing connection
-     */
-    readonly hasCheckpointSequenceNumber: boolean;
 
     /** Protocol version being used to communicate with the service */
     readonly version: string;
