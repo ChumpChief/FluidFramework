@@ -33,7 +33,6 @@ import {
     ISequencedDocumentMessage,
     IServiceConfiguration,
     ISignalMessage,
-    ITrace,
     MessageType,
     ScopeType,
 } from "@fluidframework/protocol-definitions";
@@ -561,24 +560,11 @@ export class DeltaManager
             this.clientSequenceNumberObserved = 0;
         }
 
-        const service = this.clientDetails.type === undefined || this.clientDetails.type === ""
-            ? "unknown"
-            : this.clientDetails.type;
-
-        // Start adding trace for the op.
-        const traces: ITrace[] = [
-            {
-                action: "start",
-                service,
-                timestamp: Date.now(),
-            }];
-
         const message: IDocumentMessage = {
             clientSequenceNumber: ++this.clientSequenceNumber,
             contents: JSON.stringify(contents),
             metadata,
             referenceSequenceNumber: this.lastProcessedSequenceNumber,
-            traces,
             type,
         };
 
@@ -604,7 +590,6 @@ export class DeltaManager
     }
 
     private async getDeltas(
-        telemetryEventSuffix: string,
         fromInitial: number,
         to: number | undefined,
         callback: (messages: ISequencedDocumentMessage[]) => void) {
@@ -1158,7 +1143,7 @@ export class DeltaManager
 
         this.fetching = true;
 
-        await this.getDeltas(telemetryEventSuffix, from, to, (messages) => {
+        await this.getDeltas(from, to, (messages) => {
             this.cancelDelayInfo(RetryFor.DeltaStorage);
             this.catchUpCore(messages, telemetryEventSuffix);
         });
