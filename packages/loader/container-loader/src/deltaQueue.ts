@@ -151,7 +151,6 @@ export class DeltaQueue<T> extends TypedEventEmitter<IDeltaQueueEvents<T>> imple
                 // We know next is defined since we did a length check just prior to shifting.
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 this.worker(next!);
-                this.emit("op", next);
             } catch (error) {
                 this.error = error;
                 this.emit("error", error);

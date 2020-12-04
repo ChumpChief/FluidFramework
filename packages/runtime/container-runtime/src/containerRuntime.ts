@@ -728,8 +728,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
                     break;
                 default:
             }
-
-            this.emit("op", message);
         } catch (e) {
             error = e;
             throw e;

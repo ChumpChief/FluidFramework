@@ -467,8 +467,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
                 break;
             default:
         }
-
-        this.emit("op", message);
     }
 
     public processSignal(message: IInboundSignalMessage, local: boolean) {

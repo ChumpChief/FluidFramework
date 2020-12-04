@@ -10,7 +10,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IClientDetails,
-    ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDocumentService, IDocumentStorageService } from "@fluidframework/driver-definitions";
@@ -34,7 +33,6 @@ export interface IContainerEvents extends IEvent {
     (event: "connected", listener: (clientId: string) => void);
     (event: "disconnected" | "attaching" | "attached", listener: () => void);
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
-    (event: "op", listener: (message: ISequencedDocumentMessage) => void);
 }
 
 /**

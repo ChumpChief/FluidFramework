@@ -606,8 +606,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Allow the protocol handler to process the message
         const result = this.protocolHandler.processMessage(message, local);
 
-        this.emit("op", message);
-
         return result;
     }
 

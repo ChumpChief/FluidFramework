@@ -89,7 +89,6 @@ export interface IDeltaManagerEvents extends IEvent {
     (event: "prepareSend", listener: (messageBuffer: any[]) => void);
     (event: "submitOp", listener: (message: IDocumentMessage) => void);
     (event: "beforeOpProcessing", listener: (message: ISequencedDocumentMessage) => void);
-    (event: "op", listener: (message: ISequencedDocumentMessage, processingTime: number) => void);
     (event: "allSentOpsAckd", listener: () => void);
     (event: "pong" | "processTime", listener: (latency: number) => void);
     (event: "connect", listener: (details: IConnectionDetails) => void);
@@ -148,7 +147,7 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
 
 /** Events emitted by a Delta Queue */
 export interface IDeltaQueueEvents<T> extends IErrorEvent {
-    (event: "push" | "op", listener: (task: T) => void);
+    (event: "push", listener: (task: T) => void);
     (event: "idle", listener: () => void);
 }
 

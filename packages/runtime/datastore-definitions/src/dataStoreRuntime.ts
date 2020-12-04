@@ -25,7 +25,6 @@ export interface IFluidDataStoreRuntimeEvents extends IEvent {
         event: "disconnected" | "dispose" | "attaching" | "attached",
         listener: () => void,
     );
-    (event: "op", listener: (message: ISequencedDocumentMessage) => void);
     (event: "signal", listener: (message: IInboundSignalMessage, local: boolean) => void);
     (event: "connected", listener: (clientId: string) => void);
 }

@@ -1054,8 +1054,6 @@ export class DeltaManager
     }
 
     private processInboundMessage(message: ISequencedDocumentMessage): void {
-        const startTime = Date.now();
-
         // All non-system messages are coming from some client, and should have clientId
         // System messages may have no clientId (but some do, like propose, noop, summarize)
         // Note: NoClient has not been added yet to isSystemMessage (in 0.16.x branch)
@@ -1119,9 +1117,6 @@ export class DeltaManager
         }
         const result = this.handler.process(message);
         this.scheduleSequenceNumberUpdate(message, result.immediateNoOp === true);
-
-        const endTime = Date.now();
-        this.emit("op", message, endTime - startTime);
     }
 
     /**
