@@ -85,7 +85,7 @@ export class ContainerContext implements IContainerContext {
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
-        public readonly closeFn: (error?: ICriticalContainerError) => void,
+        private readonly closeFn: (error?: ICriticalContainerError) => void,
     ) {
         this.attachListener();
     }
@@ -116,7 +116,12 @@ export class ContainerContext implements IContainerContext {
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean, context: any) {
-        this.runtime.process(message, local, context);
+        try {
+            this.runtime.process(message, local, context);
+        } catch (e) {
+            this.closeFn(e);
+            throw e;
+        }
     }
 
     public processSignal(message: ISignalMessage, local: boolean) {

@@ -17,7 +17,6 @@ import {
     IDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import { IDeltaManager } from "./deltas";
-import { ICriticalContainerError } from "./error";
 
 // Represents the attachment state of the entity.
 export enum AttachState {
@@ -84,7 +83,6 @@ export interface IContainerContext {
     readonly baseSnapshot: ISnapshotTree | undefined;
     readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData?: any) => number;
     readonly submitSignalFn: (contents: any) => void;
-    readonly closeFn: (error?: ICriticalContainerError) => void;
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
 
     /**

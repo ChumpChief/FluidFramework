@@ -732,7 +732,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             this.emit("op", message);
         } catch (e) {
             error = e;
-            this.context.closeFn(e);
             throw e;
         } finally {
             this.scheduleManager.endOperation(error, message);
