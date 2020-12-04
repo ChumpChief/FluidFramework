@@ -16,7 +16,6 @@ import {
     IDeltaManager,
     IDeltaSender,
     IRuntime,
-    ICriticalContainerError,
     AttachState,
 } from "@fluidframework/container-definitions";
 import {
@@ -403,10 +402,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         return this.reSubmit;
     }
 
-    public get closeFn(): (error?: ICriticalContainerError) => void {
-        return this.context.closeFn;
-    }
-
     public get flushMode(): FlushMode {
         return this._flushMode;
     }
@@ -737,6 +732,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             this.emit("op", message);
         } catch (e) {
             error = e;
+            this.context.closeFn(e);
             throw e;
         } finally {
             this.scheduleManager.endOperation(error, message);
