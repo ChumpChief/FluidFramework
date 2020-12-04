@@ -455,12 +455,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
         });
 
-        protocol.quorum.on("removeMember", (clientId) => {
-            if (clientId === this._clientId) {
-                this._deltaManager.updateQuorumLeave();
-            }
-        });
-
         return protocol;
     }
 
@@ -555,7 +549,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 }
             }
             this._clientId = this.pendingClientId;
-            this._deltaManager.updateQuorumJoin();
         } else if (value === ConnectionState.Disconnected) {
             // Important as we process our own joinSession message through delta request
             this.pendingClientId = undefined;

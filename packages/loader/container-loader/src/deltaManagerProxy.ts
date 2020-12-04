@@ -115,10 +115,6 @@ export class DeltaManagerProxy
         return this.deltaManager.serviceConfiguration;
     }
 
-    public get active(): boolean {
-        return this.deltaManager.active;
-    }
-
     public get readonly(): boolean | undefined {
         return this.deltaManager.readonly;
     }

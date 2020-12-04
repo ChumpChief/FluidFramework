@@ -137,9 +137,6 @@ export interface IDeltaManager<T, U> extends IEventProvider<IDeltaManagerEvents>
     /** Service configuration provided by the service. */
     readonly serviceConfiguration: IServiceConfiguration | undefined;
 
-    /** Flag to indicate whether the client can write or not. */
-    readonly active: boolean;
-
     /**
      * Tells if container is in read-only mode.
      * Data stores should listen for "readonly" notifications and disallow user making changes to data stores.
