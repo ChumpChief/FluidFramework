@@ -349,7 +349,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             values);
 
         // The load context - given we seeded the quorum - will be great
-        await this.createDetachedContext(runtimeFactory);
+        await this.loadContext(runtimeFactory);
 
         this.propagateConnectionState();
 
@@ -653,15 +653,5 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
         );
-    }
-
-    /**
-     * Creates a new, unattached container context
-     */
-    private async createDetachedContext(
-        runtimeFactory: IRuntimeFactory,
-        snapshot?: ISnapshotTree,
-    ) {
-        await this.loadContext(runtimeFactory, snapshot);
     }
 }
