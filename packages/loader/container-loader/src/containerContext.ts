@@ -11,7 +11,6 @@ import {
     IContainerContext,
     IDeltaManager,
     IRuntime,
-    ICriticalContainerError,
     AttachState,
     IRuntimeFactory,
 } from "@fluidframework/container-definitions";
@@ -35,7 +34,6 @@ export class ContainerContext implements IContainerContext {
         deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         submitSignalFn: (contents: any) => void,
-        closeFn: (error?: ICriticalContainerError) => void,
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
             container,
@@ -44,7 +42,6 @@ export class ContainerContext implements IContainerContext {
             deltaManager,
             submitFn,
             submitSignalFn,
-            closeFn,
         );
         await context.load();
         return context;
@@ -85,7 +82,6 @@ export class ContainerContext implements IContainerContext {
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         public readonly submitFn: (type: MessageType, contents: any, batch: boolean, appData: any) => number,
         public readonly submitSignalFn: (contents: any) => void,
-        private readonly closeFn: (error?: ICriticalContainerError) => void,
     ) {
         this.attachListener();
     }
@@ -116,12 +112,7 @@ export class ContainerContext implements IContainerContext {
     }
 
     public process(message: ISequencedDocumentMessage, local: boolean, context: any) {
-        try {
-            this.runtime.process(message, local, context);
-        } catch (e) {
-            this.closeFn(e);
-            throw e;
-        }
+        this.runtime.process(message, local, context);
     }
 
     public processSignal(message: ISignalMessage, local: boolean) {

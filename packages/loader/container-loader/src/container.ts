@@ -599,7 +599,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Forward non system messages to the loaded runtime for processing
         if (!isSystemMessage(message)) {
-            this.context.process(message, local, undefined);
+            try {
+                this.context.process(message, local, undefined);
+            } catch (e) {
+                this.close(e);
+            }
         }
 
         // Allow the protocol handler to process the message
@@ -648,7 +652,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             new DeltaManagerProxy(this._deltaManager),
             (type, contents, batch, metadata) => this.submitContainerMessage(type, contents, batch, metadata),
             (message) => this.submitSignal(message),
-            (error?: ICriticalContainerError) => this.close(error),
         );
     }
 
