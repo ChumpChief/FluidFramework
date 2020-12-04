@@ -41,7 +41,6 @@ import {
     ISequencedProposal,
     ISignalMessage,
     ISnapshotTree,
-    IVersion,
     MessageType,
     ISummaryTree,
 } from "@fluidframework/protocol-definitions";
@@ -246,11 +245,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._storageService;
     }
 
-    private async getVersion(): Promise<IVersion | undefined> {
-        const versions = await this.storageService.getVersions(1);
-        return versions[0];
-    }
-
     private async connectToDeltaStream(args: IConnectionArgs = {}) {
         // All agents need "write" access, including summarizer.
         if (!this.client.details.capabilities.interactive) {
@@ -291,7 +285,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._attachState = AttachState.Attached;
 
         // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null
-        const maybeSnapshotTree = await this.fetchSnapshotTree(documentId);
+        const maybeSnapshotTree = await this.fetchSnapshotTree();
 
         const attributes = await this.getDocumentAttributes(documentId, this.storageService, maybeSnapshotTree);
 
@@ -637,8 +631,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Get the most recent snapshot, or a specific version.
      * @returns The snapshot requested, or the latest snapshot if no version was specified
      */
-    private async fetchSnapshotTree(documentId: string): Promise<ISnapshotTree | undefined> {
-        const version = await this.getVersion();
+    private async fetchSnapshotTree(): Promise<ISnapshotTree | undefined> {
+        const versions = await this.storageService.getVersions(1);
+        const version = versions[0];
 
         if (version !== undefined) {
             return await this.storageService.getSnapshotTree(version) ?? undefined;
