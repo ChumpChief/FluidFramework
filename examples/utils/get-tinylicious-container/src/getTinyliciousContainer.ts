@@ -64,7 +64,6 @@ async function getContainer(
     } else {
         await container.load(
             containerRuntimeFactory,
-            documentId,
             documentService,
             documentStorageService,
         );

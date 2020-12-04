@@ -259,7 +259,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public async load(
         runtimeFactory: IRuntimeFactory,
-        documentId: string,
         documentService: IDocumentService,
         documentStorageService: IDocumentStorageService,
     ) {
@@ -287,7 +286,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Fetch specified snapshot, but intentionally do not load from snapshot if specifiedVersion is null
         const maybeSnapshotTree = await this.fetchSnapshotTree();
 
-        const attributes = await this.getDocumentAttributes(documentId, this.storageService, maybeSnapshotTree);
+        const attributes = await this.getDocumentAttributes(this.storageService, maybeSnapshotTree);
 
         // Attach op handlers to start processing ops
         this.attachDeltaManagerOpHandler(attributes);
@@ -359,13 +358,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async getDocumentAttributes(
-        documentId: string,
         storage: IDocumentStorageService | undefined,
         tree: ISnapshotTree | undefined,
     ): Promise<IDocumentAttributes> {
         if (tree === undefined) {
             return {
-                branch: documentId,
+                branch: "", // was documentId
                 minimumSequenceNumber: 0,
                 sequenceNumber: 0,
                 term: 1,
