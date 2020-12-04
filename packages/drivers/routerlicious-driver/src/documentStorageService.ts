@@ -21,13 +21,13 @@ export class DocumentStorageService implements IDocumentStorageService {
     // empty strings as values.
     private readonly blobsShaCache = new Map<string, string>();
 
-    constructor(private readonly id: string, private readonly manager: gitStorage.GitManager) {
+    constructor(private readonly documentId: string, private readonly manager: gitStorage.GitManager) {
     }
 
     public async getSnapshotTree(version?: IVersion): Promise<ISnapshotTree | null> {
         let requestVersion = version;
         if (!requestVersion) {
-            const versions = await this.getVersions(this.id, 1);
+            const versions = await this.getVersions(this.documentId, 1);
             if (versions.length === 0) {
                 return null;
             }
@@ -40,7 +40,7 @@ export class DocumentStorageService implements IDocumentStorageService {
     }
 
     public async getVersions(versionId: string, count: number): Promise<IVersion[]> {
-        const commits = await this.manager.getCommits(versionId ? versionId : this.id, count);
+        const commits = await this.manager.getCommits(versionId ? versionId : this.documentId, count);
         return commits.map((commit) => ({
             date: commit.commit.author.date,
             id: commit.sha,
@@ -55,7 +55,7 @@ export class DocumentStorageService implements IDocumentStorageService {
     }
 
     public async write(tree: ITree, parents: string[], message: string, ref: string): Promise<IVersion> {
-        const branch = ref ? `datastores/${this.id}/${ref}` : this.id;
+        const branch = ref ? `datastores/${this.documentId}/${ref}` : this.documentId;
         const commit = await this.manager.write(branch, tree, parents, message);
         return { date: commit.committer.date, id: commit.sha, treeId: commit.tree.sha };
     }
