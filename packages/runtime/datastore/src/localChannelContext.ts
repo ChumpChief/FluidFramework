@@ -38,7 +38,6 @@ export class LocalChannelContext implements IChannelContext {
         readonly deltaConnection: ChannelDeltaConnection,
         readonly objectStorage: ChannelStorageService,
     }>;
-    private readonly dirtyFn: () => void;
     private readonly factory: IChannelFactory | undefined;
 
     constructor(
@@ -49,7 +48,6 @@ export class LocalChannelContext implements IChannelContext {
         private readonly dataStoreContext: IFluidDataStoreContext,
         private readonly storageService: IDocumentStorageService,
         private readonly submitFn: (content: any, localOpMetadata: unknown) => void,
-        dirtyFn: (address: string) => void,
         private readonly snapshotTree: ISnapshotTree | undefined,
     ) {
         let blobMap: Map<string, string> | undefined;
@@ -63,7 +61,6 @@ export class LocalChannelContext implements IChannelContext {
                 this.id,
                 this.dataStoreContext.connected,
                 this.submitFn,
-                this.dirtyFn,
                 this.storageService,
                 clonedSnapshotTree !== undefined ? Promise.resolve(clonedSnapshotTree) : undefined,
                 blobMap !== undefined ?
@@ -77,7 +74,6 @@ export class LocalChannelContext implements IChannelContext {
         if (snapshotTree === undefined) {
             this.channel = this.factory.create(runtime, id);
         }
-        this.dirtyFn = () => { dirtyFn(id); };
     }
 
     public async getChannel(): Promise<IChannel> {

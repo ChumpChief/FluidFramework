@@ -25,7 +25,7 @@ import {
 import { IProvideFluidDataStoreFactory } from "./dataStoreFactory";
 import { IProvideFluidDataStoreRegistry } from "./dataStoreRegistry";
 import { IInboundSignalMessage } from "./protocol";
-import { ISummaryTreeWithStats, ISummarizerNode, SummarizeInternalFn, CreateChildSummarizerNodeParam } from "./summary";
+import { ISummaryTreeWithStats, ISummarizerNode, SummarizeInternalFn } from "./summary";
 
 /**
  * Runtime flush mode handling
@@ -229,24 +229,6 @@ IEventProvider<IFluidDataStoreContextEvents>, Partial<IProvideFluidDataStoreRegi
      * Register the runtime to the container
      */
     bindToContext(): void;
-
-    /**
-     * Call by IFluidDataStoreChannel, indicates that a channel is dirty and needs to be part of the summary.
-     * @param address - The address of the channe that is dirty.
-     */
-    setChannelDirty(address: string): void;
-
-    getCreateChildSummarizerNodeFn(
-        /** Initial id or path part of this node */
-        id: string,
-        /**
-         * Information needed to create the node.
-         * If it is from a base summary, it will assert that a summary has been seen.
-         * Attach information if it is created from an attach op.
-         * If it is local, it will throw unsupported errors on calls to summarize.
-         */
-        createParam: CreateChildSummarizerNodeParam,
-    ): CreateChildSummarizerNodeFn;
 }
 
 export interface IFluidDataStoreContextDetached extends IFluidDataStoreContext {

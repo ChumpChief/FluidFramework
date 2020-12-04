@@ -20,8 +20,6 @@ import {
 import {
     IFluidDataStoreContext,
     ISummarizeResult,
-    ISummarizerNode,
-    CreateChildSummarizerNodeFn,
     ISummarizeInternalResult,
 } from "@fluidframework/runtime-definitions";
 import { convertToSummaryTree } from "@fluidframework/runtime-utils";
@@ -40,33 +38,26 @@ export class RemoteChannelContext implements IChannelContext {
         readonly deltaConnection: ChannelDeltaConnection,
         readonly objectStorage: ChannelStorageService,
     };
-    private readonly summarizerNode: ISummarizerNode;
+
     constructor(
         private readonly runtime: IFluidDataStoreRuntime,
         private readonly dataStoreContext: IFluidDataStoreContext,
         storageService: IDocumentStorageService,
         submitFn: (content: any, localOpMetadata: unknown) => void,
-        dirtyFn: (address: string) => void,
         private readonly id: string,
         baseSnapshot: Promise<ISnapshotTree> | ISnapshotTree,
         private readonly registry: ISharedObjectRegistry,
         extraBlobs: Promise<Map<string, string>> | undefined,
-        createSummarizerNode: CreateChildSummarizerNodeFn,
         private readonly attachMessageType?: string,
     ) {
         this.services = createServiceEndpoints(
             this.id,
             this.dataStoreContext.connected,
             submitFn,
-            () => dirtyFn(this.id),
             storageService,
             Promise.resolve(baseSnapshot),
-            extraBlobs);
-
-        // Summarizer node always tracks summary state. Set trackState to true.
-        const thisSummarizeInternal =
-            async (fullTree: boolean) => this.summarizeInternal(fullTree, true /* trackState */);
-        this.summarizerNode = createSummarizerNode(thisSummarizeInternal);
+            extraBlobs,
+        );
     }
 
     // eslint-disable-next-line @typescript-eslint/promise-function-async
@@ -88,8 +79,6 @@ export class RemoteChannelContext implements IChannelContext {
     }
 
     public processOp(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void {
-        this.summarizerNode.invalidate(message.sequenceNumber);
-
         if (this.isLoaded) {
             this.services.deltaConnection.process(message, local, localOpMetadata);
         } else {
@@ -113,9 +102,7 @@ export class RemoteChannelContext implements IChannelContext {
     public async summarize(fullTree: boolean = false, trackState: boolean = true): Promise<ISummarizeResult> {
         // Summarizer node tracks the state from the summary. If trackState is true, use summarizer node to get
         // the summary. Else, get the summary tree directly.
-        return trackState
-            ? this.summarizerNode.summarize(fullTree)
-            : this.summarizeInternal(fullTree, false /* trackState */);
+        return this.summarizeInternal(fullTree, false /* trackState */);
     }
 
     private async summarizeInternal(fullTree: boolean, trackState: boolean): Promise<ISummarizeInternalResult> {

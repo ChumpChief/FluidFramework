@@ -241,19 +241,6 @@ export abstract class SharedObject<TEvent extends IErrorEvent = IErrorEvent>
     }
 
     /**
-     * Marks this object as dirty so that it is part of the next summary. It is called by a SharedSummaryBlock
-     * that want to be part of summary but does not generate ops.
-     */
-    protected dirty(): void {
-        if (!this.isAttached()) {
-            return;
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        this.services!.deltaConnection.dirty();
-    }
-
-    /**
      * Called when the object has fully connected to the delta stream
      * Default implementation for DDS, override if different behavior is required.
      */

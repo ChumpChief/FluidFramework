@@ -90,8 +90,6 @@ export class SharedSummaryBlock extends SharedObject implements ISharedSummaryBl
      */
     public set<T extends any = Jsonable>(key: string, value: AsJsonable<T>): void {
         this.data.set(key, value);
-        // Set this object as dirty so that it is part of the next summary.
-        this.dirty();
     }
 
     /**

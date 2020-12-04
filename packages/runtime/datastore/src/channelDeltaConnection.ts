@@ -22,8 +22,7 @@ export class ChannelDeltaConnection implements IDeltaConnection {
         public objectId: string,
         private _connected: boolean,
         private readonly submitFn: (message: IDocumentMessage, localOpMetadata: unknown) => void,
-        private readonly dirtyFn: () => void) {
-    }
+    ) { }
 
     public attach(handler: IDeltaHandler) {
         assert(this._handler === undefined);
@@ -48,13 +47,5 @@ export class ChannelDeltaConnection implements IDeltaConnection {
      */
     public submit(message: IDocumentMessage, localOpMetadata: unknown): void {
         this.submitFn(message, localOpMetadata);
-    }
-
-    /**
-     * Indicates that the channel is dirty and needs to be part of the summary. It is called by a SharedSummaryBlock
-     * that needs to be part of the summary but does not generate ops.
-     */
-    public dirty(): void {
-        this.dirtyFn();
     }
 }

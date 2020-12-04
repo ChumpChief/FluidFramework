@@ -41,7 +41,6 @@ import {
     IEnvelope,
     IInboundSignalMessage,
     ISummaryTreeWithStats,
-    CreateSummarizerNodeSource,
 } from "@fluidframework/runtime-definitions";
 import {
     convertSnapshotTreeToSummaryTree,
@@ -184,8 +183,8 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
                         this.dataStoreContext,
                         this.dataStoreContext.storage,
                         (content, localOpMetadata) => this.submitChannelOp(path, content, localOpMetadata),
-                        (address: string) => this.setChannelDirty(address),
-                        tree.trees[path]);
+                        tree.trees[path],
+                    );
                     // This is the case of rehydrating a detached container from snapshot. Now due to delay loading of
                     // data store, if the data store is loaded after the container is attached, then we missed marking
                     // the channel as attached. So mark it now. Otherwise add it to local channel context queue, so
@@ -201,15 +200,11 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
                         dataStoreContext,
                         dataStoreContext.storage,
                         (content, localOpMetadata) => this.submitChannelOp(path, content, localOpMetadata),
-                        (address: string) => this.setChannelDirty(address),
                         path,
                         tree.trees[path],
                         this.sharedObjectRegistry,
                         undefined /* extraBlobs */,
-                        this.dataStoreContext.getCreateChildSummarizerNodeFn(
-                            path,
-                            { type: CreateSummarizerNodeSource.FromSummary },
-                        ));
+                    );
                 }
                 const deferred = new Deferred<IChannelContext>();
                 deferred.resolve(channelContext);
@@ -317,7 +312,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
             this.dataStoreContext,
             this.dataStoreContext.storage,
             (content, localOpMetadata) => this.submitChannelOp(id, content, localOpMetadata),
-            (address: string) => this.setChannelDirty(address),
             undefined);
         this.contexts.set(id, context);
 
@@ -449,19 +443,10 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
                         this.dataStoreContext,
                         this.dataStoreContext.storage,
                         (content, localContentMetadata) => this.submitChannelOp(id, content, localContentMetadata),
-                        (address: string) => this.setChannelDirty(address),
                         id,
                         snapshotTreeP,
                         this.sharedObjectRegistry,
                         flatBlobsP,
-                        this.dataStoreContext.getCreateChildSummarizerNodeFn(
-                            id,
-                            {
-                                type: CreateSummarizerNodeSource.FromAttach,
-                                sequenceNumber: message.sequenceNumber,
-                                snapshot: attachMessage.snapshot,
-                            },
-                        ),
                         attachMessage.type);
 
                     this.contexts.set(id, remoteChannelContext);
@@ -663,11 +648,6 @@ IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext {
             default:
                 unreachableCase(type);
         }
-    }
-
-    private setChannelDirty(address: string): void {
-        this.verifyNotClosed();
-        this.dataStoreContext.setChannelDirty(address);
     }
 
     private processChannelOp(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {
