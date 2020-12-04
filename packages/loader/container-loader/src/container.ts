@@ -273,11 +273,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // connections to same file) in two ways:
         // A) creation flow breaks (as one of the clients "sees" file as existing, and hits #2 above)
         // B) Once file is created, transition from view-only connection to write does not work - some bugs to be fixed.
-        const connectionArgs: IConnectionArgs = { mode: "write" };
 
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-        const startConnectionP = this.connectToDeltaStream(connectionArgs);
+        const startConnectionP = this.connectToDeltaStream({ mode: "write" });
         startConnectionP.catch((error) => { });
 
         this._storageService = documentStorageService;
@@ -446,17 +445,15 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private get client(): IClient {
-        const client: IClient = {
-                details: {
-                    capabilities: { interactive: true },
-                },
-                mode: "read", // default reconnection mode on lost connection / connection error
-                permission: [],
-                scopes: [],
-                user: { id: "" },
-            };
-
-        return client;
+        return {
+            details: {
+                capabilities: { interactive: true },
+            },
+            mode: "read", // default reconnection mode on lost connection / connection error
+            permission: [],
+            scopes: [],
+            user: { id: "" },
+        };
     }
 
     private createDeltaManager() {
