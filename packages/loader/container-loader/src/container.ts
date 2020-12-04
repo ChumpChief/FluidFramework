@@ -246,8 +246,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._storageService;
     }
 
-    private async getVersion(version: string): Promise<IVersion | undefined> {
-        const versions = await this.storageService.getVersions(version, 1);
+    private async getVersion(): Promise<IVersion | undefined> {
+        const versions = await this.storageService.getVersions(1);
         return versions[0];
     }
 
@@ -638,7 +638,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @returns The snapshot requested, or the latest snapshot if no version was specified
      */
     private async fetchSnapshotTree(documentId: string): Promise<ISnapshotTree | undefined> {
-        const version = await this.getVersion(documentId);
+        const version = await this.getVersion();
 
         if (version !== undefined) {
             return await this.storageService.getSnapshotTree(version) ?? undefined;

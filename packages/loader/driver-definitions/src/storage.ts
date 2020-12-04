@@ -56,7 +56,7 @@ export interface IDocumentStorageService {
     /**
      * Retrieves all versions of the document starting at the specified versionId - or null if from the head
      */
-    getVersions(versionId: string | null, count: number): Promise<IVersion[]>;
+    getVersions(count: number): Promise<IVersion[]>;
 
     /**
      * Reads the object with the given ID

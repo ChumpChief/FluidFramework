@@ -27,7 +27,7 @@ export class DocumentStorageService implements IDocumentStorageService {
     public async getSnapshotTree(version?: IVersion): Promise<ISnapshotTree | null> {
         let requestVersion = version;
         if (!requestVersion) {
-            const versions = await this.getVersions(this.documentId, 1);
+            const versions = await this.getVersions(1);
             if (versions.length === 0) {
                 return null;
             }
@@ -39,8 +39,8 @@ export class DocumentStorageService implements IDocumentStorageService {
         return buildHierarchy(tree, this.blobsShaCache);
     }
 
-    public async getVersions(versionId: string, count: number): Promise<IVersion[]> {
-        const commits = await this.manager.getCommits(versionId ? versionId : this.documentId, count);
+    public async getVersions(count: number): Promise<IVersion[]> {
+        const commits = await this.manager.getCommits(this.documentId, count);
         return commits.map((commit) => ({
             date: commit.commit.author.date,
             id: commit.sha,
