@@ -473,7 +473,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.client,
         );
 
-        deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {
+        deltaManager.on("connect", (details: IConnectionDetails) => {
             this._connectionState = ConnectionState.Connecting;
 
             // Stash the clientID to detect when transitioning from connecting (socket.io channel open) to connected
@@ -483,8 +483,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // join message. after we see the join message for out new connection with our new client id,
             // we know there can no longer be outstanding ops that we sent with the previous client id.
             this.pendingClientId = details.clientId;
-
-            this.emit("connect", opsBehind);
 
             // Check if we already processed our own join op through delta storage!
             // we are fetching ops from storage in parallel to connecting to ordering service

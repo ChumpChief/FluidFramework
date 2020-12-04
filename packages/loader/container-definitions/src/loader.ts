@@ -32,10 +32,6 @@ export interface ICodeLoader {
  */
 export interface IContainerEvents extends IEvent {
     (event: "connected", listener: (clientId: string) => void);
-    /**
-     * @param opsBehind - number of ops this client is behind (if present).
-     */
-    (event: "connect", listener: (opsBehind?: number) => void);
     (event: "disconnected" | "attaching" | "attached", listener: () => void);
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
     (event: "op", listener: (message: ISequencedDocumentMessage) => void);
