@@ -67,7 +67,6 @@ import {
 } from "@fluidframework/runtime-definitions";
 import {
     FluidSerializer,
-    SummaryTracker,
     SummaryTreeBuilder,
     SummarizerNode,
     convertToSummaryTree,
@@ -435,9 +434,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
     public readonly IFluidHandleContext: IFluidHandleContext;
 
-    // back-compat: summarizerNode - remove all summary trackers
-    private readonly summaryTracker: SummaryTracker;
-
     private readonly summarizerNode: SummarizerNode;
     private readonly notBoundContexts = new Set<string>();
     // 0.24 back-compat attachingBeforeSummary
@@ -481,12 +477,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         this.IFluidHandleContext = new ContainerFluidHandleContext("", this);
         this.IFluidSerializer = new FluidSerializer(this.IFluidHandleContext);
 
-        this.summaryTracker = new SummaryTracker(
-            "", // fullPath - the root is unnamed
-            this.deltaManager.initialSequenceNumber, // referenceSequenceNumber - last acked summary ref seq number
-            this.deltaManager.initialSequenceNumber, // latestSequenceNumber - latest sequence number seen
-        );
-
         const loadedFromSequenceNumber = this.deltaManager.initialSequenceNumber;
         this.summarizerNode = SummarizerNode.createRoot(
             // Summarize function to call when summarize is called. Summarizer node always tracks summary state.
@@ -528,7 +518,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
                     typeof value === "string" ? value : Promise.resolve(value),
                     this,
                     this.storage,
-                    this.summaryTracker.createOrGetChild(key, this.summaryTracker.referenceSequenceNumber),
                     this.getCreateChildSummarizerNodeFn(key, { type: CreateSummarizerNodeSource.FromSummary }));
             } else {
                 let pkgFromSnapshot: string[];
@@ -561,7 +550,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
                     pkgFromSnapshot,
                     this,
                     this.storage,
-                    this.summaryTracker.createOrGetChild(key, this.deltaManager.lastSequenceNumber),
                     this.getCreateChildSummarizerNodeFn(key, { type: CreateSummarizerNodeSource.FromSummary }),
                     (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
                     snapshotTree,
@@ -925,7 +913,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             pkg,
             this,
             this.storage,
-            this.summaryTracker.createOrGetChild(id, this.deltaManager.lastSequenceNumber),
             this.getCreateChildSummarizerNodeFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
             undefined,
@@ -953,7 +940,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             pkg,
             this,
             this.storage,
-            this.summaryTracker.createOrGetChild(id, this.deltaManager.lastSequenceNumber),
             this.getCreateChildSummarizerNodeFn(id, { type: CreateSummarizerNodeSource.Local }),
             (cr: IFluidDataStoreChannel) => this.bindFluidDataStore(cr),
             undefined,
@@ -1040,7 +1026,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             snapshotTreeP,
             this,
             new BlobCacheStorageService(this.storage, flatBlobsP),
-            this.summaryTracker.createOrGetChild(attachMessage.id, message.sequenceNumber),
             this.getCreateChildSummarizerNodeFn(
                 attachMessage.id,
                 {
