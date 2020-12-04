@@ -386,11 +386,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const attributes = storage !== undefined ? await readAndParse<IDocumentAttributes>(storage, attributesHash)
             : readAndParseFromBlobs<IDocumentAttributes>(tree.trees[".protocol"].blobs, attributesHash);
 
-        // Back-compat for older summaries with no term
-        if (attributes.term === undefined) {
-            attributes.term = 1;
-        }
-
         return attributes;
     }
 
@@ -440,7 +435,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             "", // branchId
             attributes.minimumSequenceNumber,
             attributes.sequenceNumber,
-            attributes.term,
+            undefined, // term
             members,
             proposals,
             values,
@@ -517,7 +512,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._deltaManager.attachOpHandler(
             attributes.minimumSequenceNumber,
             attributes.sequenceNumber,
-            attributes.term ?? 1,
             {
                 process: (message) => this.processRemoteMessage(message),
                 processSignal: (message) => {

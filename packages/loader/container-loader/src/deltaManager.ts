@@ -146,7 +146,6 @@ export class DeltaManager
     private lastQueuedSequenceNumber: number = 0;
     private lastObservedSeqNumber: number = 0;
     private lastProcessedSequenceNumber: number = 0;
-    private baseTerm: number = 0;
 
     private previouslyProcessedMessage: ISequencedDocumentMessage | undefined;
 
@@ -212,10 +211,6 @@ export class DeltaManager
 
     public get lastKnownSeqNumber() {
         return this.lastObservedSeqNumber;
-    }
-
-    public get referenceTerm(): number {
-        return this.baseTerm;
     }
 
     public get minimumSequenceNumber(): number {
@@ -408,14 +403,12 @@ export class DeltaManager
     public attachOpHandler(
         minSequenceNumber: number,
         sequenceNumber: number,
-        term: number,
         handler: IDeltaHandlerStrategy,
     ) {
         debug("Attached op handler", sequenceNumber);
 
         this.initSequenceNumber = sequenceNumber;
         this.lastProcessedSequenceNumber = sequenceNumber;
-        this.baseTerm = term;
         this.minSequenceNumber = minSequenceNumber;
         this.lastQueuedSequenceNumber = sequenceNumber;
         this.lastObservedSeqNumber = sequenceNumber;
@@ -1192,12 +1185,6 @@ export class DeltaManager
 
         assert(message.sequenceNumber === this.lastProcessedSequenceNumber + 1, "non-seq seq#");
         this.lastProcessedSequenceNumber = message.sequenceNumber;
-
-        // Back-compat for older server with no term
-        if (message.term === undefined) {
-            message.term = 1;
-        }
-        this.baseTerm = message.term;
 
         this.emit("beforeOpProcessing", message);
 
