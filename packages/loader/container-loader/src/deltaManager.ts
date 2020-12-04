@@ -139,18 +139,11 @@ export class DeltaManager
     // There are three numbers we track
     // * lastQueuedSequenceNumber is the last queued sequence number. If there are gaps in seq numbers, then this number
     //   is not updated until we cover that gap, so it increases each time by 1.
-    // * lastObservedSeqNumber is  an estimation of last known sequence number for container in storage. It's initially
-    //   populated at web socket connection time (if storage provides that info) and is  updated once ops shows up.
-    //   It's never less than lastQueuedSequenceNumber
     // * lastProcessedSequenceNumber - last processed sequence number
     private lastQueuedSequenceNumber: number = 0;
-    private lastObservedSeqNumber: number = 0;
     private lastProcessedSequenceNumber: number = 0;
 
     private previouslyProcessedMessage: ISequencedDocumentMessage | undefined;
-
-    // The sequence number we initially loaded from
-    private initSequenceNumber: number = 0;
 
     private readonly _inbound: DeltaQueue<ISequencedDocumentMessage>;
     private readonly _inboundSignal: DeltaQueue<ISignalMessage>;
@@ -185,10 +178,6 @@ export class DeltaManager
 
     public get inboundSignal(): IDeltaQueue<ISignalMessage> {
         return this._inboundSignal;
-    }
-
-    public get initialSequenceNumber(): number {
-        return this.initSequenceNumber;
     }
 
     public get lastSequenceNumber(): number {
@@ -385,11 +374,9 @@ export class DeltaManager
     ) {
         debug("Attached op handler", sequenceNumber);
 
-        this.initSequenceNumber = sequenceNumber;
-        this.lastProcessedSequenceNumber = sequenceNumber;
         this.minSequenceNumber = minSequenceNumber;
+        this.lastProcessedSequenceNumber = sequenceNumber;
         this.lastQueuedSequenceNumber = sequenceNumber;
-        this.lastObservedSeqNumber = sequenceNumber;
 
         // We will use same check in other places to make sure all the seq number above are set properly.
         assert(this.handler === undefined);
@@ -911,18 +898,6 @@ export class DeltaManager
 
         const initialMessages = connection.initialMessages;
 
-        // Some storages may provide checkpointSequenceNumber to identify how far client is behind.
-        if (connection.checkpointSequenceNumber !== undefined) {
-            this.updateLatestKnownOpSeqNumber(connection.checkpointSequenceNumber);
-        }
-
-        // Update knowledge of how far we are behind, before raising "connect" event
-        // This is duplication of what enqueueMessages() does, but we have to raise event before we get there,
-        // so duplicating update logic here as well.
-        if (initialMessages.length > 0) {
-            this.updateLatestKnownOpSeqNumber(initialMessages[initialMessages.length - 1].sequenceNumber);
-        }
-
         // Notify of the connection
         // WARNING: This has to happen before processInitialMessages() call below.
         // If not, we may not update Container.pendingClientId in time before seeing our own join session op.
@@ -1063,10 +1038,6 @@ export class DeltaManager
             // to do the right thing.
             this.pending = this.pending.concat(messages);
             return;
-        }
-
-        if (messages.length > 0) {
-            this.updateLatestKnownOpSeqNumber(messages[messages.length - 1].sequenceNumber);
         }
 
         for (const message of messages) {
@@ -1276,11 +1247,5 @@ export class DeltaManager
             clearTimeout(this.updateSequenceNumberTimer);
         }
         this.updateSequenceNumberTimer = undefined;
-    }
-
-    private updateLatestKnownOpSeqNumber(seq: number) {
-        if (this.lastObservedSeqNumber < seq) {
-            this.lastObservedSeqNumber = seq;
-        }
     }
 }

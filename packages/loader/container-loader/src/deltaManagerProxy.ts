@@ -91,10 +91,6 @@ export class DeltaManagerProxy
         return this.lastSequenceNumber;
     }
 
-    public get initialSequenceNumber(): number {
-        return this.deltaManager.initialSequenceNumber;
-    }
-
     public get version(): string {
         return this.deltaManager.version;
     }
