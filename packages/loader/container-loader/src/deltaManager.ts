@@ -42,7 +42,6 @@ import {
     createGenericNetworkError,
 } from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
-import { debug } from "./debug";
 import { DeltaQueue } from "./deltaQueue";
 import { waitForConnectedState } from "./networkUtils";
 
@@ -363,16 +362,11 @@ export class DeltaManager
         this._inboundSignal.pause();
     }
 
-    /**
-     * Sets the sequence number from which inbound messages should be returned
-     */
-    public attachOpHandler(
+    public initialize(
         minSequenceNumber: number,
         sequenceNumber: number,
         handler: IDeltaHandlerStrategy,
     ) {
-        debug("Attached op handler", sequenceNumber);
-
         this.minSequenceNumber = minSequenceNumber;
         this.lastProcessedSequenceNumber = sequenceNumber;
         this.lastQueuedSequenceNumber = sequenceNumber;
@@ -382,7 +376,9 @@ export class DeltaManager
         this.handler = handler;
         // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
         assert(!!(this.handler as any));
+    }
 
+    public start() {
         this._inbound.systemResume();
         this._inboundSignal.systemResume();
 

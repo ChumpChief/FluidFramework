@@ -288,7 +288,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const attributes = await this.getDocumentAttributes(this.storageService, maybeSnapshotTree);
 
         // Attach op handlers to start processing ops
-        this.attachDeltaManagerOpHandler(attributes);
+        this.initializeAndStartDeltaManager(attributes);
 
         // ...load in the existing quorum
         // Initialize the protocol handler
@@ -336,7 +336,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const proposals: [number, ISequencedProposal, string[]][] = [];
         const values: [string, ICommittedProposal][] = [];
 
-        this.attachDeltaManagerOpHandler(attributes);
+        this.initializeAndStartDeltaManager(attributes);
 
         // We know this is create detached flow without snapshot.
         this._existing = false;
@@ -491,12 +491,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return deltaManager;
     }
 
-    private attachDeltaManagerOpHandler(attributes: IDocumentAttributes): void {
+    private initializeAndStartDeltaManager(attributes: IDocumentAttributes): void {
         // If we're the outer frame, do we want to do this?
         // Begin fetching any pending deltas once we know the base sequence #. Can this fail?
         // It seems like something, like reconnection, that we would want to retry but otherwise allow
         // the document to load
-        this._deltaManager.attachOpHandler(
+        this._deltaManager.initialize(
             attributes.minimumSequenceNumber,
             attributes.sequenceNumber,
             {
@@ -505,6 +505,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     this.processSignal(message);
                 },
             });
+        this._deltaManager.start();
     }
 
     private setConnectionState(value: ConnectionState) {
