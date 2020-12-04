@@ -418,7 +418,7 @@ export class RemotedFluidDataStoreContext extends FluidDataStoreContext {
 
     constructor(
         id: string,
-        private readonly initSnapshotValue: Promise<ISnapshotTree> | string | null,
+        private readonly initSnapshotValue: Promise<ISnapshotTree> | null,
         runtime: ContainerRuntime,
         storage: IDocumentStorageService,
         pkg?: string[],
@@ -446,18 +446,10 @@ export class RemotedFluidDataStoreContext extends FluidDataStoreContext {
     // pkg can never change for a store.
     protected async getInitialSnapshotDetails(): Promise<ISnapshotDetails> {
         if (!this.details) {
-            let tree: ISnapshotTree | null;
-            let isRootStore: boolean | undefined;
-
-            if (typeof this.initSnapshotValue === "string") {
-                const commit = (await this.storage.getVersions(this.initSnapshotValue, 1))[0];
-                tree = await this.storage.getSnapshotTree(commit);
-            } else {
-                tree = await this.initSnapshotValue;
-            }
-
             const localReadAndParse = async <T>(id: string) => readAndParse<T>(this.storage, id);
 
+            const tree: ISnapshotTree | null = await this.initSnapshotValue;
+            let isRootStore: boolean | undefined;
             if (tree !== null && tree.blobs[attributesBlobKey] !== undefined) {
                 // Need to rip through snapshot and use that to populate extraBlobs
                 const { pkg, snapshotFormatVersion, isRootDataStore } =

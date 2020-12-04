@@ -471,7 +471,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         this.IFluidSerializer = new FluidSerializer(this.IFluidHandleContext);
 
         // Extract stores stored inside the snapshot
-        const fluidDataStores = new Map<string, ISnapshotTree | string>();
+        const fluidDataStores = new Map<string, ISnapshotTree>();
 
         if (typeof context.baseSnapshot === "object") {
             const baseSnapshot = context.baseSnapshot;
@@ -484,13 +484,13 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         }
 
         // Create a context for each of them
-        for (const [key, value] of fluidDataStores) {
+        for (const [key, snapshotTree] of fluidDataStores) {
             let dataStoreContext: FluidDataStoreContext;
             // If we have a detached container, then create local data store contexts.
             if (this.attachState !== AttachState.Detached) {
                 dataStoreContext = new RemotedFluidDataStoreContext(
                     key,
-                    typeof value === "string" ? value : Promise.resolve(value),
+                    Promise.resolve(snapshotTree),
                     this,
                     this.storage,
                 );
@@ -499,7 +499,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
                 if (typeof context.baseSnapshot !== "object") {
                     throw new Error("Snapshot should be there to load from!!");
                 }
-                const snapshotTree = value as ISnapshotTree;
                 // Need to rip through snapshot.
                 const { pkg, snapshotFormatVersion, isRootDataStore }
                     = readAndParseFromBlobs<IFluidDataStoreAttributes>(
