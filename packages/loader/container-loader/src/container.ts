@@ -484,8 +484,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
         });
 
-        deltaManager.on("disconnect", (reason: string) => {
-            this.setConnectionState(ConnectionState.Disconnected, reason);
+        deltaManager.on("disconnect", () => {
+            this.setConnectionState(ConnectionState.Disconnected);
         });
 
         return deltaManager;
@@ -507,11 +507,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             });
     }
 
-    private setConnectionState(value: ConnectionState.Disconnected, reason: string);
-    private setConnectionState(value: ConnectionState.Connecting | ConnectionState.Connected);
-    private setConnectionState(
-        value: ConnectionState,
-        reason?: string) {
+    private setConnectionState(value: ConnectionState) {
         assert(value !== ConnectionState.Connecting);
         if (this.connectionState === value) {
             // Already in the desired state - exit early
