@@ -154,8 +154,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
         this._closed = true;
 
-        this._deltaManager.close(error);
-
         this._protocolHandler?.close();
 
         assert(this.connectionState === ConnectionState.Disconnected, "disconnect event was not raised!");
@@ -192,7 +190,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             return;
         }
 
-        assert(this._deltaManager.inbound.length === 0, "Inbound queue should be empty when attaching");
         // Only take a summary if the container is in detached state, otherwise we could have local changes.
         // In failed attach call, we would already have a summary cached.
         if (this._attachState === AttachState.Detached) {
@@ -519,10 +516,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private attachDeltaManagerOpHandler(attributes: IDocumentAttributes): void {
-        this._deltaManager.on("closed", (error?: ICriticalContainerError) => {
-            this.close(error);
-        });
-
         // If we're the outer frame, do we want to do this?
         // Begin fetching any pending deltas once we know the base sequence #. Can this fail?
         // It seems like something, like reconnection, that we would want to retry but otherwise allow
