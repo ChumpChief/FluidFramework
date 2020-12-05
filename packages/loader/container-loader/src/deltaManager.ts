@@ -51,9 +51,6 @@ const MaxFetchDelaySeconds = 10;
 const MaxBatchDeltas = 2000;
 const DefaultChunkSize = 16 * 1024;
 
-// This can be anything other than null
-const ImmediateNoOpResponse = "";
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 const getRetryDelayFromError = (error: any): number | undefined => error?.retryAfterSeconds;
 
@@ -1106,8 +1103,8 @@ export class DeltaManager
         if (this.handler === undefined) {
             throw new Error("Attempted to process an inbound message without a handler attached");
         }
-        const result = this.handler.process(message);
-        this.scheduleSequenceNumberUpdate(message, result.immediateNoOp === true);
+        this.handler.process(message);
+        this.scheduleSequenceNumberUpdate(message);
     }
 
     /**
@@ -1173,19 +1170,11 @@ export class DeltaManager
     /**
      * Schedules as ack to the server to update the reference sequence number
      */
-    private scheduleSequenceNumberUpdate(message: ISequencedDocumentMessage, immediateNoOp: boolean): void {
+    private scheduleSequenceNumberUpdate(message: ISequencedDocumentMessage): void {
         // Exit early for inactive (not in quorum or not writers) clients.
         // They don't take part in the minimum sequence number calculation.
         if (!(this.connectionMode === "write")) {
             this.stopSequenceNumberUpdate();
-            return;
-        }
-
-        // While processing a message, an immediate no-op can be requested.
-        // i.e. to expedite approve or commit phase of quorum.
-        if (immediateNoOp) {
-            this.stopSequenceNumberUpdate();
-            this.submit(MessageType.NoOp, ImmediateNoOpResponse);
             return;
         }
 
