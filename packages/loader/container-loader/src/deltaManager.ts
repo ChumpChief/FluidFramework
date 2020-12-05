@@ -6,7 +6,6 @@
 import { IEventProvider } from "@fluidframework/common-definitions";
 import {
     IConnectionDetails,
-    IDeltaHandlerStrategy,
     IDeltaManager,
     IDeltaManagerEvents,
     IDeltaQueue,
@@ -152,7 +151,7 @@ export class DeltaManager
     // track clientId used last time when we sent any ops
     private lastSubmittedClientId: string | undefined;
 
-    private handler: IDeltaHandlerStrategy | undefined;
+    private initialized: boolean = false;
     private deltaStorageP: Promise<IDocumentDeltaStorageService> | undefined;
 
     private messageBuffer: IDocumentMessage[] = [];
@@ -334,10 +333,10 @@ export class DeltaManager
 
         // Inbound signal queue
         this._inboundSignal = new DeltaQueue<ISignalMessage>((message) => {
-            if (this.handler === undefined) {
+            if (!this.initialized) {
                 throw new Error("Attempted to process an inbound signal without a handler attached");
             }
-            this.handler.processSignal({
+            this.emit("processSignal", {
                 clientId: message.clientId,
                 content: JSON.parse(message.content as string),
             });
@@ -359,17 +358,14 @@ export class DeltaManager
     public initialize(
         minSequenceNumber: number,
         sequenceNumber: number,
-        handler: IDeltaHandlerStrategy,
     ) {
         this.minSequenceNumber = minSequenceNumber;
         this.lastProcessedSequenceNumber = sequenceNumber;
         this.lastQueuedSequenceNumber = sequenceNumber;
 
         // We will use same check in other places to make sure all the seq number above are set properly.
-        assert(this.handler === undefined);
-        this.handler = handler;
-        // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-        assert(!!(this.handler as any));
+        assert(!this.initialized);
+        this.initialized = true;
     }
 
     public start() {
@@ -446,7 +442,7 @@ export class DeltaManager
         // But for view-only connection, we have no such signal, and with no traffic
         // on the wire, we might be always behind.
         // See comment at the end of setupNewSuccessfulConnection()
-        if (fetchOpsFromStorage && this.handler !== undefined) {
+        if (fetchOpsFromStorage && this.initialized) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
         }
@@ -889,7 +885,7 @@ export class DeltaManager
         // if we have some op on the wire (or will have a "join" op for ourselves for r/w connection), then client
         // can detect it has a gap and fetch missing ops. However if we are connecting as view-only, then there
         // is no good signal to realize if client is behind. Thus we have to hit storage to see if any ops are there.
-        if (this.handler !== undefined && connection.mode !== "write" && initialMessages.length === 0) {
+        if (this.initialized && connection.mode !== "write" && initialMessages.length === 0) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
         }
@@ -999,7 +995,7 @@ export class DeltaManager
     }
 
     private enqueueMessages(messages: ISequencedDocumentMessage[]): void {
-        if (this.handler === undefined) {
+        if (!this.initialized) {
             // We did not setup handler yet.
             // This happens when we connect to web socket faster than we get attributes for container
             // and thus faster than attachOpHandler() is called
@@ -1100,10 +1096,10 @@ export class DeltaManager
 
         this.emit("beforeOpProcessing", message);
 
-        if (this.handler === undefined) {
+        if (!this.initialized) {
             throw new Error("Attempted to process an inbound message without a handler attached");
         }
-        this.handler.process(message);
+        this.emit("processOp", message);
         this.scheduleSequenceNumberUpdate(message);
     }
 
@@ -1146,7 +1142,7 @@ export class DeltaManager
         if (messages.length !== 0) {
             props.from = messages[0].sequenceNumber;
             props.to = messages[messages.length - 1].sequenceNumber;
-            props.messageGap = this.handler !== undefined ? props.from - this.lastQueuedSequenceNumber - 1 : undefined;
+            props.messageGap = this.initialized ? props.from - this.lastQueuedSequenceNumber - 1 : undefined;
         }
 
         this.catchUpCore(messages);
@@ -1160,7 +1156,7 @@ export class DeltaManager
         // This could be optimized to stop handling messages once we realize we need to fetch missing values.
         // But for simplicity, and because catching up should be rare, we just process all of them.
         // Optimize for case of no handler - we put ops back into this.pending in such case
-        if (this.handler !== undefined) {
+        if (this.initialized) {
             const pendingSorted = this.pending.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
             this.pending = [];
             this.enqueueMessages(pendingSorted);

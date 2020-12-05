@@ -35,7 +35,6 @@ import {
     IClient,
     ICommittedProposal,
     IDocumentAttributes,
-    IProcessMessageResult,
     ISequencedClient,
     ISequencedDocumentMessage,
     ISequencedProposal,
@@ -495,15 +494,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Begin fetching any pending deltas once we know the base sequence #. Can this fail?
         // It seems like something, like reconnection, that we would want to retry but otherwise allow
         // the document to load
+        this._deltaManager.on("processOp", (message) => this.processRemoteMessage(message));
+        this._deltaManager.on("processSignal", (message) => this.processSignal(message));
         this._deltaManager.initialize(
             attributes.minimumSequenceNumber,
             attributes.sequenceNumber,
-            {
-                process: (message) => this.processRemoteMessage(message),
-                processSignal: (message) => {
-                    this.processSignal(message);
-                },
-            });
+        );
         this._deltaManager.start();
     }
 
@@ -564,7 +560,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._deltaManager.submit(type, contents, batch, metadata);
     }
 
-    private processRemoteMessage(message: ISequencedDocumentMessage): IProcessMessageResult {
+    private processRemoteMessage(message: ISequencedDocumentMessage): void {
         // Check and report if we're getting messages from a clientId that we previously
         // flagged as shouldHaveLeft, or from a client that's not in the quorum but should be
         if (message.clientId != null) {
@@ -602,9 +598,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
 
         // Allow the protocol handler to process the message
-        const result = this.protocolHandler.processMessage(message, local);
-
-        return result;
+        this.protocolHandler.processMessage(message, local);
     }
 
     private submitSignal(message: any) {
