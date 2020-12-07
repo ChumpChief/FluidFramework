@@ -244,11 +244,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async connectToDeltaStream(args: IConnectionArgs = {}) {
-        // All agents need "write" access, including summarizer.
-        if (!this.client.details.capabilities.interactive) {
-            args.mode = "write";
-        }
-
         return this._deltaManager.connect(args);
     }
 
