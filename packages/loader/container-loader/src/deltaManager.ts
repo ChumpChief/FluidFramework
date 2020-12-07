@@ -108,9 +108,6 @@ export class DeltaManager
     // file ACL - whether user has only read-only access to a file
     private _readonlyPermissions: boolean | undefined;
 
-    // tracks host requiring read-only mode.
-    private _forceReadonly = false;
-
     // Connection mode used when reconnecting on error or disconnect.
     private readonly defaultReconnectionMode: ConnectionMode;
 
@@ -210,9 +207,6 @@ export class DeltaManager
      * and do not know if user has write access to a file.
      */
     public get readonly() {
-        if (this._forceReadonly) {
-            return true;
-        }
         return this._readonlyPermissions;
     }
 
@@ -242,42 +236,6 @@ export class DeltaManager
             this._reconnectMode !== ReconnectMode.Never,
             "Cannot toggle automatic reconnect if reconnect is set to Never.");
         this._reconnectMode = reconnect ? ReconnectMode.Enabled : ReconnectMode.Disabled;
-    }
-
-    /**
-     * Sends signal to runtime (and data stores) to be read-only.
-     * Hosts may have read only views, indicating to data stores that no edits are allowed.
-     * This is independent from this._readonlyPermissions (permissions) and this.connectionMode
-     * (server can return "write" mode even when asked for "read")
-     * Leveraging same "readonly" event as runtime & data stores should behave the same in such case
-     * as in read-only permissions.
-     * But this.active can be used by some DDSes to figure out if ops can be sent
-     * (for example, read-only view still participates in code proposals / upgrades decisions)
-     *
-     * Forcing Readonly does not prevent DDS from generating ops. It is up to user code to honour
-     * the readonly flag. If ops are generated, they will accumulate locally and not be sent. If
-     * there are pending in the outbound queue, it will stop sending until force readonly is
-     * cleared.
-     *
-     * @param readonly - set or clear force readonly.
-     */
-    public forceReadonly(readonly: boolean) {
-        const oldValue = this.readonly;
-        this._forceReadonly = readonly;
-        if (oldValue !== this.readonly) {
-            let reconnect = false;
-            if (this.readonly === true) {
-                // If we switch to readonly while connected, we should disconnect first
-                // See comment in the "readonly" event handler to deltaManager set up by
-                // the ContainerRuntime constructor
-                reconnect = this.disconnectFromDeltaStream("Force readonly");
-            }
-            this.emit("readonly", this.readonly);
-            if (reconnect) {
-                // reconnect if we disconnected from before.
-                this.triggerConnect({ mode: "read", fetchOpsFromStorage: false });
-            }
-        }
     }
 
     private set_readonlyPermissions(readonly: boolean) {
