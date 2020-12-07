@@ -25,8 +25,6 @@ import {
     IClientDetails,
     IDocumentMessage,
     IDocumentSystemMessage,
-    INack,
-    INackContent,
     ISequencedDocumentMessage,
     IServiceConfiguration,
     ISignalMessage,
@@ -35,7 +33,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import {
     canRetryOnError,
-    createWriteError,
     createGenericNetworkError,
 } from "@fluidframework/driver-utils";
 import { CreateContainerError } from "@fluidframework/container-utils";
@@ -51,12 +48,6 @@ const DefaultChunkSize = 16 * 1024;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 const getRetryDelayFromError = (error: any): number | undefined => error?.retryAfterSeconds;
-
-function getNackReconnectInfo(nackContent: INackContent) {
-    const reason = `Nack: ${nackContent.message}`;
-    const canRetry = ![403, 429].includes(nackContent.code);
-    return createGenericNetworkError(reason, canRetry, nackContent.retryAfter);
-}
 
 function createReconnectError(prefix: string, err: any) {
     const error = CreateContainerError(err);
@@ -686,30 +677,9 @@ export class DeltaManager
         this._inboundSignal.push(message);
     };
 
-    // Always connect in write mode after getting nacked.
-    private readonly nackHandler = (documentId: string, messages: INack[]) => {
-        const message = messages[0];
-        // TODO: we should remove this check when service updates?
-        // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-        if (this._readonlyPermissions) {
-            this.close(createWriteError("WriteOnReadOnlyDocument"));
-        }
-
-        // check message.content for Back-compat with old service.
-        const reconnectInfo = message.content !== undefined
-            ? getNackReconnectInfo(message.content) :
-            createGenericNetworkError(`Nack: unknown reason`, true);
-
-        this.disconnectFromDeltaStream(reconnectInfo.message);
-    };
-
     private readonly errorHandler = (error) => {
         const reconnectError = createReconnectError("error", error);
         this.disconnectFromDeltaStream(reconnectError.message);
-    };
-
-    private readonly pongHandler = (latency: number) => {
-        this.emit("pong", latency);
     };
 
     /**
@@ -748,9 +718,7 @@ export class DeltaManager
 
         connection.on("op", this.opHandler);
         connection.on("signal", this.signalHandler);
-        connection.on("nack", this.nackHandler);
         connection.on("error", this.errorHandler);
-        connection.on("pong", this.pongHandler);
 
         const initialMessages = connection.initialMessages;
 
@@ -792,9 +760,7 @@ export class DeltaManager
         // Remove listeners first so we don't try to retrigger this flow accidentally through reconnectOnError
         connection.off("op", this.opHandler);
         connection.off("signal", this.signalHandler);
-        connection.off("nack", this.nackHandler);
         connection.off("error", this.errorHandler);
-        connection.off("pong", this.pongHandler);
 
         // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
         // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
