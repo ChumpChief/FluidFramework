@@ -155,8 +155,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         assert(this.connectionState === ConnectionState.Disconnected, "disconnect event was not raised!");
 
-        this.emit("closed", error);
-
         this.removeAllListeners();
     }
 

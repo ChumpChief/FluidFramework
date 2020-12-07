@@ -13,7 +13,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { IEvent, IEventProvider } from "@fluidframework/common-definitions";
 import { IDocumentService, IDocumentStorageService } from "@fluidframework/driver-definitions";
-import { ICriticalContainerError } from "./error";
 import { AttachState, IRuntimeFactory } from "./runtime";
 
 /**
@@ -31,7 +30,6 @@ export interface ICodeLoader {
  */
 export interface IContainerEvents extends IEvent {
     (event: "attaching" | "attached", listener: () => void);
-    (event: "closed", listener: (error?: ICriticalContainerError) => void);
 }
 
 /**
