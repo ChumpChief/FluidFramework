@@ -350,15 +350,6 @@ export class DeltaManager
         return DeltaManager.detailsFromConnection(connection);
     }
 
-    /**
-     * Start the connection. Any error should result in container being close.
-     * And report the error if it excape for any reason.
-     * @param args - The connection arguments
-     */
-    private triggerConnect(args: IConnectionArgs) {
-        this.connectCore(args).catch((err) => { });
-    }
-
     private async connectCore(args: IConnectionArgs = {}): Promise<IDocumentDeltaConnection> {
         if (this.connection !== undefined) {
             return this.connection;
@@ -709,30 +700,12 @@ export class DeltaManager
             ? getNackReconnectInfo(message.content) :
             createGenericNetworkError(`Nack: unknown reason`, true);
 
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.reconnectOnError(
-            "write",
-            reconnectInfo,
-        );
-    };
-
-    // Connection mode is always read on disconnect/error unless the system mode was write.
-    private readonly disconnectHandler = (disconnectReason) => {
-        // Note: we might get multiple disconnect calls on same socket, as early disconnect notification
-        // ("server_disconnect", ODSP-specific) is mapped to "disconnect"
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.reconnectOnError(
-            this.defaultReconnectionMode,
-            createReconnectError("Disconnect", disconnectReason),
-        );
+        this.disconnectFromDeltaStream(reconnectInfo.message);
     };
 
     private readonly errorHandler = (error) => {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.reconnectOnError(
-            this.defaultReconnectionMode,
-            createReconnectError("error", error),
-        );
+        const reconnectError = createReconnectError("error", error);
+        this.disconnectFromDeltaStream(reconnectError.message);
     };
 
     private readonly pongHandler = (latency: number) => {
@@ -776,7 +749,6 @@ export class DeltaManager
         connection.on("op", this.opHandler);
         connection.on("signal", this.signalHandler);
         connection.on("nack", this.nackHandler);
-        connection.on("disconnect", this.disconnectHandler);
         connection.on("error", this.errorHandler);
         connection.on("pong", this.pongHandler);
 
@@ -821,7 +793,6 @@ export class DeltaManager
         connection.off("op", this.opHandler);
         connection.off("signal", this.signalHandler);
         connection.off("nack", this.nackHandler);
-        connection.off("disconnect", this.disconnectHandler);
         connection.off("error", this.errorHandler);
         connection.off("pong", this.pongHandler);
 
@@ -840,48 +811,6 @@ export class DeltaManager
         connection.close();
 
         return true;
-    }
-
-    /**
-     * Disconnect the current connection and reconnect.
-     * @param connection - The connection that wants to reconnect - no-op if it's different from this.connection
-     * @param requestedMode - Read or write
-     * @param reconnectInfo - Error reconnect information including whether or not to reconnect
-     * @returns A promise that resolves when the connection is reestablished or we stop trying
-     */
-    private async reconnectOnError(
-        requestedMode: ConnectionMode,
-        error: ICriticalContainerError,
-    ) {
-        // We quite often get protocol errors before / after observing nack/disconnect
-        // we do not want to run through same sequence twice.
-        // If we're already disconnected/disconnecting it's not appropriate to call this again.
-        assert(this.connection !== undefined);
-
-        this.disconnectFromDeltaStream(error.message);
-
-        // If reconnection is not an option, close the DeltaManager
-        const canRetry = canRetryOnError(error);
-        if (this.reconnectMode === ReconnectMode.Never || !canRetry) {
-            // Do not raise container error if we are closing just because we lost connection.
-            // Those errors (like IdleDisconnect) would show up in telemetry dashboards and
-            // are very misleading, as first initial reaction - some logic is broken.
-            this.close(canRetry ? undefined : error);
-        }
-
-        // If closed then we can't reconnect
-        if (this.closed) {
-            return;
-        }
-
-        if (this.reconnectMode === ReconnectMode.Enabled) {
-            const delay = getRetryDelayFromError(error);
-            if (delay !== undefined) {
-                await waitForConnectedState(delay * 1000);
-            }
-
-            this.triggerConnect({ mode: requestedMode, fetchOpsFromStorage: false });
-        }
     }
 
     private processInitialMessages(
