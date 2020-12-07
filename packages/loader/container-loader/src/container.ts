@@ -437,8 +437,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return protocol;
     }
 
-    private get client(): IClient {
-        return {
+    private createDeltaManager() {
+        const client: IClient = {
             details: {
                 capabilities: { interactive: true },
             },
@@ -447,12 +447,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             scopes: [],
             user: { id: "" },
         };
-    }
 
-    private createDeltaManager() {
         const deltaManager = new DeltaManager(
             () => this.service,
-            this.client,
+            client,
         );
 
         deltaManager.on("connect", (details: IConnectionDetails) => {
