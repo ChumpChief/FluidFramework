@@ -23,23 +23,19 @@ import {
 import {
     readAndParse,
     combineAppAndProtocolSummary,
-    readAndParseFromBlobs,
 } from "@fluidframework/driver-utils";
 import {
     isSystemMessage,
-    ProtocolOpHandler,
 } from "@fluidframework/protocol-base";
 import {
     IClient,
-    ICommittedProposal,
     IDocumentAttributes,
-    ISequencedClient,
     ISequencedDocumentMessage,
-    ISequencedProposal,
     ISignalMessage,
     ISnapshotTree,
     MessageType,
     ISummaryTree,
+    SummaryType,
 } from "@fluidframework/protocol-definitions";
 import {
     EventEmitterWithErrorHandling,
@@ -47,10 +43,6 @@ import {
 import { ContainerContext } from "./containerContext";
 import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
-
-interface ILocalSequencedClient extends ISequencedClient {
-    shouldHaveLeft?: boolean;
-}
 
 export enum ConnectionState {
     /**
@@ -96,13 +88,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
         return this._context;
     }
-    private _protocolHandler: ProtocolOpHandler | undefined;
-    private get protocolHandler() {
-        if (this._protocolHandler === undefined) {
-            throw new Error("Attempted to access protocolHandler before it was defined");
-        }
-        return this._protocolHandler;
-    }
 
     private resumedOpProcessingAfterLoad = false;
 
@@ -145,10 +130,18 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
          // Get the document state post attach - possibly can just call attach but we need to change the
         // semantics around what the attach means as far as async code goes.
         const appSummary: ISummaryTree = this.context.createSummary();
-        if (this.protocolHandler === undefined) {
-            throw new Error("Protocol Handler is undefined");
-        }
-        const protocolSummary = this.protocolHandler.captureSummary();
+        const protocolSummary: ISummaryTree = {
+            tree: {
+                attributes: {
+                    content: JSON.stringify({
+                        minimumSequenceNumber: this._deltaManager.minimumSequenceNumber,
+                        sequenceNumber: this._deltaManager.lastSequenceNumber,
+                    }),
+                    type: SummaryType.Blob,
+                },
+            },
+            type: SummaryType.Tree,
+        };
         return combineAppAndProtocolSummary(appSummary, protocolSummary);
     }
 
@@ -255,32 +248,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Attach op handlers to start processing ops
         this.initializeAndStartDeltaManager(attributes.minimumSequenceNumber, attributes.sequenceNumber);
 
-        // ...load in the existing quorum
-        // Initialize the protocol handler
-        const protocolHandlerP = this.loadAndInitializeProtocolState(
-            attributes.minimumSequenceNumber,
-            attributes.sequenceNumber,
-            this.storageService,
-            maybeSnapshotTree,
-        );
-
-        let loadDetailsP: Promise<void>;
-
         // Initialize document details - if loading a snapshot use that - otherwise we need to wait on
         // the initial details
-        if (maybeSnapshotTree !== undefined) {
-            this._existing = true;
-            loadDetailsP = Promise.resolve();
-        } else {
-            // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
-            loadDetailsP = startConnectionP.then((details) => {
-                this._existing = details.existing;
-            });
-        }
-
-        // LoadContext directly requires protocolHandler to be ready, and eventually calls
-        // instantiateRuntime which will want to know existing state.  Wait for these promises to finish.
-        [this._protocolHandler] = await Promise.all([protocolHandlerP, loadDetailsP]);
+        this._existing = maybeSnapshotTree !== undefined;
 
         await this.loadContext(runtimeFactory, maybeSnapshotTree);
 
@@ -294,29 +264,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public async initializeDetached(runtimeFactory: IRuntimeFactory) {
-        const attributes: IDocumentAttributes = {
-            branch: "",
-            sequenceNumber: 0,
-            term: 1,
-            minimumSequenceNumber: 0,
-        };
-
-        const members: [string, ISequencedClient][] = [];
-        const proposals: [number, ISequencedProposal, string[]][] = [];
-        const values: [string, ICommittedProposal][] = [];
-
-        this.initializeAndStartDeltaManager(attributes.minimumSequenceNumber, attributes.sequenceNumber);
+        this.initializeAndStartDeltaManager(0 /* minimumSequenceNumber */, 0 /* sequenceNumber */);
 
         // We know this is create detached flow without snapshot.
         this._existing = false;
-
-        // Need to just seed the source data in the code quorum. Quorum itself is empty
-        this._protocolHandler = this.initializeProtocolState(
-            attributes.minimumSequenceNumber,
-            attributes.sequenceNumber,
-            members,
-            proposals,
-            values);
 
         // The load context - given we seeded the quorum - will be great
         await this.loadContext(runtimeFactory);
@@ -342,73 +293,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             storage,
             attributesHash,
         );
-    }
-
-    private async loadAndInitializeProtocolState(
-        minimumSequenceNumber: number,
-        sequenceNumber: number,
-        storage: IDocumentStorageService | undefined,
-        snapshot: ISnapshotTree | undefined,
-    ): Promise<ProtocolOpHandler> {
-        let members: [string, ISequencedClient][] = [];
-        let proposals: [number, ISequencedProposal, string[]][] = [];
-        let values: [string, any][] = [];
-
-        if (snapshot !== undefined) {
-            const baseTree = ".protocol" in snapshot.trees ? snapshot.trees[".protocol"] : snapshot;
-            if (storage !== undefined) {
-                [members, proposals, values] = await Promise.all([
-                    readAndParse<[string, ISequencedClient][]>(storage, baseTree.blobs.quorumMembers),
-                    readAndParse<[number, ISequencedProposal, string[]][]>(storage, baseTree.blobs.quorumProposals),
-                    readAndParse<[string, ICommittedProposal][]>(storage, baseTree.blobs.quorumValues),
-                ]);
-            } else {
-                members = readAndParseFromBlobs<[string, ISequencedClient][]>(snapshot.trees[".protocol"].blobs,
-                    baseTree.blobs.quorumMembers);
-                proposals = readAndParseFromBlobs<[number, ISequencedProposal, string[]][]>(
-                    snapshot.trees[".protocol"].blobs, baseTree.blobs.quorumProposals);
-                values = readAndParseFromBlobs<[string, ICommittedProposal][]>(snapshot.trees[".protocol"].blobs,
-                    baseTree.blobs.quorumValues);
-            }
-        }
-
-        const protocolHandler = this.initializeProtocolState(
-            minimumSequenceNumber,
-            sequenceNumber,
-            members,
-            proposals,
-            values);
-
-        return protocolHandler;
-    }
-
-    private initializeProtocolState(
-        minimumSequenceNumber: number,
-        sequenceNumber: number,
-        members: [string, ISequencedClient][],
-        proposals: [number, ISequencedProposal, string[]][],
-        values: [string, any][],
-    ): ProtocolOpHandler {
-        const protocol = new ProtocolOpHandler(
-            "", // branchId
-            minimumSequenceNumber,
-            sequenceNumber,
-            undefined, // term
-            members,
-            proposals,
-            values,
-            (key, value) => this.submitMessage(MessageType.Propose, { key, value }),
-            (rejectSequenceNumber) => this.submitMessage(MessageType.Reject, rejectSequenceNumber));
-
-        // Track membership changes and update connection state accordingly
-        protocol.quorum.on("addMember", (clientId, details) => {
-            // This is the only one that requires the pending client ID
-            if (clientId === this.pendingClientId) {
-                this.setConnectionState(ConnectionState.Connected);
-            }
-        });
-
-        return protocol;
     }
 
     private createDeltaManager() {
@@ -438,15 +322,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // we know there can no longer be outstanding ops that we sent with the previous client id.
             this.pendingClientId = details.clientId;
 
-            // Check if we already processed our own join op through delta storage!
-            // we are fetching ops from storage in parallel to connecting to ordering service
-            // Given async processes, it's possible that we have already processed our own join message before
-            // connection was fully established.
-            // Note that we might be still initializing quorum - connection is established proactively on load!
-            if ((this._protocolHandler !== undefined && this._protocolHandler.quorum.has(details.clientId))
-                    || deltaManager.connectionMode === "read") {
-                this.setConnectionState(ConnectionState.Connected);
-            }
+            this.setConnectionState(ConnectionState.Connected);
         });
 
         deltaManager.on("disconnect", () => {
@@ -480,14 +356,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._connectionState = value;
 
         if (value === ConnectionState.Connected) {
-            // Mark our old client should have left in the quorum if it's still there
-            if (this._clientId !== undefined) {
-                const client: ILocalSequencedClient | undefined =
-                    this._protocolHandler?.quorum.getMember(this._clientId);
-                if (client !== undefined) {
-                    client.shouldHaveLeft = true;
-                }
-            }
             this._clientId = this.pendingClientId;
         } else if (value === ConnectionState.Disconnected) {
             // Important as we process our own joinSession message through delta request
@@ -502,7 +370,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private propagateConnectionState() {
         const state = this._connectionState === ConnectionState.Connected;
         this.context.setConnectionState(state, this.clientId);
-        this.protocolHandler.quorum.setConnectionState(state, this.clientId);
     }
 
     private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
@@ -527,27 +394,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private processRemoteMessage(message: ISequencedDocumentMessage): void {
-        // Check and report if we're getting messages from a clientId that we previously
-        // flagged as shouldHaveLeft, or from a client that's not in the quorum but should be
-        if (message.clientId != null) {
-            const client: ILocalSequencedClient | undefined =
-                this.protocolHandler.quorum.getMember(message.clientId);
-            if (client === undefined && message.type !== MessageType.ClientJoin) {
-                throw new Error("messageClientIdMissingFromQuorum");
-            } else if (client?.shouldHaveLeft === true) {
-                throw new Error("messageClientIdShouldHaveLeft");
-            }
-        }
-
         const local = this._clientId === message.clientId;
 
         // Forward non system messages to the loaded runtime for processing
         if (!isSystemMessage(message)) {
             this.context.process(message, local, undefined);
         }
-
-        // Allow the protocol handler to process the message
-        this.protocolHandler.processMessage(message, local);
     }
 
     private submitSignal(message: any) {

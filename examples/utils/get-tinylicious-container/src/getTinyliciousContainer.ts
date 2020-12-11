@@ -13,7 +13,6 @@ import {
 } from "@fluidframework/driver-definitions";
 import {
     getDocAttributesFromProtocolSummary,
-    getQuorumValuesFromProtocolSummary,
 } from "@fluidframework/driver-utils";
 import { ISummaryTree } from "@fluidframework/protocol-definitions";
 import {
@@ -31,14 +30,13 @@ async function uploadNewContainer(
     const protocolSummary = createNewSummary.tree[".protocol"] as ISummaryTree;
     const appSummary = createNewSummary.tree[".app"] as ISummaryTree;
     const documentAttributes = getDocAttributesFromProtocolSummary(protocolSummary);
-    const quorumValues = getQuorumValuesFromProtocolSummary(protocolSummary);
     await Axios.post(
         `${ordererUrl}/documents/${tenantId}`,
         {
             id: documentId,
             summary: appSummary,
             sequenceNumber: documentAttributes.sequenceNumber,
-            values: quorumValues,
+            values: [], // quorumValues
         });
 }
 
