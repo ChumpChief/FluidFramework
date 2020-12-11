@@ -51,18 +51,12 @@ export enum ConnectionState {
     Disconnected,
 
     /**
-     * The document has an inbound connection but is still pending for outbound deltas
-     */
-    Connecting,
-
-    /**
      * The document is fully connected
      */
     Connected,
 }
 
 export class Container extends EventEmitterWithErrorHandling<IContainerEvents> implements IContainer {
-    private pendingClientId: string | undefined;
     private loaded = false;
     private _attachState = AttachState.Detached;
 
@@ -312,15 +306,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         );
 
         deltaManager.on("connect", (details: IConnectionDetails) => {
-            this._connectionState = ConnectionState.Connecting;
-
             // Stash the clientID to detect when transitioning from connecting (socket.io channel open) to connected
             // (have received the join message for the client ID)
             // This is especially important in the reconnect case. It's possible there could be outstanding
             // ops sent by this client, so we should keep the old client id until we see our own client's
             // join message. after we see the join message for out new connection with our new client id,
             // we know there can no longer be outstanding ops that we sent with the previous client id.
-            this.pendingClientId = details.clientId;
+            this._clientId = details.clientId;
 
             this.setConnectionState(ConnectionState.Connected);
         });
@@ -347,20 +339,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private setConnectionState(value: ConnectionState) {
-        assert(value !== ConnectionState.Connecting);
         if (this.connectionState === value) {
             // Already in the desired state - exit early
             return;
         }
 
         this._connectionState = value;
-
-        if (value === ConnectionState.Connected) {
-            this._clientId = this.pendingClientId;
-        } else if (value === ConnectionState.Disconnected) {
-            // Important as we process our own joinSession message through delta request
-            this.pendingClientId = undefined;
-        }
 
         if (this.loaded) {
             this.propagateConnectionState();
