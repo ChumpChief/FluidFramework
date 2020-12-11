@@ -13,11 +13,9 @@ import {
     IConnectionDetails,
     IContainer,
     IContainerEvents,
-    ICriticalContainerError,
     AttachState,
     IRuntimeFactory,
 } from "@fluidframework/container-definitions";
-import { CreateContainerError, GenericError } from "@fluidframework/container-utils";
 import {
     IDocumentService,
     IDocumentStorageService,
@@ -108,13 +106,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private resumedOpProcessingAfterLoad = false;
 
-    private _closed = false;
-
     public get IFluidRouter(): IFluidRouter { return this; }
-
-    private get closed(): boolean {
-        return this._closed;
-    }
 
     private get connectionState(): ConnectionState {
         return this._connectionState;
@@ -145,19 +137,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._deltaManager = this.createDeltaManager();
     }
 
-    private close(error?: ICriticalContainerError) {
-        if (this._closed) {
-            return;
-        }
-        this._closed = true;
-
-        this._protocolHandler?.close();
-
-        assert(this.connectionState === ConnectionState.Disconnected, "disconnect event was not raised!");
-
-        this.removeAllListeners();
-    }
-
     public get attachState(): AttachState {
         return this._attachState;
     }
@@ -178,7 +157,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         documentStorageService: IDocumentStorageService,
     ): Promise<void> {
         assert(this.loaded, "not loaded");
-        assert(!this.closed, "closed");
 
         // If container is already attached or attach is in progress, return.
         if (this._attachState === AttachState.Attached) {
@@ -220,10 +198,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private resume(args: IConnectionArgs = {}) {
-        if (this.closed) {
-            throw new Error("Attempting to resume() a closed DeltaManager");
-        }
-
         // Resume processing ops
         if (!this.resumedOpProcessingAfterLoad) {
             this.resumedOpProcessingAfterLoad = true;
@@ -537,8 +511,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             case MessageType.Summarize:
                 break;
             default:
-                this.close(CreateContainerError(`Runtime can't send arbitrary message type: ${type}`));
-                return -1;
+                throw new Error(`Runtime can't send arbitrary message type: ${type}`);
         }
         return this.submitMessage(type, contents, batch, metadata);
     }
@@ -555,25 +528,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // Check and report if we're getting messages from a clientId that we previously
         // flagged as shouldHaveLeft, or from a client that's not in the quorum but should be
         if (message.clientId != null) {
-            let errorMsg: string | undefined;
             const client: ILocalSequencedClient | undefined =
                 this.protocolHandler.quorum.getMember(message.clientId);
             if (client === undefined && message.type !== MessageType.ClientJoin) {
-                errorMsg = "messageClientIdMissingFromQuorum";
+                throw new Error("messageClientIdMissingFromQuorum");
             } else if (client?.shouldHaveLeft === true) {
-                errorMsg = "messageClientIdShouldHaveLeft";
-            }
-            if (errorMsg !== undefined) {
-                const error = new GenericError(
-                    errorMsg,
-                    {
-                        clientId: this._clientId,
-                        messageClientId: message.clientId,
-                        sequenceNumber: message.sequenceNumber,
-                        clientSequenceNumber: message.clientSequenceNumber,
-                    },
-                );
-                this.close(CreateContainerError(error));
+                throw new Error("messageClientIdShouldHaveLeft");
             }
         }
 
@@ -581,11 +541,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Forward non system messages to the loaded runtime for processing
         if (!isSystemMessage(message)) {
-            try {
-                this.context.process(message, local, undefined);
-            } catch (e) {
-                this.close(e);
-            }
+            this.context.process(message, local, undefined);
         }
 
         // Allow the protocol handler to process the message
