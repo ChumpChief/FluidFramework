@@ -327,7 +327,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async getDocumentAttributes(
-        storage: IDocumentStorageService | undefined,
+        storage: IDocumentStorageService,
         tree: ISnapshotTree | undefined,
     ): Promise<IDocumentAttributes> {
         if (tree === undefined) {
@@ -339,15 +339,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             };
         }
 
-        // Back-compat: old docs would have ".attributes" instead of "attributes"
-        const attributesHash = ".protocol" in tree.trees
-            ? tree.trees[".protocol"].blobs.attributes
-            : tree.blobs[".attributes"];
-
-        const attributes = storage !== undefined ? await readAndParse<IDocumentAttributes>(storage, attributesHash)
-            : readAndParseFromBlobs<IDocumentAttributes>(tree.trees[".protocol"].blobs, attributesHash);
-
-        return attributes;
+        const attributesHash = tree.trees[".protocol"].blobs.attributes;
+        return readAndParse<IDocumentAttributes>(storage, attributesHash);
     }
 
     private async loadAndInitializeProtocolState(
