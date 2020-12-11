@@ -108,15 +108,6 @@ export class DocumentDeltaConnection
         return deltaConnection;
     }
 
-    /**
-     * Last known sequence number to ordering service at the time of connection
-     * It may lap actual last sequence number (quite a bit, if container  is very active).
-     * But it's best information for client to figure out how far it is behind, at least
-     * for "read" connections. "write" connections may use own "join" op to similar information,
-     * that is likely to be more up-to-date.
-     */
-    public checkpointSequenceNumber: number | undefined;
-
     // Listen for ops sent before we receive a response to connect_document
     protected readonly queuedMessages: ISequencedDocumentMessage[] = [];
     protected readonly queuedSignals: ISignalMessage[] = [];
@@ -389,8 +380,6 @@ export class DocumentDeltaConnection
                     response.nonce !== connectMessage.nonce) {
                     return;
                 }
-
-                this.checkpointSequenceNumber = response.checkpointSequenceNumber;
 
                 this.removeConnectionListeners();
                 resolve(response);

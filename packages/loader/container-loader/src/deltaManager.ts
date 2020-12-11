@@ -327,7 +327,6 @@ export class DeltaManager
             claims: connection.claims,
             clientId: connection.clientId,
             existing: connection.existing,
-            checkpointSequenceNumber: connection.checkpointSequenceNumber,
             get initialClients() { return connection.initialClients; },
             maxMessageSize: connection.maxMessageSize,
             mode: connection.mode,
