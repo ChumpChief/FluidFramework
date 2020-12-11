@@ -253,12 +253,16 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const attributes = await this.getDocumentAttributes(this.storageService, maybeSnapshotTree);
 
         // Attach op handlers to start processing ops
-        this.initializeAndStartDeltaManager(attributes);
+        this.initializeAndStartDeltaManager(attributes.minimumSequenceNumber, attributes.sequenceNumber);
 
         // ...load in the existing quorum
         // Initialize the protocol handler
-        const protocolHandlerP =
-            this.loadAndInitializeProtocolState(attributes, this.storageService, maybeSnapshotTree);
+        const protocolHandlerP = this.loadAndInitializeProtocolState(
+            attributes.minimumSequenceNumber,
+            attributes.sequenceNumber,
+            this.storageService,
+            maybeSnapshotTree,
+        );
 
         let loadDetailsP: Promise<void>;
 
@@ -301,14 +305,15 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const proposals: [number, ISequencedProposal, string[]][] = [];
         const values: [string, ICommittedProposal][] = [];
 
-        this.initializeAndStartDeltaManager(attributes);
+        this.initializeAndStartDeltaManager(attributes.minimumSequenceNumber, attributes.sequenceNumber);
 
         // We know this is create detached flow without snapshot.
         this._existing = false;
 
         // Need to just seed the source data in the code quorum. Quorum itself is empty
         this._protocolHandler = this.initializeProtocolState(
-            attributes,
+            attributes.minimumSequenceNumber,
+            attributes.sequenceNumber,
             members,
             proposals,
             values);
@@ -346,7 +351,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async loadAndInitializeProtocolState(
-        attributes: IDocumentAttributes,
+        minimumSequenceNumber: number,
+        sequenceNumber: number,
         storage: IDocumentStorageService | undefined,
         snapshot: ISnapshotTree | undefined,
     ): Promise<ProtocolOpHandler> {
@@ -373,7 +379,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
 
         const protocolHandler = this.initializeProtocolState(
-            attributes,
+            minimumSequenceNumber,
+            sequenceNumber,
             members,
             proposals,
             values);
@@ -382,21 +389,22 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private initializeProtocolState(
-        attributes: IDocumentAttributes,
+        minimumSequenceNumber: number,
+        sequenceNumber: number,
         members: [string, ISequencedClient][],
         proposals: [number, ISequencedProposal, string[]][],
         values: [string, any][],
     ): ProtocolOpHandler {
         const protocol = new ProtocolOpHandler(
             "", // branchId
-            attributes.minimumSequenceNumber,
-            attributes.sequenceNumber,
+            minimumSequenceNumber,
+            sequenceNumber,
             undefined, // term
             members,
             proposals,
             values,
             (key, value) => this.submitMessage(MessageType.Propose, { key, value }),
-            (sequenceNumber) => this.submitMessage(MessageType.Reject, sequenceNumber));
+            (rejectSequenceNumber) => this.submitMessage(MessageType.Reject, rejectSequenceNumber));
 
         // Track membership changes and update connection state accordingly
         protocol.quorum.on("addMember", (clientId, details) => {
@@ -454,7 +462,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return deltaManager;
     }
 
-    private initializeAndStartDeltaManager(attributes: IDocumentAttributes): void {
+    private initializeAndStartDeltaManager(minimumSequenceNumber: number, sequenceNumber: number): void {
         // If we're the outer frame, do we want to do this?
         // Begin fetching any pending deltas once we know the base sequence #. Can this fail?
         // It seems like something, like reconnection, that we would want to retry but otherwise allow
@@ -462,8 +470,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._deltaManager.on("processOp", (message) => this.processRemoteMessage(message));
         this._deltaManager.on("processSignal", (message) => this.processSignal(message));
         this._deltaManager.initialize(
-            attributes.minimumSequenceNumber,
-            attributes.sequenceNumber,
+            minimumSequenceNumber,
+            sequenceNumber,
         );
         this._deltaManager.start();
     }
