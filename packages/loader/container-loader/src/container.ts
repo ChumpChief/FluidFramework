@@ -329,18 +329,19 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private async getDocumentAttributes(
         storage: IDocumentStorageService,
         tree: ISnapshotTree | undefined,
-    ): Promise<IDocumentAttributes> {
+    ): Promise<Pick<IDocumentAttributes, "minimumSequenceNumber" | "sequenceNumber">> {
         if (tree === undefined) {
             return {
-                branch: "", // was documentId
                 minimumSequenceNumber: 0,
                 sequenceNumber: 0,
-                term: 1,
             };
         }
 
         const attributesHash = tree.trees[".protocol"].blobs.attributes;
-        return readAndParse<IDocumentAttributes>(storage, attributesHash);
+        return readAndParse<Pick<IDocumentAttributes, "minimumSequenceNumber" | "sequenceNumber">>(
+            storage,
+            attributesHash,
+        );
     }
 
     private async loadAndInitializeProtocolState(
