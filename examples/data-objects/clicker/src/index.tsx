@@ -6,11 +6,9 @@
 import { DataObject, DataObjectFactory } from "@fluidframework/aqueduct";
 import { IFluidHandle } from "@fluidframework/core-interfaces";
 import { SharedCounter } from "@fluidframework/counter";
-import { ITask } from "@fluidframework/runtime-definitions";
 import { IFluidHTMLView } from "@fluidframework/view-interfaces";
 import React from "react";
 import ReactDOM from "react-dom";
-import { ClickerAgent } from "./agent";
 
 export const ClickerName = "Clicker";
 
@@ -35,7 +33,6 @@ export class Clicker extends DataObject implements IFluidHTMLView {
     protected async hasInitialized() {
         const counterHandle = this.root.get<IFluidHandle<SharedCounter>>(counterKey);
         this._counter = await counterHandle?.get();
-        this.setupAgent();
     }
 
     // #region IFluidHTMLView
@@ -53,19 +50,6 @@ export class Clicker extends DataObject implements IFluidHTMLView {
     }
 
     // #endregion IFluidHTMLView
-
-    public setupAgent() {
-        const agentTask: ITask = {
-            id: "agent",
-            instance: new ClickerAgent(this.counter),
-        };
-        this.taskManager.register(agentTask);
-        this.taskManager.pick(agentTask.id, true).then(() => {
-            console.log(`Picked`);
-        }, (err) => {
-            console.log(err);
-        });
-    }
 
     private get counter() {
         if (this._counter === undefined) {

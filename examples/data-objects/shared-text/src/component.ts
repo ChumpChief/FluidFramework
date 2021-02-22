@@ -8,12 +8,10 @@ import { parse } from "querystring";
 import * as url from "url";
 import registerDebug from "debug";
 import { controls, ui } from "@fluid-example/client-ui-lib";
-import { TextAnalyzer } from "@fluid-example/intelligence-runner-agent";
 import * as API from "@fluid-internal/client-api";
 import { SharedCell } from "@fluidframework/cell";
 import { performance } from "@fluidframework/common-utils";
 import {
-    IFluidObject,
     IFluidHandle,
     IFluidLoadable,
     IRequest,
@@ -28,8 +26,6 @@ import {
 import * as MergeTree from "@fluidframework/merge-tree";
 import {
     IFluidDataStoreContext,
-    ITask,
-    ITaskManager,
 } from "@fluidframework/runtime-definitions";
 import {
     SharedNumberSequence,
@@ -73,10 +69,8 @@ export class SharedTextRunner
     public get IFluidHTMLView() { return this; }
 
     private sharedString: SharedString;
-    private insightsMap: ISharedMap;
     private rootView: ISharedMap;
     private collabDoc: Document;
-    private taskManager: ITaskManager;
     private uiInitialized = false;
     private readonly title: string = "Shared Text";
 
@@ -118,11 +112,6 @@ export class SharedTextRunner
         this.rootView = this.collabDoc.getRoot();
 
         if (!this.runtime.existing) {
-            const insightsMapId = "insights";
-
-            const insights = this.collabDoc.createMap(insightsMapId);
-            this.rootView.set(insightsMapId, insights.handle);
-
             debug(`Not existing ${this.runtime.id} - ${performance.now()}`);
             this.rootView.set("users", this.collabDoc.createMap().handle);
             const seq = SharedNumberSequence.create(this.collabDoc.runtime);
@@ -160,14 +149,10 @@ export class SharedTextRunner
             this.rootView.set("videoPlayers", videoPlayers);
             this.rootView.set("images", images);
 
-            insights.set(newString.id, this.collabDoc.createMap().handle);
-
             // The flowContainerMap MUST be set last
 
             const flowContainerMap = this.collabDoc.createMap();
             this.rootView.set("flowContainerMap", flowContainerMap.handle);
-
-            insights.set(newString.id, this.collabDoc.createMap().handle);
         }
 
         debug(`collabDoc loaded ${this.runtime.id} - ${performance.now()}`);
@@ -176,12 +161,9 @@ export class SharedTextRunner
         await this.rootView.wait("flowContainerMap");
 
         this.sharedString = await this.rootView.get<IFluidHandle<SharedString>>("text").get();
-        this.insightsMap = await this.rootView.get<IFluidHandle<ISharedMap>>("insights").get();
         debug(`Shared string ready - ${performance.now()}`);
         debug(`id is ${this.runtime.id}`);
         debug(`Partial load fired: ${performance.now()}`);
-
-        this.taskManager = await this.context.containerRuntime.getTaskManager();
 
         const options = parse(window.location.search.substr(1));
         setTranslation(
@@ -192,14 +174,6 @@ export class SharedTextRunner
             .catch((error) => {
                 console.error("Problem adding translation", error);
             });
-
-        const taskScheduler = new TaskScheduler(
-            this.context,
-            this.taskManager,
-            this.sharedString,
-            this.insightsMap,
-        );
-        taskScheduler.start();
     }
 
     private async initializeUI(div): Promise<void> {
@@ -258,40 +232,6 @@ export class SharedTextRunner
             theFlow.loadFinished(performance.now());
             debug(`${this.runtime.id} fully loaded: ${performance.now()} `);
         });
-    }
-}
-
-class TaskScheduler {
-    constructor(
-        private readonly componentContext: IFluidDataStoreContext,
-        private readonly taskManager: ITaskManager,
-        private readonly sharedString: SharedString,
-        private readonly insightsMap: ISharedMap,
-    ) {
-
-    }
-
-    public start() {
-        const hostTokens =
-            (this.componentContext.containerRuntime as IFluidObject).IFluidTokenProvider;
-        const intelTokens = hostTokens && hostTokens.intelligence
-            ? hostTokens.intelligence.textAnalytics
-            : undefined;
-
-        if (intelTokens?.key?.length > 0) {
-            const intelTask: ITask = {
-                id: "intel",
-                instance: new TextAnalyzer(this.sharedString, this.insightsMap, intelTokens),
-            };
-            this.taskManager.register(intelTask);
-            this.taskManager.pick(intelTask.id).then(() => {
-                console.log(`Picked text analyzer`);
-            }, (err) => {
-                console.log(JSON.stringify(err));
-            });
-        } else {
-            console.log("No intel key provided.");
-        }
     }
 }
 
