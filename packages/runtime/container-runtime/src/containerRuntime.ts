@@ -1775,7 +1775,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         }
     }
 
-    public async getScheduler(): Promise<IAgentScheduler> {
+    private async getScheduler(): Promise<IAgentScheduler> {
         const taskManager = await requestFluidObject<ITaskManager>(
             await this.getDataStore(taskSchedulerId, true),
             "");
