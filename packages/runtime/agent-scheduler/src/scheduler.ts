@@ -421,9 +421,9 @@ export class TaskManager implements ITaskManager {
      */
     public async pick(taskId: string, worker?: boolean): Promise<void> {
         if (!this.context.deltaManager.clientDetails.capabilities.interactive) {
-            return Promise.reject(new Error("Picking not allowed on secondary copy"));
+            throw new Error("Picking not allowed on secondary copy");
         } else if (this.runtime.attachState !== AttachState.Attached) {
-            return Promise.reject(new Error("Picking not allowed in detached container in task manager"));
+            throw new Error("Picking not allowed in detached container in task manager");
         } else {
             const fullUrl = `/${this.runtime.id}/${this.taskUrl}/${taskId}`;
             return this.scheduler.pick(
@@ -448,13 +448,13 @@ export class TaskManager implements ITaskManager {
         };
         const response = await this.runtime.loader.request(request);
         if (response.status !== 200 || response.mimeType !== "fluid/object") {
-            return Promise.reject(new Error(`Invalid agent route: ${url}`));
+            throw new Error(`Invalid agent route: ${url}`);
         }
 
         const fluidObject = response.value as IFluidObject;
         const agent = fluidObject.IFluidRunnable;
         if (agent === undefined) {
-            return Promise.reject(new Error("Fluid object does not implement IFluidRunnable"));
+            throw new Error("Fluid object does not implement IFluidRunnable");
         }
 
         return agent.run();
