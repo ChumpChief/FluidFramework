@@ -4,7 +4,6 @@
  */
 
 import { EventEmitter } from "events";
-import { TaskManagerFactory } from "@fluidframework/agent-scheduler";
 import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
     IFluidObject,
@@ -429,16 +428,6 @@ export class ScheduleManager {
 
 export const taskSchedulerId = "_scheduler";
 
-// Wraps the provided list of packages and augments with some system level services.
-class ContainerRuntimeDataStoreRegistry extends FluidDataStoreRegistry {
-    constructor(namedEntries: NamedFluidDataStoreRegistryEntries) {
-        super([
-            ...namedEntries,
-            TaskManagerFactory.registryEntry,
-        ]);
-    }
-}
-
 /**
  * Represents the runtime of the container. Contains helper functions/state of the container.
  * It will define the store level mappings.
@@ -492,7 +481,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             }
         }
 
-        const registry = new ContainerRuntimeDataStoreRegistry(registryEntries);
+        const registry = new FluidDataStoreRegistry(registryEntries);
 
         const tryFetchBlob = async <T>(blobName: string): Promise<T | undefined> => {
             const blobId = context.baseSnapshot?.blobs[blobName];
@@ -515,12 +504,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             logger,
             requestHandler,
             storage);
-
-        // Create all internal data stores if not already existing on storage or loaded a detached
-        // container from snapshot(ex. draft mode).
-        if (!context.existing) {
-            await runtime.createRootDataStore(TaskManagerFactory.type, taskSchedulerId);
-        }
 
         return runtime;
     }
