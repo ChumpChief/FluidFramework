@@ -72,7 +72,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import {
     FlushMode,
-    InboundAttachMessage,
     IFluidDataStoreContext,
     IFluidDataStoreContextDetached,
     IFluidDataStoreRegistry,
@@ -425,8 +424,6 @@ export class ScheduleManager {
         }
     }
 }
-
-export const taskSchedulerId = "_scheduler";
 
 /**
  * Represents the runtime of the container. Contains helper functions/state of the container.
@@ -1247,21 +1244,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             isRuntimeMessage(message) === true,
             "Message passed for dirtyable check should be a container runtime message",
         );
-        return this.isContainerMessageDirtyable(message.type as ContainerMessageType, message.contents);
-    }
-
-    private isContainerMessageDirtyable(type: ContainerMessageType, contents: any) {
-        if (type === ContainerMessageType.Attach) {
-            const attachMessage = contents as InboundAttachMessage;
-            if (attachMessage.id === taskSchedulerId) {
-                return false;
-            }
-        } else if (type === ContainerMessageType.FluidDataStoreOp) {
-            const envelope = contents as IEnvelope;
-            if (envelope.address === taskSchedulerId) {
-                return false;
-            }
-        }
         return true;
     }
 
@@ -1593,9 +1575,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             localOpMetadata,
             opMetadataInternal,
         );
-        if (this.isContainerMessageDirtyable(type, content)) {
-            this.updateDocumentDirtyState(true);
-        }
+        this.updateDocumentDirtyState(true);
     }
 
     private submitChunkedMessage(type: ContainerMessageType, content: string, maxOpSize: number): number {

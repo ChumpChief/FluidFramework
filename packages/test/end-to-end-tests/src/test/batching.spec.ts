@@ -4,11 +4,11 @@
  */
 
 import { strict as assert } from "assert";
-import { ContainerMessageType, taskSchedulerId } from "@fluidframework/container-runtime";
+import { ContainerMessageType } from "@fluidframework/container-runtime";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
 import { SharedMap } from "@fluidframework/map";
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
-import { IEnvelope, FlushMode } from "@fluidframework/runtime-definitions";
+import { FlushMode } from "@fluidframework/runtime-definitions";
 import { requestFluidObject } from "@fluidframework/runtime-utils";
 import {
     ITestFluidObject,
@@ -52,10 +52,7 @@ const tests = (argsFactory: () => ITestObjectProvider) => {
     function setupBatchMessageListener(dataStore: ITestFluidObject, receivedMessages: ISequencedDocumentMessage[]) {
         dataStore.context.containerRuntime.on("op", (message: ISequencedDocumentMessage) => {
             if (message.type === ContainerMessageType.FluidDataStoreOp) {
-                const envelope = message.contents as IEnvelope;
-                if (envelope.address !== taskSchedulerId) {
-                    receivedMessages.push(message);
-                }
+                receivedMessages.push(message);
             }
         });
     }
