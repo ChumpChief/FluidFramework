@@ -19,16 +19,19 @@ export interface ITaskQueue extends ISharedObject<ITaskQueueEvents> {
      * @param taskId
      */
     volunteer(taskId: string): void;
+
     /**
      * Exit the queue, I immediately drop assigned/queued status
      * @param taskId
      */
     abandon(taskId: string): void;
+
     /**
      * Am I the currently assigned client?
      * @param taskId
      */
     assigned(taskId: string): boolean;
+
     /**
      * Am I somewhere in the queue already?
      * @param taskId

@@ -252,6 +252,10 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             const clientIdIndex = clientQueue.indexOf(clientId);
             if (clientIdIndex !== -1) {
                 clientQueue.splice(clientIdIndex, 1);
+                // Remove the queue if there are no more clients in it.
+                if (clientQueue.length === 0) {
+                    this.taskQueues.delete(taskId);
+                }
             }
         }
 
