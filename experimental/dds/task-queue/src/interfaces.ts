@@ -4,41 +4,34 @@
  */
 
 import { ISharedObject, ISharedObjectEvents } from "@fluidframework/shared-object-base";
-import { Serializable } from "@fluidframework/datastore-definitions";
 
-export interface ISharedCellEvents<T extends Serializable> extends ISharedObjectEvents {
-    (event: "valueChanged", listener: (value: T) => void);
-    (event: "delete", listener: () => void);
+export interface ITaskQueueEvents extends ISharedObjectEvents {
+    (event: "assigned" | "lost" | "reassigned", listener: (taskId: string) => void);
 }
 
 /**
  * Shared cell interface
  */
 
-export interface ISharedCell<T extends Serializable = any> extends ISharedObject<ISharedCellEvents<T>> {
+export interface ITaskQueue extends ISharedObject<ITaskQueueEvents> {
     /**
-     * Retrieves the cell value.
-     *
-     * @returns - the value of the cell
+     * Enter the queue, I'm immediately in waiting status
+     * @param taskId
      */
-    get(): T | undefined;
-
+    volunteer(taskId: string): void;
     /**
-     * Sets the cell value.
-     *
-     * @param value - a JSON-able or SharedObject value to set the cell to
+     * Exit the queue, I immediately drop assigned/queued status
+     * @param taskId
      */
-    set(value: T): void;
-
+    abandon(taskId: string): void;
     /**
-     * Checks whether cell is empty or not.
-     *
-     * @returns - `true` if the value of cell is `undefined`, `false` otherwise
+     * Am I the currently assigned client?
+     * @param taskId
      */
-    empty(): boolean;
-
+    assigned(taskId: string): boolean;
     /**
-     * Delete the value from the cell.
+     * Am I somewhere in the queue already?
+     * @param taskId
      */
-    delete(): void;
+    queued(taskId: string): boolean;
 }

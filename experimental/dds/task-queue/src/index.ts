@@ -3,5 +3,5 @@
  * Licensed under the MIT License.
  */
 
-export * from "./cell";
+export * from "./taskQueue";
 export * from "./interfaces";

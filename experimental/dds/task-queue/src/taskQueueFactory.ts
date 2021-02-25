@@ -9,28 +9,28 @@ import {
     IChannelServices,
     IChannelFactory,
 } from "@fluidframework/datastore-definitions";
-import { SharedCell } from "./cell";
-import { ISharedCell } from "./interfaces";
+import { TaskQueue } from "./taskQueue";
+import { ITaskQueue } from "./interfaces";
 import { pkgVersion } from "./packageVersion";
 
 /**
  * The factory that defines the map
  */
-export class CellFactory implements IChannelFactory {
-    public static readonly Type = "https://graph.microsoft.com/types/cell";
+export class TaskQueueFactory implements IChannelFactory {
+    public static readonly Type = "https://graph.microsoft.com/types/task-queue";
 
     public static readonly Attributes: IChannelAttributes = {
-        type: CellFactory.Type,
+        type: TaskQueueFactory.Type,
         snapshotFormatVersion: "0.1",
         packageVersion: pkgVersion,
     };
 
     public get type() {
-        return CellFactory.Type;
+        return TaskQueueFactory.Type;
     }
 
     public get attributes() {
-        return CellFactory.Attributes;
+        return TaskQueueFactory.Attributes;
     }
 
     /**
@@ -40,14 +40,14 @@ export class CellFactory implements IChannelFactory {
         runtime: IFluidDataStoreRuntime,
         id: string,
         services: IChannelServices,
-        attributes: IChannelAttributes): Promise<ISharedCell> {
-        const cell = new SharedCell(id, runtime, attributes);
+        attributes: IChannelAttributes): Promise<ITaskQueue> {
+        const cell = new TaskQueue(id, runtime, attributes);
         await cell.load(services);
         return cell;
     }
 
-    public create(document: IFluidDataStoreRuntime, id: string): ISharedCell {
-        const cell = new SharedCell(id, document, this.attributes);
+    public create(document: IFluidDataStoreRuntime, id: string): ITaskQueue {
+        const cell = new TaskQueue(id, document, this.attributes);
         cell.initializeLocal();
         return cell;
     }

@@ -4,7 +4,7 @@
  */
 
 import { assert , bufferToString } from "@fluidframework/common-utils";
-import { IFluidSerializer, ISerializedHandle } from "@fluidframework/core-interfaces";
+import { IFluidSerializer } from "@fluidframework/core-interfaces";
 
 import {
     FileMode,
@@ -18,12 +18,10 @@ import {
     IFluidDataStoreRuntime,
     IChannelStorageService,
     IChannelFactory,
-    Serializable,
 } from "@fluidframework/datastore-definitions";
 import { SharedObject, ValueType } from "@fluidframework/shared-object-base";
-import { CellFactory } from "./cellFactory";
-import { debug } from "./debug";
-import { ISharedCell, ISharedCellEvents } from "./interfaces";
+import { TaskQueueFactory } from "./taskQueueFactory";
+import { ITaskQueue, ITaskQueueEvents } from "./interfaces";
 
 /**
  * Description of a cell delta operation
@@ -96,8 +94,7 @@ const snapshotFileName = "header";
  * register for these events and respond appropriately as the data is modified. `valueChanged` will be emitted
  * in response to a `set`, and `delete` will be emitted in response to a `delete`.
  */
-export class SharedCell<T extends Serializable = any> extends SharedObject<ISharedCellEvents<T>>
-    implements ISharedCell<T> {
+export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQueue {
     /**
      * Create a new shared cell
      *
@@ -106,7 +103,7 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
      * @returns newly create shared map (but not attached yet)
      */
     public static create(runtime: IFluidDataStoreRuntime, id?: string) {
-        return runtime.createChannel(id, CellFactory.Type) as SharedCell;
+        return runtime.createChannel(id, TaskQueueFactory.Type) as TaskQueue;
     }
 
     /**
@@ -115,12 +112,14 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
      * @returns a factory that creates and load SharedCell
      */
     public static getFactory(): IChannelFactory {
-        return new CellFactory();
+        return new TaskQueueFactory();
     }
     /**
      * The data held by this cell.
      */
-    private data: T | undefined;
+    private data: any | undefined;
+
+    private taskQueues: Map<string, string[]> | undefined;
 
     /**
      * This is used to assign a unique id to outgoing messages. It is used to track messages until
@@ -145,17 +144,19 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
         super(id, runtime, attributes);
     }
 
-    /**
-     * {@inheritDoc ISharedCell.get}
-     */
-    public get() {
-        return this.data;
+    public volunteer(taskId: string) { }
+    public abandon(taskId: string) { }
+    public assigned(taskId: string) {
+        return false;
+    }
+    public queued(taskId: string) {
+        return false;
     }
 
     /**
      * {@inheritDoc ISharedCell.set}
      */
-    public set(value: T) {
+    public set(value: string) {
         if (SharedObject.is(value)) {
             throw new Error("SharedObject sets are no longer supported. Instead set the SharedObject handle.");
         }
@@ -163,11 +164,8 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
         // Serialize the value if required.
         const operationValue: ICellValue = {
             type: ValueType[ValueType.Plain],
-            value: this.toSerializable(value, this.serializer),
+            value,
         };
-
-        // Set the value locally.
-        this.setCore(value);
 
         // If we are not attached, don't submit the op.
         if (!this.isAttached()) {
@@ -185,9 +183,6 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
      * {@inheritDoc ISharedCell.delete}
      */
     public delete() {
-        // Delete the value locally.
-        this.deleteCore();
-
         // If we are not attached, don't submit the op.
         if (!this.isAttached()) {
             return;
@@ -200,23 +195,12 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
     }
 
     /**
-     * {@inheritDoc ISharedCell.empty}
-     */
-    public empty() {
-        return this.data === undefined;
-    }
-
-    /**
      * Create a snapshot for the cell
      *
      * @returns the snapshot of the current state of the cell
      */
     protected snapshotCore(serializer: IFluidSerializer): ITree {
-        // Get a serializable form of data
-        const content: ICellValue = {
-            type: ValueType[ValueType.Plain],
-            value: this.toSerializable(this.data, serializer),
-        };
+        const content = this.taskQueues?.get("foobar"); // TODO
 
         // And then construct the tree for it
         const tree: ITree = {
@@ -226,7 +210,7 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
                     path: snapshotFileName,
                     type: TreeEntry.Blob,
                     value: {
-                        contents: JSON.stringify(content),
+                        contents: JSON.stringify(content), // TODO need stringify?
                         encoding: "utf-8",
                     },
                 },
@@ -247,7 +231,8 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
             ? JSON.parse(rawContent) as ICellValue
             : { type: ValueType[ValueType.Plain], value: undefined };
 
-        this.data = this.fromSerializable(content);
+        this.data = content.value.value;
+        // TODO this.taskQueues = ???
     }
 
     /**
@@ -255,6 +240,7 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
      */
     protected initializeLocalCore() {
         this.data = undefined;
+        this.taskQueues = new Map();
     }
 
     /**
@@ -269,9 +255,7 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
     /**
      * Call back on disconnect
      */
-    protected onDisconnect() {
-        debug(`Cell ${this.id} is now disconnected`);
-    }
+    protected onDisconnect() { }
 
     /**
      * Process a cell operation
@@ -299,57 +283,16 @@ export class SharedCell<T extends Serializable = any> extends SharedObject<IShar
             const op = message.contents as ICellOperation;
 
             switch (op.type) {
-                case "setCell":
-                    this.setCore(this.fromSerializable(op.value));
-                    break;
+                // TODO
+                // case "volunteer":
+                //     break;
 
-                case "deleteCell":
-                    this.deleteCore();
-                    break;
+                // case "abandon":
+                //     break;
 
                 default:
                     throw new Error("Unknown operation");
             }
         }
-    }
-
-    private setCore(value: T) {
-        this.data = value;
-        this.emit("valueChanged", value);
-    }
-
-    private deleteCore() {
-        this.data = undefined;
-        this.emit("delete");
-    }
-
-    private toSerializable(value: T | undefined, serializer: IFluidSerializer) {
-        if (value === undefined) {
-            return value;
-        }
-
-        // Stringify to convert to the serialized handle values - and then parse in order to create
-        // a POJO for the op
-        const stringified = serializer.stringify(value, this.handle);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return JSON.parse(stringified);
-    }
-
-    private fromSerializable(operation: ICellValue) {
-        let value = operation.value;
-
-        // Convert any stored shared object to updated handle
-        if (operation.type === ValueType[ValueType.Shared]) {
-            const handle: ISerializedHandle = {
-                type: "__fluid_handle__",
-                url: operation.value as string,
-            };
-            value = handle;
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return value !== undefined
-            ? this.serializer.parse(JSON.stringify(value))
-            : value;
     }
 }
