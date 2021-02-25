@@ -14,7 +14,7 @@ import { ITaskQueue } from "./interfaces";
 import { pkgVersion } from "./packageVersion";
 
 /**
- * The factory that defines the map
+ * The factory that defines the task queue
  */
 export class TaskQueueFactory implements IChannelFactory {
     public static readonly Type = "https://graph.microsoft.com/types/task-queue";
@@ -41,14 +41,14 @@ export class TaskQueueFactory implements IChannelFactory {
         id: string,
         services: IChannelServices,
         attributes: IChannelAttributes): Promise<ITaskQueue> {
-        const cell = new TaskQueue(id, runtime, attributes);
-        await cell.load(services);
-        return cell;
+        const taskQueue = new TaskQueue(id, runtime, attributes);
+        await taskQueue.load(services);
+        return taskQueue;
     }
 
     public create(document: IFluidDataStoreRuntime, id: string): ITaskQueue {
-        const cell = new TaskQueue(id, document, this.attributes);
-        cell.initializeLocal();
-        return cell;
+        const taskQueue = new TaskQueue(id, document, this.attributes);
+        taskQueue.initializeLocal();
+        return taskQueue;
     }
 }

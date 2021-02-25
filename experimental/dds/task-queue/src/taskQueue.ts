@@ -111,7 +111,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     /**
      * Mapping of taskId to a queue of clientIds that are waiting on the task.
      */
-    private taskQueues: Map<string, string[]> | undefined;
+    private readonly taskQueues: Map<string, string[]> = new Map();
 
     /**
      * taskIds for tasks that we've sent a volunteer for but have not yet been ack'd.
@@ -163,26 +163,24 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     }
 
     public assigned(taskId: string) {
-        const currentAssignee = this.taskQueues?.get(taskId)?.[0];
+        const currentAssignee = this.taskQueues.get(taskId)?.[0];
         return (currentAssignee !== undefined && currentAssignee === this.runtime.clientId);
     }
 
     public queued(taskId: string) {
         assert(this.runtime.clientId !== undefined); // TODO, handle disconnected case
-        const clientQueue = this.taskQueues?.get(taskId);
+        const clientQueue = this.taskQueues.get(taskId);
         // If we have no queue for the taskId, then no one has signed up for it.
         return clientQueue !== undefined && clientQueue.includes(this.runtime.clientId);
     }
 
     /**
-     * Create a snapshot for the cell
+     * Create a snapshot for the task queue
      *
-     * @returns the snapshot of the current state of the cell
+     * @returns the snapshot of the current state of the task queue
      */
     protected snapshotCore(serializer: IFluidSerializer): ITree {
-        const content = this.taskQueues !== undefined
-            ? [...this.taskQueues?.entries()]
-            : [];
+        const content = [...this.taskQueues.entries()];
 
         // And then construct the tree for it
         const tree: ITree = {
@@ -211,15 +209,16 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         const content = rawContent !== undefined
             ? JSON.parse(rawContent) as [string, string[]][]
             : [];
-        this.taskQueues = new Map(content);
+
+        content.forEach(([taskId, clientIdQueue]) => {
+            this.taskQueues.set(taskId, clientIdQueue);
+        });
     }
 
     /**
      * Initialize a local instance of cell
      */
-    protected initializeLocalCore() {
-        this.taskQueues = new Map();
-    }
+    protected initializeLocalCore() { }
 
     /**
      * Process the cell value on register
@@ -245,8 +244,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
 
             switch (op.type) {
                 // TODO
-                // case "volunteer":
-                //     break;
+                case "volunteer":
+                    this.addClientToQueue(op.taskId, message.clientId);
+                    break;
 
                 // case "abandon":
                 //     break;
@@ -254,6 +254,21 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
                 default:
                     throw new Error("Unknown operation");
             }
+        }
+    }
+
+    private addClientToQueue(taskId: string, clientId: string) {
+        // Create the queue if it doesn't exist, and push the client on the back.
+        let clientQueue = this.taskQueues.get(taskId);
+        if (clientQueue === undefined) {
+            clientQueue = [];
+            this.taskQueues.set(taskId, clientQueue);
+        }
+        clientQueue.push(clientId);
+
+        // Clean up our pending state if needed
+        if (clientId === this.runtime.clientId) {
+            this.pendingTaskQueues.delete(taskId);
         }
     }
 }
