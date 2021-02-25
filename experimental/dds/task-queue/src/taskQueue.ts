@@ -65,9 +65,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     /**
      * Create a new TaskQueue
      *
-     * @param runtime - data store runtime the new shared map belongs to
-     * @param id - optional name of the shared map
-     * @returns newly create shared map (but not attached yet)
+     * @param runtime - data store runtime the new task queue belongs to
+     * @param id - optional name of the task queue
+     * @returns newly create task queue (but not attached yet)
      */
     public static create(runtime: IFluidDataStoreRuntime, id?: string) {
         return runtime.createChannel(id, TaskQueueFactory.Type) as TaskQueue;
@@ -93,11 +93,11 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     private readonly pendingTaskQueues: Set<string> = new Set();
 
     /**
-     * Constructs a new shared cell. If the object is non-local an id and service interfaces will
+     * Constructs a new task queue. If the object is non-local an id and service interfaces will
      * be provided
      *
-     * @param runtime - data store runtime the shared map belongs to
-     * @param id - optional name of the shared map
+     * @param runtime - data store runtime the task queue belongs to
+     * @param id - optional name of the task queue
      */
     constructor(id: string, runtime: IFluidDataStoreRuntime, attributes: IChannelAttributes) {
         super(id, runtime, attributes);
@@ -189,23 +189,14 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         });
     }
 
-    /**
-     * Initialize a local instance of cell
-     */
     protected initializeLocalCore() { }
 
-    /**
-     * Process the cell value on register
-     */
     protected registerCore() { }
 
-    /**
-     * Call back on disconnect
-     */
     protected onDisconnect() { }
 
     /**
-     * Process a cell operation
+     * Process a task queue operation
      *
      * @param message - the message to prepare
      * @param local - whether the message was sent by the local client
@@ -252,7 +243,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             const clientIdIndex = clientQueue.indexOf(clientId);
             if (clientIdIndex !== -1) {
                 clientQueue.splice(clientIdIndex, 1);
-                // Remove the queue if there are no more clients in it.
+                // Clean up the queue if there are no more clients in it.
                 if (clientQueue.length === 0) {
                     this.taskQueues.delete(taskId);
                 }
