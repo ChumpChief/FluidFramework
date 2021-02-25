@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { assert , bufferToString } from "@fluidframework/common-utils";
+import { assert, bufferToString } from "@fluidframework/common-utils";
 import { IFluidSerializer } from "@fluidframework/core-interfaces";
 
 import {
@@ -19,30 +19,23 @@ import {
     IChannelStorageService,
     IChannelFactory,
 } from "@fluidframework/datastore-definitions";
-import { SharedObject, ValueType } from "@fluidframework/shared-object-base";
+import { SharedObject } from "@fluidframework/shared-object-base";
 import { TaskQueueFactory } from "./taskQueueFactory";
 import { ITaskQueue, ITaskQueueEvents } from "./interfaces";
 
 /**
  * Description of a cell delta operation
  */
-type ICellOperation = ISetCellOperation | IDeleteCellOperation;
+type ITaskQueueOperation = ITaskQueueVolunteerOperation | ITaskQueueAbandonOperation;
 
-interface ISetCellOperation {
-    type: "setCell";
-    value: ICellValue;
+interface ITaskQueueVolunteerOperation {
+    type: "volunteer";
+    taskId: string;
 }
 
-interface IDeleteCellOperation {
-    type: "deleteCell";
-}
-
-interface ICellValue {
-    // The type of the value
-    type: string;
-
-    // The actual value
-    value: any;
+interface ITaskQueueAbandonOperation {
+    type: "abandon";
+    taskId: string;
 }
 
 const snapshotFileName = "header";
@@ -114,24 +107,16 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     public static getFactory(): IChannelFactory {
         return new TaskQueueFactory();
     }
-    /**
-     * The data held by this cell.
-     */
-    private data: any | undefined;
 
+    /**
+     * Mapping of taskId to a queue of clientIds that are waiting on the task.
+     */
     private taskQueues: Map<string, string[]> | undefined;
 
     /**
-     * This is used to assign a unique id to outgoing messages. It is used to track messages until
-     * they are ack'd.
+     * taskIds for tasks that we've sent a volunteer for but have not yet been ack'd.
      */
-    private messageId: number = -1;
-
-    /**
-     * This keeps track of the messageId of messages that have been ack'd. It is updated every time
-     * we a message is ack'd with it's messageId.
-     */
-    private messageIdObserved: number = -1;
+    private readonly pendingTaskQueues: Set<string> = new Set();
 
     /**
      * Constructs a new shared cell. If the object is non-local an id and service interfaces will
@@ -144,54 +129,49 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         super(id, runtime, attributes);
     }
 
-    public volunteer(taskId: string) { }
-    public abandon(taskId: string) { }
+    public volunteer(taskId: string) {
+        // Return if we're already queued or waiting to queue.
+        if (this.queued(taskId) || this.pendingTaskQueues.has(taskId)) {
+            return;
+        }
+        // TODO: Can't volunteer if detached?  Or maybe should just treat as auto-ack?
+        if (!this.isAttached()) {
+            return;
+        }
+        const op: ITaskQueueVolunteerOperation = {
+            type: "volunteer",
+            taskId,
+        };
+        this.pendingTaskQueues.add(taskId);
+        this.submitLocalMessage(op);
+    }
+
+    public abandon(taskId: string) {
+        // Return if we're not queued or waiting to queue.
+        if (!this.queued(taskId) && !this.pendingTaskQueues.has(taskId)) {
+            return;
+        }
+        // TODO: Can't abandon if detached?  Or maybe should just treat as auto-ack?
+        if (!this.isAttached()) {
+            return;
+        }
+        const op: ITaskQueueAbandonOperation = {
+            type: "abandon",
+            taskId,
+        };
+        this.submitLocalMessage(op);
+    }
+
     public assigned(taskId: string) {
-        return false;
+        const currentAssignee = this.taskQueues?.get(taskId)?.[0];
+        return (currentAssignee !== undefined && currentAssignee === this.runtime.clientId);
     }
+
     public queued(taskId: string) {
-        return false;
-    }
-
-    /**
-     * {@inheritDoc ISharedCell.set}
-     */
-    public set(value: string) {
-        if (SharedObject.is(value)) {
-            throw new Error("SharedObject sets are no longer supported. Instead set the SharedObject handle.");
-        }
-
-        // Serialize the value if required.
-        const operationValue: ICellValue = {
-            type: ValueType[ValueType.Plain],
-            value,
-        };
-
-        // If we are not attached, don't submit the op.
-        if (!this.isAttached()) {
-            return;
-        }
-
-        const op: ISetCellOperation = {
-            type: "setCell",
-            value: operationValue,
-        };
-        this.submitLocalMessage(op, ++this.messageId);
-    }
-
-    /**
-     * {@inheritDoc ISharedCell.delete}
-     */
-    public delete() {
-        // If we are not attached, don't submit the op.
-        if (!this.isAttached()) {
-            return;
-        }
-
-        const op: IDeleteCellOperation = {
-            type: "deleteCell",
-        };
-        this.submitLocalMessage(op, ++this.messageId);
+        assert(this.runtime.clientId !== undefined); // TODO, handle disconnected case
+        const clientQueue = this.taskQueues?.get(taskId);
+        // If we have no queue for the taskId, then no one has signed up for it.
+        return clientQueue !== undefined && clientQueue.includes(this.runtime.clientId);
     }
 
     /**
@@ -200,7 +180,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
      * @returns the snapshot of the current state of the cell
      */
     protected snapshotCore(serializer: IFluidSerializer): ITree {
-        const content = this.taskQueues?.get("foobar"); // TODO
+        const content = this.taskQueues !== undefined
+            ? [...this.taskQueues?.entries()]
+            : [];
 
         // And then construct the tree for it
         const tree: ITree = {
@@ -210,7 +192,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
                     path: snapshotFileName,
                     type: TreeEntry.Blob,
                     value: {
-                        contents: JSON.stringify(content), // TODO need stringify?
+                        contents: JSON.stringify(content),
                         encoding: "utf-8",
                     },
                 },
@@ -226,31 +208,23 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     protected async loadCore(storage: IChannelStorageService): Promise<void> {
         const blob = await storage.readBlob(snapshotFileName);
         const rawContent = bufferToString(blob, "utf8");
-
         const content = rawContent !== undefined
-            ? JSON.parse(rawContent) as ICellValue
-            : { type: ValueType[ValueType.Plain], value: undefined };
-
-        this.data = content.value.value;
-        // TODO this.taskQueues = ???
+            ? JSON.parse(rawContent) as [string, string[]][]
+            : [];
+        this.taskQueues = new Map(content);
     }
 
     /**
      * Initialize a local instance of cell
      */
     protected initializeLocalCore() {
-        this.data = undefined;
         this.taskQueues = new Map();
     }
 
     /**
      * Process the cell value on register
      */
-    protected registerCore() {
-        if (SharedObject.is(this.data)) {
-            this.data.bindToContext();
-        }
-    }
+    protected registerCore() { }
 
     /**
      * Call back on disconnect
@@ -266,21 +240,8 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
      * For messages from a remote client, this will be undefined.
      */
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {
-        if (this.messageId !== this.messageIdObserved) {
-            // We are waiting for an ACK on our change to this cell - we will ignore all messages until we get it.
-            if (local) {
-                const messageIdReceived = localOpMetadata as number;
-                assert(messageIdReceived !== undefined && messageIdReceived <= this.messageId,
-                    "messageId is incorrect from from the local client's ACK");
-
-                // We got an ACK. Update messageIdObserved.
-                this.messageIdObserved = localOpMetadata as number;
-            }
-            return;
-        }
-
         if (message.type === MessageType.Operation && !local) {
-            const op = message.contents as ICellOperation;
+            const op = message.contents as ITaskQueueOperation;
 
             switch (op.type) {
                 // TODO
