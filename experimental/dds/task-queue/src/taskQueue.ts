@@ -24,7 +24,7 @@ import { TaskQueueFactory } from "./taskQueueFactory";
 import { ITaskQueue, ITaskQueueEvents } from "./interfaces";
 
 /**
- * Description of a cell delta operation
+ * Description of a task queue operation
  */
 type ITaskQueueOperation = ITaskQueueVolunteerOperation | ITaskQueueAbandonOperation;
 
@@ -41,55 +41,29 @@ interface ITaskQueueAbandonOperation {
 const snapshotFileName = "header";
 
 /**
- * The SharedCell distributed data structure can be used to store a single serializable value.
+ * The TaskQueue distributed data structure tracks queues of clients that want to exclusively run a task.
  *
  * @remarks
  * ### Creation
  *
- * To create a `SharedCell`, call the static create method:
+ * To create a `TaskQueue`, call the static create method:
  *
  * ```typescript
- * const myCell = SharedCell.create(this.runtime, id);
+ * const myQueue = TaskQueue.create(this.runtime, id);
  * ```
  *
  * ### Usage
  *
- * The value stored in the cell can be set with the `.set()` method and retrieved with the `.get()` method:
- *
- * ```typescript
- * myCell.set(3);
- * console.log(myCell.get()); // 3
- * ```
- *
- * The value must only be plain JS objects or `SharedObject` handles (e.g. to another DDS or Fluid object).
- * In collaborative scenarios, the value is settled with a policy of _last write wins_.
- *
- * The `.delete()` method will delete the stored value from the cell:
- *
- * ```typescript
- * myCell.delete();
- * console.log(myCell.get()); // undefined
- * ```
- *
- * The `.empty()` method will check if the value is undefined.
- *
- * ```typescript
- * if (myCell.empty()) {
- *   // myCell.get() will return undefined
- * } else {
- *   // myCell.get() will return a non-undefined value
- * }
- * ```
+ * TODO
  *
  * ### Eventing
  *
- * `SharedCell` is an `EventEmitter`, and will emit events when other clients make modifications. You should
- * register for these events and respond appropriately as the data is modified. `valueChanged` will be emitted
- * in response to a `set`, and `delete` will be emitted in response to a `delete`.
+ * `TaskQueue` is an `EventEmitter`, and will emit events when other clients make modifications. You should
+ * register for these events and respond appropriately as the data is modified. TODO details.
  */
 export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQueue {
     /**
-     * Create a new shared cell
+     * Create a new TaskQueue
      *
      * @param runtime - data store runtime the new shared map belongs to
      * @param id - optional name of the shared map
@@ -100,9 +74,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     }
 
     /**
-     * Get a factory for SharedCell to register with the data store.
+     * Get a factory for TaskQueue to register with the data store.
      *
-     * @returns a factory that creates and load SharedCell
+     * @returns a factory that creates and load TaskQueue
      */
     public static getFactory(): IChannelFactory {
         return new TaskQueueFactory();
@@ -243,13 +217,13 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             const op = message.contents as ITaskQueueOperation;
 
             switch (op.type) {
-                // TODO
                 case "volunteer":
                     this.addClientToQueue(op.taskId, message.clientId);
                     break;
 
-                // case "abandon":
-                //     break;
+                case "abandon":
+                    this.removeClientFromQueue(op.taskId, message.clientId);
+                    break;
 
                 default:
                     throw new Error("Unknown operation");
@@ -270,5 +244,17 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         if (clientId === this.runtime.clientId) {
             this.pendingTaskQueues.delete(taskId);
         }
+    }
+
+    private removeClientFromQueue(taskId: string, clientId: string) {
+        const clientQueue = this.taskQueues.get(taskId);
+        if (clientQueue !== undefined) {
+            const clientIdIndex = clientQueue.indexOf(clientId);
+            if (clientIdIndex !== -1) {
+                clientQueue.splice(clientIdIndex, 1);
+            }
+        }
+
+        this.pendingTaskQueues.delete(taskId);
     }
 }

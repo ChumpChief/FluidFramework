@@ -10,7 +10,7 @@ export interface ITaskQueueEvents extends ISharedObjectEvents {
 }
 
 /**
- * Shared cell interface
+ * Task queue interface
  */
 
 export interface ITaskQueue extends ISharedObject<ITaskQueueEvents> {
