@@ -34,7 +34,9 @@
   },
   "dependencies": {
     "@fluid-experimental/get-container": "^0.35.0",
+    "@fluid-experimental/task-queue": "^0.35.0",
     "@fluidframework/aqueduct": "^0.35.0",
+    "@fluidframework/core-interfaces": "^0.35.0",
     "css-loader": "^1.0.0",
     "style-loader": "^1.0.0"
   },
