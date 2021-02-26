@@ -45,6 +45,11 @@ async function start(): Promise<void> {
 
     // In this app, we know our container code provides a default data object that is an IDiceRoller.
     const diceRoller: IDiceRoller = response.value;
+    // eslint-disable-next-line @typescript-eslint/dot-notation
+    if (window["diceRoller"] === undefined) {
+        // eslint-disable-next-line @typescript-eslint/dot-notation
+        window["diceRoller"] = diceRoller;
+    }
 
     // Given an IDiceRoller, we can render the value and provide controls for users to roll it.
     const div = document.getElementById("content") as HTMLDivElement;
