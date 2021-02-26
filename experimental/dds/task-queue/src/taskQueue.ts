@@ -103,6 +103,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         super(id, runtime, attributes);
 
         runtime.getQuorum().on("removeMember", (clientId: string) => {
+            console.log("Quorum alerts removal", clientId);
             this.removeClientFromAllQueues(clientId);
         });
     }
@@ -121,6 +122,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             taskId,
         };
         this.pendingTaskQueues.add(taskId);
+        console.log("Queueing self", taskId, this.runtime.clientId);
         this.submitLocalMessage(op);
     }
 
@@ -137,7 +139,6 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             type: "abandon",
             taskId,
         };
-        console.log(`Submitting: `, op);
         this.submitLocalMessage(op);
     }
 
@@ -160,6 +161,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
      */
     protected snapshotCore(serializer: IFluidSerializer): ITree {
         const content = [...this.taskQueues.entries()];
+        console.log("Generating snapshot", content);
 
         // And then construct the tree for it
         const tree: ITree = {
@@ -189,9 +191,20 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             ? JSON.parse(rawContent) as [string, string[]][]
             : [];
 
+        const quorum = this.runtime.getQuorum();
         content.forEach(([taskId, clientIdQueue]) => {
             this.taskQueues.set(taskId, clientIdQueue);
+            for (const clientId of clientIdQueue) {
+                // For reasons I don't really understand, sometimes the leave ops following the summary don't seem to
+                // trigger the removeMember handler.  Scrub them out here.  In particular it looks like the summarizer
+                // client is failing to observe the clients leaving, so summaries end up with stale clients. TODO fix
+                if(quorum.getMember(clientId) === undefined) {
+                    console.log("Scrubbing client on load", clientId);
+                    this.removeClientFromQueue(taskId, clientId);
+                }
+            }
         });
+        console.log("loadCore complete", this.taskQueues);
     }
 
     protected initializeLocalCore() { }
@@ -209,9 +222,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
      * For messages from a remote client, this will be undefined.
      */
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {
-        console.log(`Receiving message: `, message);
         if (message.type === MessageType.Operation) {
             const op = message.contents as ITaskQueueOperation;
+            console.log("Processing incoming", op.taskId, message.clientId);
 
             switch (op.type) {
                 case "volunteer":
@@ -236,6 +249,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             this.taskQueues.set(taskId, clientQueue);
         }
         clientQueue.push(clientId);
+        console.log(`Added ${clientId}`, clientQueue);
 
         // Clean up our pending state if needed
         if (clientId === this.runtime.clientId) {
@@ -249,6 +263,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             const clientIdIndex = clientQueue.indexOf(clientId);
             if (clientIdIndex !== -1) {
                 clientQueue.splice(clientIdIndex, 1);
+                console.log(`Removed ${clientId}`, clientQueue);
                 // Clean up the queue if there are no more clients in it.
                 if (clientQueue.length === 0) {
                     this.taskQueues.delete(taskId);
