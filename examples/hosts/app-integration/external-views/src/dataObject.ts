@@ -62,6 +62,7 @@ export class DiceRoller extends DataObject implements IDiceRoller {
 
         const taskQueueHandle = this.root.get<IFluidHandle<TaskQueue>>(taskQueueKey);
         this.taskQueue = await taskQueueHandle?.get();
+        // eslint-disable-next-line @typescript-eslint/dot-notation
         window["taskQueue"] = this.taskQueue;
         console.log(this.taskQueue);
     }

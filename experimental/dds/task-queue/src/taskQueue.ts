@@ -101,6 +101,10 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
      */
     constructor(id: string, runtime: IFluidDataStoreRuntime, attributes: IChannelAttributes) {
         super(id, runtime, attributes);
+
+        runtime.getQuorum().on("removeMember", (clientId: string) => {
+            this.removeClientFromAllQueues(clientId);
+        });
     }
 
     public volunteer(taskId: string) {
@@ -133,6 +137,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             type: "abandon",
             taskId,
         };
+        console.log(`Submitting: `, op);
         this.submitLocalMessage(op);
     }
 
@@ -204,7 +209,8 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
      * For messages from a remote client, this will be undefined.
      */
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {
-        if (message.type === MessageType.Operation && !local) {
+        console.log(`Receiving message: `, message);
+        if (message.type === MessageType.Operation) {
             const op = message.contents as ITaskQueueOperation;
 
             switch (op.type) {
@@ -251,5 +257,15 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         }
 
         this.pendingTaskQueues.delete(taskId);
+    }
+
+    private removeClientFromAllQueues(clientId: string) {
+        if (clientId === this.runtime.clientId) {
+            // TODO is this correct?
+            this.pendingTaskQueues.clear();
+        }
+        for (const taskId of this.taskQueues.keys()) {
+            this.removeClientFromQueue(taskId, clientId);
+        }
     }
 }
