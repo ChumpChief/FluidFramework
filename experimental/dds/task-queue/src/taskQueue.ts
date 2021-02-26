@@ -108,6 +108,11 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         });
     }
 
+    // TODO Remove or hide from interface, this is just for debugging
+    public getTaskQueues() {
+        return this.taskQueues;
+    }
+
     public volunteer(taskId: string) {
         // Return if we're already queued or waiting to queue.
         if (this.queued(taskId) || this.pendingTaskQueues.has(taskId)) {
@@ -238,6 +243,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
                 default:
                     throw new Error("Unknown operation");
             }
+
+            // TODO - remove (just for debugging) or make more scoped/correct
+            this.emit("changed");
         }
     }
 

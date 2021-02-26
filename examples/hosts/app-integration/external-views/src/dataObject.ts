@@ -17,6 +17,8 @@ export interface IDiceRoller extends EventEmitter {
      */
     readonly value: number;
 
+    taskQueue: TaskQueue | undefined;
+
     /**
      * Roll the dice.  Will cause a "diceRolled" event to be emitted.
      */
@@ -37,7 +39,8 @@ const taskQueueKey = "taskQueue";
  * The DiceRoller is our data object that implements the IDiceRoller interface.
  */
 export class DiceRoller extends DataObject implements IDiceRoller {
-    private taskQueue: TaskQueue | undefined;
+    // TODO remove again
+    public taskQueue: TaskQueue | undefined;
     /**
      * initializingFirstTime is run only once by the first client to create the DataObject.  Here we use it to
      * initialize the state of the DataObject.

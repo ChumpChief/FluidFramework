@@ -24,7 +24,29 @@ export function renderDiceRoller(diceRoller: IDiceRoller, div: HTMLDivElement) {
     // Call the roll method to modify the shared data when the button is clicked.
     rollButton.addEventListener("click", diceRoller.roll);
 
-    wrapperDiv.append(diceCharDiv, rollButton);
+    const taskQueue = diceRoller.taskQueue;
+    if (taskQueue === undefined) {
+        throw new Error("Task queue undefined");
+    }
+    const taskQueues = taskQueue.getTaskQueues();
+
+    const taskQueueView = document.createElement("div");
+    function renderTaskQueues() {
+        // eslint-disable-next-line no-null/no-null
+        while (taskQueueView.firstChild !== null) {
+            taskQueueView.removeChild(taskQueueView.firstChild);
+        }
+        for (const [taskId, clientQueue] of taskQueues) {
+            console.log([taskId, clientQueue]);
+            const taskView = document.createElement("div");
+            taskView.textContent = `${taskId}: ${clientQueue}`;
+            taskQueueView.append(taskView);
+        }
+    }
+    renderTaskQueues();
+    taskQueue.on("changed", renderTaskQueues);
+
+    wrapperDiv.append(diceCharDiv, rollButton, taskQueueView);
 
     // Get the current value of the shared data to update the view whenever it changes.
     const updateDiceChar = () => {
