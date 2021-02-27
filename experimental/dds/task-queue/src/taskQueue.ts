@@ -196,19 +196,10 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             ? JSON.parse(rawContent) as [string, string[]][]
             : [];
 
-        const quorum = this.runtime.getQuorum();
         content.forEach(([taskId, clientIdQueue]) => {
             this.taskQueues.set(taskId, clientIdQueue);
-            for (const clientId of clientIdQueue) {
-                // For reasons I don't really understand, sometimes the leave ops following the summary don't seem to
-                // trigger the removeMember handler.  Scrub them out here.  In particular it looks like the summarizer
-                // client is failing to observe the clients leaving, so summaries end up with stale clients. TODO fix
-                if(quorum.getMember(clientId) === undefined) {
-                    console.log("Scrubbing client on load", clientId);
-                    this.removeClientFromQueue(taskId, clientId);
-                }
-            }
         });
+        this.scrubClientsNotInQuorum();
         console.log("loadCore complete", this.taskQueues);
     }
 
@@ -292,6 +283,23 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         }
         for (const taskId of this.taskQueues.keys()) {
             this.removeClientFromQueue(taskId, clientId);
+        }
+    }
+
+    // This seems like it should be unnecessary if we can trust to receive the join/leave messages and
+    // also have an accurate snapshot.
+    private scrubClientsNotInQuorum() {
+        const quorum = this.runtime.getQuorum();
+        for (const [taskId, clientQueue] of this.taskQueues) {
+            const filteredClientQueue = clientQueue.filter((clientId) => quorum.getMember(clientId) !== undefined);
+            if (clientQueue.length !== filteredClientQueue.length) {
+                if (filteredClientQueue.length === 0) {
+                    this.taskQueues.delete(taskId);
+                } else {
+                    this.taskQueues.set(taskId, filteredClientQueue);
+                }
+                this.emit("changed");
+            }
         }
     }
 }
