@@ -41,6 +41,7 @@ const taskQueueKey = "taskQueue";
 export class DiceRoller extends DataObject implements IDiceRoller {
     // TODO remove again
     public taskQueue: TaskQueue | undefined;
+    private rollTimer: ReturnType<typeof setInterval> | undefined;
     /**
      * initializingFirstTime is run only once by the first client to create the DataObject.  Here we use it to
      * initialize the state of the DataObject.
@@ -65,11 +66,37 @@ export class DiceRoller extends DataObject implements IDiceRoller {
 
         const taskQueueHandle = this.root.get<IFluidHandle<TaskQueue>>(taskQueueKey);
         this.taskQueue = await taskQueueHandle?.get();
+        if (this.taskQueue === undefined) {
+            throw new Error("Task queue should be defined by now");
+        }
         // eslint-disable-next-line @typescript-eslint/dot-notation
         if (window["taskQueue"] === undefined) {
             // eslint-disable-next-line @typescript-eslint/dot-notation
             window["taskQueue"] = this.taskQueue;
         }
+
+        this.taskQueue.on("assigned", (taskId) => {
+            if (taskId === "foo") {
+                console.log("Starting roll task");
+                if (this.rollTimer !== undefined) {
+                    throw new Error("Unexpected defined rollTimer");
+                }
+                this.rollTimer = setInterval(() => {
+                    this.roll();
+                }, 1000);
+            }
+        });
+
+        this.taskQueue.on("lost", (taskId) => {
+            if (taskId === "foo") {
+                console.log("Ending roll task");
+                if (this.rollTimer === undefined) {
+                    throw new Error("Unexpected undefined rollTimer");
+                }
+                clearInterval(this.rollTimer);
+                this.rollTimer = undefined;
+            }
+        });
     }
 
     public get value() {
