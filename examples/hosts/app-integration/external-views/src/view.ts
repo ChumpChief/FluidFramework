@@ -46,7 +46,33 @@ export function renderDiceRoller(diceRoller: IDiceRoller, div: HTMLDivElement) {
     renderTaskQueues();
     taskQueue.on("changed", renderTaskQueues);
 
-    wrapperDiv.append(diceCharDiv, rollButton, taskQueueView);
+    const taskButtonView = document.createElement("div");
+    const fooVolunteerBtn = document.createElement("button");
+    fooVolunteerBtn.textContent = "Volunteer (foo)";
+    fooVolunteerBtn.addEventListener("click", () => {
+        taskQueue.volunteer("foo");
+    });
+
+    const barVolunteerBtn = document.createElement("button");
+    barVolunteerBtn.textContent = "Volunteer (bar)";
+    barVolunteerBtn.addEventListener("click", () => {
+        taskQueue.volunteer("bar");
+    });
+
+    const fooAbandonrBtn = document.createElement("button");
+    fooAbandonrBtn.textContent = "Abandon (foo)";
+    fooAbandonrBtn.addEventListener("click", () => {
+        taskQueue.abandon("foo");
+    });
+
+    const barAbandonBtn = document.createElement("button");
+    barAbandonBtn.textContent = "Abandon (bar)";
+    barAbandonBtn.addEventListener("click", () => {
+        taskQueue.abandon("bar");
+    });
+    taskButtonView.append(fooVolunteerBtn, barVolunteerBtn, fooAbandonrBtn, barAbandonBtn);
+
+    wrapperDiv.append(diceCharDiv, rollButton, taskQueueView, taskButtonView);
 
     // Get the current value of the shared data to update the view whenever it changes.
     const updateDiceChar = () => {

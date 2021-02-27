@@ -243,9 +243,6 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
                 default:
                     throw new Error("Unknown operation");
             }
-
-            // TODO - remove (just for debugging) or make more scoped/correct
-            this.emit("changed");
         }
     }
 
@@ -263,6 +260,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         if (clientId === this.runtime.clientId) {
             this.pendingTaskQueues.delete(taskId);
         }
+
+        // TODO remove
+        this.emit("changed");
     }
 
     private removeClientFromQueue(taskId: string, clientId: string) {
@@ -280,6 +280,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         }
 
         this.pendingTaskQueues.delete(taskId);
+
+        // TODO remove
+        this.emit("changed");
     }
 
     private removeClientFromAllQueues(clientId: string) {
