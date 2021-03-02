@@ -50,13 +50,13 @@ export function renderDiceRoller(diceRoller: IDiceRoller, div: HTMLDivElement) {
     const fooVolunteerBtn = document.createElement("button");
     fooVolunteerBtn.textContent = "Volunteer (foo)";
     fooVolunteerBtn.addEventListener("click", () => {
-        taskQueue.volunteer("foo");
+        taskQueue.lockTask("foo").catch((err) => { console.error(err); });
     });
 
     const barVolunteerBtn = document.createElement("button");
     barVolunteerBtn.textContent = "Volunteer (bar)";
     barVolunteerBtn.addEventListener("click", () => {
-        taskQueue.volunteer("bar");
+        taskQueue.lockTask("bar").catch((err) => { console.error(err); });
     });
 
     const fooAbandonrBtn = document.createElement("button");

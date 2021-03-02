@@ -17,10 +17,11 @@ export interface ITaskQueueEvents extends ISharedObjectEvents {
 
 export interface ITaskQueue extends ISharedObject<ITaskQueueEvents> {
     /**
-     * Enter the queue, I'm immediately in waiting status
+     * Try to lock the task.  Promise resolves when the lock is acquired, or rejects if we are removed from the
+     * queue without acquiring the lock for any reason.
      * @param taskId
      */
-    volunteer(taskId: string): void;
+    lockTask(taskId: string): Promise<void>;
 
     /**
      * Exit the queue, I immediately drop assigned/queued status
@@ -32,10 +33,10 @@ export interface ITaskQueue extends ISharedObject<ITaskQueueEvents> {
      * Am I the currently assigned client?
      * @param taskId
      */
-    assigned(taskId: string): boolean;
+    haveTaskLock(taskId: string): boolean;
 
     /**
-     * Am I somewhere in the queue already?
+     * Are we already trying to acquire the task lock?
      * @param taskId
      */
     queued(taskId: string): boolean;

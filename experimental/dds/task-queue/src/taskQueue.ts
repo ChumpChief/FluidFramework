@@ -125,15 +125,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         return this.taskQueues;
     }
 
-    public volunteer(taskId: string) {
-        // Return if we're already queued or waiting to queue.
-        if (this.queued(taskId) || this.pendingTaskQueues.has(taskId)) {
-            return;
-        }
-        // TODO: Can't volunteer if detached?  Or maybe should just treat as auto-ack?
-        if (!this.isAttached()) {
-            return;
-        }
+    private submitVolunteerOp(taskId: string) {
         const op: ITaskQueueVolunteerOperation = {
             type: "volunteer",
             taskId,
@@ -143,29 +135,39 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         this.submitLocalMessage(op);
     }
 
-    public async volunteerPromise(taskId: string) {
-        return new Promise<void>((res, rej) => {
+    public async lockTask(taskId: string) {
+        if (this.haveTaskLock(taskId)) {
+            return;
+        }
+
+        const lockAcquireP = new Promise<void>((res, rej) => {
             const checkIfLeader = (eventTaskId: string) => {
                 if (eventTaskId !== taskId) {
                     return;
                 }
 
-                if (this.assigned(taskId)) {
+                if (this.haveTaskLock(taskId)) {
                     this.queueWatcher.off("queueChange", checkIfLeader);
                     res();
-                } else if (!this.queued(taskId) && !this.pendingTaskQueues.has(taskId)) {
+                } else if (!this.queued(taskId)) {
                     this.queueWatcher.off("queueChange", checkIfLeader);
                     rej(new Error(`Removed from queue: ${taskId}`));
                 }
             };
             this.queueWatcher.on("queueChange", checkIfLeader);
-            this.volunteer(taskId);
         });
+
+        if (!this.queued(taskId)) {
+            // TODO What should be done if we are not attached?  Treat like auto-ack?
+            this.submitVolunteerOp(taskId);
+        }
+
+        return lockAcquireP;
     }
 
     public abandon(taskId: string) {
-        // Return if we're not queued or waiting to queue.
-        if (!this.queued(taskId) && !this.pendingTaskQueues.has(taskId)) {
+        // Nothing to do if we're not at least trying to get the lock.
+        if (!this.queued(taskId)) {
             return;
         }
         // TODO: Can't abandon if detached?  Or maybe should just treat as auto-ack?
@@ -179,16 +181,17 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         this.submitLocalMessage(op);
     }
 
-    public assigned(taskId: string) {
+    public haveTaskLock(taskId: string) {
         const currentAssignee = this.taskQueues.get(taskId)?.[0];
         return (currentAssignee !== undefined && currentAssignee === this.runtime.clientId);
     }
 
     public queued(taskId: string) {
-        assert(this.runtime.clientId !== undefined); // TODO, handle disconnected case
+        assert(this.runtime.clientId !== undefined); // TODO, handle disconnected/detached case
         const clientQueue = this.taskQueues.get(taskId);
         // If we have no queue for the taskId, then no one has signed up for it.
-        return clientQueue !== undefined && clientQueue.includes(this.runtime.clientId);
+        return (clientQueue !== undefined && clientQueue.includes(this.runtime.clientId))
+            || this.pendingTaskQueues.has(taskId);
     }
 
     /**
