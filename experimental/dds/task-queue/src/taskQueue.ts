@@ -242,7 +242,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
 
     protected registerCore() { }
 
-    protected onDisconnect() { }
+    protected onDisconnect() {
+        // TODO knock ourselves out of the queues here?
+    }
 
     /**
      * Process a task queue operation
@@ -337,6 +339,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
                 } else {
                     this.taskQueues.set(taskId, filteredClientQueue);
                 }
+                // TODO remove
                 this.emit("changed");
                 this.queueWatcher.emit("queueChange", taskId);
             }
