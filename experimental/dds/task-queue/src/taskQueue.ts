@@ -94,6 +94,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     private readonly pendingTaskQueues: Set<string> = new Set();
 
     private readonly opWatcher: EventEmitter = new EventEmitter();
+    private readonly queueWatcher: EventEmitter = new EventEmitter();
 
     /**
      * Constructs a new task queue. If the object is non-local an id and service interfaces will
@@ -140,6 +141,26 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         this.pendingTaskQueues.add(taskId);
         console.log("Queueing self", taskId, this.runtime.clientId);
         this.submitLocalMessage(op);
+    }
+
+    public async volunteerPromise(taskId: string) {
+        return new Promise<void>((res, rej) => {
+            const checkIfLeader = (eventTaskId: string) => {
+                if (eventTaskId !== taskId) {
+                    return;
+                }
+
+                if (this.assigned(taskId)) {
+                    this.queueWatcher.off("queueChange", checkIfLeader);
+                    res();
+                } else if (!this.queued(taskId) && !this.pendingTaskQueues.has(taskId)) {
+                    this.queueWatcher.off("queueChange", checkIfLeader);
+                    rej(new Error(`Removed from queue: ${taskId}`));
+                }
+            };
+            this.queueWatcher.on("queueChange", checkIfLeader);
+            this.volunteer(taskId);
+        });
     }
 
     public abandon(taskId: string) {
@@ -265,6 +286,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
 
         // TODO remove
         this.emit("changed");
+        this.queueWatcher.emit("queueChange", taskId);
     }
 
     private removeClientFromQueue(taskId: string, clientId: string) {
@@ -285,6 +307,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
 
         // TODO remove
         this.emit("changed");
+        this.queueWatcher.emit("queueChange", taskId);
     }
 
     private removeClientFromAllQueues(clientId: string) {
@@ -310,6 +333,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
                     this.taskQueues.set(taskId, filteredClientQueue);
                 }
                 this.emit("changed");
+                this.queueWatcher.emit("queueChange", taskId);
             }
         }
     }
