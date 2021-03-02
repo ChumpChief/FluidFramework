@@ -19,6 +19,14 @@ export interface IDiceRoller extends EventEmitter {
 
     taskQueue: TaskQueue | undefined;
 
+    volunteerAutoRoll(): Promise<void>;
+    abandonAutoRoll(): void;
+
+    volunteerRollLeadership(): Promise<void>;
+    abandonRollLeadership(): void;
+
+    hasRollLeadership: boolean;
+
     /**
      * Roll the dice.  Will cause a "diceRolled" event to be emitted.
      */
@@ -27,7 +35,7 @@ export interface IDiceRoller extends EventEmitter {
     /**
      * The diceRolled event will fire whenever someone rolls the device, either locally or remotely.
      */
-    on(event: "diceRolled", listener: () => void): this;
+    on(event: "diceRolled" | "rollLeadershipChanged", listener: () => void): this;
 }
 
 // The root is map-like, so we'll use this key for storing the value.
@@ -41,6 +49,7 @@ const taskQueueKey = "taskQueue";
 export class DiceRoller extends DataObject implements IDiceRoller {
     // TODO remove again
     public taskQueue: TaskQueue | undefined;
+    public hasRollLeadership: boolean = false;
     private rollTimer: ReturnType<typeof setInterval> | undefined;
     /**
      * initializingFirstTime is run only once by the first client to create the DataObject.  Here we use it to
@@ -75,28 +84,61 @@ export class DiceRoller extends DataObject implements IDiceRoller {
             window["taskQueue"] = this.taskQueue;
         }
 
-        this.taskQueue.on("assigned", (taskId) => {
-            if (taskId === "foo") {
-                console.log("Starting roll task");
-                if (this.rollTimer !== undefined) {
-                    throw new Error("Unexpected defined rollTimer");
-                }
-                this.rollTimer = setInterval(() => {
-                    this.roll();
-                }, 1000);
+        this.taskQueue.on("assigned", (taskId: string) => {
+            if (taskId === "RollLeadership") {
+                this.hasRollLeadership = true;
+                this.emit("rollLeadershipChanged");
             }
         });
 
-        this.taskQueue.on("lost", (taskId) => {
-            if (taskId === "foo") {
-                console.log("Ending roll task");
-                if (this.rollTimer === undefined) {
-                    throw new Error("Unexpected undefined rollTimer");
-                }
-                clearInterval(this.rollTimer);
-                this.rollTimer = undefined;
+        this.taskQueue.on("lost", (taskId: string) => {
+            if (taskId === "RollLeadership") {
+                this.hasRollLeadership = false;
+                this.emit("rollLeadershipChanged");
             }
         });
+    }
+
+    public async volunteerAutoRoll() {
+        if (this.taskQueue === undefined) {
+            throw new Error("Task queue should be defined by now");
+        }
+        await this.taskQueue.lockTask("AutoRoll");
+        console.log("Starting roll task");
+        if (this.rollTimer !== undefined) {
+            throw new Error("Unexpected defined rollTimer");
+        }
+        this.rollTimer = setInterval(() => {
+            this.roll();
+        }, 1000);
+    }
+
+    public abandonAutoRoll() {
+        if (this.taskQueue === undefined) {
+            throw new Error("Task queue should be defined by now");
+        }
+        this.taskQueue.abandon("AutoRoll");
+        console.log("Ending roll task");
+        if (this.rollTimer === undefined) {
+            throw new Error("Unexpected undefined rollTimer");
+        }
+        clearInterval(this.rollTimer);
+        this.rollTimer = undefined;
+    }
+
+    public async volunteerRollLeadership() {
+        if (this.taskQueue === undefined) {
+            throw new Error("Task queue should be defined by now");
+        }
+        await this.taskQueue.lockTask("RollLeadership");
+    }
+
+    public abandonRollLeadership() {
+        this.hasRollLeadership = false;
+        if (this.taskQueue === undefined) {
+            throw new Error("Task queue should be defined by now");
+        }
+        this.taskQueue.abandon("RollLeadership");
     }
 
     public get value() {

@@ -118,6 +118,19 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             console.log("Quorum alerts removal", clientId);
             this.removeClientFromAllQueues(clientId);
         });
+
+        this.queueWatcher.on("queueChange", (taskId: string, oldLockHolder: string, newLockHolder: string) => {
+            if (this.runtime.clientId === undefined) {
+                // TODO should we do something different in the disconnected case?
+                return;
+            }
+
+            if (oldLockHolder !== this.runtime.clientId && newLockHolder === this.runtime.clientId) {
+                this.emit("assigned", taskId);
+            } else if (oldLockHolder === this.runtime.clientId && newLockHolder !== this.runtime.clientId) {
+                this.emit("lost", taskId);
+            }
+        });
     }
 
     // TODO Remove or hide from interface, this is just for debugging
@@ -165,6 +178,14 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         return lockAcquireP;
     }
 
+    private submitAbandonOp(taskId: string) {
+        const op: ITaskQueueAbandonOperation = {
+            type: "abandon",
+            taskId,
+        };
+        this.submitLocalMessage(op);
+    }
+
     public abandon(taskId: string) {
         // Nothing to do if we're not at least trying to get the lock.
         if (!this.queued(taskId)) {
@@ -174,11 +195,13 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         if (!this.isAttached()) {
             return;
         }
-        const op: ITaskQueueAbandonOperation = {
-            type: "abandon",
-            taskId,
-        };
-        this.submitLocalMessage(op);
+
+        this.submitAbandonOp(taskId);
+
+        // Proactively remove ourselves from the queue without waiting for the ack.
+        if (this.runtime.clientId !== undefined) {
+            this.removeClientFromQueue(taskId, this.runtime.clientId);
+        }
     }
 
     public haveTaskLock(taskId: string) {
@@ -275,46 +298,52 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     }
 
     private addClientToQueue(taskId: string, clientId: string) {
+        if (clientId === this.runtime.clientId) {
+            this.pendingTaskQueues.delete(taskId);
+        }
+
         // Create the queue if it doesn't exist, and push the client on the back.
         let clientQueue = this.taskQueues.get(taskId);
         if (clientQueue === undefined) {
             clientQueue = [];
             this.taskQueues.set(taskId, clientQueue);
         }
+
+        const oldLockHolder = clientQueue[0];
         clientQueue.push(clientId);
         console.log(`Added ${clientId}`, clientQueue);
-
-        // Clean up our pending state if needed
-        if (clientId === this.runtime.clientId) {
-            this.pendingTaskQueues.delete(taskId);
-        }
+        const newLockHolder = clientQueue[0];
+        this.queueWatcher.emit("queueChange", taskId, oldLockHolder, newLockHolder);
 
         // TODO remove
         this.emit("changed");
-        this.queueWatcher.emit("queueChange", taskId);
     }
 
     private removeClientFromQueue(taskId: string, clientId: string) {
-        const clientQueue = this.taskQueues.get(taskId);
-        if (clientQueue !== undefined) {
-            const clientIdIndex = clientQueue.indexOf(clientId);
-            if (clientIdIndex !== -1) {
-                clientQueue.splice(clientIdIndex, 1);
-                console.log(`Removed ${clientId}`, clientQueue);
-                // Clean up the queue if there are no more clients in it.
-                if (clientQueue.length === 0) {
-                    this.taskQueues.delete(taskId);
-                }
-            }
-        }
-
         if (clientId === this.runtime.clientId) {
             this.pendingTaskQueues.delete(taskId);
         }
 
+        const clientQueue = this.taskQueues.get(taskId);
+        if (clientQueue === undefined) {
+            return;
+        }
+
+        const oldLockHolder = clientQueue[0];
+        const clientIdIndex = clientQueue.indexOf(clientId);
+        if (clientIdIndex !== -1) {
+            clientQueue.splice(clientIdIndex, 1);
+            console.log(`Removed ${clientId}`, clientQueue);
+            // Clean up the queue if there are no more clients in it.
+            if (clientQueue.length === 0) {
+                this.taskQueues.delete(taskId);
+            }
+        }
+        const newLockHolder = clientQueue[0];
+        this.queueWatcher.emit("queueChange", taskId, oldLockHolder, newLockHolder);
+
         // TODO remove
         this.emit("changed");
-        this.queueWatcher.emit("queueChange", taskId);
     }
 
     private removeClientFromAllQueues(clientId: string) {

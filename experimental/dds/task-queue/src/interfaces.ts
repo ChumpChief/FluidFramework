@@ -6,7 +6,7 @@
 import { ISharedObject, ISharedObjectEvents } from "@fluidframework/shared-object-base";
 
 export interface ITaskQueueEvents extends ISharedObjectEvents {
-    (event: "assigned" | "lost" | "reassigned", listener: (taskId: string) => void);
+    (event: "assigned" | "lost", listener: (taskId: string) => void);
     // TODO remove or redesign
     (event: "changed", listener: () => void);
 }

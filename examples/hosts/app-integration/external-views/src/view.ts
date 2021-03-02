@@ -21,8 +21,12 @@ export function renderDiceRoller(diceRoller: IDiceRoller, div: HTMLDivElement) {
     const rollButton = document.createElement("button");
     rollButton.style.fontSize = "50px";
     rollButton.textContent = "Roll";
+    rollButton.disabled = true;
     // Call the roll method to modify the shared data when the button is clicked.
     rollButton.addEventListener("click", diceRoller.roll);
+    diceRoller.on("rollLeadershipChanged", () => {
+        rollButton.disabled = !diceRoller.hasRollLeadership;
+    });
 
     const taskQueue = diceRoller.taskQueue;
     if (taskQueue === undefined) {
@@ -47,30 +51,36 @@ export function renderDiceRoller(diceRoller: IDiceRoller, div: HTMLDivElement) {
     taskQueue.on("changed", renderTaskQueues);
 
     const taskButtonView = document.createElement("div");
-    const fooVolunteerBtn = document.createElement("button");
-    fooVolunteerBtn.textContent = "Volunteer (foo)";
-    fooVolunteerBtn.addEventListener("click", () => {
-        taskQueue.lockTask("foo").catch((err) => { console.error(err); });
+    const autoRollVolunteerBtn = document.createElement("button");
+    autoRollVolunteerBtn.textContent = "Volunteer (AutoRoll)";
+    autoRollVolunteerBtn.addEventListener("click", () => {
+        diceRoller.volunteerAutoRoll().catch((err) => { console.error(err); });
     });
 
-    const barVolunteerBtn = document.createElement("button");
-    barVolunteerBtn.textContent = "Volunteer (bar)";
-    barVolunteerBtn.addEventListener("click", () => {
-        taskQueue.lockTask("bar").catch((err) => { console.error(err); });
+    const rollLeadershipVolunteerBtn = document.createElement("button");
+    rollLeadershipVolunteerBtn.textContent = "Volunteer (RollLeadership)";
+    rollLeadershipVolunteerBtn.addEventListener("click", () => {
+        diceRoller.volunteerRollLeadership().catch((err) => { console.error(err); });
     });
 
-    const fooAbandonrBtn = document.createElement("button");
-    fooAbandonrBtn.textContent = "Abandon (foo)";
-    fooAbandonrBtn.addEventListener("click", () => {
-        taskQueue.abandon("foo");
+    const autoRollAbandonrBtn = document.createElement("button");
+    autoRollAbandonrBtn.textContent = "Abandon (AutoRoll)";
+    autoRollAbandonrBtn.addEventListener("click", () => {
+        diceRoller.abandonAutoRoll();
     });
 
-    const barAbandonBtn = document.createElement("button");
-    barAbandonBtn.textContent = "Abandon (bar)";
-    barAbandonBtn.addEventListener("click", () => {
-        taskQueue.abandon("bar");
+    const rollLeadershipAbandonBtn = document.createElement("button");
+    rollLeadershipAbandonBtn.textContent = "Abandon (RollLeadership)";
+    rollLeadershipAbandonBtn.addEventListener("click", () => {
+        diceRoller.abandonRollLeadership();
     });
-    taskButtonView.append(fooVolunteerBtn, barVolunteerBtn, fooAbandonrBtn, barAbandonBtn);
+
+    taskButtonView.append(
+        autoRollVolunteerBtn,
+        rollLeadershipVolunteerBtn,
+        autoRollAbandonrBtn,
+        rollLeadershipAbandonBtn,
+    );
 
     wrapperDiv.append(diceCharDiv, rollButton, taskQueueView, taskButtonView);
 
