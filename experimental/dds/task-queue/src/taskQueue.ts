@@ -141,20 +141,20 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
         }
 
         const lockAcquireP = new Promise<void>((res, rej) => {
-            const checkIfLeader = (eventTaskId: string) => {
+            const checkIfAcquiredLock = (eventTaskId: string) => {
                 if (eventTaskId !== taskId) {
                     return;
                 }
 
                 if (this.haveTaskLock(taskId)) {
-                    this.queueWatcher.off("queueChange", checkIfLeader);
+                    this.queueWatcher.off("queueChange", checkIfAcquiredLock);
                     res();
                 } else if (!this.queued(taskId)) {
-                    this.queueWatcher.off("queueChange", checkIfLeader);
+                    this.queueWatcher.off("queueChange", checkIfAcquiredLock);
                     rej(new Error(`Removed from queue: ${taskId}`));
                 }
             };
-            this.queueWatcher.on("queueChange", checkIfLeader);
+            this.queueWatcher.on("queueChange", checkIfAcquiredLock);
         });
 
         if (!this.queued(taskId)) {
