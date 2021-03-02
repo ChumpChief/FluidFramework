@@ -303,7 +303,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
             }
         }
 
-        this.pendingTaskQueues.delete(taskId);
+        if (clientId === this.runtime.clientId) {
+            this.pendingTaskQueues.delete(taskId);
+        }
 
         // TODO remove
         this.emit("changed");
