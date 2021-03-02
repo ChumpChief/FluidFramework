@@ -3,9 +3,10 @@
  * Licensed under the MIT License.
  */
 
+import { EventEmitter } from "events";
+
 import { assert, bufferToString } from "@fluidframework/common-utils";
 import { IFluidSerializer } from "@fluidframework/core-interfaces";
-
 import {
     FileMode,
     ISequencedDocumentMessage,
@@ -92,6 +93,8 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
      */
     private readonly pendingTaskQueues: Set<string> = new Set();
 
+    private readonly opWatcher: EventEmitter = new EventEmitter();
+
     /**
      * Constructs a new task queue. If the object is non-local an id and service interfaces will
      * be provided
@@ -101,6 +104,14 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
      */
     constructor(id: string, runtime: IFluidDataStoreRuntime, attributes: IChannelAttributes) {
         super(id, runtime, attributes);
+
+        this.opWatcher.on("volunteer", (taskId: string, clientId: string) => {
+            this.addClientToQueue(taskId, clientId);
+        });
+
+        this.opWatcher.on("abandon", (taskId: string, clientId: string) => {
+            this.removeClientFromQueue(taskId, clientId);
+        });
 
         runtime.getQuorum().on("removeMember", (clientId: string) => {
             console.log("Quorum alerts removal", clientId);
@@ -224,11 +235,11 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
 
             switch (op.type) {
                 case "volunteer":
-                    this.addClientToQueue(op.taskId, message.clientId);
+                    this.opWatcher.emit("volunteer", op.taskId, message.clientId);
                     break;
 
                 case "abandon":
-                    this.removeClientFromQueue(op.taskId, message.clientId);
+                    this.opWatcher.emit("abandon", op.taskId, message.clientId);
                     break;
 
                 default:
