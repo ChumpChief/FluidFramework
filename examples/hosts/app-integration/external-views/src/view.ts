@@ -28,27 +28,27 @@ export function renderDiceRoller(diceRoller: IDiceRoller, div: HTMLDivElement) {
         rollButton.disabled = !diceRoller.hasRollLeadership;
     });
 
-    const taskQueue = diceRoller.taskQueue;
-    if (taskQueue === undefined) {
+    const taskManager = diceRoller.taskManager;
+    if (taskManager === undefined) {
         throw new Error("Task queue undefined");
     }
-    const taskQueues = taskQueue.getTaskQueues();
+    const taskQueues = taskManager.getTaskQueues();
 
-    const taskQueueView = document.createElement("div");
-    function renderTaskQueues() {
+    const taskManagerView = document.createElement("div");
+    function renderTaskManager() {
         // eslint-disable-next-line no-null/no-null
-        while (taskQueueView.firstChild !== null) {
-            taskQueueView.removeChild(taskQueueView.firstChild);
+        while (taskManagerView.firstChild !== null) {
+            taskManagerView.removeChild(taskManagerView.firstChild);
         }
         for (const [taskId, clientQueue] of taskQueues) {
             console.log([taskId, clientQueue]);
             const taskView = document.createElement("div");
             taskView.textContent = `${taskId}: ${clientQueue}`;
-            taskQueueView.append(taskView);
+            taskManagerView.append(taskView);
         }
     }
-    renderTaskQueues();
-    taskQueue.on("changed", renderTaskQueues);
+    renderTaskManager();
+    taskManager.on("changed", renderTaskManager);
 
     const taskButtonView = document.createElement("div");
     const autoRollVolunteerBtn = document.createElement("button");
@@ -82,7 +82,7 @@ export function renderDiceRoller(diceRoller: IDiceRoller, div: HTMLDivElement) {
         rollLeadershipAbandonBtn,
     );
 
-    wrapperDiv.append(diceCharDiv, rollButton, taskQueueView, taskButtonView);
+    wrapperDiv.append(diceCharDiv, rollButton, taskManagerView, taskButtonView);
 
     // Get the current value of the shared data to update the view whenever it changes.
     const updateDiceChar = () => {

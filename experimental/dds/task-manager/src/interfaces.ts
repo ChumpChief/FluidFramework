@@ -5,17 +5,15 @@
 
 import { ISharedObject, ISharedObjectEvents } from "@fluidframework/shared-object-base";
 
-export interface ITaskQueueEvents extends ISharedObjectEvents {
+export interface ITaskManagerEvents extends ISharedObjectEvents {
     (event: "assigned" | "lost", listener: (taskId: string) => void);
-    // TODO remove or redesign
-    (event: "changed", listener: () => void);
 }
 
 /**
- * Task queue interface
+ * Task manager interface
  */
 
-export interface ITaskQueue extends ISharedObject<ITaskQueueEvents> {
+export interface ITaskManager extends ISharedObject<ITaskManagerEvents> {
     /**
      * Try to lock the task.  Promise resolves when the lock is acquired, or rejects if we are removed from the
      * queue without acquiring the lock for any reason.

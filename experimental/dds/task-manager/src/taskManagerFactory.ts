@@ -9,28 +9,28 @@ import {
     IChannelServices,
     IChannelFactory,
 } from "@fluidframework/datastore-definitions";
-import { TaskQueue } from "./taskQueue";
-import { ITaskQueue } from "./interfaces";
+import { TaskManager } from "./taskManager";
+import { ITaskManager } from "./interfaces";
 import { pkgVersion } from "./packageVersion";
 
 /**
  * The factory that defines the task queue
  */
-export class TaskQueueFactory implements IChannelFactory {
-    public static readonly Type = "https://graph.microsoft.com/types/task-queue";
+export class TaskManagerFactory implements IChannelFactory {
+    public static readonly Type = "https://graph.microsoft.com/types/task-manager";
 
     public static readonly Attributes: IChannelAttributes = {
-        type: TaskQueueFactory.Type,
+        type: TaskManagerFactory.Type,
         snapshotFormatVersion: "0.1",
         packageVersion: pkgVersion,
     };
 
     public get type() {
-        return TaskQueueFactory.Type;
+        return TaskManagerFactory.Type;
     }
 
     public get attributes() {
-        return TaskQueueFactory.Attributes;
+        return TaskManagerFactory.Attributes;
     }
 
     /**
@@ -40,14 +40,14 @@ export class TaskQueueFactory implements IChannelFactory {
         runtime: IFluidDataStoreRuntime,
         id: string,
         services: IChannelServices,
-        attributes: IChannelAttributes): Promise<ITaskQueue> {
-        const taskQueue = new TaskQueue(id, runtime, attributes);
+        attributes: IChannelAttributes): Promise<ITaskManager> {
+        const taskQueue = new TaskManager(id, runtime, attributes);
         await taskQueue.load(services);
         return taskQueue;
     }
 
-    public create(document: IFluidDataStoreRuntime, id: string): ITaskQueue {
-        const taskQueue = new TaskQueue(id, document, this.attributes);
+    public create(document: IFluidDataStoreRuntime, id: string): ITaskManager {
+        const taskQueue = new TaskManager(id, document, this.attributes);
         taskQueue.initializeLocal();
         return taskQueue;
     }

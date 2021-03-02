@@ -3,5 +3,5 @@
  * Licensed under the MIT License.
  */
 
-export * from "./taskQueue";
+export * from "./taskManager";
 export * from "./interfaces";

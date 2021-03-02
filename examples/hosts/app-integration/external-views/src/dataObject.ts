@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from "events";
-import { TaskQueue } from "@fluid-experimental/task-queue";
+import { TaskManager } from "@fluid-experimental/task-manager";
 import { DataObject, DataObjectFactory } from "@fluidframework/aqueduct";
 import { IFluidHandle } from "@fluidframework/core-interfaces";
 
@@ -17,7 +17,7 @@ export interface IDiceRoller extends EventEmitter {
      */
     readonly value: number;
 
-    taskQueue: TaskQueue | undefined;
+    taskManager: TaskManager | undefined;
 
     volunteerAutoRoll(): Promise<void>;
     abandonAutoRoll(): void;
@@ -41,14 +41,14 @@ export interface IDiceRoller extends EventEmitter {
 // The root is map-like, so we'll use this key for storing the value.
 const diceValueKey = "diceValue";
 
-const taskQueueKey = "taskQueue";
+const taskManagerKey = "taskManager";
 
 /**
  * The DiceRoller is our data object that implements the IDiceRoller interface.
  */
 export class DiceRoller extends DataObject implements IDiceRoller {
     // TODO remove again
-    public taskQueue: TaskQueue | undefined;
+    public taskManager: TaskManager | undefined;
     public hasRollLeadership: boolean = false;
     private rollTimer: ReturnType<typeof setInterval> | undefined;
     /**
@@ -57,8 +57,8 @@ export class DiceRoller extends DataObject implements IDiceRoller {
      */
     protected async initializingFirstTime() {
         this.root.set(diceValueKey, 1);
-        const taskQueue = TaskQueue.create(this.runtime);
-        this.root.set(taskQueueKey, taskQueue.handle);
+        const taskManager = TaskManager.create(this.runtime);
+        this.root.set(taskManagerKey, taskManager.handle);
     }
 
     /**
@@ -73,25 +73,25 @@ export class DiceRoller extends DataObject implements IDiceRoller {
             }
         });
 
-        const taskQueueHandle = this.root.get<IFluidHandle<TaskQueue>>(taskQueueKey);
-        this.taskQueue = await taskQueueHandle?.get();
-        if (this.taskQueue === undefined) {
-            throw new Error("Task queue should be defined by now");
+        const taskManagerHandle = this.root.get<IFluidHandle<TaskManager>>(taskManagerKey);
+        this.taskManager = await taskManagerHandle?.get();
+        if (this.taskManager === undefined) {
+            throw new Error("Task manager should be defined by now");
         }
         // eslint-disable-next-line @typescript-eslint/dot-notation
-        if (window["taskQueue"] === undefined) {
+        if (window["taskManager"] === undefined) {
             // eslint-disable-next-line @typescript-eslint/dot-notation
-            window["taskQueue"] = this.taskQueue;
+            window["taskManager"] = this.taskManager;
         }
 
-        this.taskQueue.on("assigned", (taskId: string) => {
+        this.taskManager.on("assigned", (taskId: string) => {
             if (taskId === "RollLeadership") {
                 this.hasRollLeadership = true;
                 this.emit("rollLeadershipChanged");
             }
         });
 
-        this.taskQueue.on("lost", (taskId: string) => {
+        this.taskManager.on("lost", (taskId: string) => {
             if (taskId === "RollLeadership") {
                 this.hasRollLeadership = false;
                 this.emit("rollLeadershipChanged");
@@ -100,10 +100,10 @@ export class DiceRoller extends DataObject implements IDiceRoller {
     }
 
     public async volunteerAutoRoll() {
-        if (this.taskQueue === undefined) {
-            throw new Error("Task queue should be defined by now");
+        if (this.taskManager === undefined) {
+            throw new Error("Task manager should be defined by now");
         }
-        await this.taskQueue.lockTask("AutoRoll");
+        await this.taskManager.lockTask("AutoRoll");
         console.log("Starting roll task");
         if (this.rollTimer !== undefined) {
             throw new Error("Unexpected defined rollTimer");
@@ -114,10 +114,10 @@ export class DiceRoller extends DataObject implements IDiceRoller {
     }
 
     public abandonAutoRoll() {
-        if (this.taskQueue === undefined) {
-            throw new Error("Task queue should be defined by now");
+        if (this.taskManager === undefined) {
+            throw new Error("Task manager should be defined by now");
         }
-        this.taskQueue.abandon("AutoRoll");
+        this.taskManager.abandon("AutoRoll");
         console.log("Ending roll task");
         if (this.rollTimer === undefined) {
             throw new Error("Unexpected undefined rollTimer");
@@ -127,18 +127,18 @@ export class DiceRoller extends DataObject implements IDiceRoller {
     }
 
     public async volunteerRollLeadership() {
-        if (this.taskQueue === undefined) {
-            throw new Error("Task queue should be defined by now");
+        if (this.taskManager === undefined) {
+            throw new Error("Task manager should be defined by now");
         }
-        await this.taskQueue.lockTask("RollLeadership");
+        await this.taskManager.lockTask("RollLeadership");
     }
 
     public abandonRollLeadership() {
         this.hasRollLeadership = false;
-        if (this.taskQueue === undefined) {
-            throw new Error("Task queue should be defined by now");
+        if (this.taskManager === undefined) {
+            throw new Error("Task manager should be defined by now");
         }
-        this.taskQueue.abandon("RollLeadership");
+        this.taskManager.abandon("RollLeadership");
     }
 
     public get value() {
@@ -159,6 +159,6 @@ export class DiceRoller extends DataObject implements IDiceRoller {
 export const DiceRollerInstantiationFactory = new DataObjectFactory(
     "dice-roller",
     DiceRoller,
-    [TaskQueue.getFactory()],
+    [TaskManager.getFactory()],
     {},
 );

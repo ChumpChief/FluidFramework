@@ -21,20 +21,20 @@ import {
     IChannelFactory,
 } from "@fluidframework/datastore-definitions";
 import { SharedObject } from "@fluidframework/shared-object-base";
-import { TaskQueueFactory } from "./taskQueueFactory";
-import { ITaskQueue, ITaskQueueEvents } from "./interfaces";
+import { TaskManagerFactory } from "./taskManagerFactory";
+import { ITaskManager, ITaskManagerEvents } from "./interfaces";
 
 /**
- * Description of a task queue operation
+ * Description of a task manager operation
  */
-type ITaskQueueOperation = ITaskQueueVolunteerOperation | ITaskQueueAbandonOperation;
+type ITaskManagerOperation = ITaskManagerVolunteerOperation | ITaskManagerAbandonOperation;
 
-interface ITaskQueueVolunteerOperation {
+interface ITaskManagerVolunteerOperation {
     type: "volunteer";
     taskId: string;
 }
 
-interface ITaskQueueAbandonOperation {
+interface ITaskManagerAbandonOperation {
     type: "abandon";
     taskId: string;
 }
@@ -42,15 +42,15 @@ interface ITaskQueueAbandonOperation {
 const snapshotFileName = "header";
 
 /**
- * The TaskQueue distributed data structure tracks queues of clients that want to exclusively run a task.
+ * The TaskManager distributed data structure tracks queues of clients that want to exclusively run a task.
  *
  * @remarks
  * ### Creation
  *
- * To create a `TaskQueue`, call the static create method:
+ * To create a `TaskManager`, call the static create method:
  *
  * ```typescript
- * const myQueue = TaskQueue.create(this.runtime, id);
+ * const myQueue = TaskManager.create(this.runtime, id);
  * ```
  *
  * ### Usage
@@ -59,28 +59,28 @@ const snapshotFileName = "header";
  *
  * ### Eventing
  *
- * `TaskQueue` is an `EventEmitter`, and will emit events when other clients make modifications. You should
+ * `TaskManager` is an `EventEmitter`, and will emit events when other clients make modifications. You should
  * register for these events and respond appropriately as the data is modified. TODO details.
  */
-export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQueue {
+export class TaskManager extends SharedObject<ITaskManagerEvents> implements ITaskManager {
     /**
-     * Create a new TaskQueue
+     * Create a new TaskManager
      *
      * @param runtime - data store runtime the new task queue belongs to
      * @param id - optional name of the task queue
      * @returns newly create task queue (but not attached yet)
      */
     public static create(runtime: IFluidDataStoreRuntime, id?: string) {
-        return runtime.createChannel(id, TaskQueueFactory.Type) as TaskQueue;
+        return runtime.createChannel(id, TaskManagerFactory.Type) as TaskManager;
     }
 
     /**
-     * Get a factory for TaskQueue to register with the data store.
+     * Get a factory for TaskManager to register with the data store.
      *
-     * @returns a factory that creates and load TaskQueue
+     * @returns a factory that creates and load TaskManager
      */
     public static getFactory(): IChannelFactory {
-        return new TaskQueueFactory();
+        return new TaskManagerFactory();
     }
 
     /**
@@ -97,7 +97,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     private readonly queueWatcher: EventEmitter = new EventEmitter();
 
     /**
-     * Constructs a new task queue. If the object is non-local an id and service interfaces will
+     * Constructs a new task manager. If the object is non-local an id and service interfaces will
      * be provided
      *
      * @param runtime - data store runtime the task queue belongs to
@@ -139,7 +139,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     }
 
     private submitVolunteerOp(taskId: string) {
-        const op: ITaskQueueVolunteerOperation = {
+        const op: ITaskManagerVolunteerOperation = {
             type: "volunteer",
             taskId,
         };
@@ -179,7 +179,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     }
 
     private submitAbandonOp(taskId: string) {
-        const op: ITaskQueueAbandonOperation = {
+        const op: ITaskManagerAbandonOperation = {
             type: "abandon",
             taskId,
         };
@@ -218,9 +218,9 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     }
 
     /**
-     * Create a snapshot for the task queue
+     * Create a snapshot for the task manager
      *
-     * @returns the snapshot of the current state of the task queue
+     * @returns the snapshot of the current state of the task manager
      */
     protected snapshotCore(serializer: IFluidSerializer): ITree {
         const content = [...this.taskQueues.entries()];
@@ -270,7 +270,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
     }
 
     /**
-     * Process a task queue operation
+     * Process a task manager operation
      *
      * @param message - the message to prepare
      * @param local - whether the message was sent by the local client
@@ -279,7 +279,7 @@ export class TaskQueue extends SharedObject<ITaskQueueEvents> implements ITaskQu
      */
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {
         if (message.type === MessageType.Operation) {
-            const op = message.contents as ITaskQueueOperation;
+            const op = message.contents as ITaskManagerOperation;
             console.log("Processing incoming", op.taskId, message.clientId);
 
             switch (op.type) {

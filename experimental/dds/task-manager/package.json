@@ -1,5 +1,5 @@
 {
-  "name": "@fluid-experimental/task-queue",
+  "name": "@fluid-experimental/task-manager",
   "version": "0.35.0",
   "description": "Distributed data structure for queueing exclusive tasks",
   "homepage": "https://fluidframework.com",
