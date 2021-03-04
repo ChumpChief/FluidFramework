@@ -17,7 +17,7 @@ export interface IDiceRoller extends EventEmitter {
      */
     readonly value: number;
 
-    taskManager: TaskManager | undefined;
+    taskManager: TaskManager;
 
     volunteerAutoRoll(): Promise<void>;
     abandonAutoRoll(): void;
@@ -48,7 +48,7 @@ const taskManagerKey = "taskManager";
  */
 export class DiceRoller extends DataObject implements IDiceRoller {
     // TODO remove again
-    public taskManager: TaskManager | undefined;
+    private _taskManager: TaskManager | undefined;
     public hasRollLeadership: boolean = false;
     private rollTimer: ReturnType<typeof setInterval> | undefined;
     /**
@@ -74,10 +74,7 @@ export class DiceRoller extends DataObject implements IDiceRoller {
         });
 
         const taskManagerHandle = this.root.get<IFluidHandle<TaskManager>>(taskManagerKey);
-        this.taskManager = await taskManagerHandle?.get();
-        if (this.taskManager === undefined) {
-            throw new Error("Task manager should be defined by now");
-        }
+        this._taskManager = await taskManagerHandle?.get();
         // eslint-disable-next-line @typescript-eslint/dot-notation
         if (window["taskManager"] === undefined) {
             // eslint-disable-next-line @typescript-eslint/dot-notation
@@ -100,50 +97,35 @@ export class DiceRoller extends DataObject implements IDiceRoller {
     }
 
     public async volunteerAutoRoll() {
-        if (this.taskManager === undefined) {
-            throw new Error("Task manager should be defined by now");
-        }
-
         await this.taskManager.lockTask("AutoRoll");
 
         console.log("Starting roll task");
-        if (this.rollTimer !== undefined) {
-            throw new Error("Unexpected defined rollTimer");
-        }
+
         this.rollTimer = setInterval(() => {
             this.roll();
         }, 1000);
     }
 
     public abandonAutoRoll() {
-        if (this.taskManager === undefined) {
-            throw new Error("Task manager should be defined by now");
-        }
-        if (!this.taskManager.haveTaskLock("AutoRoll")) {
-            return;
+        console.log("Ending roll task");
+
+        if (this.taskManager.haveTaskLock("AutoRoll")) {
+            if (this.rollTimer === undefined) {
+                throw new Error("Unexpected undefined rollTimer");
+            }
+            clearInterval(this.rollTimer);
+            this.rollTimer = undefined;
         }
 
         this.taskManager.abandon("AutoRoll");
-        console.log("Ending roll task");
-        if (this.rollTimer === undefined) {
-            throw new Error("Unexpected undefined rollTimer");
-        }
-        clearInterval(this.rollTimer);
-        this.rollTimer = undefined;
     }
 
     public async volunteerRollLeadership() {
-        if (this.taskManager === undefined) {
-            throw new Error("Task manager should be defined by now");
-        }
         await this.taskManager.lockTask("RollLeadership");
     }
 
     public abandonRollLeadership() {
         this.hasRollLeadership = false;
-        if (this.taskManager === undefined) {
-            throw new Error("Task manager should be defined by now");
-        }
         this.taskManager.abandon("RollLeadership");
     }
 
@@ -156,6 +138,13 @@ export class DiceRoller extends DataObject implements IDiceRoller {
         const rollValue = Math.floor(Math.random() * 6) + 1;
         this.root.set(diceValueKey, rollValue);
     };
+
+    public get taskManager() {
+        if (this._taskManager === undefined) {
+            throw new Error("Task manager should be defined by now");
+        }
+        return this._taskManager;
+    }
 }
 
 /**

@@ -29,9 +29,6 @@ export function renderDiceRoller(diceRoller: IDiceRoller, div: HTMLDivElement) {
     });
 
     const taskManager = diceRoller.taskManager;
-    if (taskManager === undefined) {
-        throw new Error("Task queue undefined");
-    }
     const taskQueues = taskManager.getTaskQueues();
 
     const taskManagerView = document.createElement("div");
