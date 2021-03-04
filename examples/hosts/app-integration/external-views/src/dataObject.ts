@@ -97,6 +97,10 @@ export class DiceRoller extends DataObject implements IDiceRoller {
     }
 
     public async volunteerAutoRoll() {
+        if (this.taskManager.queued("AutoRoll")) {
+            return;
+        }
+
         await this.taskManager.lockTask("AutoRoll");
 
         console.log("Starting roll task");
