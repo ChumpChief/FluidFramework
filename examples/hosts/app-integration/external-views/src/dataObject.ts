@@ -103,7 +103,9 @@ export class DiceRoller extends DataObject implements IDiceRoller {
         if (this.taskManager === undefined) {
             throw new Error("Task manager should be defined by now");
         }
+
         await this.taskManager.lockTask("AutoRoll");
+
         console.log("Starting roll task");
         if (this.rollTimer !== undefined) {
             throw new Error("Unexpected defined rollTimer");
@@ -117,6 +119,10 @@ export class DiceRoller extends DataObject implements IDiceRoller {
         if (this.taskManager === undefined) {
             throw new Error("Task manager should be defined by now");
         }
+        if (!this.taskManager.haveTaskLock("AutoRoll")) {
+            return;
+        }
+
         this.taskManager.abandon("AutoRoll");
         console.log("Ending roll task");
         if (this.rollTimer === undefined) {
