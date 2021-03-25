@@ -4,11 +4,6 @@
  */
 
 import { EventEmitter } from "events";
-import {
-    AgentSchedulerFactory,
-    IProvideAgentScheduler,
-    IAgentScheduler,
-} from "@fluidframework/agent-scheduler";
 import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
     IFluidObject,
@@ -80,7 +75,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import {
     FlushMode,
-    InboundAttachMessage,
     IFluidDataStoreContext,
     IFluidDataStoreContextDetached,
     IFluidDataStoreRegistry,
@@ -107,7 +101,6 @@ import {
     createRootSummarizerNodeWithGC,
     FluidSerializer,
     IRootSummarizerNodeWithGC,
-    requestFluidObject,
     RequestParser,
     create404Response,
     exceptionToResponse,
@@ -443,18 +436,6 @@ export class ScheduleManager {
     }
 }
 
-export const agentSchedulerId = "_scheduler";
-
-// Wraps the provided list of packages and augments with some system level services.
-class ContainerRuntimeDataStoreRegistry extends FluidDataStoreRegistry {
-    constructor(namedEntries: NamedFluidDataStoreRegistryEntries) {
-        super([
-            ...namedEntries,
-            AgentSchedulerFactory.registryEntry,
-        ]);
-    }
-}
-
 /**
  * Represents the runtime of the container. Contains helper functions/state of the container.
  * It will define the store level mappings.
@@ -510,7 +491,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             }
         }
 
-        const registry = new ContainerRuntimeDataStoreRegistry(registryEntries);
+        const registry = new FluidDataStoreRegistry(registryEntries);
 
         const tryFetchBlob = async <T>(blobName: string): Promise<T | undefined> => {
             const blobId = context.baseSnapshot?.blobs[blobName];
@@ -533,14 +514,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             logger,
             requestHandler,
             storage);
-
-        // Create all internal data stores if not already existing on storage or loaded a detached
-        // container from snapshot(ex. draft mode).
-        if (!context.existing) {
-            await runtime.createRootDataStore(AgentSchedulerFactory.type, agentSchedulerId);
-        }
-
-        runtime.subscribeToLeadership();
 
         return runtime;
     }
@@ -644,19 +617,12 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     private needsFlush = false;
     private flushTrigger = false;
 
-    // Always matched IAgentScheduler.leader property
-    private _leader = false;
-
     private _connected: boolean;
 
     private paused: boolean = false;
 
     public get connected(): boolean {
         return this._connected;
-    }
-
-    public get leader(): boolean {
-        return this._leader;
     }
 
     public get summarizerClientId(): string | undefined {
@@ -1399,17 +1365,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     }
 
     private isContainerMessageDirtyable(type: ContainerMessageType, contents: any) {
-        if (type === ContainerMessageType.Attach) {
-            const attachMessage = contents as InboundAttachMessage;
-            if (attachMessage.id === agentSchedulerId) {
-                return false;
-            }
-        } else if (type === ContainerMessageType.FluidDataStoreOp) {
-            const envelope = contents as IEnvelope;
-            if (envelope.address === agentSchedulerId) {
-                return false;
-            }
-        }
         return true;
     }
 
@@ -1871,65 +1826,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             default:
                 unreachableCase(type, `Unknown ContainerMessageType: ${type}`);
         }
-    }
-
-    private subscribeToLeadership() {
-        if (this.context.clientDetails.capabilities.interactive) {
-            this.getScheduler().then((scheduler) => {
-                const LeaderTaskId = "leader";
-
-                // Each client expresses interest to be a leader.
-                // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                scheduler.pick(LeaderTaskId, async () => {
-                    assert(!this._leader, 0x134 /* "Client is already leader" */);
-                    this.updateLeader(true);
-                });
-
-                scheduler.on("lost", (key) => {
-                    if (key === LeaderTaskId) {
-                        assert(this._leader, 0x135 /* "Got leader key but client is not leader" */);
-                        this._leader = false;
-                        this.updateLeader(false);
-                    }
-                });
-            }).catch((err) => {
-                this.closeFn(CreateContainerError(err));
-            });
-        }
-    }
-
-    /**
-     * @deprecated starting in 0.36. The AgentScheduler can be requested directly, though this will also be removed in
-     * a future release when an alternative is available: containerRuntime.request(\{ url: "/_scheduler" \}).
-     * getTaskManager should be removed in 0.38.
-     */
-    public async getTaskManager(): Promise<IProvideAgentScheduler> {
-        console.error("getTaskManager is deprecated.");
-        const agentScheduler = await this.getScheduler();
-        // Prior versions would return a TaskManager, which was an IProvideAgentScheduler -- returning this for back
-        // compat.  Wrapping the agentScheduler in an IProvideAgentScheduler will help catch any cases where customers
-        // try to call other TaskManager functionality.
-        return { IAgentScheduler: agentScheduler };
-    }
-
-    private async getScheduler(): Promise<IAgentScheduler> {
-        return requestFluidObject<IAgentScheduler>(
-            await this.getDataStore(agentSchedulerId, true),
-            "",
-        );
-    }
-
-    private updateLeader(leadership: boolean) {
-        this._leader = leadership;
-        if (this.leader) {
-            assert(this.clientId === undefined || this.connected && this.deltaManager && this.deltaManager.active,
-                0x136 /* "Leader must either have undefined clientId or be connected with active delta manager!" */);
-            this.emit("leader");
-        } else {
-            this.emit("notleader");
-        }
-
-        this.dataStores.updateLeader();
     }
 
     /** Implementation of ISummarizerInternalsProvider.refreshLatestSummaryAck */
