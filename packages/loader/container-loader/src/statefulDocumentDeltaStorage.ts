@@ -40,7 +40,8 @@ export class StatefulDocumentDeltaStorage
         return this.deltaStorage !== undefined;
     }
 
-    constructor(private readonly documentService: IDocumentService) {
+    // constructor(private readonly documentService: IDocumentService) {
+    constructor(private readonly serviceProvider: () => IDocumentService | undefined) {
         super();
     }
 
@@ -57,7 +58,12 @@ export class StatefulDocumentDeltaStorage
         }
 
         // Disconnected with no current connect attempt
-        this.connectingP = this.documentService.connectToDeltaStorage();
+        // Would prefer to have the documentService passed in, rather than using serviceProvider()
+        const documentService = this.serviceProvider();
+        if (documentService === undefined) {
+            throw new Error("Failed to get document service");
+        }
+        this.connectingP = documentService.connectToDeltaStorage();
         this.deltaStorage = await this.connectingP;
         this.emit("connected");
     }
