@@ -23,7 +23,6 @@ import {
 import { assert, performance, TypedEventEmitter } from "@fluidframework/common-utils";
 import { PerformanceEvent, TelemetryLogger, safeRaiseEvent } from "@fluidframework/telemetry-utils";
 import {
-    IDocumentDeltaStorageService,
     IDocumentService,
     IDocumentDeltaConnection,
     IDocumentDeltaConnectionEvents,
@@ -59,6 +58,7 @@ import {
     DataCorruptionError,
 } from "@fluidframework/container-utils";
 import { DeltaQueue } from "./deltaQueue";
+import { StatefulDocumentDeltaStorage } from "./statefulDocumentDeltaStorage";
 
 const MaxReconnectDelaySeconds = 8;
 const InitialReconnectDelaySeconds = 1;
@@ -209,7 +209,8 @@ export class DeltaManager
     private lastSubmittedClientId: string | undefined;
 
     private handler: IDeltaHandlerStrategy | undefined;
-    private deltaStorage: IDocumentDeltaStorageService | undefined;
+    // TODO make this IStatefulDocumentDeltaStorage and move connection policy out of DeltaManager.
+    private readonly deltaStorage: StatefulDocumentDeltaStorage;
 
     private messageBuffer: IDocumentMessage[] = [];
 
@@ -421,6 +422,9 @@ export class DeltaManager
         private readonly _active: () => boolean,
     ) {
         super();
+
+        // TODO Eventually, pass this in instead of the serviceProvider.
+        this.deltaStorage = new StatefulDocumentDeltaStorage(serviceProvider);
 
         this.clientDetails = this.client.details;
         this.defaultReconnectionMode = this.client.mode;
@@ -785,8 +789,10 @@ export class DeltaManager
             throw new Error("Delta manager is not attached");
         }
 
-        if (this.deltaStorage === undefined) {
-            this.deltaStorage = await docService.connectToDeltaStorage();
+        if (!this.deltaStorage.connected) {
+            // Instead of issuing the connect command here, we should instead be waiting on the connect event
+            // Such that the connection policy can be controlled by whoever gave us the delta storage.
+            await this.deltaStorage.connect();
         }
 
         const stream = this.deltaStorage.fetchMessages(
