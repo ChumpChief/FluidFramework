@@ -23,8 +23,6 @@ import {
     IDocumentDeltaStorageService,
     IDocumentService,
     IDocumentDeltaConnection,
-    IDocumentStorageService,
-    LoaderCachingPolicy,
     IDocumentDeltaConnectionEvents,
 } from "@fluidframework/driver-definitions";
 import { isSystemMessage } from "@fluidframework/protocol-base";
@@ -58,8 +56,6 @@ import {
     DataCorruptionError,
 } from "@fluidframework/container-utils";
 import { DeltaQueue } from "./deltaQueue";
-import { RetriableDocumentStorageService } from "./retriableDocumentStorageService";
-import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 
 const MaxReconnectDelaySeconds = 8;
 const InitialReconnectDelaySeconds = 1;
@@ -203,7 +199,6 @@ export class DeltaManager
     // Counts the number of noops sent by the client which may not be acked.
     private trailingNoopCount = 0;
     private closed = false;
-    private storageService: RetriableDocumentStorageService | undefined;
     private readonly deltaStreamDelayId = uuid();
     private readonly deltaStorageDelayId = uuid();
 
@@ -358,30 +353,6 @@ export class DeltaManager
     public shouldJoinWrite(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
-    }
-
-    public async connectToStorage(): Promise<IDocumentStorageService> {
-        if (this.storageService !== undefined) {
-            return this.storageService;
-        }
-        const service = this.serviceProvider();
-        if (service === undefined) {
-            throw new Error("Not attached");
-        }
-
-        let storageService = await service.connectToStorage();
-        // Enable prefetching for the service unless it has a caching policy set otherwise:
-        if (storageService.policies?.caching !== LoaderCachingPolicy.NoCaching) {
-            storageService = new PrefetchDocumentStorageService(storageService);
-        }
-
-        this.storageService = new RetriableDocumentStorageService(storageService, this, this.logger);
-
-        // ensure we did not lose that policy in the process of wrapping
-        assert(storageService.policies?.minBlobSize === this.storageService.policies?.minBlobSize,
-            0x0e0 /* "lost minBlobSize policy" */);
-
-        return this.storageService;
     }
 
     /**
@@ -843,7 +814,6 @@ export class DeltaManager
             return;
         }
         this.closed = true;
-        this.storageService?.dispose();
 
         this.closeAbortController.abort();
 
