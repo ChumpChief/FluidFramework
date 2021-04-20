@@ -118,7 +118,8 @@ export class StatefulDocumentDeltaConnection
         return this._deltaConnection !== undefined;
     }
 
-    private get deltaConnection() {
+    // TODO make this private, insist that callers retain their own reference
+    public get deltaConnection() {
         if (this._deltaConnection === undefined) {
             throw new Error("Can't perform this operation in disconnected state");
         }
@@ -203,7 +204,8 @@ export class StatefulDocumentDeltaConnection
     };
 
     private readonly errorHandler = (error) => {
-        this.emit("error", error);
+        // TODO emit error, once converted
+        // this.emit("error", error);
     };
 
     private readonly pongHandler = (latency: number) => {

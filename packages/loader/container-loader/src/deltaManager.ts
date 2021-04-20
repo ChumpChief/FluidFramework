@@ -1073,9 +1073,11 @@ export class DeltaManager
         }
 
         if (!this.deltaConnection.connected) {
-            return false;
+            // After conversion, this will actually return false.
+            // return false;
+        } else {
+            this.deltaConnection.releaseCurrentConnection();
         }
-        this.deltaConnection.releaseCurrentConnection();
 
         const connection = this.connection;
         // Avoid any re-entrancy - clear object reference
