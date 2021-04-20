@@ -194,7 +194,12 @@ export class StatefulDocumentDeltaConnection
     };
 
     private readonly disconnectHandler = (disconnectReason) => {
-        this.releaseCurrentConnection(disconnectReason);
+        if (this._deltaConnection === undefined) {
+            // TODO allow the assert
+            console.error("Connection was already released before disconnect handler");
+        } else {
+            this.releaseCurrentConnection(disconnectReason);
+        }
     };
 
     private readonly errorHandler = (error) => {
@@ -230,6 +235,7 @@ export class StatefulDocumentDeltaConnection
         this._deltaConnection.off("error", this.errorHandler);
         this._deltaConnection.off("pong", this.pongHandler);
         this._deltaConnection = undefined;
+
         this.emit("disconnect", disconnectReason);
     }
 }

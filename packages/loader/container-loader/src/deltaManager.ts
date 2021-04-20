@@ -57,7 +57,7 @@ import {
     DataCorruptionError,
 } from "@fluidframework/container-utils";
 import { DeltaQueue } from "./deltaQueue";
-// import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
+import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 import { StatefulDocumentDeltaStorage } from "./statefulDocumentDeltaStorage";
 
 const MaxReconnectDelaySeconds = 8;
@@ -209,7 +209,7 @@ export class DeltaManager
 
     private handler: IDeltaHandlerStrategy | undefined;
     // TODO make this IStatefulDocumentDeltaConnection and move connection policy out of DeltaManager.
-    // private readonly deltaConnection: StatefulDocumentDeltaConnection;
+    private readonly deltaConnection: StatefulDocumentDeltaConnection;
     // TODO make this IStatefulDocumentDeltaStorage and move connection policy out of DeltaManager.
     private readonly deltaStorage: StatefulDocumentDeltaStorage;
 
@@ -428,8 +428,17 @@ export class DeltaManager
     ) {
         super();
 
-        // TODO Eventually, pass the StatefulDocumentDeltaConnection itself in instead of the serviceProvider.
-        // this.deltaConnection = new StatefulDocumentDeltaConnection(serviceProvider);
+        // TODO Eventually, pass the StatefulDocumentDeltaConnection itself in rather than create locally.
+        this.deltaConnection = new StatefulDocumentDeltaConnection();
+        // this.deltaConnection.on("op", this.opHandler);
+        // this.deltaConnection.on("signal", this.signalHandler);
+        // this.deltaConnection.on("nack", this.nackHandler);
+        // this.deltaConnection.on("disconnect", this.disconnectHandler);
+        // this.deltaConnection.on("error", this.errorHandler);
+        // this.deltaConnection.on("pong", this.pongHandler);
+        // ???
+        // this.deltaConnection.on("connect", this.setupNewSuccessfulConnection);
+
         // TODO Eventually, pass the StatefulDocumentDeltaStorage itself in instead of the serviceProvider.
         this.deltaStorage = new StatefulDocumentDeltaStorage(serviceProvider);
 
@@ -604,6 +613,7 @@ export class DeltaManager
             const connection = new NoDeltaStream();
             this.connectionP = new Promise((resolve) => {
                 this.setupNewSuccessfulConnection(connection, "read");
+                this.deltaConnection.setNewConnection(connection);
                 resolve(connection);
             });
             return this.connectionP;
@@ -668,6 +678,7 @@ export class DeltaManager
             }
 
             this.setupNewSuccessfulConnection(connection, requestedMode);
+            this.deltaConnection.setNewConnection(connection);
 
             return connection;
         };
@@ -953,6 +964,18 @@ export class DeltaManager
         this.emit("pong", latency);
     };
 
+    private setReadonlyFromNewConnection(connection: IDocumentDeltaConnection, requestedMode: ConnectionMode) {
+        // Does information in scopes & mode matches?
+        // If we asked for "write" and got "read", then file is read-only
+        // But if we ask read, server can still give us write.
+        const readonly = !connection.claims.scopes.includes(ScopeType.DocWrite);
+        const connectionMode = connection.mode ?? "read";
+        assert(requestedMode === "read" || readonly === (connectionMode === "read"),
+            0x0e7 /* "claims/connectionMode mismatch" */);
+        assert(!readonly || connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
+        this.set_readonlyPermissions(readonly);
+    }
+
     /**
      * Once we've successfully gotten a connection, we need to set up state, attach event listeners, and process
      * initial messages.
@@ -963,14 +986,7 @@ export class DeltaManager
         assert(this.connection === undefined, 0x0e6 /* "old connection exists on new connection setup" */);
         this.connection = connection;
 
-        // Does information in scopes & mode matches?
-        // If we asked for "write" and got "read", then file is read-only
-        // But if we ask read, server can still give us write.
-        const readonly = !connection.claims.scopes.includes(ScopeType.DocWrite);
-        assert(requestedMode === "read" || readonly === (this.connectionMode === "read"),
-            0x0e7 /* "claims/connectionMode mismatch" */);
-        assert(!readonly || this.connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
-        this.set_readonlyPermissions(readonly);
+        this.setReadonlyFromNewConnection(connection, requestedMode);
 
         this.refreshDelayInfo(this.deltaStreamDelayId);
 
@@ -1055,6 +1071,11 @@ export class DeltaManager
         if (this.connection === undefined) {
             return false;
         }
+
+        if (!this.deltaConnection.connected) {
+            return false;
+        }
+        this.deltaConnection.releaseCurrentConnection();
 
         const connection = this.connection;
         // Avoid any re-entrancy - clear object reference
