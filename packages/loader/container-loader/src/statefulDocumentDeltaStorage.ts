@@ -45,6 +45,7 @@ export class StatefulDocumentDeltaStorage
         super();
     }
 
+    // TODO setDeltaStorage instead?
     public async connect(): Promise<void> {
         if (this.deltaStorage !== undefined) {
             // In connected state

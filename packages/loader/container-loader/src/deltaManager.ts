@@ -32,7 +32,6 @@ import {
     ConnectionMode,
     IClient,
     IClientConfiguration,
-    IClientDetails,
     IDocumentMessage,
     INack,
     INackContent,
@@ -58,7 +57,7 @@ import {
     DataCorruptionError,
 } from "@fluidframework/container-utils";
 import { DeltaQueue } from "./deltaQueue";
-import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
+// import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 import { StatefulDocumentDeltaStorage } from "./statefulDocumentDeltaStorage";
 
 const MaxReconnectDelaySeconds = 8;
@@ -151,7 +150,6 @@ export class DeltaManager
 
     public get disposed() { return this.closed; }
 
-    public readonly clientDetails: IClientDetails;
     public get IDeltaSender() { return this; }
 
     /**
@@ -211,7 +209,7 @@ export class DeltaManager
 
     private handler: IDeltaHandlerStrategy | undefined;
     // TODO make this IStatefulDocumentDeltaConnection and move connection policy out of DeltaManager.
-    private readonly deltaConnection: StatefulDocumentDeltaConnection;
+    // private readonly deltaConnection: StatefulDocumentDeltaConnection;
     // TODO make this IStatefulDocumentDeltaStorage and move connection policy out of DeltaManager.
     private readonly deltaStorage: StatefulDocumentDeltaStorage;
 
@@ -357,6 +355,10 @@ export class DeltaManager
         return this._reconnectMode;
     }
 
+    public get clientDetails() {
+        return this.client.details;
+    }
+
     public shouldJoinWrite(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
@@ -427,11 +429,10 @@ export class DeltaManager
         super();
 
         // TODO Eventually, pass the StatefulDocumentDeltaConnection itself in instead of the serviceProvider.
-        this.deltaConnection = new StatefulDocumentDeltaConnection(serviceProvider);
+        // this.deltaConnection = new StatefulDocumentDeltaConnection(serviceProvider);
         // TODO Eventually, pass the StatefulDocumentDeltaStorage itself in instead of the serviceProvider.
         this.deltaStorage = new StatefulDocumentDeltaStorage(serviceProvider);
 
-        this.clientDetails = this.client.details;
         this.defaultReconnectionMode = this.client.mode;
         this._reconnectMode = reconnectAllowed ? ReconnectMode.Enabled : ReconnectMode.Never;
 
@@ -735,9 +736,9 @@ export class DeltaManager
             this.clientSequenceNumberObserved = 0;
         }
 
-        const service = this.clientDetails.type === undefined || this.clientDetails.type === ""
+        const service = this.client.details.type === undefined || this.client.details.type === ""
             ? "unknown"
-            : this.clientDetails.type;
+            : this.client.details.type;
 
         // Start adding trace for the op.
         const traces: ITrace[] = [
@@ -1273,9 +1274,9 @@ export class DeltaManager
 
         // Add final ack trace.
         if (message.traces !== undefined && message.traces.length > 0) {
-            const service = this.clientDetails.type === undefined || this.clientDetails.type === ""
+            const service = this.client.details.type === undefined || this.client.details.type === ""
                 ? "unknown"
-                : this.clientDetails.type;
+                : this.client.details.type;
             message.traces.push({
                 action: "end",
                 service,
