@@ -10,11 +10,9 @@ import {
 import { assert, TypedEventEmitter } from "@fluidframework/common-utils";
 import {
     IDocumentDeltaConnection,
-    IDocumentService,
 } from "@fluidframework/driver-definitions";
 import {
     ConnectionMode,
-    IClient,
     IClientConfiguration,
     IDocumentMessage,
     INack,
@@ -114,117 +112,73 @@ export interface IStatefulDocumentDeltaConnection extends IEventProvider<IStatef
 export class StatefulDocumentDeltaConnection
     extends TypedEventEmitter<IStatefulDocumentDeltaConnectionEvents>
     implements IStatefulDocumentDeltaConnection {
-    private connectingP: Promise<IDocumentDeltaConnection> | undefined;
-    private deltaConnection: IDocumentDeltaConnection | undefined;
+    private _deltaConnection: IDocumentDeltaConnection | undefined;
 
     public get connected() {
-        return this.deltaConnection !== undefined;
+        return this._deltaConnection !== undefined;
+    }
+
+    private get deltaConnection() {
+        if (this._deltaConnection === undefined) {
+            throw new Error("Can't perform this operation in disconnected state");
+        }
+        return this._deltaConnection;
     }
 
     public get clientId() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.clientId;
     }
 
     public get claims() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.claims;
     }
 
     public get mode() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.mode;
     }
 
     public get existing() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.existing;
     }
 
     public get maxMessageSize() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.maxMessageSize;
     }
 
     public get version() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.version;
     }
 
     public get initialMessages() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.initialMessages;
     }
 
     public get initialSignals() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.initialSignals;
     }
 
     public get initialClients() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.initialClients;
     }
 
     public get serviceConfiguration() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.serviceConfiguration;
     }
 
     public get checkpointSequenceNumber() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
         return this.deltaConnection.checkpointSequenceNumber;
     }
 
-    // constructor(private readonly documentService: IDocumentService) {
-    constructor(private readonly serviceProvider: () => IDocumentService | undefined) {
-        super();
+    public submit(messages: IDocumentMessage[]) {
+        this.deltaConnection.submit(messages);
     }
 
-    // TODO remove in favor of setNewConnection?
-    public async connect(client: IClient): Promise<void> {
-        if (this.deltaConnection !== undefined) {
-            // In connected state
-            return;
-        }
+    public submitSignal(message: any) {
+        this.deltaConnection.submitSignal(message);
+    }
 
-        if (this.connectingP !== undefined) {
-            // In connecting state
-            await this.connectingP;
-            return;
-        }
-
-        // Disconnected with no current connect attempt
-        // Would prefer to have the documentService passed in, rather than using serviceProvider()
-        const documentService = this.serviceProvider();
-        if (documentService === undefined) {
-            throw new Error("Failed to get document service");
-        }
-        this.connectingP = documentService.connectToDeltaStream(client);
-        this.deltaConnection = await this.connectingP;
-        this.emit("connected");
+    public close() {
+        this.deltaConnection.close();
     }
 
     private readonly opHandler = (documentId: string, messages: ISequencedDocumentMessage[]) => {
@@ -240,16 +194,7 @@ export class StatefulDocumentDeltaConnection
     };
 
     private readonly disconnectHandler = (disconnectReason) => {
-        assert(this.deltaConnection !== undefined, "Disconnect event raised from unknown deltaConnection");
-        this.deltaConnection.off("op", this.opHandler);
-        this.deltaConnection.off("signal", this.signalHandler);
-        this.deltaConnection.off("nack", this.nackHandler);
-        this.deltaConnection.off("disconnect", this.disconnectHandler);
-        this.deltaConnection.off("error", this.errorHandler);
-        this.deltaConnection.off("pong", this.pongHandler);
-        this.deltaConnection = undefined;
-
-        this.emit("disconnect", disconnectReason);
+        this.releaseCurrentConnection(disconnectReason);
     };
 
     private readonly errorHandler = (error) => {
@@ -261,38 +206,30 @@ export class StatefulDocumentDeltaConnection
     };
 
     public setNewConnection(connection: IDocumentDeltaConnection) {
-        if (this.deltaConnection !== undefined) {
+        if (this._deltaConnection !== undefined) {
             throw new Error("Tried to set new connection, but already had one");
         }
 
-        this.deltaConnection = connection;
-        // Re-emit events
-        this.deltaConnection.on("op", this.opHandler);
-        this.deltaConnection.on("signal", this.signalHandler);
-        this.deltaConnection.on("nack", this.nackHandler);
-        this.deltaConnection.on("disconnect", this.disconnectHandler);
-        this.deltaConnection.on("error", this.errorHandler);
-        this.deltaConnection.on("pong", this.pongHandler);
+        this._deltaConnection = connection;
+        connection.on("op", this.opHandler);
+        connection.on("signal", this.signalHandler);
+        connection.on("nack", this.nackHandler);
+        connection.on("disconnect", this.disconnectHandler);
+        connection.on("error", this.errorHandler);
+        connection.on("pong", this.pongHandler);
+
+        this.emit("connected");
     }
 
-    public submit(messages: IDocumentMessage[]) {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
-        this.deltaConnection.submit(messages);
-    }
-
-    public submitSignal(message: any) {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
-        this.deltaConnection.submitSignal(message);
-    }
-
-    public close() {
-        if (this.deltaConnection === undefined) {
-            throw new Error("Can't access until connected");
-        }
-        this.deltaConnection.close();
+    public releaseCurrentConnection(disconnectReason?: any) {
+        assert(this._deltaConnection !== undefined, "No connection to tear down");
+        this._deltaConnection.off("op", this.opHandler);
+        this._deltaConnection.off("signal", this.signalHandler);
+        this._deltaConnection.off("nack", this.nackHandler);
+        this._deltaConnection.off("disconnect", this.disconnectHandler);
+        this._deltaConnection.off("error", this.errorHandler);
+        this._deltaConnection.off("pong", this.pongHandler);
+        this._deltaConnection = undefined;
+        this.emit("disconnect", disconnectReason);
     }
 }
