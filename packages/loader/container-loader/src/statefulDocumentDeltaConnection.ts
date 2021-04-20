@@ -7,7 +7,7 @@ import {
     IEvent,
     IEventProvider,
 } from "@fluidframework/common-definitions";
-import { TypedEventEmitter } from "@fluidframework/common-utils";
+import { assert, TypedEventEmitter } from "@fluidframework/common-utils";
 import {
     IDocumentDeltaConnection,
     IDocumentService,
@@ -203,6 +203,7 @@ export class StatefulDocumentDeltaConnection
         super();
     }
 
+    // TODO remove in favor of setNewConnection?
     public async connect(client: IClient): Promise<void> {
         if (this.deltaConnection !== undefined) {
             // In connected state
@@ -224,6 +225,54 @@ export class StatefulDocumentDeltaConnection
         this.connectingP = documentService.connectToDeltaStream(client);
         this.deltaConnection = await this.connectingP;
         this.emit("connected");
+    }
+
+    private readonly opHandler = (documentId: string, messages: ISequencedDocumentMessage[]) => {
+        this.emit("op", documentId, messages);
+    };
+
+    private readonly signalHandler = (message: ISignalMessage) => {
+        this.emit("signal", message);
+    };
+
+    private readonly nackHandler = (documentId: string, messages: INack[]) => {
+        this.emit("nack", documentId, messages);
+    };
+
+    private readonly disconnectHandler = (disconnectReason) => {
+        assert(this.deltaConnection !== undefined, "Disconnect event raised from unknown deltaConnection");
+        this.deltaConnection.off("op", this.opHandler);
+        this.deltaConnection.off("signal", this.signalHandler);
+        this.deltaConnection.off("nack", this.nackHandler);
+        this.deltaConnection.off("disconnect", this.disconnectHandler);
+        this.deltaConnection.off("error", this.errorHandler);
+        this.deltaConnection.off("pong", this.pongHandler);
+        this.deltaConnection = undefined;
+
+        this.emit("disconnect", disconnectReason);
+    };
+
+    private readonly errorHandler = (error) => {
+        this.emit("error", error);
+    };
+
+    private readonly pongHandler = (latency: number) => {
+        this.emit("pong", latency);
+    };
+
+    public setNewConnection(connection: IDocumentDeltaConnection) {
+        if (this.deltaConnection !== undefined) {
+            throw new Error("Tried to set new connection, but already had one");
+        }
+
+        this.deltaConnection = connection;
+        // Re-emit events
+        this.deltaConnection.on("op", this.opHandler);
+        this.deltaConnection.on("signal", this.signalHandler);
+        this.deltaConnection.on("nack", this.nackHandler);
+        this.deltaConnection.on("disconnect", this.disconnectHandler);
+        this.deltaConnection.on("error", this.errorHandler);
+        this.deltaConnection.on("pong", this.pongHandler);
     }
 
     public submit(messages: IDocumentMessage[]) {

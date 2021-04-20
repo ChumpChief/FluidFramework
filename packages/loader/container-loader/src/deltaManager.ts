@@ -58,6 +58,7 @@ import {
     DataCorruptionError,
 } from "@fluidframework/container-utils";
 import { DeltaQueue } from "./deltaQueue";
+import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 import { StatefulDocumentDeltaStorage } from "./statefulDocumentDeltaStorage";
 
 const MaxReconnectDelaySeconds = 8;
@@ -209,6 +210,8 @@ export class DeltaManager
     private lastSubmittedClientId: string | undefined;
 
     private handler: IDeltaHandlerStrategy | undefined;
+    // TODO make this IStatefulDocumentDeltaConnection and move connection policy out of DeltaManager.
+    private readonly deltaConnection: StatefulDocumentDeltaConnection;
     // TODO make this IStatefulDocumentDeltaStorage and move connection policy out of DeltaManager.
     private readonly deltaStorage: StatefulDocumentDeltaStorage;
 
@@ -423,7 +426,9 @@ export class DeltaManager
     ) {
         super();
 
-        // TODO Eventually, pass this in instead of the serviceProvider.
+        // TODO Eventually, pass the StatefulDocumentDeltaConnection itself in instead of the serviceProvider.
+        this.deltaConnection = new StatefulDocumentDeltaConnection(serviceProvider);
+        // TODO Eventually, pass the StatefulDocumentDeltaStorage itself in instead of the serviceProvider.
         this.deltaStorage = new StatefulDocumentDeltaStorage(serviceProvider);
 
         this.clientDetails = this.client.details;
