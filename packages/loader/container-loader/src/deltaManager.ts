@@ -231,7 +231,7 @@ export class DeltaManager
      */
     public get hasCheckpointSequenceNumber() {
         // Valid to be called only if we have active connection.
-        assert(this.connection !== undefined, 0x0df /* "Missing active connection" */);
+        assert(this.deltaConnection.connected, 0x0df /* "Missing active connection" */);
         return this._hasCheckpointSequenceNumber;
     }
 
@@ -458,10 +458,10 @@ export class DeltaManager
         // within an array *must* fit within the maxMessageSize and are guaranteed to be ordered sequentially.
         this._outbound = new DeltaQueue<IDocumentMessage[]>(
             (messages) => {
-                if (this.connection === undefined) {
+                if (!this.deltaConnection.connected) {
                     throw new Error("Attempted to submit an outbound message without connection");
                 }
-                this.connection.submit(messages);
+                this.deltaConnection.submit(messages);
             });
 
         this._outbound.on("error", (error) => {
@@ -529,7 +529,7 @@ export class DeltaManager
     public async preFetchOps(cacheOnly: boolean) {
         // Note that might already got connected to delta stream by now.
         // If we did, then we proactively fetch ops at the end of setupNewSuccessfulConnection to ensure
-        if (this.connection === undefined) {
+        if (!this.deltaConnection.connected) {
             return this.fetchMissingDeltasCore("DocumentOpen", cacheOnly, this.lastQueuedSequenceNumber, undefined);
         }
     }
@@ -788,8 +788,8 @@ export class DeltaManager
     }
 
     public submitSignal(content: any) {
-        if (this.connection !== undefined) {
-            this.connection.submitSignal(content);
+        if (this.deltaConnection.connected) {
+            this.deltaConnection.submitSignal(content);
         } else {
             this.logger.sendErrorEvent({ eventName: "submitSignalDisconnected" });
         }
@@ -1293,8 +1293,8 @@ export class DeltaManager
 
         // if we have connection, and message is local, then we better treat is as local!
         assert(
-            this.connection === undefined
-            || this.connection.clientId !== message.clientId
+            !this.deltaConnection.connected
+            || this.deltaConnection.clientId !== message.clientId
             || this.lastSubmittedClientId === message.clientId,
             0x0ee /* "Not accounting local messages correctly" */,
         );
@@ -1334,7 +1334,7 @@ export class DeltaManager
         if (this.minSequenceNumber > message.minimumSequenceNumber) {
             throw new DataCorruptionError("msn moves backwards", {
                 ...extractLogSafeMessageProperties(message),
-                clientId: this.connection?.clientId,
+                clientId: this.deltaConnection.connected ? this.deltaConnection.clientId : undefined,
             });
         }
         this.minSequenceNumber = message.minimumSequenceNumber;
@@ -1342,7 +1342,7 @@ export class DeltaManager
         if (message.sequenceNumber !== this.lastProcessedSequenceNumber + 1) {
             throw new DataCorruptionError("non-seq seq#", {
                 ...extractLogSafeMessageProperties(message),
-                clientId: this.connection?.clientId,
+                clientId: this.deltaConnection.connected ? this.deltaConnection.clientId : undefined,
             });
         }
         this.lastProcessedSequenceNumber = message.sequenceNumber;
