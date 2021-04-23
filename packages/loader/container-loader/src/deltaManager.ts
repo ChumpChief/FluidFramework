@@ -401,6 +401,9 @@ export class DeltaManager
                 // If we switch to readonly while connected, we should disconnect first
                 // See comment in the "readonly" event handler to deltaManager set up by
                 // the ContainerRuntime constructor
+                if (this.deltaConnection.connected) {
+                    this.deltaConnection.releaseCurrentConnection();
+                }
                 reconnect = this.disconnectFromDeltaStream("Force readonly");
             }
             safeRaiseEvent(this, this.logger, "readonly", this.readonly);
@@ -612,8 +615,8 @@ export class DeltaManager
         if (docService.policies?.storageOnly === true) {
             const connection = new NoDeltaStream();
             this.connectionP = new Promise((resolve) => {
-                this.setupNewSuccessfulConnection(connection, "read");
                 this.deltaConnection.setNewConnection(connection);
+                this.setupNewSuccessfulConnection(connection, "read");
                 resolve(connection);
             });
             return this.connectionP;
@@ -677,8 +680,8 @@ export class DeltaManager
                 });
             }
 
-            this.setupNewSuccessfulConnection(connection, requestedMode);
             this.deltaConnection.setNewConnection(connection);
+            this.setupNewSuccessfulConnection(connection, requestedMode);
 
             return connection;
         };
@@ -844,6 +847,9 @@ export class DeltaManager
         this.closeAbortController.abort();
 
         // This raises "disconnect" event if we have active connection.
+        if (this.deltaConnection.connected) {
+            this.deltaConnection.releaseCurrentConnection();
+        }
         this.disconnectFromDeltaStream(error !== undefined ? `${error.message}` : "Container closed");
 
         this._inbound.clear();
@@ -930,6 +936,9 @@ export class DeltaManager
             });
         }
 
+        if (this.deltaConnection.connected) {
+            this.deltaConnection.releaseCurrentConnection();
+        }
         this.disconnectFromDeltaStream(reconnectInfo.message);
 
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -943,6 +952,7 @@ export class DeltaManager
     private readonly disconnectHandler = (disconnectReason) => {
         const error = createReconnectError("Disconnect", disconnectReason);
 
+        // Shouldn't need to release here since the disconnect event already does this
         this.disconnectFromDeltaStream(error.message);
 
         // Note: we might get multiple disconnect calls on same socket, as early disconnect notification
@@ -962,6 +972,9 @@ export class DeltaManager
 
         const reconnectError = createReconnectError("error", error);
 
+        if (this.deltaConnection.connected) {
+            this.deltaConnection.releaseCurrentConnection();
+        }
         this.disconnectFromDeltaStream(reconnectError.message);
 
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1003,6 +1016,9 @@ export class DeltaManager
 
         if (this.closed) {
             // Raise proper events, Log telemetry event and close connection.
+            if (this.deltaConnection.connected) {
+                this.deltaConnection.releaseCurrentConnection();
+            }
             this.disconnectFromDeltaStream(`Disconnect on close`);
             return;
         }
@@ -1081,13 +1097,6 @@ export class DeltaManager
     private disconnectFromDeltaStream(reason: string) {
         if (this.connection === undefined) {
             return false;
-        }
-
-        if (!this.deltaConnection.connected) {
-            // After conversion, this will actually return false.
-            // return false;
-        } else {
-            this.deltaConnection.releaseCurrentConnection();
         }
 
         const connection = this.connection;
