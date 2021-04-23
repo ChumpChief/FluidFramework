@@ -401,7 +401,8 @@ export class DeltaManager
                 if (this.deltaConnection.connected) {
                     this.deltaConnection.releaseCurrentConnection();
                 }
-                this.disconnectFromDeltaStream("Force readonly");
+                this.disconnectFromDeltaStream();
+                this.transitionToDisconnectedState("Force readonly");
             }
             safeRaiseEvent(this, this.logger, "readonly", this.readonly);
             if (currentlyConnected) {
@@ -430,12 +431,12 @@ export class DeltaManager
 
         // TODO Eventually, pass the StatefulDocumentDeltaConnection itself in rather than create locally.
         this.deltaConnection = new StatefulDocumentDeltaConnection();
-        // this.deltaConnection.on("op", this.opHandler);
-        // this.deltaConnection.on("signal", this.signalHandler);
-        // this.deltaConnection.on("nack", this.nackHandler);
-        // this.deltaConnection.on("disconnect", this.disconnectHandler);
-        // this.deltaConnection.on("error", this.errorHandler);
-        // this.deltaConnection.on("pong", this.pongHandler);
+        this.deltaConnection.on("op", this.opHandler);
+        this.deltaConnection.on("signal", this.signalHandler);
+        this.deltaConnection.on("nack", this.nackHandler);
+        this.deltaConnection.on("disconnect", this.disconnectHandler);
+        this.deltaConnection.on("error", this.errorHandler);
+        this.deltaConnection.on("pong", this.pongHandler);
         // ???
         // this.deltaConnection.on("connect", this.setupNewSuccessfulConnection);
 
@@ -854,7 +855,8 @@ export class DeltaManager
         if (this.deltaConnection.connected) {
             this.deltaConnection.releaseCurrentConnection();
         }
-        this.disconnectFromDeltaStream(error !== undefined ? `${error.message}` : "Container closed");
+        this.disconnectFromDeltaStream();
+        this.transitionToDisconnectedState(error !== undefined ? `${error.message}` : "Container closed");
 
         this._inbound.clear();
         this._outbound.clear();
@@ -943,7 +945,8 @@ export class DeltaManager
         if (this.deltaConnection.connected) {
             this.deltaConnection.releaseCurrentConnection();
         }
-        this.disconnectFromDeltaStream(reconnectInfo.message);
+        this.disconnectFromDeltaStream();
+        this.transitionToDisconnectedState(reconnectInfo.message);
 
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.reconnectOnError(
@@ -957,15 +960,18 @@ export class DeltaManager
         const error = createReconnectError("Disconnect", disconnectReason);
 
         // Shouldn't need to release here since the disconnect event already does this
-        this.disconnectFromDeltaStream(error.message);
+        this.disconnectFromDeltaStream();
+        this.transitionToDisconnectedState(error.message);
 
-        // Note: we might get multiple disconnect calls on same socket, as early disconnect notification
-        // ("server_disconnect", ODSP-specific) is mapped to "disconnect"
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.reconnectOnError(
-            this.defaultReconnectionMode,
-            error,
-        );
+        if (disconnectReason !== "releaseCurrentConnection") {
+            // Note: we might get multiple disconnect calls on same socket, as early disconnect notification
+            // ("server_disconnect", ODSP-specific) is mapped to "disconnect"
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            this.reconnectOnError(
+                this.defaultReconnectionMode,
+                error,
+            );
+        }
     };
 
     private readonly errorHandler = (error) => {
@@ -979,7 +985,8 @@ export class DeltaManager
         if (this.deltaConnection.connected) {
             this.deltaConnection.releaseCurrentConnection();
         }
-        this.disconnectFromDeltaStream(reconnectError.message);
+        this.disconnectFromDeltaStream();
+        this.transitionToDisconnectedState(reconnectError.message);
 
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.reconnectOnError(
@@ -992,18 +999,6 @@ export class DeltaManager
         this.emit("pong", latency);
     };
 
-    private setReadonlyFromNewConnection(connection: IDocumentDeltaConnection, requestedMode: ConnectionMode) {
-        // Does information in scopes & mode matches?
-        // If we asked for "write" and got "read", then file is read-only
-        // But if we ask read, server can still give us write.
-        const readonly = !connection.claims.scopes.includes(ScopeType.DocWrite);
-        const connectionMode = connection.mode ?? "read";
-        assert(requestedMode === "read" || readonly === (connectionMode === "read"),
-            0x0e7 /* "claims/connectionMode mismatch" */);
-        assert(!readonly || connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
-        this.set_readonlyPermissions(readonly);
-    }
-
     /**
      * Once we've successfully gotten a connection, we need to set up state, attach event listeners, and process
      * initial messages.
@@ -1014,18 +1009,19 @@ export class DeltaManager
         assert(this.connection === undefined, 0x0e6 /* "old connection exists on new connection setup" */);
         this.connection = connection;
 
-        connection.on("op", this.opHandler);
-        connection.on("signal", this.signalHandler);
-        connection.on("nack", this.nackHandler);
-        connection.on("disconnect", this.disconnectHandler);
-        connection.on("error", this.errorHandler);
-        connection.on("pong", this.pongHandler);
-
         this.transitionToConnectedState(connection, requestedMode);
     }
 
     private transitionToConnectedState(connection: IDocumentDeltaConnection, requestedMode: ConnectionMode) {
-        this.setReadonlyFromNewConnection(connection, requestedMode);
+        // Does information in scopes & mode matches?
+        // If we asked for "write" and got "read", then file is read-only
+        // But if we ask read, server can still give us write.
+        const readonly = !connection.claims.scopes.includes(ScopeType.DocWrite);
+        const connectionMode = connection.mode ?? "read";
+        assert(requestedMode === "read" || readonly === (connectionMode === "read"),
+            0x0e7 /* "claims/connectionMode mismatch" */);
+        assert(!readonly || connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
+        this.set_readonlyPermissions(readonly);
 
         this.refreshDelayInfo(this.deltaStreamDelayId);
 
@@ -1034,7 +1030,8 @@ export class DeltaManager
             if (this.deltaConnection.connected) {
                 this.deltaConnection.releaseCurrentConnection();
             }
-            this.disconnectFromDeltaStream(`Disconnect on close`);
+            this.disconnectFromDeltaStream();
+            this.transitionToDisconnectedState("Disconnect on close");
             return;
         }
 
@@ -1102,7 +1099,7 @@ export class DeltaManager
      * Disconnect the current connection.
      * @param reason - Text description of disconnect reason to emit with disconnect event
      */
-    private disconnectFromDeltaStream(reason: string) {
+    private disconnectFromDeltaStream() {
         if (this.connection === undefined) {
             return;
         }
@@ -1110,16 +1107,6 @@ export class DeltaManager
         const connection = this.connection;
         // Avoid any re-entrancy - clear object reference
         this.connection = undefined;
-
-        // Remove listeners first so we don't try to retrigger this flow accidentally through reconnectOnError
-        connection.off("op", this.opHandler);
-        connection.off("signal", this.signalHandler);
-        connection.off("nack", this.nackHandler);
-        connection.off("disconnect", this.disconnectHandler);
-        connection.off("error", this.errorHandler);
-        connection.off("pong", this.pongHandler);
-
-        this.transitionToDisconnectedState(reason);
 
         connection.close();
     }
