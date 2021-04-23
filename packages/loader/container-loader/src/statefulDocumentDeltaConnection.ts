@@ -199,7 +199,7 @@ export class StatefulDocumentDeltaConnection
             // TODO allow the assert
             console.error("Connection was already released before disconnect handler");
         } else {
-            this.releaseCurrentConnection(disconnectReason);
+            this.releaseCurrentConnectionCore(disconnectReason);
         }
     };
 
@@ -228,7 +228,15 @@ export class StatefulDocumentDeltaConnection
         this.emit("connected");
     }
 
-    public releaseCurrentConnection(disconnectReason?: any) {
+    public releaseCurrentConnection() {
+        if (this._deltaConnection === undefined) {
+            throw new Error("Tried to release current connection, but not currently connected");
+        }
+
+        this.releaseCurrentConnectionCore("releaseCurrentConnection");
+    }
+
+    private releaseCurrentConnectionCore(disconnectReason: any) {
         assert(this._deltaConnection !== undefined, "No connection to tear down");
         this._deltaConnection.off("op", this.opHandler);
         this._deltaConnection.off("signal", this.signalHandler);
