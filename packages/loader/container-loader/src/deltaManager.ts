@@ -272,9 +272,12 @@ export class DeltaManager
     }
 
     public get maxMessageSize(): number {
-        return this.connection?.serviceConfiguration?.maxMessageSize
-            ?? this.connection?.maxMessageSize
-            ?? DefaultChunkSize;
+        if (this.deltaConnection.connected) {
+            return this.deltaConnection.serviceConfiguration?.maxMessageSize
+                ?? this.deltaConnection.maxMessageSize;
+        } else {
+            return DefaultChunkSize;
+        }
     }
 
     public get version(): string {
@@ -1242,7 +1245,7 @@ export class DeltaManager
                         const error = new DataCorruptionError(
                             "Two messages with same seq# and different payload!",
                             {
-                                clientId: this.connection?.clientId,
+                                clientId: this.deltaConnection.connected ? this.deltaConnection.clientId : undefined,
                                 sequenceNumber: message.sequenceNumber,
                                 message1,
                                 message2,
