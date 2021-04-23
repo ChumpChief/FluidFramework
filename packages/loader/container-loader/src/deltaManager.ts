@@ -930,6 +930,8 @@ export class DeltaManager
             });
         }
 
+        this.disconnectFromDeltaStream(reconnectInfo.message);
+
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.reconnectOnError(
             "write",
@@ -939,12 +941,16 @@ export class DeltaManager
 
     // Connection mode is always read on disconnect/error unless the system mode was write.
     private readonly disconnectHandler = (disconnectReason) => {
+        const error = createReconnectError("Disconnect", disconnectReason);
+
+        this.disconnectFromDeltaStream(error.message);
+
         // Note: we might get multiple disconnect calls on same socket, as early disconnect notification
         // ("server_disconnect", ODSP-specific) is mapped to "disconnect"
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.reconnectOnError(
             this.defaultReconnectionMode,
-            createReconnectError("Disconnect", disconnectReason),
+            error,
         );
     };
 
@@ -953,10 +959,15 @@ export class DeltaManager
         // We are getting transport errors from WebSocket here, right before or after "disconnect".
         // This happens only in Firefox.
         logNetworkFailure(this.logger, { eventName: "DeltaConnectionError" }, error);
+
+        const reconnectError = createReconnectError("error", error);
+
+        this.disconnectFromDeltaStream(reconnectError.message);
+
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.reconnectOnError(
             this.defaultReconnectionMode,
-            createReconnectError("error", error),
+            reconnectError,
         );
     };
 
@@ -1119,13 +1130,6 @@ export class DeltaManager
         requestedMode: ConnectionMode,
         error: ICriticalContainerError,
     ) {
-        // We quite often get protocol errors before / after observing nack/disconnect
-        // we do not want to run through same sequence twice.
-        // If we're already disconnected/disconnecting it's not appropriate to call this again.
-        assert(this.connection !== undefined, 0x0eb /* "Missing connection for reconnect" */);
-
-        this.disconnectFromDeltaStream(error.message);
-
         // If reconnection is not an option, close the DeltaManager
         const canRetry = canRetryOnError(error);
         if (this.reconnectMode === ReconnectMode.Never || !canRetry) {
