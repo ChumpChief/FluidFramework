@@ -258,13 +258,13 @@ describe("Loader", () => {
                 it("Should override readonly", async () => {
                     await startDeltaManager();
 
-                    assert.strictEqual(deltaManager.readonly, false);
+                    assert.strictEqual(deltaManager.readonly, false, "Incorrect initially");
 
                     deltaManager.forceReadonly(true);
-                    assert.strictEqual(deltaManager.readonly, true);
+                    assert.strictEqual(deltaManager.readonly, true, "Incorrect after forcing readonly on");
 
                     deltaManager.forceReadonly(false);
-                    assert.strictEqual(deltaManager.readonly, false);
+                    assert.strictEqual(deltaManager.readonly, false, "Incorrect after forcing readonly off");
                 });
 
                 it("Should raise readonly event when container was not readonly", async () => {
