@@ -1111,6 +1111,14 @@ export class DeltaManager
         connection.off("error", this.errorHandler);
         connection.off("pong", this.pongHandler);
 
+        this.transitionToDisconnectedState(reason);
+
+        connection.close();
+
+        return true;
+    }
+
+    private transitionToDisconnectedState(reason: string) {
         // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
         // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
         // but it's safe to assume (until better design is put into place) that batches should not exist
@@ -1122,10 +1130,6 @@ export class DeltaManager
         this._outbound.pause();
         this._outbound.clear();
         this.emit("disconnect", reason);
-
-        connection.close();
-
-        return true;
     }
 
     /**
