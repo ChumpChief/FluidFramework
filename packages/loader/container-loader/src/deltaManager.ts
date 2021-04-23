@@ -1010,6 +1010,13 @@ export class DeltaManager
         assert(this.connection === undefined, 0x0e6 /* "old connection exists on new connection setup" */);
         this.connection = connection;
 
+        connection.on("op", this.opHandler);
+        connection.on("signal", this.signalHandler);
+        connection.on("nack", this.nackHandler);
+        connection.on("disconnect", this.disconnectHandler);
+        connection.on("error", this.errorHandler);
+        connection.on("pong", this.pongHandler);
+
         this.setReadonlyFromNewConnection(connection, requestedMode);
 
         this.refreshDelayInfo(this.deltaStreamDelayId);
@@ -1031,13 +1038,6 @@ export class DeltaManager
         assert(this.messageBuffer.length === 0, 0x0e9 /* "messageBuffer is not empty on new connection" */);
 
         this._outbound.resume();
-
-        connection.on("op", this.opHandler);
-        connection.on("signal", this.signalHandler);
-        connection.on("nack", this.nackHandler);
-        connection.on("disconnect", this.disconnectHandler);
-        connection.on("error", this.errorHandler);
-        connection.on("pong", this.pongHandler);
 
         const initialMessages = connection.initialMessages;
 
