@@ -281,32 +281,26 @@ export class DeltaManager
     }
 
     public get version(): string {
-        if (this.connection === undefined) {
-            throw new Error("Cannot check version without a connection");
-        }
-        return this.connection.version;
+        return this.deltaConnection.version;
     }
 
     public get serviceConfiguration(): IClientConfiguration | undefined {
-        return this.connection?.serviceConfiguration;
+        return this.deltaConnection.connected ? this.deltaConnection.serviceConfiguration : undefined;
     }
 
     public get scopes(): string[] | undefined {
-        return this.connection?.claims.scopes;
+        return this.deltaConnection.connected ? this.deltaConnection.claims.scopes : undefined;
     }
 
     public get socketDocumentId(): string | undefined {
-        return this.connection?.claims.documentId;
+        return this.deltaConnection.connected ? this.deltaConnection.claims.documentId : undefined;
     }
 
     /**
      * The current connection mode, initially read.
      */
     public get connectionMode(): ConnectionMode {
-        if (this.connection === undefined) {
-            return "read";
-        }
-        return this.connection.mode;
+        return this.deltaConnection.connected ? this.deltaConnection.mode : "read";
     }
 
     /**
