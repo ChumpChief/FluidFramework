@@ -393,7 +393,7 @@ export class DeltaManager
         const oldValue = this.readonly;
         this._forceReadonly = readonly;
         if (oldValue !== this.readonly) {
-            let reconnect = false;
+            const currentlyConnected = this.deltaConnection.connected;
             if (this.readonly === true) {
                 // If we switch to readonly while connected, we should disconnect first
                 // See comment in the "readonly" event handler to deltaManager set up by
@@ -401,10 +401,10 @@ export class DeltaManager
                 if (this.deltaConnection.connected) {
                     this.deltaConnection.releaseCurrentConnection();
                 }
-                reconnect = this.disconnectFromDeltaStream("Force readonly");
+                this.disconnectFromDeltaStream("Force readonly");
             }
             safeRaiseEvent(this, this.logger, "readonly", this.readonly);
-            if (reconnect) {
+            if (currentlyConnected) {
                 // reconnect if we disconnected from before.
                 this.triggerConnect({ reason: "forceReadonly", mode: "read", fetchOpsFromStorage: false });
             }
@@ -1104,7 +1104,7 @@ export class DeltaManager
      */
     private disconnectFromDeltaStream(reason: string) {
         if (this.connection === undefined) {
-            return false;
+            return;
         }
 
         const connection = this.connection;
@@ -1122,8 +1122,6 @@ export class DeltaManager
         this.transitionToDisconnectedState(reason);
 
         connection.close();
-
-        return true;
     }
 
     private transitionToDisconnectedState(reason: string) {
