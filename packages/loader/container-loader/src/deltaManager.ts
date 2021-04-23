@@ -1017,6 +1017,10 @@ export class DeltaManager
         connection.on("error", this.errorHandler);
         connection.on("pong", this.pongHandler);
 
+        this.transitionToConnectedState(connection, requestedMode);
+    }
+
+    private transitionToConnectedState(connection: IDocumentDeltaConnection, requestedMode: ConnectionMode) {
         this.setReadonlyFromNewConnection(connection, requestedMode);
 
         this.refreshDelayInfo(this.deltaStreamDelayId);
