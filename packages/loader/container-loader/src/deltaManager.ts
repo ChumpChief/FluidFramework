@@ -740,9 +740,9 @@ export class DeltaManager
         // reset clientSequenceNumber if we are using new clientId.
         // we keep info about old connection as long as possible to be able to account for all non-acked ops
         // that we pick up on next connection.
-        assert(!!this.connection, 0x0e4 /* "Lost old connection!" */);
-        if (this.lastSubmittedClientId !== this.connection?.clientId) {
-            this.lastSubmittedClientId = this.connection?.clientId;
+        assert(this.deltaConnection.connected, 0x0e4 /* "Lost old connection!" */);
+        if (this.lastSubmittedClientId !== this.deltaConnection.clientId) {
+            this.lastSubmittedClientId = this.deltaConnection.clientId;
             this.clientSequenceNumber = 0;
             this.clientSequenceNumberObserved = 0;
         }
@@ -842,6 +842,13 @@ export class DeltaManager
         this.closed = true;
 
         this.closeAbortController.abort();
+
+        this.deltaConnection.off("op", this.opHandler);
+        this.deltaConnection.off("signal", this.signalHandler);
+        this.deltaConnection.off("nack", this.nackHandler);
+        this.deltaConnection.off("disconnect", this.disconnectHandler);
+        this.deltaConnection.off("error", this.errorHandler);
+        this.deltaConnection.off("pong", this.pongHandler);
 
         // This raises "disconnect" event if we have active connection.
         if (this.deltaConnection.connected) {
