@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+import { EventEmitter } from "events";
 import { default as AbortController } from "abort-controller";
 import { v4 as uuid } from "uuid";
 import {
@@ -48,7 +49,9 @@ import {
     createWriteError,
     createGenericNetworkError,
     getRetryDelayFromError,
+    isOnline,
     logNetworkFailure,
+    OnlineStatus,
     waitForConnectedState,
 } from "@fluidframework/driver-utils";
 import {
@@ -136,6 +139,77 @@ class NoDeltaStream extends TypedEventEmitter<IDocumentDeltaConnectionEvents> im
     }
 }
 
+class ExtendableTimer {
+    private timeoutId: ReturnType<typeof setTimeout> | undefined;
+    private expectedTimeout: number | undefined;
+    private timeoutExpiredP: Promise<void> | undefined;
+    private readonly timeoutExpiredEmitter = new EventEmitter();
+
+    private get remainingTime() {
+        return this.expectedTimeout === undefined ? 0 : this.expectedTimeout - Date.now();
+    }
+
+    private readonly expireTimer = () => {
+        this.timeoutId = undefined;
+        this.expectedTimeout = undefined;
+        this.timeoutExpiredP = undefined;
+        this.timeoutExpiredEmitter.emit("expired");
+    };
+
+    /**
+     * Ensure the timer will not expire any sooner than the given delay.
+     * @param milliseconds - minimum delay from the time of calling
+     */
+    public delayAtLeast(milliseconds: number) {
+        if (this.remainingTime >= milliseconds) {
+            // Nothing to do if we're already delaying longer
+            return;
+        }
+
+        // If the timer was not already set, set up the promise tracking the new timer's expiration
+        if (this.timeoutExpiredP === undefined) {
+            this.timeoutExpiredP = new Promise<void>((resolve) => {
+                this.timeoutExpiredEmitter.once("expired", () => { resolve(); });
+            });
+        }
+
+        // Clear the old timeout, we're about to extend it
+        if (this.timeoutId !== undefined) {
+            clearTimeout(this.timeoutId);
+        }
+
+        // Set up the new timeout and track roughly the remaining time so we can compare against future calls
+        this.timeoutId = setTimeout(this.expireTimer, milliseconds);
+        this.expectedTimeout = Date.now() + milliseconds;
+    }
+
+    /**
+     * Wait for the timer to expire (including any extensions it gets during the waiting period)
+     * @returns A Promise that resolves once the timer expires
+     */
+    public async waitForTimerExpired() {
+        if (this.timeoutExpiredP !== undefined) {
+            return this.timeoutExpiredP;
+        }
+        // If no promise, then there's no active timer.
+    }
+}
+
+async function waitForOnlineOrTimeout(timeout: number = 30000): Promise<void> {
+    // Don't need to wait if we're already Online, and if Unknown then we won't get any signal to wait for.
+    if (isOnline() === OnlineStatus.Offline && window?.addEventListener !== undefined) {
+        return new Promise((resolve) => {
+            const declareOnline = () => {
+                resolve();
+                window.removeEventListener("online", declareOnline);
+            };
+            window.addEventListener("online", declareOnline);
+            // Even if we think we're offline, maybe we're not?  Try after a timeout anyway.
+            setTimeout(declareOnline, timeout);
+        });
+    }
+}
+
 /**
  * Manages the flow of both inbound and outbound messages. This class ensures that shared objects receive delta
  * messages in order regardless of possible network conditions or timings causing out of order delivery.
@@ -164,7 +238,7 @@ export class DeltaManager
     private _forceReadonly = false;
 
     // Connection mode used when reconnecting on error or disconnect.
-    private readonly defaultReconnectionMode: ConnectionMode;
+    private defaultReconnectionMode: ConnectionMode;
 
     private pending: ISequencedDocumentMessage[] = [];
     private fetching = false;
@@ -194,6 +268,7 @@ export class DeltaManager
     private readonly _inboundSignal: DeltaQueue<ISignalMessage>;
     private readonly _outbound: DeltaQueue<IDocumentMessage[]>;
 
+    private readonly serverRetryDelay = new ExtendableTimer();
     private connectionP: Promise<IDocumentDeltaConnection> | undefined;
     private connection: IDocumentDeltaConnection | undefined;
     private clientSequenceNumber = 0;
@@ -393,7 +468,6 @@ export class DeltaManager
         const oldValue = this.readonly;
         this._forceReadonly = readonly;
         if (oldValue !== this.readonly) {
-            const currentlyConnected = this.deltaConnection.connected;
             if (this.readonly === true) {
                 // If we switch to readonly while connected, we should disconnect first
                 // See comment in the "readonly" event handler to deltaManager set up by
@@ -401,14 +475,8 @@ export class DeltaManager
                 if (this.deltaConnection.connected) {
                     this.deltaConnection.releaseCurrentConnection();
                 }
-                this.disconnectFromDeltaStream();
-                this.transitionToDisconnectedState("Force readonly");
             }
             safeRaiseEvent(this, this.logger, "readonly", this.readonly);
-            if (currentlyConnected) {
-                // reconnect if we disconnected from before.
-                this.triggerConnect({ reason: "forceReadonly", mode: "read", fetchOpsFromStorage: false });
-            }
         }
     }
 
@@ -934,6 +1002,8 @@ export class DeltaManager
             ? getNackReconnectInfo(message.content) :
             createGenericNetworkError(`Nack: unknown reason`, true);
 
+        this.updateStateFromError(reconnectInfo);
+
         if (this.reconnectMode !== ReconnectMode.Enabled) {
             this.logger.sendErrorEvent({
                 eventName: "NackWithNoReconnect",
@@ -942,35 +1012,35 @@ export class DeltaManager
             });
         }
 
+        // The nack means we tried to write, so when we trigger the reconnect it should be in write mode.
+        this.defaultReconnectionMode = "write";
+
         if (this.deltaConnection.connected) {
             this.deltaConnection.releaseCurrentConnection();
         }
-        this.disconnectFromDeltaStream();
-        this.transitionToDisconnectedState(reconnectInfo.message);
-
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.reconnectOnError(
-            "write",
-            reconnectInfo,
-        );
     };
 
     // Connection mode is always read on disconnect/error unless the system mode was write.
     private readonly disconnectHandler = (disconnectReason) => {
         const error = createReconnectError("Disconnect", disconnectReason);
 
+        this.updateStateFromError(error);
+
         // Shouldn't need to release here since the disconnect event already does this
         this.disconnectFromDeltaStream();
         this.transitionToDisconnectedState(error.message);
 
-        if (disconnectReason !== "releaseCurrentConnection") {
-            // Note: we might get multiple disconnect calls on same socket, as early disconnect notification
-            // ("server_disconnect", ODSP-specific) is mapped to "disconnect"
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            this.reconnectOnError(
-                this.defaultReconnectionMode,
-                error,
-            );
+        if (this.reconnectMode === ReconnectMode.Enabled) {
+            Promise.all([waitForOnlineOrTimeout(), this.serverRetryDelay.waitForTimerExpired()])
+                .then(() => {
+                    const mode = this._forceReadonly ? "read" : this.defaultReconnectionMode;
+                    this.triggerConnect({
+                        reason: "reconnect",
+                        mode,
+                        fetchOpsFromStorage: false,
+                    });
+                })
+                .catch(() => { console.error("Failed on reconnect"); });
         }
     };
 
@@ -982,17 +1052,11 @@ export class DeltaManager
 
         const reconnectError = createReconnectError("error", error);
 
+        this.updateStateFromError(reconnectError);
+
         if (this.deltaConnection.connected) {
             this.deltaConnection.releaseCurrentConnection();
         }
-        this.disconnectFromDeltaStream();
-        this.transitionToDisconnectedState(reconnectError.message);
-
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.reconnectOnError(
-            this.defaultReconnectionMode,
-            reconnectError,
-        );
     };
 
     private readonly pongHandler = (latency: number) => {
@@ -1125,17 +1189,7 @@ export class DeltaManager
         this.emit("disconnect", reason);
     }
 
-    /**
-     * Disconnect the current connection and reconnect.
-     * @param connection - The connection that wants to reconnect - no-op if it's different from this.connection
-     * @param requestedMode - Read or write
-     * @param reconnectInfo - Error reconnect information including whether or not to reconnect
-     * @returns A promise that resolves when the connection is reestablished or we stop trying
-     */
-    private async reconnectOnError(
-        requestedMode: ConnectionMode,
-        error: ICriticalContainerError,
-    ) {
+    private updateStateFromError(error: ICriticalContainerError) {
         // If reconnection is not an option, close the DeltaManager
         const canRetry = canRetryOnError(error);
         if (this.reconnectMode === ReconnectMode.Never || !canRetry) {
@@ -1145,19 +1199,15 @@ export class DeltaManager
             this.close(canRetry ? undefined : error);
         }
 
-        // If closed then we can't reconnect
+        // If closed then we can't reconnect, don't need to bother with delay tracking
         if (this.closed) {
             return;
         }
 
-        if (this.reconnectMode === ReconnectMode.Enabled) {
-            const delay = getRetryDelayFromError(error);
-            if (delay !== undefined) {
-                this.emitDelayInfo(this.deltaStreamDelayId, delay, error);
-                await waitForConnectedState(delay * 1000);
-            }
-
-            this.triggerConnect({ reason: "reconnect", mode: requestedMode, fetchOpsFromStorage: false });
+        const delay = getRetryDelayFromError(error);
+        if (delay !== undefined) {
+            this.emitDelayInfo(this.deltaStreamDelayId, delay, error);
+            this.serverRetryDelay.delayAtLeast(delay * 1000);
         }
     }
 
