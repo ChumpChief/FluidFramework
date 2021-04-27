@@ -89,7 +89,7 @@ describe("Loader", () => {
                     () => service,
                     client as IClient,
                     logger,
-                    false,
+                    true,
                     () => false,
                 );
 
