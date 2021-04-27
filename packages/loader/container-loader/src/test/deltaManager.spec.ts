@@ -272,20 +272,24 @@ describe("Loader", () => {
                     let runCount = 0;
 
                     deltaManager.on("readonly", (readonly: boolean) => {
-                        assert.strictEqual(readonly, true);
+                        assert.strictEqual(readonly, true, "Appears writable after forcing readonly");
                         runCount++;
                     });
 
                     deltaManager.forceReadonly(true);
-                    assert.strictEqual(runCount, 1);
+                    assert.strictEqual(runCount, 1, "Wrong number of runs for the readonly event");
                 });
 
-                it("Shouldn't raise readonly event when container was already readonly", async () => {
+                it.skip("Shouldn't raise readonly event when container was already readonly", async () => {
                     await startDeltaManager();
 
-                    // Closing underlying connection makes container readonly
+                    // Closing underlying connection makes container readonly <-- THIS IS FALSE
+                    // In the current implementation, the test runs with reconnectAllowed false.  So closing the
+                    // deltaConnection causes the whole container to close, which sets readonlyPermissions
+                    // to false.  So this test isn't testing what it thinks it is.  Now that the test uses
+                    // reconnectAllowed true, it exposes that this was never the behavior.
                     deltaConnection.close();
-                    assert.strictEqual(deltaManager.readonly, true);
+                    assert.strictEqual(deltaManager.readonly, true, "Appears writable after closing the connection");
 
                     deltaManager.on("readonly", () => {
                         assert.fail("Shouldn't be called");
