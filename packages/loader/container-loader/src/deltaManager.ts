@@ -465,13 +465,16 @@ export class DeltaManager
      * @param readonly - set or clear force readonly.
      */
     public forceReadonly(readonly: boolean) {
+        const oldValue = this.readonly;
         this._forceReadonly = readonly;
-        if (this._readonlyPermissions !== readonly) {
-            // If we switch to readonly while connected, we should disconnect first
-            // See comment in the "readonly" event handler to deltaManager set up by
-            // the ContainerRuntime constructor
-            if (this.deltaConnection.connected) {
-                this.deltaConnection.releaseCurrentConnection();
+        if (oldValue !== this.readonly) {
+            if (this.readonly === true) {
+                // If we switch to readonly while connected, we should disconnect first
+                // See comment in the "readonly" event handler to deltaManager set up by
+                // the ContainerRuntime constructor
+                if (this.deltaConnection.connected) {
+                    this.deltaConnection.releaseCurrentConnection();
+                }
             }
             safeRaiseEvent(this, this.logger, "readonly", this.readonly);
         }
