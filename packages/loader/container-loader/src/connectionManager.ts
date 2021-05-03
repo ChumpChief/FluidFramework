@@ -151,9 +151,6 @@ export class ConnectionManager
     // Connection mode used when reconnecting on error or disconnect.
     private readonly defaultReconnectionMode: ConnectionMode;
 
-    // The minimum sequence number and last sequence number received from the server
-    private minSequenceNumber: number = 0;
-
     // There are three numbers we track
     // * lastQueuedSequenceNumber is the last queued sequence number. If there are gaps in seq numbers, then this number
     //   is not updated until we cover that gap, so it increases each time by 1.
@@ -162,12 +159,6 @@ export class ConnectionManager
     //   It's never less than lastQueuedSequenceNumber
     // * lastProcessedSequenceNumber - last processed sequence number
     private lastObservedSeqNumber: number = 0;
-    private lastProcessedSequenceNumber: number = 0;
-    private lastProcessedMessage: ISequencedDocumentMessage | undefined;
-    private baseTerm: number = 0;
-
-    // The sequence number we initially loaded from
-    private initSequenceNumber: number = 0;
 
     private connectionP: Promise<IDocumentDeltaConnection> | undefined;
     private connection: IDocumentDeltaConnection | undefined;
@@ -195,30 +186,6 @@ export class ConnectionManager
         // Valid to be called only if we have active connection.
         assert(this.connection !== undefined, 0x0df /* "Missing active connection" */);
         return this._hasCheckpointSequenceNumber;
-    }
-
-    public get initialSequenceNumber(): number {
-        return this.initSequenceNumber;
-    }
-
-    public get lastSequenceNumber(): number {
-        return this.lastProcessedSequenceNumber;
-    }
-
-    public get lastMessage() {
-        return this.lastProcessedMessage;
-    }
-
-    public get lastKnownSeqNumber() {
-        return this.lastObservedSeqNumber;
-    }
-
-    public get referenceTerm(): number {
-        return this.baseTerm;
-    }
-
-    public get minimumSequenceNumber(): number {
-        return this.minSequenceNumber;
     }
 
     public get maxMessageSize(): number {
@@ -395,10 +362,6 @@ export class ConnectionManager
         term: number,
         handler: IDeltaHandlerStrategy,
     ) {
-        this.initSequenceNumber = sequenceNumber;
-        this.lastProcessedSequenceNumber = sequenceNumber;
-        this.baseTerm = term;
-        this.minSequenceNumber = minSequenceNumber;
         this.lastObservedSeqNumber = sequenceNumber;
     }
 
