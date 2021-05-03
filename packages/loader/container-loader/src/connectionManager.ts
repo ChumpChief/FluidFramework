@@ -49,7 +49,6 @@ import {
 
 const MaxReconnectDelaySeconds = 8;
 const InitialReconnectDelaySeconds = 1;
-const DefaultChunkSize = 16 * 1024;
 
 function getNackReconnectInfo(nackContent: INackContent) {
     const reason = `Nack: ${nackContent.message}`;
@@ -164,12 +163,6 @@ export class ConnectionManager
 
     private readonly closeAbortController = new AbortController();
 
-    public get maxMessageSize(): number {
-        return this.connection?.serviceConfiguration?.maxMessageSize
-            ?? this.connection?.maxMessageSize
-            ?? DefaultChunkSize;
-    }
-
     /**
      * The current connection mode, initially read.
      */
@@ -219,14 +212,6 @@ export class ConnectionManager
         }
 
         return { readonly: this._readonlyPermissions };
-    }
-
-    /**
-     * Automatic reconnecting enabled or disabled.
-     * If set to Never, then reconnecting will never be allowed.
-     */
-    public get reconnectMode(): ReconnectMode {
-        return this._reconnectMode;
     }
 
     public shouldJoinWrite(): boolean {
@@ -536,7 +521,7 @@ export class ConnectionManager
             ? getNackReconnectInfo(message.content) :
             createGenericNetworkError(`Nack: unknown reason`, true);
 
-        if (this.reconnectMode !== ReconnectMode.Enabled) {
+        if (this._reconnectMode !== ReconnectMode.Enabled) {
             this.logger.sendErrorEvent({
                 eventName: "NackWithNoReconnect",
                 reason: reconnectInfo.message,
@@ -665,7 +650,7 @@ export class ConnectionManager
 
         // If reconnection is not an option, close the DeltaManager
         const canRetry = canRetryOnError(error);
-        if (this.reconnectMode === ReconnectMode.Never || !canRetry) {
+        if (this._reconnectMode === ReconnectMode.Never || !canRetry) {
             // Do not raise container error if we are closing just because we lost connection.
             // Those errors (like IdleDisconnect) would show up in telemetry dashboards and
             // are very misleading, as first initial reaction - some logic is broken.
@@ -677,7 +662,7 @@ export class ConnectionManager
             return;
         }
 
-        if (this.reconnectMode === ReconnectMode.Enabled) {
+        if (this._reconnectMode === ReconnectMode.Enabled) {
             const delay = getRetryDelayFromError(error);
             if (delay !== undefined) {
                 this.emitDelayInfo(this.deltaStreamDelayId, delay, error);
