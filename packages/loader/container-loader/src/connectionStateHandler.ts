@@ -123,7 +123,6 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
     public receivedConnectEvent(
         connectionMode: ConnectionMode,
         details: IConnectionDetails,
-        opsBehind?: number,
     ) {
         const oldState = this._connectionState;
         this._connectionState = ConnectionState.Connecting;

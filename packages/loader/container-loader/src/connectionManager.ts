@@ -133,12 +133,9 @@ export class ConnectionManager
     implements
     IEventProvider<IConnectionManagerInternalEvents>
 {
-    public get active(): boolean { return this._active(); }
-
     public get disposed() { return this.closed; }
 
     public readonly clientDetails: IClientDetails;
-    public get IDeltaSender() { return this; }
 
     /**
      * Controls whether the DeltaManager will automatically reconnect to the delta stream after receiving a disconnect.
@@ -373,7 +370,6 @@ export class ConnectionManager
         private client: IClient,
         private readonly logger: ITelemetryLogger,
         reconnectAllowed: boolean,
-        private readonly _active: () => boolean,
     ) {
         super();
 

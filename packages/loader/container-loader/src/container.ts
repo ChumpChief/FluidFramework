@@ -1538,7 +1538,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.connectionStateHandler.receivedConnectEvent(
                 this._deltaManager.connectionMode,
                 details,
-                opsBehind,
             );
 
             // Back-compat for new client and old server.
