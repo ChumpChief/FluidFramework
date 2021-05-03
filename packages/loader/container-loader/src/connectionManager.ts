@@ -16,9 +16,8 @@ import {
     ReadOnlyInfo,
 } from "@fluidframework/container-definitions";
 import { assert, performance, TypedEventEmitter } from "@fluidframework/common-utils";
-import { PerformanceEvent, TelemetryLogger, safeRaiseEvent, logIfFalse } from "@fluidframework/telemetry-utils";
+import { TelemetryLogger, safeRaiseEvent } from "@fluidframework/telemetry-utils";
 import {
-    IDocumentDeltaStorageService,
     IDocumentService,
     IDocumentDeltaConnection,
     IDocumentStorageService,
@@ -159,8 +158,6 @@ export class ConnectionManager
     // Connection mode used when reconnecting on error or disconnect.
     private readonly defaultReconnectionMode: ConnectionMode;
 
-    private fetching = false;
-
     // The minimum sequence number and last sequence number received from the server
     private minSequenceNumber: number = 0;
 
@@ -171,13 +168,10 @@ export class ConnectionManager
     //   populated at web socket connection time (if storage provides that info) and is  updated once ops shows up.
     //   It's never less than lastQueuedSequenceNumber
     // * lastProcessedSequenceNumber - last processed sequence number
-    private lastQueuedSequenceNumber: number = 0;
     private lastObservedSeqNumber: number = 0;
     private lastProcessedSequenceNumber: number = 0;
     private lastProcessedMessage: ISequencedDocumentMessage | undefined;
     private baseTerm: number = 0;
-
-    private previouslyProcessedMessage: ISequencedDocumentMessage | undefined;
 
     // The sequence number we initially loaded from
     private initSequenceNumber: number = 0;
@@ -191,10 +185,6 @@ export class ConnectionManager
     private closed = false;
     private storageService: RetriableDocumentStorageService | undefined;
     private readonly deltaStreamDelayId = uuid();
-    private readonly deltaStorageDelayId = uuid();
-
-    private handler: IDeltaHandlerStrategy | undefined;
-    private deltaStorage: IDocumentDeltaStorageService | undefined;
 
     private messageBuffer: IDocumentMessage[] = [];
 
@@ -444,16 +434,7 @@ export class ConnectionManager
         this.lastProcessedSequenceNumber = sequenceNumber;
         this.baseTerm = term;
         this.minSequenceNumber = minSequenceNumber;
-        this.lastQueuedSequenceNumber = sequenceNumber;
         this.lastObservedSeqNumber = sequenceNumber;
-    }
-
-    public async preFetchOps(cacheOnly: boolean) {
-        // Note that might already got connected to delta stream by now.
-        // If we did, then we proactively fetch ops at the end of setupNewSuccessfulConnection to ensure
-        if (this.connection === undefined) {
-            return this.fetchMissingDeltasCore("DocumentOpen", cacheOnly, this.lastQueuedSequenceNumber, undefined);
-        }
     }
 
     private static detailsFromConnection(connection: IDocumentDeltaConnection): IConnectionDetails {
@@ -499,7 +480,6 @@ export class ConnectionManager
             return this.connectionP;
         }
 
-        const fetchOpsFromStorage = args.fetchOpsFromStorage ?? true;
         let requestedMode = args.mode ?? this.defaultReconnectionMode;
 
         // if we have any non-acked ops from last connection, reconnect as "write".
@@ -509,24 +489,6 @@ export class ConnectionManager
         // so DDSes will immediately resubmit all pending ops, and some of them will be duplicates, corrupting document
         if (this.shouldJoinWrite()) {
             requestedMode = "write";
-        }
-
-        // Note: There is race condition here.
-        // We want to issue request to storage as soon as possible, to
-        // reduce latency of becoming current, thus this code here.
-        // But there is no ordering between fetching OPs and connection to delta stream
-        // As result, we might be behind by the time we connect to delta stream
-        // In case of r/w connection, that's not an issue, because we will hear our
-        // own "join" message and realize any gap client has in ops.
-        // But for view-only connection, we have no such signal, and with no traffic
-        // on the wire, we might be always behind.
-        // See comment at the end of setupNewSuccessfulConnection()
-        logIfFalse(
-            this.handler !== undefined || !fetchOpsFromStorage,
-            this.logger,
-            "CantFetchWithoutBaseline"); // can't fetch if no baseline
-        if (fetchOpsFromStorage && this.handler !== undefined) {
-            this.fetchMissingDeltas(args.reason, this.lastQueuedSequenceNumber);
         }
 
         const docService = this.serviceProvider();
@@ -627,41 +589,6 @@ export class ConnectionManager
         });
 
         return this.connectionP;
-    }
-
-    private async getDeltas(
-        from: number, // exclusive
-        to: number | undefined, // exclusive
-        callback: (messages: ISequencedDocumentMessage[]) => void,
-        cacheOnly: boolean)
-    {
-        const docService = this.serviceProvider();
-        if (docService === undefined) {
-            throw new Error("Delta manager is not attached");
-        }
-
-        if (this.deltaStorage === undefined) {
-            this.deltaStorage = await docService.connectToDeltaStorage();
-        }
-
-        const stream = this.deltaStorage.fetchMessages(
-            from, // inclusive
-            to, // exclusive
-            this.closeAbortController.signal,
-            cacheOnly);
-
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            const result = await stream.read();
-            if (result.done) {
-                break;
-            }
-            PerformanceEvent.timedExec(
-                this.logger,
-                { eventName: "GetDeltas_OpProcessing", count: result.value.length},
-                () => callback(result.value),
-                { end: true, cancel: "error" });
-        }
     }
 
     /**
@@ -844,22 +771,6 @@ export class ConnectionManager
             "connect",
             ConnectionManager.detailsFromConnection(connection),
             this._hasCheckpointSequenceNumber ? this.lastKnownSeqNumber - this.lastSequenceNumber : undefined);
-
-        // If we got some initial ops, then we know the gap and call above fetched ops to fill it.
-        // Same is true for "write" mode even if we have no ops - we will get self "join" ops very very soon.
-        // However if we are connecting as view-only, then there is no good signal to realize if client is behind.
-        // Thus we have to hit storage to see if any ops are there.
-        if (initialMessages.length === 0) {
-            if (checkpointSequenceNumber !== undefined) {
-                // We know how far we are behind (roughly). If it's non-zero gap, fetch ops right away.
-                if (checkpointSequenceNumber > this.lastQueuedSequenceNumber) {
-                    this.fetchMissingDeltas("AfterConnection", this.lastQueuedSequenceNumber);
-                }
-            // we do not know the gap, and we will not learn about it if socket is quite - have to ask.
-            } else if (connection.mode !== "write") {
-                this.fetchMissingDeltas("AfterConnection", this.lastQueuedSequenceNumber);
-            }
-        }
     }
 
     /**
@@ -935,67 +846,6 @@ export class ConnectionManager
             }
 
             this.triggerConnect({ reason: "reconnect", mode: requestedMode, fetchOpsFromStorage: false });
-        }
-    }
-
-    /**
-     * Retrieves the missing deltas between the given sequence numbers
-     */
-     private fetchMissingDeltas(telemetryEventSuffix: string, lastKnowOp: number, to?: number) {
-         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-         this.fetchMissingDeltasCore(telemetryEventSuffix, false /* cacheOnly */, lastKnowOp, to);
-     }
-
-     /**
-     * Retrieves the missing deltas between the given sequence numbers
-     */
-    private async fetchMissingDeltasCore(
-        telemetryEventSuffix: string,
-        cacheOnly: boolean,
-        lastKnowOp: number,
-        to?: number)
-    {
-        // Exit out early if we're already fetching deltas
-        if (this.fetching) {
-            return;
-        }
-
-        if (this.closed) {
-            this.logger.sendTelemetryEvent({ eventName: "fetchMissingDeltasClosedConnection" });
-            return;
-        }
-
-        try {
-            assert(lastKnowOp === this.lastQueuedSequenceNumber, 0x0f1 /* "from arg" */);
-            let from = lastKnowOp + 1;
-
-            const n = this.previouslyProcessedMessage?.sequenceNumber;
-            if (n !== undefined) {
-                // If we already processed at least one op, then we have this.previouslyProcessedMessage populated
-                // and can use it to validate that we are operating on same file, i.e. it was not overwritten.
-                // Knowing about this mechanism, we could ask for op we already observed to increase validation.
-                // This is especially useful when coming out of offline mode or loading from
-                // very old cached (by client / driver) snapshot.
-                assert(n === lastKnowOp, 0x0f2 /* "previouslyProcessedMessage" */);
-                assert(from > 1, 0x0f3 /* "not positive" */);
-                from--;
-            }
-
-            this.fetching = true;
-
-            await this.getDeltas(
-                from,
-                to,
-                (messages) => {
-                    this.refreshDelayInfo(this.deltaStorageDelayId);
-                },
-                cacheOnly);
-        } catch (error) {
-            this.logger.sendErrorEvent({eventName: "GetDeltas_Exception"}, error);
-            this.close(CreateContainerError(error));
-        } finally {
-            this.refreshDelayInfo(this.deltaStorageDelayId);
-            this.fetching = false;
         }
     }
 
