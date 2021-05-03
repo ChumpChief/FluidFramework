@@ -16,20 +16,13 @@ import { TelemetryLogger, safeRaiseEvent } from "@fluidframework/telemetry-utils
 import {
     IDocumentService,
     IDocumentDeltaConnection,
-    IDocumentDeltaConnectionEvents,
 } from "@fluidframework/driver-definitions";
 import {
     ConnectionMode,
     IClient,
-    IClientConfiguration,
     IClientDetails,
-    IDocumentMessage,
     INack,
     INackContent,
-    ISequencedDocumentMessage,
-    ISignalClient,
-    ISignalMessage,
-    ITokenClaims,
     ScopeType,
 } from "@fluidframework/protocol-definitions";
 import {
@@ -80,42 +73,6 @@ export enum ReconnectMode {
  */
 export interface IConnectionManagerInternalEvents extends IDeltaManagerEvents {
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
-}
-
-/**
- * Implementation of IDocumentDeltaConnection that does not support submitting
- * or receiving ops. Used in storage-only mode.
- */
-class NoDeltaStream extends TypedEventEmitter<IDocumentDeltaConnectionEvents> implements IDocumentDeltaConnection {
-    clientId: string = "storage-only client";
-    claims: ITokenClaims = {
-        scopes: [ScopeType.DocRead],
-    } as any;
-    mode: ConnectionMode = "read";
-    existing: boolean = true;
-    maxMessageSize: number = 0;
-    version: string = "";
-    initialMessages: ISequencedDocumentMessage[] = [];
-    initialSignals: ISignalMessage[] = [];
-    initialClients: ISignalClient[] = [];
-    serviceConfiguration: IClientConfiguration = undefined as any;
-    checkpointSequenceNumber?: number | undefined = undefined;
-    submit(messages: IDocumentMessage[]): void {
-        this.emit("nack", this.clientId, messages.map((operation) => {
-            return {
-                operation,
-                content: { message: "Cannot submit with storage-only connection", code: 403 },
-            };
-        }));
-    }
-    submitSignal(message: any): void {
-        this.emit("nack", this.clientId, {
-            operation: message,
-            content: { message: "Cannot submit signal with storage-only connection", code: 403 },
-        });
-    }
-    close(): void {
-    }
 }
 
 /**
@@ -193,13 +150,12 @@ export class ConnectionManager
     }
 
     public get readOnlyInfo(): ReadOnlyInfo {
-        const storageOnly = this.connection !== undefined && this.connection instanceof NoDeltaStream;
-        if (storageOnly || this._forceReadonly || this._readonlyPermissions === true) {
+        if (this._forceReadonly || this._readonlyPermissions === true) {
             return {
                 readonly: true,
                 forced: this._forceReadonly,
                 permissions: this._readonlyPermissions,
-                storageOnly,
+                storageOnly: false,
             };
         }
 
@@ -344,15 +300,6 @@ export class ConnectionManager
         const docService = this.serviceProvider();
         if (docService === undefined) {
             throw new Error("Container is not attached");
-        }
-
-        if (docService.policies?.storageOnly === true) {
-            const connection = new NoDeltaStream();
-            this.connectionP = new Promise((resolve) => {
-                this.setupNewSuccessfulConnection(connection, "read");
-                resolve(connection);
-            });
-            return this.connectionP;
         }
 
         // The promise returned from connectCore will settle with a resolved connection or reject with error
