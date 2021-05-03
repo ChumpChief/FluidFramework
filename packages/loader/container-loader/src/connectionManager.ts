@@ -9,10 +9,9 @@ import {
     IConnectionDetails,
     IDeltaManagerEvents,
     ICriticalContainerError,
-    ReadOnlyInfo,
 } from "@fluidframework/container-definitions";
 import { assert, performance, TypedEventEmitter } from "@fluidframework/common-utils";
-import { TelemetryLogger, safeRaiseEvent } from "@fluidframework/telemetry-utils";
+import { TelemetryLogger } from "@fluidframework/telemetry-utils";
 import {
     IDocumentService,
     IDocumentDeltaConnection,
@@ -23,11 +22,9 @@ import {
     IClientDetails,
     INack,
     INackContent,
-    ScopeType,
 } from "@fluidframework/protocol-definitions";
 import {
     canRetryOnError,
-    createWriteError,
     createGenericNetworkError,
     getRetryDelayFromError,
     logNetworkFailure,
@@ -61,12 +58,6 @@ export interface IConnectionArgs {
     reason: string;
 }
 
-export enum ReconnectMode {
-    Never = "Never",
-    Disabled = "Disabled",
-    Enabled = "Enabled",
-}
-
 /**
  * Includes events emitted by the concrete implementation DeltaManager
  * but not exposed on the public interface IDeltaManager
@@ -84,163 +75,26 @@ export class ConnectionManager
     implements
     IEventProvider<IConnectionManagerInternalEvents>
 {
-    public get disposed() { return this.closed; }
-
     public readonly clientDetails: IClientDetails;
-
-    /**
-     * Controls whether the DeltaManager will automatically reconnect to the delta stream after receiving a disconnect.
-     */
-    private _reconnectMode: ReconnectMode;
-
-    // file ACL - whether user has only read-only access to a file
-    private _readonlyPermissions: boolean | undefined;
-
-    // tracks host requiring read-only mode.
-    private _forceReadonly = false;
-
-    // Connection mode used when reconnecting on error or disconnect.
-    private readonly defaultReconnectionMode: ConnectionMode;
 
     private connectionP: Promise<IDocumentDeltaConnection> | undefined;
     private connection: IDocumentDeltaConnection | undefined;
-    private clientSequenceNumber = 0;
-    private clientSequenceNumberObserved = 0;
-    // Counts the number of noops sent by the client which may not be acked.
-    private trailingNoopCount = 0;
     private closed = false;
 
     private readonly closeAbortController = new AbortController();
-
-    /**
-     * The current connection mode, initially read.
-     */
-    public get connectionMode(): ConnectionMode {
-        if (this.connection === undefined) {
-            return "read";
-        }
-        return this.connection.mode;
-    }
-
-    /**
-     * Tells if container is in read-only mode.
-     * Data stores should listen for "readonly" notifications and disallow user
-     * making changes to data stores.
-     * Readonly state can be because of no storage write permission,
-     * or due to host forcing readonly mode for container.
-     * It is undefined if we have not yet established websocket connection
-     * and do not know if user has write access to a file.
-     * @deprecated - use readOnlyInfo
-     */
-    public get readonly() {
-        if (this._forceReadonly) {
-            return true;
-        }
-        return this._readonlyPermissions;
-    }
-
-    /**
-     * Tells if user has no write permissions for file in storage
-     * It is undefined if we have not yet established websocket connection
-     * and do not know if user has write access to a file.
-     * @deprecated - use readOnlyInfo
-     */
-    public get readonlyPermissions() {
-        return this._readonlyPermissions;
-    }
-
-    public get readOnlyInfo(): ReadOnlyInfo {
-        if (this._forceReadonly || this._readonlyPermissions === true) {
-            return {
-                readonly: true,
-                forced: this._forceReadonly,
-                permissions: this._readonlyPermissions,
-                storageOnly: false,
-            };
-        }
-
-        return { readonly: this._readonlyPermissions };
-    }
-
-    public shouldJoinWrite(): boolean {
-        // We don't have to wait for ack for topmost NoOps. So subtract those.
-        return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
-    }
-
-    /**
-     * Enables or disables automatic reconnecting.
-     * Will throw an error if reconnectMode set to Never.
-     */
-    public setAutomaticReconnect(reconnect: boolean): void {
-        assert(
-            this._reconnectMode !== ReconnectMode.Never,
-            0x0e1 /* "Cannot toggle automatic reconnect if reconnect is set to Never." */);
-        this._reconnectMode = reconnect ? ReconnectMode.Enabled : ReconnectMode.Disabled;
-    }
-
-    /**
-     * Sends signal to runtime (and data stores) to be read-only.
-     * Hosts may have read only views, indicating to data stores that no edits are allowed.
-     * This is independent from this._readonlyPermissions (permissions) and this.connectionMode
-     * (server can return "write" mode even when asked for "read")
-     * Leveraging same "readonly" event as runtime & data stores should behave the same in such case
-     * as in read-only permissions.
-     * But this.active can be used by some DDSes to figure out if ops can be sent
-     * (for example, read-only view still participates in code proposals / upgrades decisions)
-     *
-     * Forcing Readonly does not prevent DDS from generating ops. It is up to user code to honour
-     * the readonly flag. If ops are generated, they will accumulate locally and not be sent. If
-     * there are pending in the outbound queue, it will stop sending until force readonly is
-     * cleared.
-     *
-     * @param readonly - set or clear force readonly.
-     */
-    public forceReadonly(readonly: boolean) {
-        const oldValue = this.readonly;
-        this._forceReadonly = readonly;
-        if (oldValue !== this.readonly) {
-            let reconnect = false;
-            if (this.readonly === true) {
-                // If we switch to readonly while connected, we should disconnect first
-                // See comment in the "readonly" event handler to deltaManager set up by
-                // the ContainerRuntime constructor
-                reconnect = this.disconnectFromDeltaStream("Force readonly");
-            }
-            safeRaiseEvent(this, this.logger, "readonly", this.readonly);
-            if (reconnect) {
-                // reconnect if we disconnected from before.
-                this.triggerConnect({ reason: "forceReadonly", mode: "read", fetchOpsFromStorage: false });
-            }
-        }
-    }
-
-    private set_readonlyPermissions(readonly: boolean) {
-        const oldValue = this.readonly;
-        this._readonlyPermissions = readonly;
-        if (oldValue !== this.readonly) {
-            safeRaiseEvent(this, this.logger, "readonly", this.readonly);
-        }
-    }
 
     constructor(
         private readonly serviceProvider: () => IDocumentService | undefined,
         private client: IClient,
         private readonly logger: ITelemetryLogger,
-        reconnectAllowed: boolean,
     ) {
         super();
 
         this.clientDetails = this.client.details;
-        this.defaultReconnectionMode = this.client.mode;
-        this._reconnectMode = reconnectAllowed ? ReconnectMode.Enabled : ReconnectMode.Never;
 
         // Initially, all queues are created paused.
         // - outbound is flipped back and forth in setupNewSuccessfulConnection / disconnectFromDeltaStream
         // - inbound & inboundSignal are resumed in attachOpHandler() when we have handler setup
-    }
-
-    public dispose() {
-        throw new Error("Not implemented.");
     }
 
     private static detailsFromConnection(connection: IDocumentDeltaConnection): IConnectionDetails {
@@ -286,16 +140,8 @@ export class ConnectionManager
             return this.connectionP;
         }
 
-        let requestedMode = args.mode ?? this.defaultReconnectionMode;
-
-        // if we have any non-acked ops from last connection, reconnect as "write".
-        // without that we would connect in view-only mode, which will result in immediate
-        // firing of "connected" event from Container and switch of current clientId (as tracked
-        // by all DDSes). This will make it impossible to figure out if ops actually made it through,
-        // so DDSes will immediately resubmit all pending ops, and some of them will be duplicates, corrupting document
-        if (this.shouldJoinWrite()) {
-            requestedMode = "write";
-        }
+        // Always join write for now
+        const requestedMode = "write";
 
         const docService = this.serviceProvider();
         if (docService === undefined) {
@@ -399,11 +245,6 @@ export class ConnectionManager
         // This raises "disconnect" event if we have active connection.
         this.disconnectFromDeltaStream(error !== undefined ? `${error.message}` : "Container closed");
 
-        // Notify everyone we are in read-only state.
-        // Useful for data stores in case we hit some critical error,
-        // to switch to a mode where user edits are not accepted
-        this.set_readonlyPermissions(true);
-
         // This needs to be the last thing we do (before removing listeners), as it causes
         // Container to dispose context and break ability of data stores / runtime to "hear"
         // from delta manager, including notification (above) about readonly state.
@@ -415,28 +256,14 @@ export class ConnectionManager
     // Always connect in write mode after getting nacked.
     private readonly nackHandler = (documentId: string, messages: INack[]) => {
         const message = messages[0];
-        // TODO: we should remove this check when service updates?
-        // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-        if (this._readonlyPermissions) {
-            this.close(createWriteError("WriteOnReadOnlyDocument"));
-        }
 
         // check message.content for Back-compat with old service.
         const reconnectInfo = message.content !== undefined
             ? getNackReconnectInfo(message.content) :
             createGenericNetworkError(`Nack: unknown reason`, true);
 
-        if (this._reconnectMode !== ReconnectMode.Enabled) {
-            this.logger.sendErrorEvent({
-                eventName: "NackWithNoReconnect",
-                reason: reconnectInfo.message,
-                mode: this.connectionMode,
-            });
-        }
-
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.reconnectOnError(
-            "write",
             reconnectInfo,
         );
     };
@@ -447,7 +274,6 @@ export class ConnectionManager
         // ("server_disconnect", ODSP-specific) is mapped to "disconnect"
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.reconnectOnError(
-            this.defaultReconnectionMode,
             createReconnectError("Disconnect", disconnectReason),
         );
     };
@@ -459,7 +285,6 @@ export class ConnectionManager
         logNetworkFailure(this.logger, { eventName: "DeltaConnectionError" }, error);
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.reconnectOnError(
-            this.defaultReconnectionMode,
             createReconnectError("error", error),
         );
     };
@@ -473,15 +298,6 @@ export class ConnectionManager
         // Old connection should have been cleaned up before establishing a new one
         assert(this.connection === undefined, 0x0e6 /* "old connection exists on new connection setup" */);
         this.connection = connection;
-
-        // Does information in scopes & mode matches?
-        // If we asked for "write" and got "read", then file is read-only
-        // But if we ask read, server can still give us write.
-        const readonly = !connection.claims.scopes.includes(ScopeType.DocWrite);
-        assert(requestedMode === "read" || readonly === (this.connectionMode === "read"),
-            0x0e7 /* "claims/connectionMode mismatch" */);
-        assert(!readonly || this.connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
-        this.set_readonlyPermissions(readonly);
 
         if (this.closed) {
             // Raise proper events, Log telemetry event and close connection.
@@ -535,7 +351,6 @@ export class ConnectionManager
      * @returns A promise that resolves when the connection is reestablished or we stop trying
      */
     private async reconnectOnError(
-        requestedMode: ConnectionMode,
         error: ICriticalContainerError,
     ) {
         // We quite often get protocol errors before / after observing nack/disconnect
@@ -547,7 +362,7 @@ export class ConnectionManager
 
         // If reconnection is not an option, close the DeltaManager
         const canRetry = canRetryOnError(error);
-        if (this._reconnectMode === ReconnectMode.Never || !canRetry) {
+        if (!canRetry) {
             // Do not raise container error if we are closing just because we lost connection.
             // Those errors (like IdleDisconnect) would show up in telemetry dashboards and
             // are very misleading, as first initial reaction - some logic is broken.
@@ -559,13 +374,12 @@ export class ConnectionManager
             return;
         }
 
-        if (this._reconnectMode === ReconnectMode.Enabled) {
-            const delay = getRetryDelayFromError(error);
-            if (delay !== undefined) {
-                await waitForConnectedState(delay * 1000);
-            }
-
-            this.triggerConnect({ reason: "reconnect", mode: requestedMode, fetchOpsFromStorage: false });
+        const delay = getRetryDelayFromError(error);
+        if (delay !== undefined) {
+            await waitForConnectedState(delay * 1000);
         }
+
+        // Always connect in write mode for now
+        this.triggerConnect({ reason: "reconnect", mode: "write", fetchOpsFromStorage: false });
     }
 }
