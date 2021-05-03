@@ -4,14 +4,11 @@
  */
 
 import { default as AbortController } from "abort-controller";
-import { v4 as uuid } from "uuid";
 import { ITelemetryLogger, IEventProvider } from "@fluidframework/common-definitions";
 import {
     IConnectionDetails,
     IDeltaManagerEvents,
     ICriticalContainerError,
-    ContainerErrorType,
-    IThrottlingWarning,
     ReadOnlyInfo,
 } from "@fluidframework/container-definitions";
 import { assert, performance, TypedEventEmitter } from "@fluidframework/common-utils";
@@ -82,7 +79,6 @@ export enum ReconnectMode {
  * but not exposed on the public interface IDeltaManager
  */
 export interface IConnectionManagerInternalEvents extends IDeltaManagerEvents {
-    (event: "throttled", listener: (error: IThrottlingWarning) => void);
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
 }
 
@@ -156,10 +152,6 @@ export class ConnectionManager
     // Counts the number of noops sent by the client which may not be acked.
     private trailingNoopCount = 0;
     private closed = false;
-    private readonly deltaStreamDelayId = uuid();
-
-    private readonly throttlingIdSet = new Set<string>();
-    private timeTillThrottling: number = 0;
 
     private readonly closeAbortController = new AbortController();
 
@@ -405,9 +397,6 @@ export class ConnectionManager
                     const retryDelayFromError = getRetryDelayFromError(origError);
                     delay = retryDelayFromError ?? Math.min(delay * 2, MaxReconnectDelaySeconds);
 
-                    if (retryDelayFromError !== undefined) {
-                        this.emitDelayInfo(retryDelayFromError, error);
-                    }
                     await waitForConnectedState(delay * 1000);
                 }
             }
@@ -474,36 +463,6 @@ export class ConnectionManager
         this.emit("closed", error);
 
         this.removeAllListeners();
-    }
-
-    private refreshDelayInfo() {
-        this.throttlingIdSet.delete(this.deltaStreamDelayId);
-        if (this.throttlingIdSet.size === 0) {
-            this.timeTillThrottling = 0;
-        }
-    }
-
-    private emitDelayInfo(
-        delaySeconds: number,
-        error: ICriticalContainerError,
-    ) {
-        const timeNow = Date.now();
-        this.throttlingIdSet.add(this.deltaStreamDelayId);
-        if (delaySeconds > 0 && (timeNow + delaySeconds > this.timeTillThrottling)) {
-            this.timeTillThrottling = timeNow + delaySeconds;
-
-            // Add 'throttling' properties to an error with safely extracted properties:
-            const throttlingWarning: IThrottlingWarning = {
-                errorType: ContainerErrorType.throttlingError,
-                message: `Service busy/throttled: ${error.message}`,
-                retryAfterSeconds: delaySeconds,
-            };
-            const reconfiguredError: IThrottlingWarning = {
-                ...CreateContainerError(error),
-                ...throttlingWarning,
-            };
-            this.emit("throttled", reconfiguredError);
-        }
     }
 
     // Always connect in write mode after getting nacked.
@@ -580,8 +539,6 @@ export class ConnectionManager
             0x0e7 /* "claims/connectionMode mismatch" */);
         assert(!readonly || this.connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
         this.set_readonlyPermissions(readonly);
-
-        this.refreshDelayInfo();
 
         if (this.closed) {
             // Raise proper events, Log telemetry event and close connection.
@@ -664,7 +621,6 @@ export class ConnectionManager
         if (this._reconnectMode === ReconnectMode.Enabled) {
             const delay = getRetryDelayFromError(error);
             if (delay !== undefined) {
-                this.emitDelayInfo(delay, error);
                 await waitForConnectedState(delay * 1000);
             }
 
