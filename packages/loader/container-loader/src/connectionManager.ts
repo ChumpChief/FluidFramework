@@ -406,7 +406,7 @@ export class ConnectionManager
                     delay = retryDelayFromError ?? Math.min(delay * 2, MaxReconnectDelaySeconds);
 
                     if (retryDelayFromError !== undefined) {
-                        this.emitDelayInfo(this.deltaStreamDelayId, retryDelayFromError, error);
+                        this.emitDelayInfo(retryDelayFromError, error);
                     }
                     await waitForConnectedState(delay * 1000);
                 }
@@ -476,20 +476,19 @@ export class ConnectionManager
         this.removeAllListeners();
     }
 
-    public refreshDelayInfo(id: string) {
-        this.throttlingIdSet.delete(id);
+    private refreshDelayInfo() {
+        this.throttlingIdSet.delete(this.deltaStreamDelayId);
         if (this.throttlingIdSet.size === 0) {
             this.timeTillThrottling = 0;
         }
     }
 
-    public emitDelayInfo(
-        id: string,
+    private emitDelayInfo(
         delaySeconds: number,
         error: ICriticalContainerError,
     ) {
         const timeNow = Date.now();
-        this.throttlingIdSet.add(id);
+        this.throttlingIdSet.add(this.deltaStreamDelayId);
         if (delaySeconds > 0 && (timeNow + delaySeconds > this.timeTillThrottling)) {
             this.timeTillThrottling = timeNow + delaySeconds;
 
@@ -582,7 +581,7 @@ export class ConnectionManager
         assert(!readonly || this.connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
         this.set_readonlyPermissions(readonly);
 
-        this.refreshDelayInfo(this.deltaStreamDelayId);
+        this.refreshDelayInfo();
 
         if (this.closed) {
             // Raise proper events, Log telemetry event and close connection.
@@ -665,7 +664,7 @@ export class ConnectionManager
         if (this._reconnectMode === ReconnectMode.Enabled) {
             const delay = getRetryDelayFromError(error);
             if (delay !== undefined) {
-                this.emitDelayInfo(this.deltaStreamDelayId, delay, error);
+                this.emitDelayInfo(delay, error);
                 await waitForConnectedState(delay * 1000);
             }
 
