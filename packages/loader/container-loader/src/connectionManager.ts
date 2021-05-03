@@ -8,7 +8,6 @@ import { v4 as uuid } from "uuid";
 import { ITelemetryLogger, IEventProvider } from "@fluidframework/common-definitions";
 import {
     IConnectionDetails,
-    IDeltaHandlerStrategy,
     IDeltaManagerEvents,
     ICriticalContainerError,
     ContainerErrorType,
@@ -151,15 +150,6 @@ export class ConnectionManager
     // Connection mode used when reconnecting on error or disconnect.
     private readonly defaultReconnectionMode: ConnectionMode;
 
-    // There are three numbers we track
-    // * lastQueuedSequenceNumber is the last queued sequence number. If there are gaps in seq numbers, then this number
-    //   is not updated until we cover that gap, so it increases each time by 1.
-    // * lastObservedSeqNumber is  an estimation of last known sequence number for container in storage. It's initially
-    //   populated at web socket connection time (if storage provides that info) and is  updated once ops shows up.
-    //   It's never less than lastQueuedSequenceNumber
-    // * lastProcessedSequenceNumber - last processed sequence number
-    private lastObservedSeqNumber: number = 0;
-
     private connectionP: Promise<IDocumentDeltaConnection> | undefined;
     private connection: IDocumentDeltaConnection | undefined;
     private clientSequenceNumber = 0;
@@ -172,45 +162,12 @@ export class ConnectionManager
     private readonly throttlingIdSet = new Set<string>();
     private timeTillThrottling: number = 0;
 
-    // True if current connection has checkpoint information
-    // I.e. we know how far behind the client was at the time of establishing connection
-    private _hasCheckpointSequenceNumber = false;
-
     private readonly closeAbortController = new AbortController();
-
-    /**
-     * Tells if  current connection has checkpoint information.
-     * I.e. we know how far behind the client was at the time of establishing connection
-     */
-    public get hasCheckpointSequenceNumber() {
-        // Valid to be called only if we have active connection.
-        assert(this.connection !== undefined, 0x0df /* "Missing active connection" */);
-        return this._hasCheckpointSequenceNumber;
-    }
 
     public get maxMessageSize(): number {
         return this.connection?.serviceConfiguration?.maxMessageSize
             ?? this.connection?.maxMessageSize
             ?? DefaultChunkSize;
-    }
-
-    public get version(): string {
-        if (this.connection === undefined) {
-            throw new Error("Cannot check version without a connection");
-        }
-        return this.connection.version;
-    }
-
-    public get serviceConfiguration(): IClientConfiguration | undefined {
-        return this.connection?.serviceConfiguration;
-    }
-
-    public get scopes(): string[] | undefined {
-        return this.connection?.claims.scopes;
-    }
-
-    public get socketDocumentId(): string | undefined {
-        return this.connection?.claims.documentId;
     }
 
     /**
@@ -351,18 +308,6 @@ export class ConnectionManager
 
     public dispose() {
         throw new Error("Not implemented.");
-    }
-
-    /**
-     * Sets the sequence number from which inbound messages should be returned
-     */
-    public attachOpHandler(
-        minSequenceNumber: number,
-        sequenceNumber: number,
-        term: number,
-        handler: IDeltaHandlerStrategy,
-    ) {
-        this.lastObservedSeqNumber = sequenceNumber;
     }
 
     private static detailsFromConnection(connection: IDocumentDeltaConnection): IConnectionDetails {
@@ -665,25 +610,6 @@ export class ConnectionManager
         connection.on("error", this.errorHandler);
         connection.on("pong", this.pongHandler);
 
-        const initialMessages = connection.initialMessages;
-
-        this._hasCheckpointSequenceNumber = false;
-
-        // Some storages may provide checkpointSequenceNumber to identify how far client is behind.
-        const checkpointSequenceNumber = connection.checkpointSequenceNumber;
-        if (checkpointSequenceNumber !== undefined) {
-            this._hasCheckpointSequenceNumber = true;
-            this.updateLatestKnownOpSeqNumber(checkpointSequenceNumber);
-        }
-
-        // Update knowledge of how far we are behind, before raising "connect" event
-        // This is duplication of what enqueueMessages() does, but we have to raise event before we get there,
-        // so duplicating update logic here as well.
-        if (initialMessages.length > 0) {
-            this._hasCheckpointSequenceNumber = true;
-            this.updateLatestKnownOpSeqNumber(initialMessages[initialMessages.length - 1].sequenceNumber);
-        }
-
         // Notify of the connection
         // WARNING: This has to happen before processInitialMessages() call below.
         // If not, we may not update Container.pendingClientId in time before seeing our own join session op.
@@ -759,12 +685,6 @@ export class ConnectionManager
             }
 
             this.triggerConnect({ reason: "reconnect", mode: requestedMode, fetchOpsFromStorage: false });
-        }
-    }
-
-    private updateLatestKnownOpSeqNumber(seq: number) {
-        if (this.lastObservedSeqNumber < seq) {
-            this.lastObservedSeqNumber = seq;
         }
     }
 }
