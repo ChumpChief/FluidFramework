@@ -727,7 +727,7 @@ export class ConnectionManager
         this.emit(
             "connect",
             ConnectionManager.detailsFromConnection(connection),
-            this._hasCheckpointSequenceNumber ? this.lastKnownSeqNumber - this.lastSequenceNumber : undefined);
+        );
     }
 
     /**

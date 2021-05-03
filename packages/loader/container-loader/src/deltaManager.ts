@@ -1049,7 +1049,7 @@ export class DeltaManager
         this.emit(
             "connect",
             DeltaManager.detailsFromConnection(connection),
-            this._hasCheckpointSequenceNumber ? this.lastKnownSeqNumber - this.lastSequenceNumber : undefined);
+        );
 
         this.processInitialMessages(
             initialMessages,

@@ -84,7 +84,7 @@ export interface IDeltaManagerEvents extends IEvent {
      * The connect event fires once we've received the connect_document_success message from the
      * server.  This happens prior to the client's join message (if there is a join message).
      */
-    (event: "connect", listener: (details: IConnectionDetails, opsBehind?: number) => void);
+    (event: "connect", listener: (details: IConnectionDetails) => void);
     (event: "disconnect", listener: (reason: string) => void);
     (event: "readonly", listener: (readonly: boolean) => void);
 }

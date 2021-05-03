@@ -4,13 +4,13 @@
  */
 
 import { ITelemetryLogger } from "@fluidframework/common-definitions";
-import { ChildLogger, TelemetryLogger } from "@fluidframework/telemetry-utils";
+import { ChildLogger } from "@fluidframework/telemetry-utils";
 import { IDeltaManager } from "@fluidframework/container-definitions";
 import {
     IDocumentMessage,
     ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
-import { assert, performance } from "@fluidframework/common-utils";
+import { assert } from "@fluidframework/common-utils";
 
 class OpPerfTelemetry {
     private pongCount: number = 0;
@@ -25,9 +25,6 @@ class OpPerfTelemetry {
 
     private firstConnection = true;
     private connectionOpSeqNumber: number | undefined;
-    private readonly bootTime = performance.now();
-    private connectionStartTime = 0;
-    private gap = 0;
 
     private readonly logger: ITelemetryLogger;
 
@@ -42,18 +39,8 @@ class OpPerfTelemetry {
 
         this.deltaManager.on("op", (message) => this.afterProcessingOp(message));
 
-        this.deltaManager.on("connect", (details, opsBehind) => {
+        this.deltaManager.on("connect", (details) => {
             this.clientId = details.clientId;
-            if (opsBehind !== undefined) {
-                this.connectionOpSeqNumber = this.deltaManager.lastKnownSeqNumber;
-                this.gap = opsBehind;
-                this.connectionStartTime = performance.now();
-
-                // We might be already up-today. If so, report it right away.
-                if (this.gap <= 0) {
-                    this.reportGettingUpToDate();
-                }
-            }
         });
         this.deltaManager.on("disconnect", () => {
             this.clientSequenceNumberForLatencyStatistics = undefined;
@@ -82,12 +69,10 @@ class OpPerfTelemetry {
         this.connectionOpSeqNumber = undefined;
         this.logger.sendPerformanceEvent({
             eventName: "ConnectionSpeed",
-            duration: performance.now() - this.connectionStartTime,
-            ops: this.gap,
+            duration: 0,
+            ops: 0,
             // track time to connect only for first connection.
-            timeToConnect: this.firstConnection ?
-                TelemetryLogger.formatTick(this.connectionStartTime - this.bootTime) :
-                undefined,
+            timeToConnect: undefined,
             firstConnection: this.firstConnection,
         });
     }
