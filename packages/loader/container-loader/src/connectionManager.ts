@@ -20,8 +20,6 @@ import { TelemetryLogger, safeRaiseEvent } from "@fluidframework/telemetry-utils
 import {
     IDocumentService,
     IDocumentDeltaConnection,
-    IDocumentStorageService,
-    LoaderCachingPolicy,
     IDocumentDeltaConnectionEvents,
 } from "@fluidframework/driver-definitions";
 import {
@@ -49,8 +47,6 @@ import {
 import {
     CreateContainerError,
 } from "@fluidframework/container-utils";
-import { RetriableDocumentStorageService } from "./retriableDocumentStorageService";
-import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 
 const MaxReconnectDelaySeconds = 8;
 const InitialReconnectDelaySeconds = 1;
@@ -183,10 +179,7 @@ export class ConnectionManager
     // Counts the number of noops sent by the client which may not be acked.
     private trailingNoopCount = 0;
     private closed = false;
-    private storageService: RetriableDocumentStorageService | undefined;
     private readonly deltaStreamDelayId = uuid();
-
-    private messageBuffer: IDocumentMessage[] = [];
 
     private readonly throttlingIdSet = new Set<string>();
     private timeTillThrottling: number = 0;
@@ -318,30 +311,6 @@ export class ConnectionManager
     public shouldJoinWrite(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
-    }
-
-    public async connectToStorage(): Promise<IDocumentStorageService> {
-        if (this.storageService !== undefined) {
-            return this.storageService;
-        }
-        const service = this.serviceProvider();
-        if (service === undefined) {
-            throw new Error("Not attached");
-        }
-
-        let storageService = await service.connectToStorage();
-        // Enable prefetching for the service unless it has a caching policy set otherwise:
-        if (storageService.policies?.caching !== LoaderCachingPolicy.NoCaching) {
-            storageService = new PrefetchDocumentStorageService(storageService);
-        }
-
-        this.storageService = new RetriableDocumentStorageService(storageService, this, this.logger);
-
-        // ensure we did not lose that policy in the process of wrapping
-        assert(storageService.policies?.minBlobSize === this.storageService.policies?.minBlobSize,
-            0x0e0 /* "lost minBlobSize policy" */);
-
-        return this.storageService;
     }
 
     /**
@@ -599,7 +568,6 @@ export class ConnectionManager
             return;
         }
         this.closed = true;
-        this.storageService?.dispose();
 
         this.closeAbortController.abort();
 
@@ -733,13 +701,6 @@ export class ConnectionManager
             return;
         }
 
-        // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
-        // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
-        // but it's safe to assume (until better design is put into place) that batches should not exist
-        // across multiple connections. Right now we assume runtime will not submit any ops in disconnected
-        // state. As requirements change, so should these checks.
-        assert(this.messageBuffer.length === 0, 0x0e9 /* "messageBuffer is not empty on new connection" */);
-
         connection.on("nack", this.nackHandler);
         connection.on("disconnect", this.disconnectHandler);
         connection.on("error", this.errorHandler);
@@ -791,13 +752,6 @@ export class ConnectionManager
         connection.off("disconnect", this.disconnectHandler);
         connection.off("error", this.errorHandler);
         connection.off("pong", this.pongHandler);
-
-        // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
-        // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
-        // but it's safe to assume (until better design is put into place) that batches should not exist
-        // across multiple connections. Right now we assume runtime will not submit any ops in disconnected
-        // state. As requirements change, so should these checks.
-        assert(this.messageBuffer.length === 0, 0x0ea /* "messageBuffer is not empty on disconnect" */);
 
         this.emit("disconnect", reason);
 
