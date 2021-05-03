@@ -59,6 +59,7 @@ import {
     CreateProcessingError,
     DataCorruptionError,
 } from "@fluidframework/container-utils";
+import { ConnectionManager } from "./connectionManager";
 import { DeltaQueue } from "./deltaQueue";
 import { RetriableDocumentStorageService } from "./retriableDocumentStorageService";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
@@ -150,6 +151,7 @@ export class DeltaManager
     IEventProvider<IDeltaManagerInternalEvents>
 {
     public get active(): boolean { return this._active(); }
+    public connectionManager: ConnectionManager | undefined;
 
     public get disposed() { return this.closed; }
 
