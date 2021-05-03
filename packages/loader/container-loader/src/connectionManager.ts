@@ -464,10 +464,6 @@ export class ConnectionManager
         );
     };
 
-    private readonly pongHandler = (latency: number) => {
-        this.emit("pong", latency);
-    };
-
     /**
      * Once we've successfully gotten a connection, we need to set up state, attach event listeners, and process
      * initial messages.
@@ -496,7 +492,6 @@ export class ConnectionManager
         connection.on("nack", this.nackHandler);
         connection.on("disconnect", this.disconnectHandler);
         connection.on("error", this.errorHandler);
-        connection.on("pong", this.pongHandler);
 
         // Notify of the connection
         // WARNING: This has to happen before processInitialMessages() call below.
@@ -524,7 +519,6 @@ export class ConnectionManager
         connection.off("nack", this.nackHandler);
         connection.off("disconnect", this.disconnectHandler);
         connection.off("error", this.errorHandler);
-        connection.off("pong", this.pongHandler);
 
         this.emit("disconnect", reason);
 

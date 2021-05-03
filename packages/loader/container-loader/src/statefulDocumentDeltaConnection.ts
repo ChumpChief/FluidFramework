@@ -23,9 +23,9 @@ import {
 } from "@fluidframework/protocol-definitions";
 
 export interface IStatefulDocumentDeltaConnectionEvents extends IEvent {
-    (event: "connected" | "disconnected", listener: () => void);
+    (event: "connected" | "disconnected", listener: () => void); // For the runtime
+    (event: "serverDisconnected", listener: (reason: any) => void); // For the manager only
     (event: "nack", listener: (documentId: string, message: INack[]) => void);
-    (event: "disconnect", listener: (reason: any) => void);
     (event: "op", listener: (documentId: string, messages: ISequencedDocumentMessage[]) => void);
     (event: "signal", listener: (message: ISignalMessage) => void);
     (event: "pong", listener: (latency: number) => void);
@@ -195,7 +195,9 @@ export class StatefulDocumentDeltaConnection
     };
 
     private readonly disconnectHandler = (disconnectReason) => {
-        this.releaseCurrentConnectionCore(disconnectReason);
+        this.releaseCurrentConnection();
+        this.emit("disconnected");
+        this.emit("serverDisconnected", disconnectReason);
     };
 
     private readonly errorHandler = (error) => {
@@ -222,15 +224,17 @@ export class StatefulDocumentDeltaConnection
         this.emit("connected");
     }
 
-    public releaseCurrentConnection() {
+    public disconnect() {
         if (this._deltaConnection === undefined) {
             throw new Error("Tried to release current connection, but not currently connected");
         }
 
-        this.releaseCurrentConnectionCore("releaseCurrentConnection");
+        this.releaseCurrentConnection();
+
+        this.emit("disconnected");
     }
 
-    private releaseCurrentConnectionCore(disconnectReason: any) {
+    private releaseCurrentConnection() {
         assert(this._deltaConnection !== undefined, "No connection to tear down");
         this._deltaConnection.off("op", this.opHandler);
         this._deltaConnection.off("signal", this.signalHandler);
@@ -239,7 +243,5 @@ export class StatefulDocumentDeltaConnection
         this._deltaConnection.off("error", this.errorHandler);
         this._deltaConnection.off("pong", this.pongHandler);
         this._deltaConnection = undefined;
-
-        this.emit("disconnect", disconnectReason);
     }
 }
