@@ -16,7 +16,6 @@ import {
 } from "@fluidframework/driver-definitions";
 import {
     IClient,
-    IClientDetails,
     INack,
     INackContent,
 } from "@fluidframework/protocol-definitions";
@@ -67,7 +66,7 @@ const detailsFromConnection = (connection: IDocumentDeltaConnection): IConnectio
  * but not exposed on the public interface IDeltaManager
  */
 export interface IConnectionManagerInternalEvents extends IDeltaManagerEvents {
-    (event: "closed", listener: (error?: ICriticalContainerError) => void);
+    (event: "closed", listener: () => void);
 }
 
 /**
@@ -79,23 +78,18 @@ export class ConnectionManager
     implements
     IEventProvider<IConnectionManagerInternalEvents>
 {
-    public readonly clientDetails: IClientDetails;
-
     private connectionP: Promise<IDocumentDeltaConnection> | undefined;
     private connection: IDocumentDeltaConnection | undefined;
     private closed = false;
 
     constructor(
         private readonly serviceProvider: () => IDocumentService | undefined,
-        private client: IClient,
+        private readonly client: IClient,
     ) {
         super();
 
-        this.clientDetails = this.client.details;
-
-        // Initially, all queues are created paused.
-        // - outbound is flipped back and forth in setupNewSuccessfulConnection / disconnectFromDeltaStream
-        // - inbound & inboundSignal are resumed in attachOpHandler() when we have handler setup
+        // Always join write for now
+        this.client.mode = "write";
     }
 
     public async connect(): Promise<IConnectionDetails> {
@@ -129,17 +123,12 @@ export class ConnectionManager
                 }
 
                 try {
-                    // Always join write for now
-                    this.client.mode = "write";
                     connection = await docService.connectToDeltaStream(this.client);
                 } catch (origError) {
-                    const error = CreateContainerError(origError);
-
                     // Socket.io error when we connect to wrong socket, or hit some multiplexing bug
                     if (!canRetryOnError(origError)) {
-                        this.close();
                         // eslint-disable-next-line @typescript-eslint/no-throw-literal
-                        throw error;
+                        throw CreateContainerError(origError);
                     }
 
                     const retryDelayFromError = getRetryDelayFromError(origError);
