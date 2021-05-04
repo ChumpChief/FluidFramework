@@ -229,7 +229,9 @@ export class StatefulDocumentDeltaConnection
             throw new Error("Tried to release current connection, but not currently connected");
         }
 
+        const connection = this._deltaConnection;
         this.releaseCurrentConnection();
+        connection.close();
 
         this.emit("disconnected");
     }

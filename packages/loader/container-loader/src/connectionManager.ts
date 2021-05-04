@@ -23,11 +23,11 @@ import {
     canRetryOnError,
     createGenericNetworkError,
     getRetryDelayFromError,
-    waitForConnectedState,
 } from "@fluidframework/driver-utils";
 import {
     CreateContainerError,
 } from "@fluidframework/container-utils";
+import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
 const MaxReconnectDelaySeconds = 8;
 const InitialReconnectDelaySeconds = 1;
@@ -78,9 +78,10 @@ export class ConnectionManager
     implements
     IEventProvider<IConnectionManagerInternalEvents>
 {
-    private connectionP: Promise<IDocumentDeltaConnection> | undefined;
-    private connection: IDocumentDeltaConnection | undefined;
+    private connectionP: Promise<void> | undefined;
     private closed = false;
+
+    private readonly statefulConnection: StatefulDocumentDeltaConnection = new StatefulDocumentDeltaConnection();
 
     constructor(
         private readonly serviceProvider: () => IDocumentService | undefined,
@@ -90,16 +91,20 @@ export class ConnectionManager
 
         // Always join write for now
         this.client.mode = "write";
+
+        this.statefulConnection.on("nack", this.nackHandler);
+        this.statefulConnection.on("disconnect", this.disconnectHandler);
+        this.statefulConnection.on("error", this.errorHandler);
     }
 
     public async connect(): Promise<IConnectionDetails> {
-        const connection = await this.connectCore();
-        return detailsFromConnection(connection);
+        await this.connectCore();
+        return detailsFromConnection(this.statefulConnection);
     }
 
-    private async connectCore(): Promise<IDocumentDeltaConnection> {
-        if (this.connection !== undefined) {
-            return this.connection;
+    private async connectCore(): Promise<void> {
+        if (this.statefulConnection !== undefined) {
+            return;
         }
 
         if (this.connectionP !== undefined) {
@@ -134,7 +139,8 @@ export class ConnectionManager
                     const retryDelayFromError = getRetryDelayFromError(origError);
                     delay = retryDelayFromError ?? Math.min(delay * 2, MaxReconnectDelaySeconds);
 
-                    await waitForConnectedState(delay * 1000);
+                    // Should include online status in consideration here
+                    await new Promise((resolve) => { setTimeout(resolve, delay * 1000); });
                 }
             }
 
@@ -144,7 +150,7 @@ export class ConnectionManager
         };
 
         // This promise settles as soon as we know the outcome of the connection attempt
-        this.connectionP = new Promise((resolve, reject) => {
+        this.connectionP = new Promise<void>((resolve, reject) => {
             // Regardless of how the connection attempt concludes, we'll clear the promise and remove the listener
 
             // Reject the connection promise if the DeltaManager gets closed during connection
@@ -156,10 +162,10 @@ export class ConnectionManager
             this.on("closed", cleanupAndReject);
 
             // Attempt the connection
-            connectCore().then((connection) => {
+            connectCore().then(() => {
                 this.connectionP = undefined;
                 this.removeListener("closed", cleanupAndReject);
-                resolve(connection);
+                resolve();
             }).catch(cleanupAndReject);
         });
 
@@ -218,8 +224,7 @@ export class ConnectionManager
      */
     private setupNewSuccessfulConnection(connection: IDocumentDeltaConnection) {
         // Old connection should have been cleaned up before establishing a new one
-        assert(this.connection === undefined, 0x0e6 /* "old connection exists on new connection setup" */);
-        this.connection = connection;
+        assert(!this.statefulConnection.connected, 0x0e6 /* "old connection exists on new connection setup" */);
 
         if (this.closed) {
             // Raise proper events, Log telemetry event and close connection.
@@ -227,9 +232,7 @@ export class ConnectionManager
             return;
         }
 
-        connection.on("nack", this.nackHandler);
-        connection.on("disconnect", this.disconnectHandler);
-        connection.on("error", this.errorHandler);
+        this.statefulConnection.setNewConnection(connection);
 
         // Notify of the connection
         // WARNING: This has to happen before processInitialMessages() call below.
@@ -245,24 +248,13 @@ export class ConnectionManager
      * @param reason - Text description of disconnect reason to emit with disconnect event
      */
     private disconnectFromDeltaStream() {
-        if (this.connection === undefined) {
-            return false;
+        if (!this.statefulConnection.connected) {
+            return;
         }
 
-        const connection = this.connection;
-        // Avoid any re-entrancy - clear object reference
-        this.connection = undefined;
-
-        // Remove listeners first so we don't try to retrigger this flow accidentally through reconnectOnError
-        connection.off("nack", this.nackHandler);
-        connection.off("disconnect", this.disconnectHandler);
-        connection.off("error", this.errorHandler);
+        this.statefulConnection.disconnect();
 
         this.emit("disconnect");
-
-        connection.close();
-
-        return true;
     }
 
     /**
@@ -277,7 +269,7 @@ export class ConnectionManager
         // We quite often get protocol errors before / after observing nack/disconnect
         // we do not want to run through same sequence twice.
         // If we're already disconnected/disconnecting it's not appropriate to call this again.
-        assert(this.connection !== undefined, 0x0eb /* "Missing connection for reconnect" */);
+        assert(this.statefulConnection.connected, 0x0eb /* "Missing connection for reconnect" */);
 
         this.disconnectFromDeltaStream();
 
@@ -297,7 +289,7 @@ export class ConnectionManager
 
         const delay = getRetryDelayFromError(error);
         if (delay !== undefined) {
-            await waitForConnectedState(delay * 1000);
+            await new Promise((resolve) => { setTimeout(resolve, delay * 1000); });
         }
 
         // Always connect in write mode for now
