@@ -201,7 +201,7 @@ export class DeltaManager
     private readonly _inboundSignal: DeltaQueue<ISignalMessage>;
     private readonly _outbound: DeltaQueue<IDocumentMessage[]>;
 
-    private connectionP: Promise<IDocumentDeltaConnection> | undefined;
+    private connectionP: Promise<void> | undefined;
     private connection: IDocumentDeltaConnection | undefined;
     private readonly statefulConnection: StatefulDocumentDeltaConnection = new StatefulDocumentDeltaConnection();
     private clientSequenceNumber = 0;
@@ -566,8 +566,9 @@ export class DeltaManager
     }
 
     public async connect(args: IConnectionArgs): Promise<IConnectionDetails> {
-        const connection = await this.connectCore(args);
-        return DeltaManager.detailsFromConnection(connection);
+        await this.connectCore(args);
+        assert(this.connection !== undefined, "Connection should be defined after connectCore resolves");
+        return DeltaManager.detailsFromConnection(this.connection);
     }
 
     /**
@@ -585,9 +586,9 @@ export class DeltaManager
         });
     }
 
-    private async connectCore(args: IConnectionArgs): Promise<IDocumentDeltaConnection> {
+    private async connectCore(args: IConnectionArgs): Promise<void> {
         if (this.connection !== undefined) {
-            return this.connection;
+            return;
         }
 
         if (this.connectionP !== undefined) {
@@ -633,7 +634,7 @@ export class DeltaManager
             const connection = new NoDeltaStream();
             this.connectionP = new Promise((resolve) => {
                 this.setupNewSuccessfulConnection(connection, "read");
-                resolve(connection);
+                resolve();
             });
             return this.connectionP;
         }
@@ -717,7 +718,7 @@ export class DeltaManager
             connectCore().then((connection) => {
                 this.connectionP = undefined;
                 this.removeListener("closed", cleanupAndReject);
-                resolve(connection);
+                resolve();
             }).catch(cleanupAndReject);
         });
 
