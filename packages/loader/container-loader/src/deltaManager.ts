@@ -202,8 +202,8 @@ export class DeltaManager
     private readonly _outbound: DeltaQueue<IDocumentMessage[]>;
 
     private connectionP: Promise<void> | undefined;
-    private connection: IDocumentDeltaConnection | undefined;
     private readonly statefulConnection: StatefulDocumentDeltaConnection = new StatefulDocumentDeltaConnection();
+    private storageOnlyMode: boolean = false;
     private clientSequenceNumber = 0;
     private clientSequenceNumberObserved = 0;
     // Counts the number of noops sent by the client which may not be acked.
@@ -237,7 +237,7 @@ export class DeltaManager
      */
     public get hasCheckpointSequenceNumber() {
         // Valid to be called only if we have active connection.
-        assert(this.connection !== undefined, 0x0df /* "Missing active connection" */);
+        assert(this.statefulConnection.connected, 0x0df /* "Missing active connection" */);
         return this._hasCheckpointSequenceNumber;
     }
 
@@ -278,38 +278,46 @@ export class DeltaManager
     }
 
     public get maxMessageSize(): number {
-        return this.connection?.serviceConfiguration?.maxMessageSize
-            ?? this.connection?.maxMessageSize
-            ?? DefaultChunkSize;
+        if (this.statefulConnection.connected) {
+            return this.statefulConnection.serviceConfiguration?.maxMessageSize
+                ?? this.statefulConnection.maxMessageSize;
+        }
+        return DefaultChunkSize;
     }
 
     public get version(): string {
-        if (this.connection === undefined) {
-            throw new Error("Cannot check version without a connection");
-        }
-        return this.connection.version;
+        return this.statefulConnection.version;
     }
 
     public get serviceConfiguration(): IClientConfiguration | undefined {
-        return this.connection?.serviceConfiguration;
+        if (this.statefulConnection.connected) {
+            return this.statefulConnection.serviceConfiguration;
+        }
+        return undefined;
     }
 
     public get scopes(): string[] | undefined {
-        return this.connection?.claims.scopes;
+        if (this.statefulConnection.connected) {
+            return this.statefulConnection.claims.scopes;
+        }
+        return undefined;
     }
 
     public get socketDocumentId(): string | undefined {
-        return this.connection?.claims.documentId;
+        if (this.statefulConnection.connected) {
+            return this.statefulConnection.claims.documentId;
+        }
+        return undefined;
     }
 
     /**
      * The current connection mode, initially read.
      */
     public get connectionMode(): ConnectionMode {
-        if (this.connection === undefined) {
+        if (!this.statefulConnection.connected) {
             return "read";
         }
-        return this.connection.mode;
+        return this.statefulConnection.mode;
     }
 
     /**
@@ -340,13 +348,12 @@ export class DeltaManager
     }
 
     public get readOnlyInfo(): ReadOnlyInfo {
-        const storageOnly = this.connection !== undefined && this.connection instanceof NoDeltaStream;
-        if (storageOnly || this._forceReadonly || this._readonlyPermissions === true) {
+        if (this.storageOnlyMode || this._forceReadonly || this._readonlyPermissions === true) {
             return {
                 readonly: true,
                 forced: this._forceReadonly,
                 permissions: this._readonlyPermissions,
-                storageOnly,
+                storageOnly: this.storageOnlyMode,
             };
         }
 
@@ -454,9 +461,12 @@ export class DeltaManager
     ) {
         super();
 
+        this.statefulConnection.on("op", this.opHandler);
+        this.statefulConnection.on("signal", this.signalHandler);
         this.statefulConnection.on("nack", this.nackHandler);
         this.statefulConnection.on("serverDisconnected", this.disconnectHandler);
         this.statefulConnection.on("error", this.errorHandler);
+        this.statefulConnection.on("pong", this.pongHandler);
 
         this.clientDetails = this.client.details;
         this.defaultReconnectionMode = this.client.mode;
@@ -475,10 +485,7 @@ export class DeltaManager
         // within an array *must* fit within the maxMessageSize and are guaranteed to be ordered sequentially.
         this._outbound = new DeltaQueue<IDocumentMessage[]>(
             (messages) => {
-                if (this.connection === undefined) {
-                    throw new Error("Attempted to submit an outbound message without connection");
-                }
-                this.connection.submit(messages);
+                this.statefulConnection.submit(messages);
             });
 
         this._outbound.on("error", (error) => {
@@ -546,7 +553,7 @@ export class DeltaManager
     public async preFetchOps(cacheOnly: boolean) {
         // Note that might already got connected to delta stream by now.
         // If we did, then we proactively fetch ops at the end of setupNewSuccessfulConnection to ensure
-        if (this.connection === undefined) {
+        if (!this.statefulConnection.connected) {
             return this.fetchMissingDeltasCore("DocumentOpen", cacheOnly, this.lastQueuedSequenceNumber, undefined);
         }
     }
@@ -567,8 +574,7 @@ export class DeltaManager
 
     public async connect(args: IConnectionArgs): Promise<IConnectionDetails> {
         await this.connectCore(args);
-        assert(this.connection !== undefined, "Connection should be defined after connectCore resolves");
-        return DeltaManager.detailsFromConnection(this.connection);
+        return DeltaManager.detailsFromConnection(this.statefulConnection);
     }
 
     /**
@@ -587,7 +593,7 @@ export class DeltaManager
     }
 
     private async connectCore(args: IConnectionArgs): Promise<void> {
-        if (this.connection !== undefined) {
+        if (this.statefulConnection.connected) {
             return;
         }
 
@@ -631,6 +637,7 @@ export class DeltaManager
         }
 
         if (docService.policies?.storageOnly === true) {
+            this.storageOnlyMode = true;
             const connection = new NoDeltaStream();
             this.connectionP = new Promise((resolve) => {
                 this.setupNewSuccessfulConnection(connection, "read");
@@ -759,9 +766,12 @@ export class DeltaManager
         // reset clientSequenceNumber if we are using new clientId.
         // we keep info about old connection as long as possible to be able to account for all non-acked ops
         // that we pick up on next connection.
-        assert(!!this.connection, 0x0e4 /* "Lost old connection!" */);
-        if (this.lastSubmittedClientId !== this.connection?.clientId) {
-            this.lastSubmittedClientId = this.connection?.clientId;
+        assert(this.statefulConnection.connected, 0x0e4 /* "Lost old connection!" */);
+        const clientId = this.statefulConnection.connected
+            ? this.statefulConnection.clientId
+            : undefined;
+        if (this.lastSubmittedClientId !== clientId) {
+            this.lastSubmittedClientId = clientId;
             this.clientSequenceNumber = 0;
             this.clientSequenceNumberObserved = 0;
         }
@@ -807,8 +817,8 @@ export class DeltaManager
     }
 
     public submitSignal(content: any) {
-        if (this.connection !== undefined) {
-            this.connection.submitSignal(content);
+        if (this.statefulConnection.connected) {
+            this.statefulConnection.submitSignal(content);
         } else {
             this.logger.sendErrorEvent({ eventName: "submitSignalDisconnected" });
         }
@@ -861,9 +871,12 @@ export class DeltaManager
 
         this.closeAbortController.abort();
 
+        this.statefulConnection.off("op", this.opHandler);
+        this.statefulConnection.off("signal", this.signalHandler);
         this.statefulConnection.off("nack", this.nackHandler);
         this.statefulConnection.off("serverDisconnected", this.disconnectHandler);
         this.statefulConnection.off("error", this.errorHandler);
+        this.statefulConnection.off("pong", this.pongHandler);
 
         // This raises "disconnect" event if we have active connection.
         this.disconnectFromDeltaStream(error !== undefined ? `${error.message}` : "Container closed");
@@ -999,16 +1012,15 @@ export class DeltaManager
      */
     private setupNewSuccessfulConnection(connection: IDocumentDeltaConnection, requestedMode: ConnectionMode) {
         // Old connection should have been cleaned up before establishing a new one
-        assert(this.connection === undefined, 0x0e6 /* "old connection exists on new connection setup" */);
-        this.connection = connection;
+        assert(!this.statefulConnection.connected, 0x0e6 /* "old connection exists on new connection setup" */);
 
         // Does information in scopes & mode matches?
         // If we asked for "write" and got "read", then file is read-only
         // But if we ask read, server can still give us write.
         const readonly = !connection.claims.scopes.includes(ScopeType.DocWrite);
-        assert(requestedMode === "read" || readonly === (this.connectionMode === "read"),
+        assert(requestedMode === "read" || readonly === (connection.mode === "read"),
             0x0e7 /* "claims/connectionMode mismatch" */);
-        assert(!readonly || this.connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
+        assert(!readonly || connection.mode === "read", 0x0e8 /* "readonly perf with write connection" */);
         this.set_readonlyPermissions(readonly);
 
         this.refreshDelayInfo(this.deltaStreamDelayId);
@@ -1019,6 +1031,8 @@ export class DeltaManager
             return;
         }
 
+        this.statefulConnection.setNewConnection(connection);
+
         // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
         // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
         // but it's safe to assume (until better design is put into place) that batches should not exist
@@ -1027,13 +1041,6 @@ export class DeltaManager
         assert(this.messageBuffer.length === 0, 0x0e9 /* "messageBuffer is not empty on new connection" */);
 
         this._outbound.resume();
-
-        connection.on("op", this.opHandler);
-        connection.on("signal", this.signalHandler);
-        connection.on("nack", this.nackHandler);
-        connection.on("disconnect", this.disconnectHandler);
-        connection.on("error", this.errorHandler);
-        connection.on("pong", this.pongHandler);
 
         const initialMessages = connection.initialMessages;
 
@@ -1091,21 +1098,11 @@ export class DeltaManager
      * @param reason - Text description of disconnect reason to emit with disconnect event
      */
     private disconnectFromDeltaStream(reason: string) {
-        if (this.connection === undefined) {
+        if (!this.statefulConnection.connected) {
             return false;
         }
 
-        const connection = this.connection;
-        // Avoid any re-entrancy - clear object reference
-        this.connection = undefined;
-
-        // Remove listeners first so we don't try to retrigger this flow accidentally through reconnectOnError
-        connection.off("op", this.opHandler);
-        connection.off("signal", this.signalHandler);
-        connection.off("nack", this.nackHandler);
-        connection.off("disconnect", this.disconnectHandler);
-        connection.off("error", this.errorHandler);
-        connection.off("pong", this.pongHandler);
+        this.statefulConnection.disconnect();
 
         // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
         // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
@@ -1118,8 +1115,6 @@ export class DeltaManager
         this._outbound.pause();
         this._outbound.clear();
         this.emit("disconnect", reason);
-
-        connection.close();
 
         return true;
     }
@@ -1138,7 +1133,7 @@ export class DeltaManager
         // We quite often get protocol errors before / after observing nack/disconnect
         // we do not want to run through same sequence twice.
         // If we're already disconnected/disconnecting it's not appropriate to call this again.
-        assert(this.connection !== undefined, 0x0eb /* "Missing connection for reconnect" */);
+        assert(this.statefulConnection.connected, 0x0eb /* "Missing connection for reconnect" */);
 
         this.disconnectFromDeltaStream(error.message);
 
@@ -1234,11 +1229,14 @@ export class DeltaManager
                     const message1 = this.comparableMessagePayload(this.previouslyProcessedMessage);
                     const message2 = this.comparableMessagePayload(message);
                     if (message1 !== message2) {
+                        const clientId = this.statefulConnection.connected
+                            ? this.statefulConnection.clientId
+                            : undefined;
                         const error = new NonRetryableError(
                             "Two messages with same seq# and different payload!",
                             DriverErrorType.fileOverwrittenInStorage,
                             {
-                                clientId: this.connection?.clientId,
+                                clientId,
                                 sequenceNumber: message.sequenceNumber,
                                 message1,
                                 message2,
@@ -1287,8 +1285,8 @@ export class DeltaManager
 
         // if we have connection, and message is local, then we better treat is as local!
         assert(
-            this.connection === undefined
-            || this.connection.clientId !== message.clientId
+            !this.statefulConnection.connected
+            || this.statefulConnection.clientId !== message.clientId
             || this.lastSubmittedClientId === message.clientId,
             0x0ee /* "Not accounting local messages correctly" */,
         );
@@ -1324,11 +1322,14 @@ export class DeltaManager
             });
         }
 
+        const clientId = this.statefulConnection.connected
+            ? this.statefulConnection.clientId
+            : undefined;
         // Watch the minimum sequence number and be ready to update as needed
         if (this.minSequenceNumber > message.minimumSequenceNumber) {
             throw new DataCorruptionError("msn moves backwards", {
                 ...extractLogSafeMessageProperties(message),
-                clientId: this.connection?.clientId,
+                clientId,
             });
         }
         this.minSequenceNumber = message.minimumSequenceNumber;
@@ -1336,7 +1337,7 @@ export class DeltaManager
         if (message.sequenceNumber !== this.lastProcessedSequenceNumber + 1) {
             throw new DataCorruptionError("non-seq seq#", {
                 ...extractLogSafeMessageProperties(message),
-                clientId: this.connection?.clientId,
+                clientId,
             });
         }
         this.lastProcessedSequenceNumber = message.sequenceNumber;

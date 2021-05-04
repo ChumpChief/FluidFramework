@@ -195,7 +195,7 @@ export class StatefulDocumentDeltaConnection
     };
 
     private readonly disconnectHandler = (disconnectReason) => {
-        this.releaseCurrentConnection();
+        // this.releaseCurrentConnection();
         this.emit("disconnected");
         this.emit("serverDisconnected", disconnectReason);
     };
