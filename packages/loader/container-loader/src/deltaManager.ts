@@ -59,10 +59,11 @@ import {
     CreateProcessingError,
     DataCorruptionError,
 } from "@fluidframework/container-utils";
-import { ConnectionManager } from "./connectionManager";
+// import { ConnectionManager } from "./connectionManager";
 import { DeltaQueue } from "./deltaQueue";
 import { RetriableDocumentStorageService } from "./retriableDocumentStorageService";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
+import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
 const MaxReconnectDelaySeconds = 8;
 const InitialReconnectDelaySeconds = 1;
@@ -151,7 +152,7 @@ export class DeltaManager
     IEventProvider<IDeltaManagerInternalEvents>
 {
     public get active(): boolean { return this._active(); }
-    public connectionManager: ConnectionManager | undefined;
+    // public connectionManager: ConnectionManager | undefined;
 
     public get disposed() { return this.closed; }
 
@@ -202,6 +203,7 @@ export class DeltaManager
 
     private connectionP: Promise<IDocumentDeltaConnection> | undefined;
     private connection: IDocumentDeltaConnection | undefined;
+    private readonly statefulConnection: StatefulDocumentDeltaConnection = new StatefulDocumentDeltaConnection();
     private clientSequenceNumber = 0;
     private clientSequenceNumberObserved = 0;
     // Counts the number of noops sent by the client which may not be acked.
@@ -451,6 +453,10 @@ export class DeltaManager
         private readonly _active: () => boolean,
     ) {
         super();
+
+        this.statefulConnection.on("nack", this.nackHandler);
+        this.statefulConnection.on("serverDisconnected", this.disconnectHandler);
+        this.statefulConnection.on("error", this.errorHandler);
 
         this.clientDetails = this.client.details;
         this.defaultReconnectionMode = this.client.mode;
@@ -853,6 +859,10 @@ export class DeltaManager
         this.storageService?.dispose();
 
         this.closeAbortController.abort();
+
+        this.statefulConnection.off("nack", this.nackHandler);
+        this.statefulConnection.off("serverDisconnected", this.disconnectHandler);
+        this.statefulConnection.off("error", this.errorHandler);
 
         // This raises "disconnect" event if we have active connection.
         this.disconnectFromDeltaStream(error !== undefined ? `${error.message}` : "Container closed");
