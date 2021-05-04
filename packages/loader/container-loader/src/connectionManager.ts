@@ -93,7 +93,7 @@ export class ConnectionManager
         this.client.mode = "write";
 
         this.statefulConnection.on("nack", this.nackHandler);
-        this.statefulConnection.on("disconnect", this.disconnectHandler);
+        this.statefulConnection.on("serverDisconnected", this.disconnectHandler);
         this.statefulConnection.on("error", this.errorHandler);
     }
 
@@ -103,7 +103,7 @@ export class ConnectionManager
     }
 
     private async connectCore(): Promise<void> {
-        if (this.statefulConnection !== undefined) {
+        if (this.statefulConnection.connected) {
             return;
         }
 
@@ -180,6 +180,10 @@ export class ConnectionManager
             return;
         }
         this.closed = true;
+
+        this.statefulConnection.off("nack", this.nackHandler);
+        this.statefulConnection.off("serverDisconnected", this.disconnectHandler);
+        this.statefulConnection.off("error", this.errorHandler);
 
         // This raises "disconnect" event if we have active connection.
         this.disconnectFromDeltaStream();

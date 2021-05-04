@@ -23,8 +23,8 @@ import {
 } from "@fluidframework/protocol-definitions";
 
 export interface IStatefulDocumentDeltaConnectionEvents extends IEvent {
-    (event: "connected" | "disconnected", listener: () => void); // For the runtime
-    (event: "serverDisconnected", listener: (reason: any) => void); // For the manager only
+    (event: "connected" | "disconnected", listener: () => void); // For the delta manager and runtime
+    (event: "serverDisconnected", listener: (reason: any) => void); // For the connection manager only
     (event: "nack", listener: (documentId: string, message: INack[]) => void);
     (event: "op", listener: (documentId: string, messages: ISequencedDocumentMessage[]) => void);
     (event: "signal", listener: (message: ISignalMessage) => void);
