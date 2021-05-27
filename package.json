@@ -141,7 +141,6 @@
         ]
       },
       "tools": [
-        "tools/generator-fluid",
         "server/tinylicious"
       ],
       "services": {
@@ -150,7 +149,6 @@
           "routerlicious"
         ]
       }
-    },
-    "generatorName": "generator-fluid"
+    }
   }
 }
