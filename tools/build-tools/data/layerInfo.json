@@ -152,9 +152,7 @@
             "HostUtils": {
                 "dev": true,
                 "packages": [
-                    "@fluid-experimental/get-container",
-                    "@fluid-experimental/fluid-static",
-                    "@fluid-experimental/tinylicious-client"
+                    "@fluid-experimental/get-container"
                 ],
                 "deps": [
                     "Loader",
