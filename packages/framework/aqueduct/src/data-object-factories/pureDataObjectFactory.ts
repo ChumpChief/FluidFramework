@@ -23,10 +23,6 @@ import {
 } from "@fluidframework/runtime-definitions";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
 import { IChannelFactory } from "@fluidframework/datastore-definitions";
-import {
-    FluidObjectSymbolProvider,
-    DependencyContainer,
-} from "@fluidframework/synthesize";
 
 import {
     IDataObjectProps,
@@ -50,7 +46,6 @@ async function createDataObject<TObj extends PureDataObject<O, S, E>, O, S, E ex
     ctor: new (props: IDataObjectProps<O, S>) => TObj,
     context: IFluidDataStoreContext,
     sharedObjectRegistry: ISharedObjectRegistry,
-    optionalProviders: FluidObjectSymbolProvider<O>,
     runtimeClassArg: typeof FluidDataStoreRuntime,
     initProps?: S)
 {
@@ -75,9 +70,7 @@ async function createDataObject<TObj extends PureDataObject<O, S, E>, O, S, E ex
     // becomes globally available. But it's not full initialization - constructor can't
     // access DDSs or other services of runtime as objects are not fully initialized.
     // In order to use object, we need to go through full initialization by calling finishInitialization().
-    const dependencyContainer = new DependencyContainer(context.scope.IFluidDependencySynthesizer);
-    const providers = dependencyContainer.synthesize<O>(optionalProviders, {});
-    const instance = new ctor({ runtime, context, providers, initProps });
+    const instance = new ctor({ runtime, context, initProps });
 
     // if it's a newly created object, we need to wait for it to finish initialization
     // as that results in creation of DDSs, before it gets attached, providing atomic
@@ -116,7 +109,6 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
         public readonly type: string,
         private readonly ctor: new (props: IDataObjectProps<O, S>) => TObj,
         sharedObjects: readonly IChannelFactory[],
-        private readonly optionalProviders: FluidObjectSymbolProvider<O>,
         registryEntries?: NamedFluidDataStoreRegistryEntries,
         private readonly runtimeClass: typeof FluidDataStoreRuntime = FluidDataStoreRuntime,
     ) {
@@ -155,7 +147,6 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
             this.ctor,
             context,
             this.sharedObjectRegistry,
-            this.optionalProviders,
             this.runtimeClass);
 
         return runtime;
@@ -258,7 +249,6 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
             this.ctor,
             context,
             this.sharedObjectRegistry,
-            this.optionalProviders,
             this.runtimeClass,
             initialState);
 

@@ -12,7 +12,6 @@ import {
     IRequest,
     IResponse,
 } from "@fluidframework/core-interfaces";
-import { AsyncFluidObjectProvider, FluidObjectKey } from "@fluidframework/synthesize";
 import { IFluidDataStoreContext } from "@fluidframework/runtime-definitions";
 import { IFluidDataStoreRuntime } from "@fluidframework/datastore-definitions";
 import { FluidObjectHandle } from "@fluidframework/datastore";
@@ -27,8 +26,6 @@ import { defaultFluidObjectRequestHandler } from "../request-handlers";
 export interface IDataObjectProps<O = object, S = undefined> {
     readonly runtime: IFluidDataStoreRuntime;
     readonly context: IFluidDataStoreContext;
-    // eslint-disable-next-line @typescript-eslint/ban-types
-    readonly providers: AsyncFluidObjectProvider<FluidObjectKey<O>, FluidObjectKey<object>>;
     readonly initProps?: S;
 }
 
@@ -59,16 +56,6 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
      */
     protected readonly context: IFluidDataStoreContext;
 
-    /**
-     * Providers are IFluidObject keyed objects that provide back
-     * a promise to the corresponding IFluidObject or undefined.
-     * Providers injected/provided by the Container and/or HostingApplication
-     *
-     * To define providers set IFluidObject interfaces in the generic O type for your data store
-     */
-    // eslint-disable-next-line @typescript-eslint/ban-types
-    protected readonly providers: AsyncFluidObjectProvider<FluidObjectKey<O>, FluidObjectKey<object>>;
-
     protected initProps?: S;
 
     protected initializeP: Promise<void> | undefined;
@@ -96,7 +83,6 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
         super();
         this.runtime = props.runtime;
         this.context = props.context;
-        this.providers = props.providers;
         this.initProps = props.initProps;
 
         assert((this.runtime as any)._dataObject === undefined, 0x0bd /* "Object runtime already has DataObject!" */);

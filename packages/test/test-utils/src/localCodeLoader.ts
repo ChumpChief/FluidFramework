@@ -64,7 +64,6 @@ export class LocalCodeLoader implements ICodeLoader {
                                     defaultFactory,
                                     [[defaultFactory.type, Promise.resolve(defaultFactory)]],
                                     undefined,
-                                    undefined,
                                     runtimeOptions,
                                 ),
                         },

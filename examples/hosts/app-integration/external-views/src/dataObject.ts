@@ -75,5 +75,4 @@ export const DiceRollerInstantiationFactory = new DataObjectFactory<DiceRoller, 
     "dice-roller",
     DiceRoller,
     [],
-    {},
 );
