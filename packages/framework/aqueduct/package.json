@@ -71,7 +71,6 @@
     "@fluidframework/request-handler": "^0.41.0",
     "@fluidframework/runtime-definitions": "^0.41.0",
     "@fluidframework/runtime-utils": "^0.41.0",
-    "@fluidframework/view-interfaces": "^0.41.0",
     "assert": "^2.0.0",
     "uuid": "^8.3.1"
   },
