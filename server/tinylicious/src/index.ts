@@ -8,10 +8,10 @@ import * as path from "path";
 import http from "http";
 import Axios from "axios";
 import winston from "winston";
-import { runService } from "@fluidframework/server-services-shared";
 import { configureLogging } from "@fluidframework/server-services-utils";
 import { TinyliciousResourcesFactory } from "./resourcesFactory";
 import { TinyliciousRunnerFactory } from "./runnerFactory";
+import { runService } from "./servicesSharedRunner";
 
 // Each TCP connect has a delay to allow it to be reuse after close, and unit test make a lot of connection,
 // which might cause port exhaustion.
