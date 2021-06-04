@@ -26,7 +26,7 @@ export class TinyliciousRunner implements IRunner {
 
     constructor(
         private readonly serverFactory: IWebServerFactory,
-        private readonly port: string | number,
+        private readonly port: number,
         private readonly orderManager: IOrdererManager,
         private readonly tenantManager: ITenantManager,
         private readonly storage: IDocumentStorage,
@@ -80,17 +80,10 @@ export class TinyliciousRunner implements IRunner {
      * Ensure provided port is free
      */
     private async ensurePortIsFree(): Promise<void> {
-        // If port is a named pipe resolve immediately
-        if (typeof this.port === "string") {
-            return;
-        }
-
         const freePort = await detect(this.port);
-        if (this.port === freePort) {
-            return;
+        if (this.port !== freePort) {
+            throw new Error(`Port: ${this.port} is occupied. Try port: ${freePort}`);
         }
-
-        throw new Error(`Port: ${this.port} is occupied. Try port: ${freePort}`);
     }
 
     /**
