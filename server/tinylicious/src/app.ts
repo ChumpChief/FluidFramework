@@ -13,19 +13,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Router } from "express";
 import safeStringify from "json-stringify-safe";
-import morgan from "morgan";
-import * as winston from "winston";
 import { create as createRoutes } from "./routes";
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-const split = require("split");
-
-/**
- * Basic stream logging interface for libraries that require a stream to pipe output to (re: Morgan)
- */
-const stream = split().on("data", (message) => {
-    winston.info(message);
-});
 
 export function create(
     storage: IDocumentStorage,
@@ -42,8 +30,6 @@ export function create(
     app.set("trust proxy", 1);
 
     app.use(compression());
-    // hard coded from config
-    app.use(morgan("dev", { stream }));
 
     app.use(cookieParser());
     app.use(bodyParser.json({ limit: requestSize }));

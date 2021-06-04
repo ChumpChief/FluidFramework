@@ -3,17 +3,23 @@
  * Licensed under the MIT License.
  */
 
-// import * as services from "@fluidframework/server-services";
-import * as core from "@fluidframework/server-services-core";
+import {
+    IDocumentStorage,
+    IOrdererManager,
+    IResources,
+    ITenantManager,
+    IWebServerFactory,
+    MongoManager,
+} from "@fluidframework/server-services-core";
 
-export class TinyliciousResources implements core.IResources {
+export class TinyliciousResources implements IResources {
     constructor(
-        public orderManager: core.IOrdererManager,
-        public tenantManager: core.ITenantManager,
-        public storage: core.IDocumentStorage,
-        public mongoManager: core.MongoManager,
+        public orderManager: IOrdererManager,
+        public tenantManager: ITenantManager,
+        public storage: IDocumentStorage,
+        public mongoManager: MongoManager,
         public port: any,
-        public webServerFactory: core.IWebServerFactory,
+        public webServerFactory: IWebServerFactory,
     ) {
     }
 

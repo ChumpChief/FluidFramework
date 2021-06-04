@@ -14,7 +14,7 @@ import {
     MongoManager,
     IResourcesFactory,
 } from "@fluidframework/server-services-core";
-import * as utils from "@fluidframework/server-services-utils";
+import { normalizePort } from "@fluidframework/server-services-utils";
 import * as git from "isomorphic-git";
 import socketIo from "socket.io";
 
@@ -41,7 +41,7 @@ class DbFactory implements IDbFactory {
 export class TinyliciousResourcesFactory implements IResourcesFactory<TinyliciousResources> {
     public async create(): Promise<TinyliciousResources> {
         // Pull in the default port off the config
-        const port = utils.normalizePort(process.env.PORT ?? defaultTinyliciousPort);
+        const port = normalizePort(process.env.PORT ?? defaultTinyliciousPort);
         // hard coded from config
         const collectionNames = {
             content: "content",
