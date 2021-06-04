@@ -24,44 +24,44 @@ export function create(
     const requestSize = undefined;
 
     // Express app configuration
-    const app = express();
+    const expressApp = express();
 
     // Running behind iisnode
-    app.set("trust proxy", 1);
+    expressApp.set("trust proxy", 1);
 
-    app.use(compression());
+    expressApp.use(compression());
 
-    app.use(cookieParser());
-    app.use(bodyParser.json({ limit: requestSize }));
-    app.use(bodyParser.urlencoded({ limit: requestSize, extended: false }));
+    expressApp.use(cookieParser());
+    expressApp.use(bodyParser.json({ limit: requestSize }));
+    expressApp.use(bodyParser.urlencoded({ limit: requestSize, extended: false }));
 
     // Bind routes
     const routes = createRoutes(
         mongoManager,
         storage);
 
-    app.use(cors());
-    app.use(routes.storage);
-    app.use(routes.ordering);
+    expressApp.use(cors());
+    expressApp.use(routes.storage);
+    expressApp.use(routes.ordering);
 
     // Basic Help Message
-    app.use(Router().get("/", (req, res) => {
+    expressApp.use(Router().get("/", (req, res) => {
         // eslint-disable-next-line max-len
         res.status(200).send("This is Tinylicious. Learn more at https://github.com/microsoft/FluidFramework/tree/main/server/tinylicious");
     }));
 
     // Catch 404 and forward to error handler
-    app.use((req, res, next) => {
+    expressApp.use((req, res, next) => {
         const err = new Error("Not Found");
         (err as any).status = 404;
         next(err);
     });
 
     // Error handlers
-    app.use((err, req, res, next) => {
+    expressApp.use((err, req, res, next) => {
         res.status(err.status || 500);
         res.json({ error: safeStringify(err), message: err.message });
     });
 
-    return app;
+    return expressApp;
 }

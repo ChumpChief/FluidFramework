@@ -39,10 +39,10 @@ export class TinyliciousRunner implements IRunner {
         // Make sure provided port is unoccupied
         await this.ensurePortIsFree();
 
-        const alfred = create(this.storage, this.mongoManager);
-        alfred.set("port", this.port);
+        const expressApp = create(this.storage, this.mongoManager);
+        expressApp.set("port", this.port);
 
-        this.server = this.serverFactory.create(alfred);
+        this.server = this.serverFactory.create(expressApp);
         const httpServer = this.server.httpServer;
 
         configureWebSocketServices(
