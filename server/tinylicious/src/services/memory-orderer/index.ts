@@ -7,6 +7,5 @@ export * from "./interfaces";
 export * from "./localContext";
 export * from "./localKafka";
 export * from "./localLambdaController";
-export * from "./localNodeFactory";
 export * from "./localOrderer";
 export * from "./pubsub";
