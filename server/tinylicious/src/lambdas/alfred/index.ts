@@ -18,6 +18,7 @@ import {
 import safeStringify from "json-stringify-safe";
 import * as semver from "semver";
 import * as core from "@fluidframework/server-services-core";
+import { v4 as uuid } from "uuid";
 import {
     canSummarize,
     canWrite,
@@ -28,7 +29,6 @@ import {
     createRoomJoinMessage,
     createNackMessage,
     createRoomLeaveMessage,
-    generateClientId,
 } from "../utils";
 
 interface IRoom {
@@ -205,7 +205,7 @@ export function configureWebSocketServices(
                 return Promise.reject({ code: 403, message: "Invalid token" });
             }
 
-            const clientId = generateClientId();
+            const clientId = uuid();
             const room: IRoom = {
                 tenantId: claims.tenantId,
                 documentId: claims.documentId,
