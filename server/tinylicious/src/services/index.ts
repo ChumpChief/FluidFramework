@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-export * from "./dbFactory";
+export * from "./inMemorydb";
 export * from "./pubSubPublisher";
 export * from "./runner";
 export * from "./taskMessageSender";

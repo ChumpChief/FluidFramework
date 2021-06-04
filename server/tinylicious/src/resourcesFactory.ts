@@ -7,7 +7,13 @@ import fs from "fs";
 import { LocalOrdererManager } from "@fluidframework/server-local-server";
 import { DocumentStorage } from "@fluidframework/server-services-shared";
 import { generateToken, Historian } from "@fluidframework/server-services-client";
-import { MongoDatabaseManager, MongoManager, IResourcesFactory } from "@fluidframework/server-services-core";
+import {
+    IDb,
+    IDbFactory,
+    MongoDatabaseManager,
+    MongoManager,
+    IResourcesFactory,
+} from "@fluidframework/server-services-core";
 import * as utils from "@fluidframework/server-services-utils";
 import * as git from "isomorphic-git";
 import { Provider } from "nconf";
@@ -16,7 +22,7 @@ import socketIo from "socket.io";
 import winston from "winston";
 import { TinyliciousResources } from "./resources";
 import {
-    DbFactory,
+    InMemoryDb,
     PubSubPublisher,
     TaskMessageSender,
     TenantManager,
@@ -25,6 +31,14 @@ import {
 
 const defaultTinyliciousPort = 7070;
 
+class DbFactory implements IDbFactory {
+    private readonly db = new InMemoryDb();
+
+    public async connect(): Promise<IDb> {
+        return this.db;
+    }
+}
+
 export class TinyliciousResourcesFactory implements IResourcesFactory<TinyliciousResources> {
     public async create(config: Provider): Promise<TinyliciousResources> {
         // Pull in the default port off the config
@@ -32,7 +46,7 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
         const collectionNames = config.get("mongo:collectionNames");
 
         const tenantManager = new TenantManager(`http://localhost:${port}`);
-        const dbFactory = new DbFactory(config);
+        const dbFactory = new DbFactory();
         const taskMessageSender = new TaskMessageSender();
         const mongoManager = new MongoManager(dbFactory);
         const databaseManager = new MongoDatabaseManager(
