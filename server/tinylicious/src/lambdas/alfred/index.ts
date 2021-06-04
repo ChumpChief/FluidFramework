@@ -28,7 +28,6 @@ import {
     createRoomJoinMessage,
     createNackMessage,
     createRoomLeaveMessage,
-    getRandomInt,
     generateClientId,
 } from "../utils";
 
@@ -71,15 +70,6 @@ const getSubmitOpThrottleId = (clientId: string, tenantId: string) => `${clientI
 
 // Sanitize the received op before sending.
 function sanitizeMessage(message: any): IDocumentMessage {
-    // Trace sampling.
-    if (message.operation && message.operation.traces && getRandomInt(100) === 0) {
-        message.operation.traces.push(
-            {
-                action: "start",
-                service: "alfred",
-                timestamp: Date.now(),
-            });
-    }
     const sanitizedMessage: IDocumentMessage = {
         clientSequenceNumber: message.clientSequenceNumber,
         contents: message.contents,
