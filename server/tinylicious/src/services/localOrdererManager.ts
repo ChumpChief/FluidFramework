@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import { IPubSub, LocalOrderer } from "@fluidframework/server-memory-orderer";
 import { GitManager, IHistorian } from "@fluidframework/server-services-client";
 import {
     IDatabaseManager,
@@ -16,6 +15,7 @@ import {
     ITenantManager,
     TokenGenerator,
 } from "@fluidframework/server-services-core";
+import { IPubSub, LocalOrderer } from "./memory-orderer";
 
 export class LocalOrdererManager implements IOrdererManager {
     private readonly map = new Map<string, Promise<IOrderer>>();
