@@ -3,7 +3,10 @@
  * Licensed under the MIT License.
  */
 
+import * as path from "path";
 import nconf from "nconf";
+import { TinyliciousResourcesFactory } from "./resourcesFactory";
+import { TinyliciousRunnerFactory } from "./runnerFactory";
 import { IResources, IResourcesFactory, IRunnerFactory } from "./services";
 
 /**
@@ -23,7 +26,7 @@ export async function run<T extends IResources>(
         .catch(async (error) => {
             await runner
                     .stop()
-                    .catch((innerError) => {
+                    .catch(() => {
                         error.forceKill = true;
                     });
             return Promise.reject(error);
@@ -45,14 +48,12 @@ export async function run<T extends IResources>(
  * Variant of run that is used to fully run a service. It configures base settings such as logging. And then will
  * exit the service once the runner completes.
  */
-export function runService<T extends IResources>(
-    resourceFactory: IResourcesFactory<T>,
-    runnerFactory: IRunnerFactory<T>,
-    configOrPath: nconf.Provider | string,
-) {
-    const config = typeof configOrPath === "string"
-        ? nconf.argv().env({ separator: "__", parseValues: true }).file(configOrPath).use("memory")
-        : configOrPath;
+export function runService() {
+    const resourceFactory = new TinyliciousResourcesFactory();
+    const runnerFactory = new TinyliciousRunnerFactory();
+    const configPath = path.join(__dirname, "../config.json");
+
+    const config = nconf.argv().env({ separator: "__", parseValues: true }).file(configPath).use("memory");
 
     const runningP = run(config, resourceFactory, runnerFactory);
 
