@@ -14,7 +14,6 @@ import {
     MongoManager,
     IResourcesFactory,
 } from "@fluidframework/server-services-core";
-import { normalizePort } from "@fluidframework/server-services-utils";
 import * as git from "isomorphic-git";
 import socketIo from "socket.io";
 
@@ -41,7 +40,7 @@ class DbFactory implements IDbFactory {
 export class TinyliciousResourcesFactory implements IResourcesFactory<TinyliciousResources> {
     public async create(): Promise<TinyliciousResources> {
         // Pull in the default port off the config
-        const port = normalizePort(process.env.PORT ?? defaultTinyliciousPort);
+        const port = defaultTinyliciousPort;
         // hard coded from config
         const collectionNames = {
             content: "content",
@@ -72,19 +71,12 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
         // Initialize isomorphic-git
         git.plugins.set("fs", fs);
 
-        // hard coded from config
-        const foremanPermissions = {
-            paparazziQueue: ["snapshot", "spell", "intel", "translation"],
-            augloopQueue: ["augmentation"],
-            headlessQueue: ["chain-snapshot", "chain-intel", "chain-translation", "chain-spell", "chain-cache"],
-        };
-
         const orderManager = new LocalOrdererManager(
             storage,
             databaseManager,
             tenantManager,
             taskMessageSender,
-            foremanPermissions,
+            {}, // foreman permissions
             generateToken,
             async (tenantId: string) => {
                 const url = `http://localhost:${port}/repos/${encodeURIComponent(tenantId)}`;
