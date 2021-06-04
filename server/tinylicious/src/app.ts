@@ -14,7 +14,6 @@ import cors from "cors";
 import express, { Router } from "express";
 import safeStringify from "json-stringify-safe";
 import morgan from "morgan";
-import { Provider } from "nconf";
 import * as winston from "winston";
 import { create as createRoutes } from "./routes";
 
@@ -29,12 +28,12 @@ const stream = split().on("data", (message) => {
 });
 
 export function create(
-    config: Provider,
     storage: IDocumentStorage,
     mongoManager: MongoManager,
 ) {
     // Maximum REST request size
-    const requestSize = config.get("alfred:restJsonSize");
+    // hard coded from config
+    const requestSize = undefined;
 
     // Express app configuration
     const app = express();
@@ -43,7 +42,8 @@ export function create(
     app.set("trust proxy", 1);
 
     app.use(compression());
-    app.use(morgan(config.get("logger:morganFormat"), { stream }));
+    // hard coded from config
+    app.use(morgan("dev", { stream }));
 
     app.use(cookieParser());
     app.use(bodyParser.json({ limit: requestSize }));

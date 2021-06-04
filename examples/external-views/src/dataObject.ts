@@ -39,7 +39,7 @@ export class DiceRoller extends DataObject implements IDiceRoller {
      * initialize the state of the DataObject.
      */
     protected async initializingFirstTime() {
-        this.root.set(diceValueKey, 1);
+        this.root.set(diceValueKey, 6);
     }
 
     /**
@@ -61,7 +61,7 @@ export class DiceRoller extends DataObject implements IDiceRoller {
     }
 
     public readonly roll = () => {
-        const rollValue = Math.floor(Math.random() * 6) + 1;
+        const rollValue = this.value - 1 !== 0 ? this.value - 1 : 6;
         this.root.set(diceValueKey, rollValue);
     };
 }

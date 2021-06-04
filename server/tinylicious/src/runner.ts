@@ -14,7 +14,6 @@ import {
     IRunner,
 } from "@fluidframework/server-services-core";
 import { Deferred } from "@fluidframework/common-utils";
-import { Provider } from "nconf";
 import * as winston from "winston";
 import { configureWebSocketServices } from "@fluidframework/server-lambdas";
 import { TestClientManager } from "@fluidframework/server-test-utils";
@@ -27,7 +26,6 @@ export class TinyliciousRunner implements IRunner {
 
     constructor(
         private readonly serverFactory: IWebServerFactory,
-        private readonly config: Provider,
         private readonly port: string | number,
         private readonly orderManager: IOrdererManager,
         private readonly tenantManager: ITenantManager,
@@ -39,17 +37,9 @@ export class TinyliciousRunner implements IRunner {
         this.runningDeferred = new Deferred<void>();
 
         // Make sure provided port is unoccupied
-        try {
-            await this.ensurePortIsFree();
-        } catch (e) {
-            if (this.config.get("exitOnPortConflict")) {
-                winston.info(e.message);
-                return;
-            }
-            throw e;
-        }
+        await this.ensurePortIsFree();
 
-        const alfred = app.create(this.config, this.storage, this.mongoManager);
+        const alfred = app.create(this.storage, this.mongoManager);
         alfred.set("port", this.port);
 
         this.server = this.serverFactory.create(alfred);
