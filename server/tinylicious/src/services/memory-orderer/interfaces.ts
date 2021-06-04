@@ -24,13 +24,6 @@ export interface IConcreteNode extends EventEmitter {
     connectOrderer(tenantId: string, documentId: string): Promise<IOrderer>;
 }
 
-export interface IReservationManager {
-    /**
-     * Retrieves an existing reservation
-     */
-    getOrReserve(key: string, node: IConcreteNode): Promise<IConcreteNode>;
-}
-
 export interface IConcreteNodeFactory {
     create(): Promise<IConcreteNode>;
 }
