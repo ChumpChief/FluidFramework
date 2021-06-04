@@ -47,7 +47,7 @@ export class TinyliciousTenant implements ITenant {
     }
 }
 
-export class TenantManager implements ITenantManager {
+export class TinyliciousTenantManager implements ITenantManager {
     constructor(private readonly url: string) {
     }
 

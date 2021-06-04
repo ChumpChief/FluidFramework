@@ -24,7 +24,7 @@ import {
     LocalOrdererManager,
     PubSubPublisher,
     TaskMessageSender,
-    TenantManager,
+    TinyliciousTenantManager,
     WebServerFactory,
 } from "./services";
 
@@ -50,7 +50,7 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
             scribeDeltas: "scribeDeltas",
         };
 
-        const tenantManager = new TenantManager(`http://localhost:${port}`);
+        const tenantManager = new TinyliciousTenantManager(`http://localhost:${port}`);
         const dbFactory = new DbFactory();
         const taskMessageSender = new TaskMessageSender();
         const mongoManager = new MongoManager(dbFactory);
