@@ -58,7 +58,6 @@ export class TinyliciousRunner implements IRunner {
         // Listen on provided port, on all network interfaces.
         httpServer.listen(this.port);
         httpServer.on("error", (error) => this.onError(error));
-        httpServer.on("listening", () => this.onListening());
 
         return this.runningDeferred.promise;
     }
@@ -120,15 +119,5 @@ export class TinyliciousRunner implements IRunner {
             default:
                 throw error;
         }
-    }
-
-    /**
-     * Event listener for HTTP server "listening" event.
-     */
-    private onListening() {
-        const addr = this.server.httpServer.address();
-        const bind =
-            typeof addr === "string" ? `pipe ${addr}` : `port ${addr.port}`;
-        winston.info(`Listening on ${bind}`);
     }
 }
