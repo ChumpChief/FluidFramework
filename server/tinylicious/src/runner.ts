@@ -18,7 +18,7 @@ import * as winston from "winston";
 import { configureWebSocketServices } from "@fluidframework/server-lambdas";
 import { TestClientManager } from "@fluidframework/server-test-utils";
 import detect from "detect-port";
-import { create } from "./app";
+import { createExpressApp } from "./app";
 
 export class TinyliciousRunner implements IRunner {
     private server: IWebServer;
@@ -39,7 +39,7 @@ export class TinyliciousRunner implements IRunner {
         // Make sure provided port is unoccupied
         await this.ensurePortIsFree();
 
-        const expressApp = create(this.storage, this.mongoManager);
+        const expressApp = createExpressApp(this.storage, this.mongoManager);
         expressApp.set("port", this.port);
 
         this.server = this.serverFactory.create(expressApp);

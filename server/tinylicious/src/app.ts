@@ -15,7 +15,7 @@ import express, { Router } from "express";
 import safeStringify from "json-stringify-safe";
 import { create as createRoutes } from "./routes";
 
-export function create(
+export function createExpressApp(
     storage: IDocumentStorage,
     mongoManager: MongoManager,
 ) {
