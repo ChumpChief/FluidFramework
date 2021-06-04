@@ -7,7 +7,6 @@ import assert from "assert";
 import * as resources from "@fluidframework/gitresources";
 import { buildHierarchy } from "@fluidframework/protocol-base";
 import * as api from "@fluidframework/protocol-definitions";
-import { debug } from "./debug";
 import { ICreateRefParamsExternal, IPatchRefParamsExternal, IGitManager, IHistorian } from "./storage";
 
 export class GitManager implements IGitManager {
@@ -36,7 +35,6 @@ export class GitManager implements IGitManager {
 
     public async getCommit(sha: string): Promise<resources.ICommit> {
         if (this.commitCache.has(sha)) {
-            debug(`Cache hit on ${sha}`);
             return this.commitCache.get(sha);
         }
 
@@ -51,7 +49,6 @@ export class GitManager implements IGitManager {
 
         // See if the sha is really a ref and convert
         if (this.refCache.has(shaOrRef)) {
-            debug(`Commit cache hit on ${shaOrRef}`);
             sha = this.refCache.get(shaOrRef);
 
             // Delete refcache after first use
@@ -89,7 +86,6 @@ export class GitManager implements IGitManager {
      */
     public async getTree(root: string, recursive = true): Promise<resources.ITree> {
         if (this.treeCache.has(root)) {
-            debug(`Tree cache hit on ${root}`);
             return this.treeCache.get(root);
         }
 
@@ -98,7 +94,6 @@ export class GitManager implements IGitManager {
 
     public async getBlob(sha: string): Promise<resources.IBlob> {
         if (this.blobCache.has(sha)) {
-            debug(`Blob cache hit on ${sha}`);
             return this.blobCache.get(sha);
         }
 

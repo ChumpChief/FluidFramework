@@ -6,7 +6,6 @@
 import * as querystring from "querystring";
 import { AxiosError, AxiosInstance, AxiosRequestConfig, default as Axios } from "axios";
 import { v4 as uuid } from "uuid";
-import { debug } from "./debug";
 
 export abstract class RestWrapper {
     constructor(
@@ -127,13 +126,6 @@ export class BasicRestWrapper extends RestWrapper {
             this.axios.request<T>(options)
                 .then((response) => { resolve(response.data); })
                 .catch((error: AxiosError) => {
-                    if (error && error.config) {
-                        // eslint-disable-next-line max-len
-                        debug(`[${error.config.method}] request to [${error.config.url}] failed with [${error.code}] [${error.message}]`);
-                    } else {
-                        debug(`request to ${options.url} failed ${error ? error.message : ""}`);
-                    }
-
                     if (error?.response?.status === 429 && error?.response?.data?.retryAfter > 0 && canRetry) {
                         setTimeout(() => {
                             this.request<T>(options, statusCode)
