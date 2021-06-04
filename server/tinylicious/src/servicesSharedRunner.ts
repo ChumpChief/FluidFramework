@@ -6,30 +6,38 @@
 import * as path from "path";
 import nconf from "nconf";
 import { TinyliciousResourcesFactory } from "./resourcesFactory";
-import { TinyliciousRunnerFactory } from "./runnerFactory";
+import { TinyliciousRunner } from "./runner";
 
 /**
  * Uses the provided factories to create and execute a runner.
  */
 export async function run() {
     const resourceFactory = new TinyliciousResourcesFactory();
-    const runnerFactory = new TinyliciousRunnerFactory();
     const configPath = path.join(__dirname, "../config.json");
 
     const config = nconf.argv().env({ separator: "__", parseValues: true }).file(configPath).use("memory");
 
     const resources = await resourceFactory.create(config);
-    const runner = await runnerFactory.create(resources);
+
+    const runner = new TinyliciousRunner(
+        resources.webServerFactory,
+        resources.config,
+        resources.port,
+        resources.orderManager,
+        resources.tenantManager,
+        resources.storage,
+        resources.mongoManager,
+    );
 
     // Start the runner and then listen for the message to stop it
     const runningP = runner
         .start()
         .catch(async (error) => {
             await runner
-                    .stop()
-                    .catch(() => {
-                        error.forceKill = true;
-                    });
+                .stop()
+                .catch(() => {
+                    error.forceKill = true;
+                });
             return Promise.reject(error);
         });
 
@@ -50,9 +58,7 @@ export async function run() {
  * exit the service once the runner completes.
  */
 export function runService() {
-    const runningP = run();
-
-    runningP.then(
+    run().then(
         () => {
             process.exit(0);
         },
