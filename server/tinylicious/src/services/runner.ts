@@ -3,8 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import type nconf from "nconf";
-
 /**
  * A runner represents a task that starts once start is called. And ends when either start completes
  * or stop is called.
@@ -19,26 +17,6 @@ export interface IRunner {
      * Stops the runner
      */
     stop(): Promise<void>;
-}
-
-/**
- * Base interfaces for resources that can be provided to a runner
- */
-export interface IResources {
-    /**
-     * Disposes fo the resources
-     */
-    dispose(): Promise<void>;
-}
-
-/**
- * A resource factory is used to create the resources needed by a runner
- */
-export interface IResourcesFactory<T extends IResources> {
-    /**
-     * Creates a new set of resources
-     */
-    create(config: nconf.Provider): Promise<T>;
 }
 
 /**

@@ -7,16 +7,17 @@ import * as path from "path";
 import nconf from "nconf";
 import { TinyliciousResourcesFactory } from "./resourcesFactory";
 import { TinyliciousRunnerFactory } from "./runnerFactory";
-import { IResources, IResourcesFactory, IRunnerFactory } from "./services";
 
 /**
  * Uses the provided factories to create and execute a runner.
  */
-export async function run<T extends IResources>(
-    config: nconf.Provider,
-    resourceFactory: IResourcesFactory<T>,
-    runnerFactory: IRunnerFactory<T>,
-) {
+export async function run() {
+    const resourceFactory = new TinyliciousResourcesFactory();
+    const runnerFactory = new TinyliciousRunnerFactory();
+    const configPath = path.join(__dirname, "../config.json");
+
+    const config = nconf.argv().env({ separator: "__", parseValues: true }).file(configPath).use("memory");
+
     const resources = await resourceFactory.create(config);
     const runner = await runnerFactory.create(resources);
 
@@ -49,13 +50,7 @@ export async function run<T extends IResources>(
  * exit the service once the runner completes.
  */
 export function runService() {
-    const resourceFactory = new TinyliciousResourcesFactory();
-    const runnerFactory = new TinyliciousRunnerFactory();
-    const configPath = path.join(__dirname, "../config.json");
-
-    const config = nconf.argv().env({ separator: "__", parseValues: true }).file(configPath).use("memory");
-
-    const runningP = run(config, resourceFactory, runnerFactory);
+    const runningP = run();
 
     runningP.then(
         () => {
