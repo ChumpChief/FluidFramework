@@ -17,7 +17,6 @@ import {
     SummaryReader,
     SummaryWriter,
 } from "@fluidframework/server-lambdas";
-import { IGitManager } from "@fluidframework/server-services-client";
 import {
     DefaultServiceConfiguration,
     IContext,
@@ -38,6 +37,7 @@ import {
     ILogger,
     TokenGenerator,
 } from "@fluidframework/server-services-core";
+import { IGitManager } from "../services-client";
 import { ILocalOrdererSetup } from "./interfaces";
 import { LocalContext } from "./localContext";
 import { LocalKafka } from "./localKafka";

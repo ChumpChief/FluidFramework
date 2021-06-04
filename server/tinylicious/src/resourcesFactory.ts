@@ -5,7 +5,6 @@
 
 import fs from "fs";
 import { DocumentStorage } from "@fluidframework/server-services-shared";
-import { generateToken, Historian } from "@fluidframework/server-services-client";
 import {
     IDb,
     IDbFactory,
@@ -19,6 +18,8 @@ import socketIo from "socket.io";
 import winston from "winston";
 import { TinyliciousResources } from "./resources";
 import {
+    generateToken,
+    Historian,
     InMemoryDb,
     LocalOrdererManager,
     PubSubPublisher,

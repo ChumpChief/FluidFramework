@@ -22,7 +22,6 @@ import {
 import * as _ from "lodash";
 import * as moniker from "moniker";
 import { v4 as uuid } from "uuid";
-import { debug } from "./debug";
 import { IConcreteNode, IConnectedMessage, IConnectMessage, INodeMessage, IOpMessage } from "./interfaces";
 import { LocalOrderer } from "./localOrderer";
 import { ISubscriber } from "./pubsub";
@@ -95,9 +94,8 @@ export class LocalNode extends EventEmitter implements IConcreteNode {
         id: string,
         address: string,
         databaseManager: IDatabaseManager,
-        timeoutLength: number): Promise<INode> {
-        debug("Creating node", id);
-
+        timeoutLength: number,
+    ): Promise<INode> {
         const nodeCollection = await databaseManager.getNodeCollection();
         const node = {
             _id: id,
@@ -166,7 +164,6 @@ export class LocalNode extends EventEmitter implements IConcreteNode {
 
         // Connections will arrive from remote nodes
         this.webSocketServer.on("connection", (wsSocket, request) => {
-            debug(`New inbound web socket connection ${request.url}`);
             const socket = new Socket<INodeMessage>(wsSocket);
             const subscriber = new RemoteSubscriber(socket);
 
@@ -228,16 +225,11 @@ export class LocalNode extends EventEmitter implements IConcreteNode {
                 }
             });
         });
-
-        this.webSocketServer.on("error", (error) => {
-            debug("wss error", error);
-        });
     }
 
     public async connectOrderer(tenantId: string, documentId: string): Promise<IOrderer> {
         const fullId = `${tenantId}/${documentId}`;
         // Our node is responsible for sequencing messages
-        debug(`${this.id} Becoming leader for ${fullId}`);
         const orderer = await LocalOrderer.load(
             this.storage,
             this.databaseManager,
@@ -260,7 +252,6 @@ export class LocalNode extends EventEmitter implements IConcreteNode {
         // Check to see if we can even renew at this point
         if (now > this.node.expiration) {
             // Have lost the node. Need to shutdown everything and close down
-            debug(`${this.node._id} did not renew before expiration`);
             this.emit("expired");
 
             // TODO close the web socket server
@@ -283,7 +274,6 @@ export class LocalNode extends EventEmitter implements IConcreteNode {
                         },
                         (error) => {
                             // Try again immediately.
-                            debug(`Failed to renew expiration for ${this.node._id}`, error);
                             this.scheduleHeartbeat();
                         });
                 },

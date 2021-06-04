@@ -15,7 +15,6 @@ import {
     IWebSocket,
     MongoManager,
 } from "@fluidframework/server-services-core";
-import { debug } from "./debug";
 import { IConcreteNode, IConnectedMessage, IConnectMessage, INodeMessage, IOpMessage } from "./interfaces";
 import { IOrdererConnectionFactory, ProxyOrderer } from "./proxyOrderer";
 import { Socket } from "./socket";
@@ -174,7 +173,6 @@ export class RemoteNode extends EventEmitter implements IConcreteNode {
     public async connectOrderer(tenantId: string, documentId: string): Promise<IOrderer> {
         const fullId = `${tenantId}/${documentId}`;
         assert(!this.orderers.has(fullId));
-        debug(`Connecting to ${fullId}:${this.id}`);
 
         const orderer = new ProxyOrderer(new ProxySocketThing(this, tenantId, documentId));
         this.orderers.set(fullId, orderer);

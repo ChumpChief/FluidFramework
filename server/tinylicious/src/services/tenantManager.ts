@@ -10,7 +10,7 @@ import {
     ITenantOrderer,
     ITenantStorage,
 } from "@fluidframework/server-services-core";
-import { GitManager, Historian } from "@fluidframework/server-services-client";
+import { GitManager, Historian } from "./services-client";
 
 export class TinyliciousTenant implements ITenant {
     private readonly owner = "tinylicious";

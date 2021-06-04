@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { ISubscriber, IPubSub } from "@fluidframework/server-memory-orderer";
+import { ISubscriber, IPubSub } from "./memory-orderer";
 
 export class PubSubPublisher implements IPubSub {
     constructor(private readonly io: SocketIO.Server) {}

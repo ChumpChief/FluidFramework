@@ -6,7 +6,6 @@
 import { EventEmitter } from "events";
 import ws from "ws";
 import { IsoBuffer } from "@fluidframework/common-utils";
-import { debug } from "./debug";
 
 export class Socket<T> extends EventEmitter {
     // eslint-disable-next-line @typescript-eslint/no-shadow
@@ -33,14 +32,12 @@ export class Socket<T> extends EventEmitter {
         this.socket.on(
             "error",
             (error) => {
-                debug(`ws error on connection to ${socket.url}`, error);
                 this.emit("error", error);
             });
 
         this.socket.on(
             "close",
             (code, reason) => {
-                debug(`ws to ${socket.url} close ${code} ${reason}`);
                 this.emit("close", code, reason);
             });
 
@@ -66,7 +63,6 @@ export class Socket<T> extends EventEmitter {
 
         this.sendScheduled = true;
         setImmediate(() => {
-            debug(`Sending ${this.pending.length} messages`);
             this.sendBuffers(this.pending);
             this.pending = [];
             this.sendScheduled = false;
