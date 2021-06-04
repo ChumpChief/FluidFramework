@@ -3,8 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import * as path from "path";
-import nconf from "nconf";
 import { TinyliciousResourcesFactory } from "./resourcesFactory";
 import { TinyliciousRunner } from "./runner";
 
@@ -13,11 +11,8 @@ import { TinyliciousRunner } from "./runner";
  */
 async function run() {
     const resourceFactory = new TinyliciousResourcesFactory();
-    const configPath = path.join(__dirname, "../config.json");
 
-    const config = nconf.argv().env({ separator: "__", parseValues: true }).file(configPath).use("memory");
-
-    const resources = await resourceFactory.create(config);
+    const resources = await resourceFactory.create();
 
     const runner = new TinyliciousRunner(
         resources.webServerFactory,

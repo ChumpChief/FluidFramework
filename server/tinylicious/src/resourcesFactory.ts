@@ -16,7 +16,6 @@ import {
 } from "@fluidframework/server-services-core";
 import * as utils from "@fluidframework/server-services-utils";
 import * as git from "isomorphic-git";
-import { Provider } from "nconf";
 import socketIo from "socket.io";
 
 import winston from "winston";
@@ -40,10 +39,20 @@ class DbFactory implements IDbFactory {
 }
 
 export class TinyliciousResourcesFactory implements IResourcesFactory<TinyliciousResources> {
-    public async create(config: Provider): Promise<TinyliciousResources> {
+    public async create(): Promise<TinyliciousResources> {
         // Pull in the default port off the config
         const port = utils.normalizePort(process.env.PORT ?? defaultTinyliciousPort);
-        const collectionNames = config.get("mongo:collectionNames");
+        // hard coded from config
+        const collectionNames = {
+            content: "content",
+            deltas: "deltas",
+            documents: "documents",
+            partitions: "partitions",
+            tenants: "tenants",
+            nodes: "nodes",
+            reservations: "reservations",
+            scribeDeltas: "scribeDeltas",
+        };
 
         const tenantManager = new TenantManager(`http://localhost:${port}`);
         const dbFactory = new DbFactory();
@@ -63,12 +72,19 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
         // Initialize isomorphic-git
         git.plugins.set("fs", fs);
 
+        // hard coded from config
+        const foremanPermissions = {
+            paparazziQueue: ["snapshot", "spell", "intel", "translation"],
+            augloopQueue: ["augmentation"],
+            headlessQueue: ["chain-snapshot", "chain-intel", "chain-translation", "chain-spell", "chain-cache"],
+        };
+
         const orderManager = new LocalOrdererManager(
             storage,
             databaseManager,
             tenantManager,
             taskMessageSender,
-            config.get("foreman:permissions"),
+            foremanPermissions,
             generateToken,
             async (tenantId: string) => {
                 const url = `http://localhost:${port}/repos/${encodeURIComponent(tenantId)}`;
