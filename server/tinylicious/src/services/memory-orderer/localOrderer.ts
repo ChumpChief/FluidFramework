@@ -28,7 +28,6 @@ import {
     CheckpointManager,
     createDeliCheckpointManagerFromCollection,
     DeliLambda,
-    ForemanLambda,
     ScribeLambda,
     ScriptoriumLambda,
     SummaryReader,
@@ -100,7 +99,6 @@ export class LocalOrderer implements IOrderer {
         pubSub: IPubSub = new PubSub(),
         broadcasterContext: IContext = new LocalContext(logger),
         scriptoriumContext: IContext = new LocalContext(logger),
-        foremanContext: IContext = new LocalContext(logger),
         scribeContext: IContext = new LocalContext(logger),
         deliContext: IContext = new LocalContext(logger),
         serviceConfiguration: Partial<IServiceConfiguration> = {},
@@ -116,7 +114,6 @@ export class LocalOrderer implements IOrderer {
             pubSub,
             broadcasterContext,
             scriptoriumContext,
-            foremanContext,
             scribeContext,
             deliContext,
             merge({}, DefaultServiceConfiguration, serviceConfiguration));
@@ -126,7 +123,6 @@ export class LocalOrderer implements IOrderer {
     public deltasKafka: LocalKafka;
 
     public scriptoriumLambda: LocalLambdaController | undefined;
-    public foremanLambda: LocalLambdaController | undefined;
     public scribeLambda: LocalLambdaController | undefined;
     public deliLambda: LocalLambdaController | undefined;
     public broadcasterLambda: LocalLambdaController | undefined;
@@ -144,7 +140,6 @@ export class LocalOrderer implements IOrderer {
         private readonly pubSub: IPubSub,
         private readonly broadcasterContext: IContext,
         private readonly scriptoriumContext: IContext,
-        private readonly foremanContext: IContext,
         private readonly scribeContext: IContext,
         private readonly deliContext: IContext,
         private readonly serviceConfiguration: IServiceConfiguration,
@@ -225,15 +220,6 @@ export class LocalOrderer implements IOrderer {
             this.setup,
             this.broadcasterContext,
             async (_, context) => new BroadcasterLambda(this.socketPublisher, context));
-
-        this.foremanLambda = new LocalLambdaController(
-            this.deltasKafka,
-            this.setup,
-            this.foremanContext,
-            async (_, context) => new ForemanLambda(
-                context,
-                this.tenantId,
-                this.documentId));
 
         if (this.gitManager) {
             this.scribeLambda = new LocalLambdaController(
@@ -332,11 +318,6 @@ export class LocalOrderer implements IOrderer {
             this.scriptoriumLambda.start();
         }
 
-        if (this.foremanLambda) {
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            this.foremanLambda.start();
-        }
-
         if (this.scribeLambda) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.scribeLambda.start();
@@ -364,11 +345,6 @@ export class LocalOrderer implements IOrderer {
         if (this.scriptoriumLambda) {
             this.scriptoriumLambda.close();
             this.scriptoriumLambda = undefined;
-        }
-
-        if (this.foremanLambda) {
-            this.foremanLambda.close();
-            this.foremanLambda = undefined;
         }
 
         if (this.scribeLambda) {
