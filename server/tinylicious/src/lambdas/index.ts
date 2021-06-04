@@ -5,7 +5,6 @@
 
 export * from "./alfred";
 export * from "./broadcaster";
-export * from "./copier";
 export * from "./deli";
 export * from "./foreman";
 export * from "./scribe";
