@@ -43,13 +43,9 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
         const port = defaultTinyliciousPort;
         // hard coded from config
         const collectionNames = {
-            content: "content",
             deltas: "deltas",
             documents: "documents",
-            partitions: "partitions",
-            tenants: "tenants",
             nodes: "nodes",
-            reservations: "reservations",
             scribeDeltas: "scribeDeltas",
         };
 
