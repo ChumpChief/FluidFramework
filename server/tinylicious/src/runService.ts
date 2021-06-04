@@ -11,7 +11,7 @@ import { TinyliciousRunner } from "./runner";
 /**
  * Uses the provided factories to create and execute a runner.
  */
-export async function run() {
+async function run() {
     const resourceFactory = new TinyliciousResourcesFactory();
     const configPath = path.join(__dirname, "../config.json");
 

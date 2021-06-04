@@ -6,7 +6,7 @@
 
 import http from "http";
 import Axios from "axios";
-import { runService } from "./servicesSharedRunner";
+import { runService } from "./runService";
 
 // Each TCP connect has a delay to allow it to be reuse after close, and unit test make a lot of connection,
 // which might cause port exhaustion.
