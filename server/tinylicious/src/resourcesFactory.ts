@@ -4,7 +4,6 @@
  */
 
 import fs from "fs";
-import { LocalOrdererManager } from "@fluidframework/server-local-server";
 import { DocumentStorage } from "@fluidframework/server-services-shared";
 import { generateToken, Historian } from "@fluidframework/server-services-client";
 import {
@@ -21,6 +20,7 @@ import winston from "winston";
 import { TinyliciousResources } from "./resources";
 import {
     InMemoryDb,
+    LocalOrdererManager,
     PubSubPublisher,
     TaskMessageSender,
     TenantManager,

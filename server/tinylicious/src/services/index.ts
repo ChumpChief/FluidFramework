@@ -4,6 +4,7 @@
  */
 
 export * from "./inMemorydb";
+export * from "./localOrdererManager";
 export * from "./pubSubPublisher";
 export * from "./runner";
 export * from "./taskMessageSender";
