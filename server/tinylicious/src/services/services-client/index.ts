@@ -7,7 +7,6 @@ export * from "./auth";
 export * from "./error";
 export * from "./gitManager";
 export * from "./historian";
-export * from "./interfaces";
 export * from "./restWrapper";
 export * from "./storage";
 export * from "./scopes";
