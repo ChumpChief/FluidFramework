@@ -6,12 +6,10 @@
 import { ICommitDetails } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
-import nconf from "nconf";
 import { queryParamToNumber, queryParamToString } from "../../../utils";
 import * as utils from "../utils";
 
 export async function getCommits(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     sha: string,
@@ -19,7 +17,7 @@ export async function getCommits(
 ): Promise<ICommitDetails[]> {
     const descriptions = await git.log({
         depth: count,
-        dir: utils.getGitDir(store, tenantId),
+        dir: utils.getGitDir(tenantId),
         ref: sha,
     });
 
@@ -50,14 +48,13 @@ export async function getCommits(
     });
 }
 
-export function create(store: nconf.Provider): Router {
+export function create(): Router {
     const router: Router = Router();
 
     router.get(
         "/repos/:ignored?/:tenantId/commits",
         (request, response) => {
             const commitsP = getCommits(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 queryParamToString(request.query.sha),

@@ -6,7 +6,6 @@
 import { ICreateRefParams, IPatchRefParams, IRef } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
-import nconf from "nconf";
 import * as utils from "../utils";
 
 function refToIRef(ref: string, sha: string): IRef {
@@ -22,25 +21,23 @@ function refToIRef(ref: string, sha: string): IRef {
 }
 
 export async function getRefs(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
 ): Promise<IRef[]> {
     const branches = await git.listBranches({
-        dir: utils.getGitDir(store, tenantId),
+        dir: utils.getGitDir(tenantId),
     });
 
-    return Promise.all(branches.map(async (branch) => getRef(store, tenantId, authorization, branch)));
+    return Promise.all(branches.map(async (branch) => getRef(tenantId, authorization, branch)));
 }
 
 export async function getRef(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     ref: string,
 ): Promise<IRef> {
     const resolved = await git.resolveRef({
-        dir: utils.getGitDir(store, tenantId),
+        dir: utils.getGitDir(tenantId),
         ref,
     });
 
@@ -48,13 +45,12 @@ export async function getRef(
 }
 
 export async function createRef(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     params: ICreateRefParams,
 ): Promise<IRef> {
     await git.writeRef({
-        dir: utils.getGitDir(store, tenantId),
+        dir: utils.getGitDir(tenantId),
         ref: params.ref,
         value: params.sha,
     });
@@ -63,13 +59,12 @@ export async function createRef(
 }
 
 export async function updateRef(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     ref: string,
     params: IPatchRefParams,
 ): Promise<IRef> {
-    const dir = utils.getGitDir(store, tenantId);
+    const dir = utils.getGitDir(tenantId);
 
     // Current code - or nodegit - takes in updates without the /refs input - need to resolve the behavior and
     // either leave in the refs below or update the git managers to include it.
@@ -87,7 +82,6 @@ export async function updateRef(
 }
 
 export async function deleteRef(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     ref: string,
@@ -95,14 +89,13 @@ export async function deleteRef(
     throw new Error("Not implemented");
 }
 
-export function create(store: nconf.Provider): Router {
+export function create(): Router {
     const router: Router = Router();
 
     router.get(
         "/repos/:ignored?/:tenantId/git/refs",
         (request, response) => {
             const refsP = getRefs(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"));
 
@@ -116,7 +109,6 @@ export function create(store: nconf.Provider): Router {
         "/repos/:ignored?/:tenantId/git/refs/*",
         (request, response) => {
             const refP = getRef(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.params[0]);
@@ -131,7 +123,6 @@ export function create(store: nconf.Provider): Router {
         "/repos/:ignored?/:tenantId/git/refs",
         (request, response) => {
             const refP = createRef(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.body);
@@ -147,7 +138,6 @@ export function create(store: nconf.Provider): Router {
         "/repos/:ignored?/:tenantId/git/refs/*",
         (request, response) => {
             const refP = updateRef(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.params[0],
@@ -163,7 +153,6 @@ export function create(store: nconf.Provider): Router {
         "/repos/:ignored?/:tenantId/git/refs/*",
         (request, response) => {
             const refP = deleteRef(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.params[0]);

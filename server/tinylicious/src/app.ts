@@ -51,7 +51,6 @@ export function create(
 
     // Bind routes
     const routes = createRoutes(
-        config,
         mongoManager,
         storage);
 

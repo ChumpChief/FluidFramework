@@ -5,11 +5,9 @@
 
 import { IHeader } from "@fluidframework/gitresources";
 import { Router } from "express";
-import nconf from "nconf";
 import * as utils from "../utils";
 
 export async function getHeader(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     sha: string,
@@ -19,7 +17,6 @@ export async function getHeader(
 }
 
 export async function getTree(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     sha: string,
@@ -28,7 +25,7 @@ export async function getTree(
     throw new Error("Not implemented");
 }
 
-export function create(store: nconf.Provider): Router {
+export function create(): Router {
     const router: Router = Router();
 
     router.get(
@@ -36,7 +33,6 @@ export function create(store: nconf.Provider): Router {
         (request, response) => {
             const useCache = !("disableCache" in request.query);
             const headerP = getHeader(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.params.sha,
@@ -50,7 +46,6 @@ export function create(store: nconf.Provider): Router {
         (request, response) => {
             const useCache = !("disableCache" in request.query);
             const headerP = getTree(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.params.sha,

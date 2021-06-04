@@ -6,11 +6,9 @@
 import { ICreateTreeParams, ITree, ITreeEntry } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
-import nconf from "nconf";
 import * as utils from "../utils";
 
 export async function createTree(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     params: ICreateTreeParams,
@@ -28,16 +26,15 @@ export async function createTree(
 
     const treeDescription: git.TreeDescription = { entries };
     const sha = await git.writeObject({
-        dir: utils.getGitDir(store, tenantId),
+        dir: utils.getGitDir(tenantId),
         type: "tree",
         object: treeDescription,
     });
 
-    return getTree(store, tenantId, authorization, sha, false, true);
+    return getTree(tenantId, authorization, sha, false, true);
 }
 
 export async function getTree(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     sha: string,
@@ -48,7 +45,7 @@ export async function getTree(
 
     if (recursive) {
         returnEntries = await git.walkBeta2({
-            dir: utils.getGitDir(store, tenantId),
+            dir: utils.getGitDir(tenantId),
             map: (async (path, [head]) => {
                 if (path === ".") {
                     return;
@@ -66,7 +63,7 @@ export async function getTree(
             trees: [git.TREE({ ref: sha } as any)],
         });
     } else {
-        const treeObject = await git.readObject({ dir: utils.getGitDir(store, tenantId), oid: sha });
+        const treeObject = await git.readObject({ dir: utils.getGitDir(tenantId), oid: sha });
         const description = treeObject.object as git.TreeDescription;
 
         returnEntries = description.entries.map((tree) => {
@@ -90,14 +87,13 @@ export async function getTree(
     };
 }
 
-export function create(store: nconf.Provider): Router {
+export function create(): Router {
     const router: Router = Router();
 
     router.post(
         "/repos/:ignored?/:tenantId/git/trees",
         (request, response) => {
             const treeP = createTree(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.body);
@@ -114,7 +110,6 @@ export function create(store: nconf.Provider): Router {
         (request, response) => {
             const useCache = !("disableCache" in request.query);
             const treeP = getTree(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.params.sha,

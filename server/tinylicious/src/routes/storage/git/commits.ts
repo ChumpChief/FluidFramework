@@ -6,11 +6,9 @@
 import { ICommit, ICreateCommitParams } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
-import nconf from "nconf";
 import * as utils from "../utils";
 
 export async function createCommit(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     params: ICreateCommitParams,
@@ -32,7 +30,7 @@ export async function createCommit(
     };
 
     const sha = await git.writeObject({
-        dir: utils.getGitDir(store, tenantId),
+        dir: utils.getGitDir(tenantId),
         type: "commit",
         object: commitDescription,
     });
@@ -49,13 +47,12 @@ export async function createCommit(
 }
 
 export async function getCommit(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     sha: string,
     useCache: boolean,
 ): Promise<ICommit> {
-    const commit = await git.readObject({ dir: utils.getGitDir(store, tenantId), oid: sha });
+    const commit = await git.readObject({ dir: utils.getGitDir(tenantId), oid: sha });
     const description = commit.object as git.CommitDescription;
 
     return {
@@ -77,14 +74,13 @@ export async function getCommit(
     };
 }
 
-export function create(store: nconf.Provider): Router {
+export function create(): Router {
     const router: Router = Router();
 
     router.post(
         "/repos/:ignored?/:tenantId/git/commits",
         (request, response) => {
             const commitP = createCommit(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.body);
@@ -101,7 +97,6 @@ export function create(store: nconf.Provider): Router {
         (request, response) => {
             const useCache = !("disableCache" in request.query);
             const commitP = getCommit(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.params.sha,

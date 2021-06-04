@@ -6,7 +6,6 @@
 import { MongoManager } from "@fluidframework/server-services-core";
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 import { Router } from "express";
-import { Provider } from "nconf";
 import { getParam, queryParamToNumber } from "../../utils";
 
 async function getDeltas(
@@ -39,8 +38,9 @@ async function getDeltas(
     return dbDeltas.map((delta) => delta.operation);
 }
 
-export function create(config: Provider, mongoManager: MongoManager): Router {
-    const deltasCollectionName = config.get("mongo:collectionNames:deltas");
+export function create(mongoManager: MongoManager): Router {
+    // hard coded from config
+    const deltasCollectionName = "deltas";
     const router: Router = Router();
 
     /**

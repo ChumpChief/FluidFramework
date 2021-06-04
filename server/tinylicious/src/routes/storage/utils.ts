@@ -5,7 +5,6 @@
 
 import * as path from "path";
 import { Response } from "express";
-import nconf from "nconf";
 
 /**
  * Helper function to handle a promise that should be returned to the user
@@ -29,7 +28,8 @@ export function handleResponse<T>(
         });
 }
 
-export function getGitDir(store: nconf.Provider, tenantId: string) {
-    const directory = store.get("storage");
+export function getGitDir(tenantId: string) {
+    // hard coded from config
+    const directory = "/var/tmp/tinylicious";
     return path.join(directory, `./${tenantId}`);
 }

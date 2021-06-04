@@ -6,11 +6,9 @@
 import { IBlob, ICreateBlobParams, ICreateBlobResponse } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
-import nconf from "nconf";
 import * as utils from "../utils";
 
 export async function createBlob(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     body: ICreateBlobParams,
@@ -18,7 +16,7 @@ export async function createBlob(
     const buffer = Buffer.from(body.content, body.encoding as BufferEncoding);
 
     const sha = await git.writeObject({
-        dir: utils.getGitDir(store, tenantId),
+        dir: utils.getGitDir(tenantId),
         type: "blob",
         object: buffer,
     });
@@ -30,13 +28,12 @@ export async function createBlob(
 }
 
 export async function getBlob(
-    store: nconf.Provider,
     tenantId: string,
     authorization: string,
     sha: string,
     useCache: boolean,
 ): Promise<IBlob> {
-    const gitObj = await git.readObject({ dir: utils.getGitDir(store, tenantId), oid: sha });
+    const gitObj = await git.readObject({ dir: utils.getGitDir(tenantId), oid: sha });
     const buffer = gitObj.object as Buffer;
 
     const result: IBlob = {
@@ -50,14 +47,13 @@ export async function getBlob(
     return result;
 }
 
-export function create(store: nconf.Provider): Router {
+export function create(): Router {
     const router: Router = Router();
 
     router.post(
         "/repos/:ignored?/:tenantId/git/blobs",
         (request, response) => {
             const blobP = createBlob(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.body);
@@ -77,7 +73,6 @@ export function create(store: nconf.Provider): Router {
         (request, response) => {
             const useCache = !("disableCache" in request.query);
             const blobP = getBlob(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.params.sha,
@@ -98,7 +93,6 @@ export function create(store: nconf.Provider): Router {
             const useCache = !("disableCache" in request.query);
 
             const blobP = getBlob(
-                store,
                 request.params.tenantId,
                 request.get("Authorization"),
                 request.params.sha,

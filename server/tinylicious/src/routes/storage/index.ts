@@ -4,7 +4,6 @@
  */
 
 import { Router } from "express";
-import nconf from "nconf";
 import * as blobs from "./git/blobs";
 import * as commits from "./git/commits";
 import * as refs from "./git/refs";
@@ -29,19 +28,19 @@ export interface IRoutes {
     };
 }
 
-export function create(store: nconf.Provider): Router {
+export function create(): Router {
     const apiRoutes = {
         git: {
-            blobs: blobs.create(store),
-            commits: commits.create(store),
-            refs: refs.create(store),
-            tags: tags.create(store),
-            trees: trees.create(store),
+            blobs: blobs.create(),
+            commits: commits.create(),
+            refs: refs.create(),
+            tags: tags.create(),
+            trees: trees.create(),
         },
         repository: {
-            commits: repositoryCommits.create(store),
-            contents: contents.create(store),
-            headers: headers.create(store),
+            commits: repositoryCommits.create(),
+            contents: contents.create(),
+            headers: headers.create(),
         },
     };
 
