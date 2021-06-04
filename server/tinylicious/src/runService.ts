@@ -21,7 +21,7 @@ async function run() {
 
     const runner = new TinyliciousRunner(
         resources.webServerFactory,
-        resources.config,
+        config,
         resources.port,
         resources.orderManager,
         resources.tenantManager,

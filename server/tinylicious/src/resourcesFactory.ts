@@ -79,7 +79,6 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
             pubsub);
 
         return new TinyliciousResources(
-            config,
             orderManager,
             tenantManager,
             storage,
