@@ -7,21 +7,16 @@ import {
     IDocumentStorage,
     MongoManager,
 } from "@fluidframework/server-services-core";
-import { Router } from "express";
 import * as ordering from "./ordering";
 import * as storage from "./storage";
 
-export interface IRoutes {
-    ordering: Router;
-    storage: Router;
-}
-
-export function create(
+export function createOrderingRouter(
     mongoManager: MongoManager,
     documentStorage: IDocumentStorage,
 ) {
-    return {
-        ordering: ordering.create(documentStorage, mongoManager),
-        storage: storage.create(),
-    };
+    return ordering.create(documentStorage, mongoManager);
+}
+
+export function createStorageRouter() {
+    return storage.create();
 }

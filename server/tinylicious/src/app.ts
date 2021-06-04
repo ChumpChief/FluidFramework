@@ -13,7 +13,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Router } from "express";
 import safeStringify from "json-stringify-safe";
-import { create as createRoutes } from "./routes";
+import { createOrderingRouter, createStorageRouter } from "./routes";
 
 export function createExpressApp(
     storage: IDocumentStorage,
@@ -36,13 +36,12 @@ export function createExpressApp(
     expressApp.use(bodyParser.urlencoded({ limit: requestSize, extended: false }));
 
     // Bind routes
-    const routes = createRoutes(
-        mongoManager,
-        storage);
+    const storageRouter = createStorageRouter();
+    const orderingRouter = createOrderingRouter(mongoManager, storage);
 
     expressApp.use(cors());
-    expressApp.use(routes.storage);
-    expressApp.use(routes.ordering);
+    expressApp.use(storageRouter);
+    expressApp.use(orderingRouter);
 
     // Basic Help Message
     expressApp.use(Router().get("/", (req, res) => {
