@@ -7,17 +7,6 @@ import { merge } from "lodash";
 import { ProtocolOpHandler } from "@fluidframework/protocol-base";
 import { IClient } from "@fluidframework/protocol-definitions";
 import {
-    BroadcasterLambda,
-    CheckpointManager,
-    createDeliCheckpointManagerFromCollection,
-    DeliLambda,
-    ForemanLambda,
-    ScribeLambda,
-    ScriptoriumLambda,
-    SummaryReader,
-    SummaryWriter,
-} from "@fluidframework/server-lambdas";
-import {
     DefaultServiceConfiguration,
     IContext,
     IDeliState,
@@ -37,6 +26,17 @@ import {
     ILogger,
     TokenGenerator,
 } from "@fluidframework/server-services-core";
+import {
+    BroadcasterLambda,
+    CheckpointManager,
+    createDeliCheckpointManagerFromCollection,
+    DeliLambda,
+    ForemanLambda,
+    ScribeLambda,
+    ScriptoriumLambda,
+    SummaryReader,
+    SummaryWriter,
+} from "../../lambdas";
 import { IGitManager } from "../services-client";
 import { ILocalOrdererSetup } from "./interfaces";
 import { LocalContext } from "./localContext";

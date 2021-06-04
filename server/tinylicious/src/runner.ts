@@ -15,10 +15,10 @@ import {
 } from "@fluidframework/server-services-core";
 import { Deferred } from "@fluidframework/common-utils";
 import * as winston from "winston";
-import { configureWebSocketServices } from "@fluidframework/server-lambdas";
 import { TestClientManager } from "@fluidframework/server-test-utils";
 import detect from "detect-port";
 import { createExpressApp } from "./app";
+import { configureWebSocketServices } from "./lambdas";
 
 export class TinyliciousRunner implements IRunner {
     private server: IWebServer;
