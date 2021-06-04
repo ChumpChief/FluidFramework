@@ -4,16 +4,9 @@
  */
 
 import { strict as assert } from "assert";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
-import * as util from "util";
 import { ICollection, IDb } from "@fluidframework/server-services-core";
 import { Provider } from "nconf";
-import rimrafCallback from "rimraf";
 import { DbFactory } from "../services";
-
-const rimraf = util.promisify(rimrafCallback);
 
 /**
  * Test database document
@@ -46,8 +39,7 @@ interface ITestConfig {
         }
     }
 
-    // dispose method to allow the config to do any cleanup - i.e. delete the temporary
-    // directory used by leveldb
+    // dispose method to allow the config to do any cleanup
     dispose: () => Promise<void>;
 }
 
@@ -103,24 +95,7 @@ describe("Tinylicious", () => {
                     dispose: async () => { },
                 }),
             },
-            {
-                name: "levelDb",
-                create: () => {
-                    const levelDir = fs.mkdtempSync(path.join(os.tmpdir(), "level-"));
-
-                    return {
-                        value: {
-                            db: {
-                                inMemory: false,
-                                path: levelDir,
-                            },
-                        },
-                        dispose: async () => {
-                            await rimraf(levelDir);
-                        },
-                    };
-                },
-            });
+        );
 
         for (const configFactory of configFactories) {
             describe(configFactory.name, () => {

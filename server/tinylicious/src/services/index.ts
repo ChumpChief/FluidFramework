@@ -5,6 +5,7 @@
 
 export * from "./dbFactory";
 export * from "./pubSubPublisher";
+export * from "./runner";
 export * from "./taskMessageSender";
 export * from "./tenantManager";
 export * from "./webServerFactory";

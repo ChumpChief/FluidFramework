@@ -7,8 +7,6 @@
 import * as path from "path";
 import http from "http";
 import Axios from "axios";
-import winston from "winston";
-import { configureLogging } from "@fluidframework/server-services-utils";
 import { TinyliciousResourcesFactory } from "./resourcesFactory";
 import { TinyliciousRunnerFactory } from "./runnerFactory";
 import { runService } from "./servicesSharedRunner";
@@ -24,11 +22,7 @@ Axios.defaults.httpAgent = new http.Agent({ keepAlive: true });
 
 const configPath = path.join(__dirname, "../config.json");
 
-configureLogging(configPath);
-
 runService(
     new TinyliciousResourcesFactory(),
     new TinyliciousRunnerFactory(),
-    winston,
-    "tinylicious",
     configPath);
