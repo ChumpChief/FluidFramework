@@ -9,6 +9,5 @@ export * from "./memory-orderer";
 export * from "./pubSubPublisher";
 export * from "./runner";
 export * from "./services-client";
-export * from "./taskMessageSender";
 export * from "./tenantManager";
 export * from "./webServerFactory";

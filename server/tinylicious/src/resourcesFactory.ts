@@ -18,12 +18,10 @@ import socketIo from "socket.io";
 import winston from "winston";
 import { TinyliciousResources } from "./resources";
 import {
-    generateToken,
     Historian,
     InMemoryDb,
     LocalOrdererManager,
     PubSubPublisher,
-    TaskMessageSender,
     TinyliciousTenantManager,
     WebServerFactory,
 } from "./services";
@@ -52,7 +50,6 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
 
         const tenantManager = new TinyliciousTenantManager(`http://localhost:${port}`);
         const dbFactory = new DbFactory();
-        const taskMessageSender = new TaskMessageSender();
         const mongoManager = new MongoManager(dbFactory);
         const databaseManager = new MongoDatabaseManager(
             mongoManager,
@@ -71,10 +68,7 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
         const orderManager = new LocalOrdererManager(
             storage,
             databaseManager,
-            tenantManager,
-            taskMessageSender,
             {}, // foreman permissions
-            generateToken,
             async (tenantId: string) => {
                 const url = `http://localhost:${port}/repos/${encodeURIComponent(tenantId)}`;
                 return new Historian(url, false, false);

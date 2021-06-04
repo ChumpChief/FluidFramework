@@ -10,9 +10,6 @@ import {
     IOrderer,
     IOrdererManager,
     IServiceConfiguration,
-    ITaskMessageSender,
-    ITenantManager,
-    TokenGenerator,
 } from "@fluidframework/server-services-core";
 import { IPubSub, LocalOrderer } from "./memory-orderer";
 import { GitManager, IHistorian } from "./services-client";
@@ -23,10 +20,7 @@ export class LocalOrdererManager implements IOrdererManager {
     constructor(
         private readonly storage: IDocumentStorage,
         private readonly databaseManager: IDatabaseManager,
-        private readonly tenantManager: ITenantManager,
-        private readonly taskMessageSender: ITaskMessageSender,
         private readonly permission: any, // Can probably remove
-        private readonly tokenGenerator: TokenGenerator,
         private readonly createHistorian: (tenant: string) => Promise<IHistorian>,
         private readonly logger: ILogger,
         private readonly serviceConfiguration?: Partial<IServiceConfiguration>,
@@ -77,10 +71,7 @@ export class LocalOrdererManager implements IOrdererManager {
             this.databaseManager,
             tenantId,
             documentId,
-            this.taskMessageSender,
-            this.tenantManager,
             this.permission,
-            this.tokenGenerator,
             this.logger,
             gitManager,
             undefined /* ILocalOrdererSetup */,
