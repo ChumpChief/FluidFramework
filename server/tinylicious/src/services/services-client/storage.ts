@@ -6,6 +6,10 @@
 import * as git from "@fluidframework/gitresources";
 import * as api from "@fluidframework/protocol-definitions";
 
+interface IExternalWriterConfig {
+    enabled: boolean;
+}
+
 /**
  * Required params to create ref with config
  */
@@ -14,38 +18,10 @@ export interface ICreateRefParamsExternal extends git.ICreateRefParams {
 }
 
 /**
- * Required params to get ref with config
- */
-export interface IGetRefParamsExternal {
-    config?: IExternalWriterConfig;
-}
-
-/**
  * Required params to patch ref with config
  */
 export interface IPatchRefParamsExternal extends git.IPatchRefParams {
     config?: IExternalWriterConfig
-}
-
-interface IExternalWriterConfig {
-    enabled: boolean;
-}
-
-/**
- * Git cache data
- */
-export interface IGitCache {
-    // Cached blob values
-    blobs: git.IBlob[];
-
-    // Reference mapping
-    refs: { [key: string]: string };
-
-    // All trees contained in the commit (includes submodules)
-    trees: git.ITree[];
-
-    // Commits for each module
-    commits: git.ICommit[];
 }
 
 /**
@@ -100,17 +76,4 @@ export interface IGitManager {
     createRef(branch: string, sha: string): Promise<git.IRef>;
     upsertRef(branch: string, commitSha: string): Promise<git.IRef>;
     write(branch: string, inputTree: api.ITree, parents: string[], message: string): Promise<git.ICommit>;
-}
-
-/**
- * Uploads a summary to storage.
- */
-export interface ISummaryUploadManager {
-    /**
-     * Writes summary tree to storage.
-     * @param summaryTree Summary tree to write to storage
-     * @param parentHandle Parent summary acked handle (from summary ack)
-     * @returns Id of created tree.
-     */
-    writeSummaryTree(summaryTree: api.ISummaryTree, parentHandle: string): Promise<string>;
 }
