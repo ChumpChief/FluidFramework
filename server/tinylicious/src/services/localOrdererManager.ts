@@ -20,7 +20,6 @@ export class LocalOrdererManager implements IOrdererManager {
     constructor(
         private readonly storage: IDocumentStorage,
         private readonly databaseManager: IDatabaseManager,
-        private readonly permission: any, // Can probably remove
         private readonly createHistorian: (tenant: string) => Promise<IHistorian>,
         private readonly logger: ILogger,
         private readonly serviceConfiguration?: Partial<IServiceConfiguration>,
@@ -71,7 +70,6 @@ export class LocalOrdererManager implements IOrdererManager {
             this.databaseManager,
             tenantId,
             documentId,
-            this.permission,
             this.logger,
             gitManager,
             undefined /* ILocalOrdererSetup */,

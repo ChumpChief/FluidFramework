@@ -68,7 +68,6 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
         const orderManager = new LocalOrdererManager(
             storage,
             databaseManager,
-            {}, // foreman permissions
             async (tenantId: string) => {
                 const url = `http://localhost:${port}/repos/${encodeURIComponent(tenantId)}`;
                 return new Historian(url, false, false);

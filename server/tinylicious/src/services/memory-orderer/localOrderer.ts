@@ -89,7 +89,6 @@ export class LocalOrderer implements IOrderer {
         databaseManager: IDatabaseManager,
         tenantId: string,
         documentId: string,
-        permission: any,
         logger: ILogger,
         gitManager?: IGitManager,
         setup: ILocalOrdererSetup = new LocalOrdererSetup(
@@ -114,7 +113,6 @@ export class LocalOrderer implements IOrderer {
             tenantId,
             documentId,
             gitManager,
-            permission,
             pubSub,
             broadcasterContext,
             scriptoriumContext,
@@ -143,7 +141,6 @@ export class LocalOrderer implements IOrderer {
         private readonly tenantId: string,
         private readonly documentId: string,
         private readonly gitManager: IGitManager | undefined,
-        private readonly permission: any,
         private readonly pubSub: IPubSub,
         private readonly broadcasterContext: IContext,
         private readonly scriptoriumContext: IContext,
@@ -234,7 +231,6 @@ export class LocalOrderer implements IOrderer {
             this.setup,
             this.foremanContext,
             async (_, context) => new ForemanLambda(
-                this.permission,
                 context,
                 this.tenantId,
                 this.documentId));
