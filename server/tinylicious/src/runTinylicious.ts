@@ -32,7 +32,7 @@ async function run() {
                 .catch(() => {
                     error.forceKill = true;
                 });
-            return Promise.reject(error);
+            throw error;
         });
 
     process.on("SIGTERM", () => {
