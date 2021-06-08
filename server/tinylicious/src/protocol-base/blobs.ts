@@ -7,11 +7,7 @@ import { unreachableCase } from "../common-utils";
 import * as git from "../gitresources";
 import {
     FileMode,
-    IBlob,
-    IAttachment,
     ISnapshotTreeEx,
-    ITree,
-    TreeEntry,
     SummaryType,
     SummaryObject,
 } from "../protocol-definitions";
@@ -90,85 +86,4 @@ export function buildHierarchy(
     }
 
     return root;
-}
-
-/**
- * Basic implementation of a blob ITreeEntry
- */
-export class BlobTreeEntry {
-    public readonly mode = FileMode.File;
-    public readonly type = TreeEntry.Blob;
-    public readonly value: IBlob;
-
-    /**
-     * Creates a blob ITreeEntry
-     * @param path - path of entry
-     * @param contents - blob contents
-     * @param encoding - encoding of contents; defaults to utf-8
-     */
-    constructor(public readonly path: string, contents: string, encoding: string = "utf-8") {
-        this.value = { contents, encoding };
-    }
-}
-
-/**
- * Basic implementation of a commit ITreeEntry
- */
-export class CommitTreeEntry {
-    public readonly mode = FileMode.Commit;
-    public readonly type = TreeEntry.Commit;
-
-    /**
-     * Creates a commit ITreeEntry
-     * @param path - path of entry
-     * @param value - commit value
-     */
-    constructor(public readonly path: string, public readonly value: string) { }
-}
-
-/**
- * Basic implementation of a tree ITreeEntry
- */
-export class TreeTreeEntry {
-    public readonly mode = FileMode.Directory;
-    public readonly type = TreeEntry.Tree;
-
-    /**
-     * Creates a tree ITreeEntry
-     * @param path - path of entry
-     * @param value - subtree
-     */
-    constructor(public readonly path: string, public readonly value: ITree) { }
-}
-
-/**
- * Basic implementation of an attachment ITreeEntry
- */
-export class AttachmentTreeEntry {
-    public readonly mode = FileMode.File;
-    public readonly type = TreeEntry.Attachment;
-    public readonly value: IAttachment;
-
-    /**
-     * Creates an attachment ITreeEntry
-     * @param path - path of entry
-     * @param id - id of external blob attachment
-     */
-    constructor(public readonly path: string, public readonly id: string) {
-        this.value = { id };
-    }
-}
-
-// eslint-disable-next-line @typescript-eslint/ban-types
-export function addBlobToTree(tree: ITree, blobName: string, content: object) {
-    tree.entries.push(
-        {
-            mode: FileMode.File,
-            path: blobName,
-            type: TreeEntry.Blob,
-            value: {
-                contents: JSON.stringify(content),
-                encoding: "utf-8",
-            },
-        });
 }

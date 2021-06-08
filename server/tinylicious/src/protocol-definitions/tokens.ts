@@ -14,24 +14,3 @@ export interface ITokenClaims {
     exp: number;
     ver: string;
 }
-
-export interface ISummaryTokenClaims {
-    sub: string;
-    act: IActorClient;
-    claims: ITokenClaims;
-}
-
-export interface IActorClient {
-    sub: string;
-}
-
-/**
- * The ITokenService abstracts the discovery of claims contained within a token
- */
-export interface ITokenService {
-    extractClaims(token: string): ITokenClaims;
-}
-
-export interface ITokenProvider {
-    isValid(): boolean;
-}
