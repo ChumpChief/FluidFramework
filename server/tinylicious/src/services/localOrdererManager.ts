@@ -9,7 +9,6 @@ import {
     ILogger,
     IOrderer,
     IOrdererManager,
-    IServiceConfiguration,
 } from "@fluidframework/server-services-core";
 import { IPubSub, LocalOrderer } from "./memory-orderer";
 import { GitManager, IHistorian } from "./services-client";
@@ -22,8 +21,7 @@ export class LocalOrdererManager implements IOrdererManager {
         private readonly databaseManager: IDatabaseManager,
         private readonly createHistorian: (tenant: string) => Promise<IHistorian>,
         private readonly logger: ILogger,
-        private readonly serviceConfiguration?: Partial<IServiceConfiguration>,
-        private readonly pubsub?: IPubSub,
+        private readonly pubsub: IPubSub,
     ) {
     }
 
@@ -78,7 +76,7 @@ export class LocalOrdererManager implements IOrdererManager {
             undefined /* scriptoriumContext */,
             undefined /* scribeContext */,
             undefined /* deliContext */,
-            this.serviceConfiguration);
+        );
 
         const lambdas = [
             orderer.broadcasterLambda,

@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import { merge } from "lodash";
 import {
     DefaultServiceConfiguration,
     IContext,
@@ -101,7 +100,6 @@ export class LocalOrderer implements IOrderer {
         scriptoriumContext: IContext = new LocalContext(logger),
         scribeContext: IContext = new LocalContext(logger),
         deliContext: IContext = new LocalContext(logger),
-        serviceConfiguration: Partial<IServiceConfiguration> = {},
     ) {
         const documentDetails = await setup.documentP();
 
@@ -116,7 +114,8 @@ export class LocalOrderer implements IOrderer {
             scriptoriumContext,
             scribeContext,
             deliContext,
-            merge({}, DefaultServiceConfiguration, serviceConfiguration));
+            DefaultServiceConfiguration,
+        );
     }
 
     public rawDeltasKafka: LocalKafka;
