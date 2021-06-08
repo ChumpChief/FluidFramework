@@ -7,8 +7,6 @@ import { IsoBuffer } from "./indexNode";
 
 export const fromBase64ToUtf8 = (input: string): string => IsoBuffer.from(input, "base64").toString("utf-8");
 
-export const fromUtf8ToBase64 = (input: string): string => IsoBuffer.from(input, "utf8").toString("base64");
-
 /**
  * Convenience function to convert unknown encoding to utf8 that avoids
  * buffer copies/encode ops when no conversion is needed
