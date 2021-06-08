@@ -4,7 +4,7 @@
  */
 
 import * as winston from "winston";
-import { toUtf8 } from "@fluidframework/common-utils";
+import { toUtf8 } from "../common-utils";
 import { ICommit, ICommitDetails, ICreateCommitParams } from "../gitresources";
 import {
     ITreeEntry,

@@ -3,10 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import { Deferred } from "@fluidframework/common-utils";
 import * as winston from "winston";
 import detect from "detect-port";
 import { createExpressApp } from "./app";
+import { Deferred } from "./common-utils";
 import { configureWebSocketServices } from "./lambdas";
 import {
     IDocumentStorage,

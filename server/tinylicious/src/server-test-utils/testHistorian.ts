@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { gitHashFile, IsoBuffer } from "@fluidframework/common-utils";
 import { v4 as uuid } from "uuid";
+import { gitHashFile, IsoBuffer } from "../common-utils";
 import * as git from "../gitresources";
 import { ICollection, IDb } from "../server-services-core";
 import { IHistorian } from "../services";

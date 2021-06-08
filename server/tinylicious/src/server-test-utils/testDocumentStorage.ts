@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { gitHashFile, IsoBuffer, Uint8ArrayToString } from "@fluidframework/common-utils";
+import { gitHashFile, IsoBuffer, Uint8ArrayToString } from "../common-utils";
 import { ICommit, ICommitDetails, ICreateCommitParams, ICreateTreeEntry } from "../gitresources";
 import {
     ISummaryTree,

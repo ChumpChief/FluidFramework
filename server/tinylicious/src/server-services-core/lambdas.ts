@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from "events";
-import { safelyParseJSON } from "@fluidframework/common-utils";
+import { safelyParseJSON } from "../common-utils";
 import { BoxcarType, IBoxcarMessage, IMessage } from "./messages";
 import { IQueuedMessage } from "./queue";
 

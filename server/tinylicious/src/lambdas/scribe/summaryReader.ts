@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { toUtf8 } from "@fluidframework/common-utils";
+import { toUtf8 } from "../../common-utils";
 import { IDeliState } from "../../server-services-core";
 import { IDocumentAttributes, ISequencedDocumentMessage } from "../../protocol-definitions";
 import { IGitManager } from "../../services";

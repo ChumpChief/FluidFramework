@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { Deferred } from "@fluidframework/common-utils";
+import { Deferred } from "../common-utils";
 
 export interface IQueuedMessage {
     topic: string;

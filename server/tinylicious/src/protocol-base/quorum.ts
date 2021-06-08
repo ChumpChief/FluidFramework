@@ -5,7 +5,7 @@
 
 import cloneDeep from "lodash/cloneDeep";
 
-import { assert, Deferred, doIfNotDisposed, EventForwarder, TypedEventEmitter } from "@fluidframework/common-utils";
+import { assert, Deferred, doIfNotDisposed, EventForwarder, TypedEventEmitter } from "../common-utils";
 import {
     ICommittedProposal,
     IPendingProposal,

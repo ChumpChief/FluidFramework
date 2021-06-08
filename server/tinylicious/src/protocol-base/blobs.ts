@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { unreachableCase } from "@fluidframework/common-utils";
+import { unreachableCase } from "../common-utils";
 import * as git from "../gitresources";
 import {
     FileMode,
