@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import { performance } from "../../common-utils";
 import {
     IClient,
     IClientJoin,
@@ -112,21 +111,6 @@ export class LocalOrdererConnection implements IOrdererConnection {
     }
 
     private submitRawOperation(messages: IRawOperationMessage[]) {
-        if (this.serviceConfiguration.enableTraces) {
-            // Add trace
-            messages.forEach((message) => {
-                const operation = message.operation;
-                if (operation && operation.traces) {
-                    operation.traces.push(
-                        {
-                            action: "start",
-                            service: "alfred",
-                            timestamp: performance.now(),
-                        });
-                }
-            });
-        }
-
         const boxcar: IBoxcarMessage = {
             contents: messages,
             documentId: this.documentId,
