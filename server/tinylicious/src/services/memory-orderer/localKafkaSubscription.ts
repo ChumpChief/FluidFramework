@@ -4,8 +4,8 @@
  */
 
 import { EventEmitter } from "events";
-import { IQueuedMessage } from "@fluidframework/server-services-core";
 import * as Deque from "double-ended-queue";
+import { IQueuedMessage } from "../../server-services-core";
 import { IKafkaSubscriber } from "./interfaces";
 
 /**

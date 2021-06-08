@@ -4,19 +4,19 @@
  */
 
 import fs from "fs";
-import { DocumentStorage } from "@fluidframework/server-services-shared";
+import * as git from "isomorphic-git";
+import socketIo from "socket.io";
+
+import winston from "winston";
+import { TinyliciousResources } from "./resources";
 import {
     IDb,
     IDbFactory,
     MongoDatabaseManager,
     MongoManager,
     IResourcesFactory,
-} from "@fluidframework/server-services-core";
-import * as git from "isomorphic-git";
-import socketIo from "socket.io";
-
-import winston from "winston";
-import { TinyliciousResources } from "./resources";
+} from "./server-services-core";
+import { DocumentStorage } from "./server-services-shared";
 import {
     Historian,
     InMemoryDb,

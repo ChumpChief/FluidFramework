@@ -5,6 +5,13 @@
 
 import { performance } from "@fluidframework/common-utils";
 import {
+    IClient,
+    IClientJoin,
+    IDocumentMessage,
+    IDocumentSystemMessage,
+    MessageType,
+} from "../../protocol-definitions";
+import {
     BoxcarType,
     IBoxcarMessage,
     IDocument,
@@ -13,14 +20,7 @@ import {
     IRawOperationMessage,
     IServiceConfiguration,
     RawOperationType,
-} from "@fluidframework/server-services-core";
-import {
-    IClient,
-    IClientJoin,
-    IDocumentMessage,
-    IDocumentSystemMessage,
-    MessageType,
-} from "../../protocol-definitions";
+} from "../../server-services-core";
 import { ISubscriber } from "./pubsub";
 
 export class LocalOrdererConnection implements IOrdererConnection {

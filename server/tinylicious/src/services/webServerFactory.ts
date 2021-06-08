@@ -5,15 +5,15 @@
 
 import { EventEmitter } from "events";
 import * as http from "http";
-import { HttpServer } from "@fluidframework/server-services-shared";
+import { Socket } from "socket.io";
 import {
     IWebServer,
     IWebServerFactory,
     IWebSocket,
     IWebSocketServer,
     RequestListener,
-} from "@fluidframework/server-services-core";
-import { Socket } from "socket.io";
+} from "../server-services-core";
+import { HttpServer } from "../server-services-shared";
 import { WebServer } from "./webServer";
 
 class SocketIoSocket implements IWebSocket {

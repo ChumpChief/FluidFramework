@@ -12,7 +12,7 @@ import {
     IPartitionLambda,
     ISequencedOperationMessage,
     SequencedOperationType,
-} from "@fluidframework/server-services-core";
+} from "../../server-services-core";
 
 export class ScriptoriumLambda implements IPartitionLambda {
     private pending = new Map<string, ISequencedOperationMessage[]>();

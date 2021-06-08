@@ -5,6 +5,20 @@
 
 import assert from "assert";
 import { inspect } from "util";
+import Deque from "double-ended-queue";
+import * as _ from "lodash";
+import { ProtocolOpHandler } from "../../protocol-base";
+import {
+    IDocumentMessage,
+    IDocumentSystemMessage,
+    ISequencedDocumentMessage,
+    ISummaryAck,
+    ISummaryNack,
+    MessageType,
+    ISequencedDocumentAugmentedMessage,
+    IProtocolState,
+    ScopeType,
+} from "../../protocol-definitions";
 import {
     ControlMessageType,
     extractBoxcar,
@@ -20,21 +34,7 @@ import {
     IQueuedMessage,
     IPartitionLambda,
     INackMessagesControlMessageContents,
-} from "@fluidframework/server-services-core";
-import Deque from "double-ended-queue";
-import * as _ from "lodash";
-import { ProtocolOpHandler } from "../../protocol-base";
-import {
-    IDocumentMessage,
-    IDocumentSystemMessage,
-    ISequencedDocumentMessage,
-    ISummaryAck,
-    ISummaryNack,
-    MessageType,
-    ISequencedDocumentAugmentedMessage,
-    IProtocolState,
-    ScopeType,
-} from "../../protocol-definitions";
+} from "../../server-services-core";
 import { ICheckpointManager, IPendingMessageReader, ISummaryReader, ISummaryWriter } from "./interfaces";
 import { initializeProtocol } from "./utils";
 

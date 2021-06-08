@@ -4,6 +4,18 @@
  */
 
 import {
+    BroadcasterLambda,
+    CheckpointManager,
+    createDeliCheckpointManagerFromCollection,
+    DeliLambda,
+    ScribeLambda,
+    ScriptoriumLambda,
+    SummaryReader,
+    SummaryWriter,
+} from "../../lambdas";
+import { ProtocolOpHandler } from "../../protocol-base";
+import { IClient } from "../../protocol-definitions";
+import {
     DefaultServiceConfiguration,
     IContext,
     IDeliState,
@@ -19,19 +31,7 @@ import {
     ITopic,
     IWebSocket,
     ILogger,
-} from "@fluidframework/server-services-core";
-import {
-    BroadcasterLambda,
-    CheckpointManager,
-    createDeliCheckpointManagerFromCollection,
-    DeliLambda,
-    ScribeLambda,
-    ScriptoriumLambda,
-    SummaryReader,
-    SummaryWriter,
-} from "../../lambdas";
-import { ProtocolOpHandler } from "../../protocol-base";
-import { IClient } from "../../protocol-definitions";
+} from "../../server-services-core";
 import { IGitManager } from "../services-client";
 import { ILocalOrdererSetup } from "./interfaces";
 import { LocalContext } from "./localContext";

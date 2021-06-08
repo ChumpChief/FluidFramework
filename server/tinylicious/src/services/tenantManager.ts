@@ -9,7 +9,7 @@ import {
     ITenantManager,
     ITenantOrderer,
     ITenantStorage,
-} from "@fluidframework/server-services-core";
+} from "../server-services-core";
 import { GitManager, Historian } from "./services-client";
 
 export class TinyliciousTenant implements ITenant {

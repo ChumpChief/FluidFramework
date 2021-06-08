@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IWebSocket } from "@fluidframework/server-services-core";
+import { IWebSocket } from "../../server-services-core";
 
 export interface ISubscriber {
     id: string;

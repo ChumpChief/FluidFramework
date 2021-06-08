@@ -8,7 +8,7 @@ import {
     ICollection,
     IScribe,
     ISequencedOperationMessage,
-} from "@fluidframework/server-services-core";
+} from "../../server-services-core";
 import {
     generateServiceProtocolEntries,
     getQuorumTreeEntries,

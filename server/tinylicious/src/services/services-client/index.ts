@@ -8,5 +8,7 @@ export * from "./error";
 export * from "./gitManager";
 export * from "./historian";
 export * from "./restWrapper";
+export * from "./promiseTimeout";
 export * from "./storage";
 export * from "./scopes";
+export * from "./summaryTreeUploadManager";

@@ -3,11 +3,11 @@
  * Licensed under the MIT License.
  */
 
+import { Router } from "express";
 import {
     IDocumentStorage,
     MongoManager,
-} from "@fluidframework/server-services-core";
-import { Router } from "express";
+} from "../../server-services-core";
 import * as deltas from "./deltas";
 import * as documents from "./documents";
 

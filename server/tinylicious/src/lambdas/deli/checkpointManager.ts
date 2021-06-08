@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { ICollection, IDeliState, IDocument, IQueuedMessage } from "@fluidframework/server-services-core";
+import { ICollection, IDeliState, IDocument, IQueuedMessage } from "../../server-services-core";
 
 export interface IDeliCheckpointManager {
     writeCheckpoint(checkpoint: IDeliState): Promise<void>;

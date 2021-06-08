@@ -10,7 +10,7 @@ import {
     ITenantManager,
     IWebServerFactory,
     MongoManager,
-} from "@fluidframework/server-services-core";
+} from "./server-services-core";
 
 export class TinyliciousResources implements IResources {
     constructor(

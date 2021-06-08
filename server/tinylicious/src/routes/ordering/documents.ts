@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { IDocumentStorage } from "@fluidframework/server-services-core";
 import { Router } from "express";
+import { IDocumentStorage } from "../../server-services-core";
 import { getParam } from "../../utils";
 
 export function create(storage: IDocumentStorage): Router {

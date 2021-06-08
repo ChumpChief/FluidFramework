@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from "events";
+import { IClient, IDocumentMessage } from "../../protocol-definitions";
 import {
     ICollection,
     IContext,
@@ -13,8 +14,7 @@ import {
     ISequencedOperationMessage,
     IQueuedMessage,
     IServiceConfiguration,
-} from "@fluidframework/server-services-core";
-import { IClient, IDocumentMessage } from "../../protocol-definitions";
+} from "../../server-services-core";
 
 export interface IConcreteNode extends EventEmitter {
     id: string;

@@ -6,7 +6,7 @@
 import {
     IDocumentStorage,
     MongoManager,
-} from "@fluidframework/server-services-core";
+} from "../server-services-core";
 import * as ordering from "./ordering";
 import * as storage from "./storage";
 

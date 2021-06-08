@@ -25,6 +25,36 @@ export interface IPatchRefParamsExternal extends git.IPatchRefParams {
 }
 
 /**
+ * Git cache data
+ */
+ export interface IGitCache {
+    // Cached blob values
+    blobs: git.IBlob[];
+
+    // Reference mapping
+    refs: { [key: string]: string };
+
+    // All trees contained in the commit (includes submodules)
+    trees: git.ITree[];
+
+    // Commits for each module
+    commits: git.ICommit[];
+}
+
+/**
+ * Uploads a summary to storage.
+ */
+ export interface ISummaryUploadManager {
+    /**
+     * Writes summary tree to storage.
+     * @param summaryTree Summary tree to write to storage
+     * @param parentHandle Parent summary acked handle (from summary ack)
+     * @returns Id of created tree.
+     */
+    writeSummaryTree(summaryTree: api.ISummaryTree, parentHandle: string): Promise<string>;
+}
+
+/**
  * Interface to a generic Git provider
  */
 export interface IGitService {

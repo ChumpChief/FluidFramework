@@ -3,9 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { MongoManager } from "@fluidframework/server-services-core";
 import { Router } from "express";
 import { ISequencedDocumentMessage } from "../../protocol-definitions";
+import { MongoManager } from "../../server-services-core";
 import { getParam, queryParamToNumber } from "../../utils";
 
 async function getDeltas(

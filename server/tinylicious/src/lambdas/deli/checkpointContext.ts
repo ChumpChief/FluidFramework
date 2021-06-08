@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IContext, IDeliState } from "@fluidframework/server-services-core";
+import { IContext, IDeliState } from "../../server-services-core";
 import { ICheckpointParams, IDeliCheckpointManager } from "./checkpointManager";
 
 export class CheckpointContext {

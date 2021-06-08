@@ -3,6 +3,12 @@
  * Licensed under the MIT License.
  */
 
+import { Deferred } from "@fluidframework/common-utils";
+import * as winston from "winston";
+import { TestClientManager } from "@fluidframework/server-test-utils";
+import detect from "detect-port";
+import { createExpressApp } from "./app";
+import { configureWebSocketServices } from "./lambdas";
 import {
     IDocumentStorage,
     IOrdererManager,
@@ -12,13 +18,7 @@ import {
     MongoManager,
     DefaultMetricClient,
     IRunner,
-} from "@fluidframework/server-services-core";
-import { Deferred } from "@fluidframework/common-utils";
-import * as winston from "winston";
-import { TestClientManager } from "@fluidframework/server-test-utils";
-import detect from "detect-port";
-import { createExpressApp } from "./app";
-import { configureWebSocketServices } from "./lambdas";
+} from "./server-services-core";
 
 export class TinyliciousRunner implements IRunner {
     private server: IWebServer;

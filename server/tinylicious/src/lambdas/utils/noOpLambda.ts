@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IContext, IQueuedMessage, IPartitionLambda } from "@fluidframework/server-services-core";
+import { IContext, IQueuedMessage, IPartitionLambda } from "../../server-services-core";
 
 export class NoOpLambda implements IPartitionLambda {
     constructor(private readonly context: IContext) {

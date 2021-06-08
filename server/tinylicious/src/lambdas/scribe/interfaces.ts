@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IScribe, ISequencedOperationMessage } from "@fluidframework/server-services-core";
+import { IScribe, ISequencedOperationMessage } from "../../server-services-core";
 import {
     ISummaryAck,
     ISummaryNack,

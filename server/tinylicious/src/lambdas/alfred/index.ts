@@ -5,7 +5,6 @@
 
 import safeStringify from "json-stringify-safe";
 import * as semver from "semver";
-import * as core from "@fluidframework/server-services-core";
 import { v4 as uuid } from "uuid";
 
 import {
@@ -19,6 +18,7 @@ import {
     MessageType,
     NackErrorType,
 } from "../../protocol-definitions";
+import * as core from "../../server-services-core";
 import {
     canSummarize,
     canWrite,

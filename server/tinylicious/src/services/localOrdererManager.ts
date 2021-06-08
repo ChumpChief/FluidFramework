@@ -9,7 +9,7 @@ import {
     ILogger,
     IOrderer,
     IOrdererManager,
-} from "@fluidframework/server-services-core";
+} from "../server-services-core";
 import { IPubSub, LocalOrderer } from "./memory-orderer";
 import { GitManager, IHistorian } from "./services-client";
 

@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { ICollection } from "@fluidframework/server-services-core";
 import * as _ from "lodash";
+import { ICollection } from "../server-services-core";
 
 // TODO consider https://github.com/kofrasa/mingo for handling queries
 

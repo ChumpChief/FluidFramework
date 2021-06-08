@@ -3,10 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import {
-    IDocumentStorage,
-    MongoManager,
-} from "@fluidframework/server-services-core";
 import * as bodyParser from "body-parser";
 import compression from "compression";
 import cookieParser from "cookie-parser";
@@ -14,6 +10,10 @@ import cors from "cors";
 import express, { Router } from "express";
 import safeStringify from "json-stringify-safe";
 import { createOrderingRouter, createStorageRouter } from "./routes";
+import {
+    IDocumentStorage,
+    MongoManager,
+} from "./server-services-core";
 
 export function createExpressApp(
     storage: IDocumentStorage,

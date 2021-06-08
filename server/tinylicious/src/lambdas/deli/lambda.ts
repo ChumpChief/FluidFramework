@@ -4,6 +4,18 @@
  */
 
 import { EventEmitter } from "events";
+import { isServiceMessageType } from "../../protocol-base";
+import {
+    ISequencedDocumentAugmentedMessage,
+    IBranchOrigin,
+    IClientJoin,
+    IDocumentSystemMessage,
+    ISequencedDocumentMessage,
+    ISequencedDocumentSystemMessage,
+    ITrace,
+    MessageType,
+    NackErrorType,
+} from "../../protocol-definitions";
 import {
     ControlMessageType,
     extractBoxcar,
@@ -25,19 +37,7 @@ import {
     IQueuedMessage,
     INackMessagesControlMessageContents,
     IUpdateDSNControlMessageContents,
-} from "@fluidframework/server-services-core";
-import { isServiceMessageType } from "../../protocol-base";
-import {
-    ISequencedDocumentAugmentedMessage,
-    IBranchOrigin,
-    IClientJoin,
-    IDocumentSystemMessage,
-    ISequencedDocumentMessage,
-    ISequencedDocumentSystemMessage,
-    ITrace,
-    MessageType,
-    NackErrorType,
-} from "../../protocol-definitions";
+} from "../../server-services-core";
 import { canSummarize } from "../../services";
 import { CheckpointContext } from "./checkpointContext";
 import { ClientSequenceNumberManager } from "./clientSeqManager";
