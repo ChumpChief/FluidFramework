@@ -14,7 +14,6 @@ export * from "./logger";
 export * from "./promiseCache";
 export * from "./promises";
 export * from "./rangeTracker";
-export * from "./rateLimiter";
 export * from "./safeParser";
 export * from "./timer";
 export * from "./trace";
