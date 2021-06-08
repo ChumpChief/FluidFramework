@@ -51,7 +51,7 @@ async function run() {
  * Variant of run that is used to fully run a service. It configures base settings such as logging. And then will
  * exit the service once the runner completes.
  */
-export function runService() {
+export function runTinylicious() {
     run().then(
         () => {
             process.exit(0);
