@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { ProtocolOpHandler } from "@fluidframework/protocol-base";
 import { IProtocolState } from "@fluidframework/protocol-definitions";
+import { ProtocolOpHandler } from "../../protocol-base";
 
 export const initializeProtocol = (
     protocolState: IProtocolState,

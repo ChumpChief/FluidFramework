@@ -4,7 +4,6 @@
  */
 
 import { EventEmitter } from "events";
-import { isServiceMessageType } from "@fluidframework/protocol-base";
 import {
     ISequencedDocumentAugmentedMessage,
     IBranchOrigin,
@@ -38,6 +37,7 @@ import {
     INackMessagesControlMessageContents,
     IUpdateDSNControlMessageContents,
 } from "@fluidframework/server-services-core";
+import { isServiceMessageType } from "../../protocol-base";
 import { canSummarize } from "../../services";
 import { CheckpointContext } from "./checkpointContext";
 import { ClientSequenceNumberManager } from "./clientSeqManager";

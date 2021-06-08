@@ -5,7 +5,6 @@
 
 import assert from "assert";
 import { inspect } from "util";
-import { ProtocolOpHandler } from "@fluidframework/protocol-base";
 import {
     IDocumentMessage,
     IDocumentSystemMessage,
@@ -35,6 +34,7 @@ import {
 } from "@fluidframework/server-services-core";
 import Deque from "double-ended-queue";
 import * as _ from "lodash";
+import { ProtocolOpHandler } from "../../protocol-base";
 import { ICheckpointManager, IPendingMessageReader, ISummaryReader, ISummaryWriter } from "./interfaces";
 import { initializeProtocol } from "./utils";
 

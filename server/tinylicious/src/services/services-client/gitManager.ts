@@ -5,8 +5,8 @@
 
 import assert from "assert";
 import * as resources from "@fluidframework/gitresources";
-import { buildHierarchy } from "@fluidframework/protocol-base";
 import * as api from "@fluidframework/protocol-definitions";
+import { buildHierarchy } from "../../protocol-base";
 import { ICreateRefParamsExternal, IPatchRefParamsExternal, IGitManager, IHistorian } from "./storage";
 
 export class GitManager implements IGitManager {

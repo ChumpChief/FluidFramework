@@ -5,11 +5,6 @@
 
 import { ICreateCommitParams, ICreateTreeEntry } from "@fluidframework/gitresources";
 import {
-    generateServiceProtocolEntries,
-    getQuorumTreeEntries,
-    mergeAppAndProtocolTree,
-} from "@fluidframework/protocol-base";
-import {
     ISequencedDocumentMessage,
     ISummaryContent,
     ITreeEntry,
@@ -22,6 +17,11 @@ import {
     IScribe,
     ISequencedOperationMessage,
 } from "@fluidframework/server-services-core";
+import {
+    generateServiceProtocolEntries,
+    getQuorumTreeEntries,
+    mergeAppAndProtocolTree,
+} from "../../protocol-base";
 import { IGitManager } from "../../services";
 import { ISummaryWriteResponse, ISummaryWriter } from "./interfaces";
 
