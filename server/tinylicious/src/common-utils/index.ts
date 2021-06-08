@@ -17,5 +17,4 @@ export * from "./timer";
 export * from "./trace";
 export * from "./typedEventEmitter";
 export * from "./unreachable";
-export * from "./lazy";
 export * from "./performanceIsomorphic";
