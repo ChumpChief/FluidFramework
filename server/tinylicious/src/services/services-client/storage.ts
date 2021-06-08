@@ -69,8 +69,6 @@ export interface IGitService {
     createRef(params: git.ICreateRefParams): Promise<git.IRef>;
     updateRef(ref: string, params: git.IPatchRefParams): Promise<git.IRef>;
     deleteRef(ref: string): Promise<void>;
-    createTag(tag: git.ICreateTagParams): Promise<git.ITag>;
-    getTag(tag: string): Promise<git.ITag>;
     createTree(tree: git.ICreateTreeParams): Promise<git.ITree>;
     getTree(sha: string, recursive: boolean): Promise<git.ITree>;
 }

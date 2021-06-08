@@ -104,14 +104,6 @@ export class Historian implements IHistorian {
         await this.restWrapper.delete(`/git/refs/${ref}`, this.getQueryString());
     }
 
-    public createTag(tag: git.ICreateTagParams): Promise<git.ITag> {
-        return this.restWrapper.post(`/git/tags`, tag, this.getQueryString());
-    }
-
-    public getTag(tag: string): Promise<git.ITag> {
-        return this.restWrapper.get(`/git/tags/${tag}`, this.getQueryString());
-    }
-
     public createTree(tree: git.ICreateTreeParams): Promise<git.ITree> {
         return this.restWrapper.post<git.ITree>(`/git/trees`, tree, this.getQueryString(tree));
     }
