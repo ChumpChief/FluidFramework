@@ -70,12 +70,7 @@ export class LocalOrdererManager implements IOrdererManager {
             documentId,
             this.logger,
             gitManager,
-            undefined /* ILocalOrdererSetup */,
             this.pubsub,
-            undefined /* broadcasterContext */,
-            undefined /* scriptoriumContext */,
-            undefined /* scribeContext */,
-            undefined /* deliContext */,
         );
 
         const lambdas = [

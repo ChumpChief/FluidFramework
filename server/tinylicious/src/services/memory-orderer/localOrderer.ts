@@ -39,7 +39,7 @@ import { LocalKafka } from "./localKafka";
 import { LocalLambdaController } from "./localLambdaController";
 import { LocalOrdererConnection } from "./localOrdererConnection";
 import { LocalOrdererSetup } from "./localOrdererSetup";
-import { IPubSub, ISubscriber, PubSub, WebSocketSubscriber } from "./pubsub";
+import { IPubSub, ISubscriber, WebSocketSubscriber } from "./pubsub";
 
 const DefaultScribe: IScribe = {
     lastClientSummaryHead: undefined,
@@ -88,20 +88,23 @@ export class LocalOrderer implements IOrderer {
         tenantId: string,
         documentId: string,
         logger: ILogger,
-        gitManager?: IGitManager,
-        setup: ILocalOrdererSetup = new LocalOrdererSetup(
+        gitManager: IGitManager,
+        pubSub: IPubSub,
+    ) {
+        const setup: ILocalOrdererSetup = new LocalOrdererSetup(
             tenantId,
             documentId,
             storage,
             databaseManager,
-            gitManager),
-        pubSub: IPubSub = new PubSub(),
-        broadcasterContext: IContext = new LocalContext(logger),
-        scriptoriumContext: IContext = new LocalContext(logger),
-        scribeContext: IContext = new LocalContext(logger),
-        deliContext: IContext = new LocalContext(logger),
-    ) {
+            gitManager,
+        );
+
         const documentDetails = await setup.documentP();
+
+        const broadcasterContext: IContext = new LocalContext(logger);
+        const scriptoriumContext: IContext = new LocalContext(logger);
+        const scribeContext: IContext = new LocalContext(logger);
+        const deliContext: IContext = new LocalContext(logger);
 
         return new LocalOrderer(
             setup,
