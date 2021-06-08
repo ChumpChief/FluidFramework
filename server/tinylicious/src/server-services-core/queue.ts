@@ -18,51 +18,6 @@ export interface IPartition {
     offset: number;
 }
 
-export interface IPartitionWithEpoch extends IPartition {
-    leaderEpoch: number;
-}
-
-export interface IConsumer {
-    readonly groupId: string;
-
-    readonly topic: string;
-
-    /**
-     * Returns true if the consumer is connected
-     */
-    isConnected(): boolean;
-
-    /**
-     * Closes the consumer.
-     */
-    close(): Promise<void>;
-
-    /**
-     * Pauses retrieval of new messages
-     */
-    pause(): Promise<void>;
-
-    /**
-     * Resumes retrival of messages
-     */
-    resume(): Promise<void>;
-
-    /**
-     * Commits consumer checkpoint offset.
-     */
-    commitCheckpoint(partitionId: number, queuedMessage: IQueuedMessage): Promise<void>;
-
-    /**
-     * Event handlers
-     */
-    on(event: "connected" | "disconnected" | "closed" | "paused" | "resumed", listener: () => void): this;
-    on(event: "data", listener: (message: IQueuedMessage) => void): this;
-    on(event: "rebalancing", listener: (partitions: IPartition[]) => void): this;
-    on(event: "rebalanced", listener: (partitions: IPartitionWithEpoch[]) => void): this;
-    on(event: string, listener: (...args: any[]) => void): this;
-    once(event: "connected" | "disconnected" | "closed" | "paused" | "resumed", listener: () => void): this;
-}
-
 /**
  * A pending message the producer is holding on to
  */
