@@ -138,14 +138,6 @@ export interface IPatchRefParams {
 }
 
 /**
- * Required params to create repo
- * @param name - name of the repository
- */
-export interface ICreateRepoParams {
-    name: string;
-}
-
-/**
  * Required details to create tree entry
  */
 export interface ICreateTreeEntry {
