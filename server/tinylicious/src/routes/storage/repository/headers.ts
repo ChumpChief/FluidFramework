@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { IHeader } from "@fluidframework/gitresources";
 import { Router } from "express";
+import { IHeader } from "../../../gitresources";
 import * as utils from "../utils";
 
 export async function getHeader(

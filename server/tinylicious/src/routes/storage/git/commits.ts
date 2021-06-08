@@ -3,9 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { ICommit, ICreateCommitParams } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
+import { ICommit, ICreateCommitParams } from "../../../gitresources";
 import * as utils from "../utils";
 
 export async function createCommit(

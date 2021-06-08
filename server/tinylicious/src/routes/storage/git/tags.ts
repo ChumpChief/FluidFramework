@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import * as git from "@fluidframework/gitresources";
 import { Router } from "express";
+import * as git from "../../../gitresources";
 import * as utils from "../utils";
 
 export async function createTag(

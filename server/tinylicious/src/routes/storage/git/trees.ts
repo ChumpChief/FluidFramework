@@ -3,9 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { ICreateTreeParams, ITree, ITreeEntry } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
+import { ICreateTreeParams, ITree, ITreeEntry } from "../../../gitresources";
 import * as utils from "../utils";
 
 export async function createTree(

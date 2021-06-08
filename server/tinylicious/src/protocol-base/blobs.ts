@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import * as git from "@fluidframework/gitresources";
 import { unreachableCase } from "@fluidframework/common-utils";
+import * as git from "../gitresources";
 import {
     FileMode,
     IBlob,

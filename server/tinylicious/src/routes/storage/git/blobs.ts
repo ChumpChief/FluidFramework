@@ -3,9 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { IBlob, ICreateBlobParams, ICreateBlobResponse } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
+import { IBlob, ICreateBlobParams, ICreateBlobResponse } from "../../../gitresources";
 import * as utils from "../utils";
 
 export async function createBlob(

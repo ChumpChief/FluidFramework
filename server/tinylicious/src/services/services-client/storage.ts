@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import * as git from "@fluidframework/gitresources";
+import * as git from "../../gitresources";
 import * as api from "../../protocol-definitions";
 
 interface IExternalWriterConfig {

@@ -3,9 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { ICommit, ICommitDetails, ICreateCommitParams } from "@fluidframework/gitresources";
 import * as winston from "winston";
 import { toUtf8 } from "@fluidframework/common-utils";
+import { ICommit, ICommitDetails, ICreateCommitParams } from "../gitresources";
 import {
     ITreeEntry,
     ICommittedProposal,

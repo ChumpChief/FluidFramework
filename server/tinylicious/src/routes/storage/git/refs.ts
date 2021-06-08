@@ -3,9 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { ICreateRefParams, IPatchRefParams, IRef } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
+import { ICreateRefParams, IPatchRefParams, IRef } from "../../../gitresources";
 import * as utils from "../utils";
 
 function refToIRef(ref: string, sha: string): IRef {

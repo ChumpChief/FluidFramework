@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { ICommit, ICommitDetails } from "@fluidframework/gitresources";
+import { ICommit, ICommitDetails } from "../gitresources";
 import { IProtocolState, ISummaryTree, ICommittedProposal } from "../protocol-definitions";
 import { IGitCache } from "../services";
 import { INackMessagesControlMessageContents } from "./messages";

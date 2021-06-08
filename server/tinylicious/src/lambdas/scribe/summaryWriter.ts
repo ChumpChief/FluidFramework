@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { ICreateCommitParams, ICreateTreeEntry } from "@fluidframework/gitresources";
+import { ICreateCommitParams, ICreateTreeEntry } from "../../gitresources";
 import {
     ICollection,
     IScribe,

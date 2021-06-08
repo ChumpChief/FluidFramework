@@ -4,7 +4,7 @@
  */
 
 import { assert, gitHashFile, IsoBuffer, Uint8ArrayToString, unreachableCase } from "@fluidframework/common-utils";
-import { ICreateTreeEntry } from "@fluidframework/gitresources";
+import { ICreateTreeEntry } from "../../gitresources";
 import { getGitMode, getGitType } from "../../protocol-base";
 import {
     ISnapshotTreeEx,

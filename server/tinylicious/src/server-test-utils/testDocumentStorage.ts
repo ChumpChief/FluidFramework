@@ -4,7 +4,7 @@
  */
 
 import { gitHashFile, IsoBuffer, Uint8ArrayToString } from "@fluidframework/common-utils";
-import { ICommit, ICommitDetails, ICreateCommitParams, ICreateTreeEntry } from "@fluidframework/gitresources";
+import { ICommit, ICommitDetails, ICreateCommitParams, ICreateTreeEntry } from "../gitresources";
 import {
     ISummaryTree,
     ICommittedProposal,

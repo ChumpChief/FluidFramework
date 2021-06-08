@@ -4,8 +4,8 @@
  */
 
 import { gitHashFile, IsoBuffer } from "@fluidframework/common-utils";
-import * as git from "@fluidframework/gitresources";
 import { v4 as uuid } from "uuid";
+import * as git from "../gitresources";
 import { ICollection, IDb } from "../server-services-core";
 import { IHistorian } from "../services";
 import { TestDb } from "./testCollection";

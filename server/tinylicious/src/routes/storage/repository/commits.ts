@@ -3,9 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { ICommitDetails } from "@fluidframework/gitresources";
 import { Router } from "express";
 import * as git from "isomorphic-git";
+import { ICommitDetails } from "../../../gitresources";
 import { queryParamToNumber, queryParamToString } from "../../../utils";
 import * as utils from "../utils";
 
