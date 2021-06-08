@@ -29,8 +29,6 @@
     "@fluidframework/common-definitions": "^0.20.0",
     "@fluidframework/common-utils": "^0.30.0",
     "@fluidframework/gitresources": "^0.1025.0-25645",
-    "@fluidframework/server-services-utils": "^0.1025.0-25645",
-    "@fluidframework/server-test-utils": "^0.1025.0-25645",
     "axios": "^0.21.1",
     "body-parser": "^1.17.1",
     "compression": "^1.7.2",

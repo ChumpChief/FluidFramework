@@ -5,7 +5,6 @@
 
 import { Deferred } from "@fluidframework/common-utils";
 import * as winston from "winston";
-import { TestClientManager } from "@fluidframework/server-test-utils";
 import detect from "detect-port";
 import { createExpressApp } from "./app";
 import { configureWebSocketServices } from "./lambdas";
@@ -19,6 +18,7 @@ import {
     DefaultMetricClient,
     IRunner,
 } from "./server-services-core";
+import { TestClientManager } from "./server-test-utils";
 
 export class TinyliciousRunner implements IRunner {
     private server: IWebServer;
