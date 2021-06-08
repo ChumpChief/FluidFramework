@@ -20,32 +20,6 @@ export interface IEventProvider<TEvent extends IEvent> {
     readonly off: IEventTransformer<this, TEvent>;
 }
 
-/**
- * Allow an interface to extend an interfaces that already extends an IEventProvider
- *``` typescript
- * interface AEvents extends IEvent{
- *  (event: "a-event",listener: (a: number)=>void);
- * }
- * interface A extends IEventProvider<AEvents>{
- *  a: object;
- * }
- *
- * interface BEvents extends IEvent{
- *  (event: "b-event",listener: (b: string)=>void);
- * }
- * interface B extends ExtendEventProvider<AEvents, A, BEvents>{
- *  b: boolean;
- * };
- *```
- * interface B will now extend interface A and it's events
- *
- */
-export type ExtendEventProvider<
-    TBaseEvent extends IEvent,
-    TBase extends IEventProvider<TBaseEvent>,
-    TEvent extends TBaseEvent> =
-        Omit<Omit<Omit<TBase,"on">,"once">,"off"> & IEventProvider<TBaseEvent> & IEventProvider<TEvent>;
-
 // These types handle replaceing IEventThisPlaceHolder with this, so we can
 // support polymorphic this. For instance if an event wanted to be:
 // (event: "some-event", listener:(target: this)=>void)
