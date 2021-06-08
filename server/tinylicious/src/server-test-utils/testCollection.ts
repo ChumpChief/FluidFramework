@@ -5,7 +5,7 @@
 
 import { EventEmitter } from "events";
 import * as _ from "lodash";
-import { ICollection, IDb, IDbFactory } from "../server-services-core";
+import { ICollection, IDb } from "../server-services-core";
 
 export class TestCollection implements ICollection<any> {
     constructor(public collection: any[]) {
@@ -187,20 +187,5 @@ export class TestDb implements IDb {
 
         const collection = this.collections[name];
         return new TestCollection(collection);
-    }
-}
-
-export interface ITestDbFactory extends IDbFactory {
-    readonly testDatabase: IDb;
-}
-
-export class TestDbFactory implements ITestDbFactory {
-    public readonly testDatabase: IDb;
-    constructor(collections: { [key: string]: any[] }) {
-        this.testDatabase = new TestDb(collections);
-    }
-
-    public async connect(): Promise<IDb> {
-        return this.testDatabase;
     }
 }
