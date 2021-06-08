@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import { fromUtf8ToBase64 } from "@fluidframework/common-utils";
 import * as git from "../../gitresources";
 import { RestWrapper, BasicRestWrapper } from "./restWrapper";
 import { IHistorian } from "./storage";
@@ -17,14 +16,6 @@ function endsWith(value: string, endings: string[]): boolean {
 
     return false;
 }
-
-export interface ICredentials {
-    user: string;
-    password: string;
-}
-
-export const getAuthorizationTokenFromCredentials = (credentials: ICredentials): string =>
-    `Basic ${fromUtf8ToBase64(`${credentials.user}:${credentials.password}`)}`;
 
 /**
  * Implementation of the IHistorian interface that calls out to a REST interface
