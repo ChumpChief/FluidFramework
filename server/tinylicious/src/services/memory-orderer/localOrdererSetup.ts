@@ -4,7 +4,6 @@
  */
 
 import { fromBase64ToUtf8 } from "@fluidframework/common-utils";
-import { IDocumentAttributes } from "@fluidframework/protocol-definitions";
 import {
     ICollection,
     IDatabaseManager,
@@ -13,6 +12,7 @@ import {
     IDocumentStorage,
     ISequencedOperationMessage,
 } from "@fluidframework/server-services-core";
+import { IDocumentAttributes } from "../../protocol-definitions";
 import { IGitManager } from "../services-client";
 import { ILocalOrdererSetup } from "./interfaces";
 

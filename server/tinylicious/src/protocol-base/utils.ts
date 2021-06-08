@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { MessageType } from "@fluidframework/protocol-definitions";
+import { MessageType } from "../protocol-definitions";
 
 /**
  * Check if the string is a service message type, which includes

@@ -4,8 +4,8 @@
  */
 
 import { toUtf8 } from "@fluidframework/common-utils";
-import { IDocumentAttributes, ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 import { IDeliState } from "@fluidframework/server-services-core";
+import { IDocumentAttributes, ISequencedDocumentMessage } from "../../protocol-definitions";
 import { IGitManager } from "../../services";
 import { ILatestSummaryState, ISummaryReader } from "./interfaces";
 

@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { ScopeType } from "@fluidframework/protocol-definitions";
+import { ScopeType } from "../../protocol-definitions";
 
 export const canRead = (scopes: string[]) => scopes.includes(ScopeType.DocRead);
 export const canWrite = (scopes: string[]) => scopes.includes(ScopeType.DocWrite);

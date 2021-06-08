@@ -4,6 +4,7 @@
  */
 
 import * as git from "@fluidframework/gitresources";
+import { unreachableCase } from "@fluidframework/common-utils";
 import {
     FileMode,
     IBlob,
@@ -13,8 +14,7 @@ import {
     TreeEntry,
     SummaryType,
     SummaryObject,
-} from "@fluidframework/protocol-definitions";
-import { unreachableCase } from "@fluidframework/common-utils";
+} from "../protocol-definitions";
 /**
  * Take a summary object and returns its git mode.
  *

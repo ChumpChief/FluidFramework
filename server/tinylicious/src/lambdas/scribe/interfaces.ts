@@ -3,13 +3,13 @@
  * Licensed under the MIT License.
  */
 
+import { IScribe, ISequencedOperationMessage } from "@fluidframework/server-services-core";
 import {
     ISummaryAck,
     ISummaryNack,
     ISequencedDocumentAugmentedMessage,
     ISequencedDocumentMessage,
-} from "@fluidframework/protocol-definitions";
-import { IScribe, ISequencedOperationMessage } from "@fluidframework/server-services-core";
+} from "../../protocol-definitions";
 
 export interface ISummaryWriteResponse {
     message: ISummaryAck | ISummaryNack;

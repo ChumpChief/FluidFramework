@@ -5,14 +5,6 @@
 
 import { ICreateCommitParams, ICreateTreeEntry } from "@fluidframework/gitresources";
 import {
-    ISequencedDocumentMessage,
-    ISummaryContent,
-    ITreeEntry,
-    TreeEntry,
-    FileMode,
-    ISequencedDocumentAugmentedMessage,
-} from "@fluidframework/protocol-definitions";
-import {
     ICollection,
     IScribe,
     ISequencedOperationMessage,
@@ -22,6 +14,14 @@ import {
     getQuorumTreeEntries,
     mergeAppAndProtocolTree,
 } from "../../protocol-base";
+import {
+    ISequencedDocumentMessage,
+    ISummaryContent,
+    ITreeEntry,
+    TreeEntry,
+    FileMode,
+    ISequencedDocumentAugmentedMessage,
+} from "../../protocol-definitions";
 import { IGitManager } from "../../services";
 import { ISummaryWriteResponse, ISummaryWriter } from "./interfaces";
 

@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { IDocumentAttributes, ITreeEntry, FileMode, TreeEntry } from "@fluidframework/protocol-definitions";
 import { ICreateTreeEntry, ITree } from "@fluidframework/gitresources";
+import { IDocumentAttributes, ITreeEntry, FileMode, TreeEntry } from "../protocol-definitions";
 import { IQuorumSnapshot } from "./quorum";
 
 export function getQuorumTreeEntries(

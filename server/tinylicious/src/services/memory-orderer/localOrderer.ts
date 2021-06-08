@@ -4,7 +4,6 @@
  */
 
 import { merge } from "lodash";
-import { IClient } from "@fluidframework/protocol-definitions";
 import {
     DefaultServiceConfiguration,
     IContext,
@@ -33,6 +32,7 @@ import {
     SummaryWriter,
 } from "../../lambdas";
 import { ProtocolOpHandler } from "../../protocol-base";
+import { IClient } from "../../protocol-definitions";
 import { IGitManager } from "../services-client";
 import { ILocalOrdererSetup } from "./interfaces";
 import { LocalContext } from "./localContext";

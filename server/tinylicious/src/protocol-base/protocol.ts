@@ -13,7 +13,7 @@ import {
     ISequencedDocumentSystemMessage,
     ISequencedProposal,
     MessageType,
-} from "@fluidframework/protocol-definitions";
+} from "../protocol-definitions";
 import { Quorum } from "./quorum";
 
 export interface IScribeProtocolState {

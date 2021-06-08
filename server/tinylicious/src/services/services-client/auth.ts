@@ -3,10 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import { ITokenClaims, IUser, ScopeType } from "@fluidframework/protocol-definitions";
 import { KJUR as jsrsasign } from "jsrsasign";
 import jwtDecode from "jwt-decode";
 import { v4 as uuid } from "uuid";
+import { ITokenClaims, IUser, ScopeType } from "../../protocol-definitions";
 import { NetworkError } from "./error";
 
 /**

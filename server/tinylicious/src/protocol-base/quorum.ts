@@ -14,7 +14,7 @@ import {
     ISequencedClient,
     ISequencedDocumentMessage,
     ISequencedProposal,
-} from "@fluidframework/protocol-definitions";
+} from "../protocol-definitions";
 
 /**
  * Appends a deferred and rejection count to a sequenced proposal. For locally generated promises this allows us to

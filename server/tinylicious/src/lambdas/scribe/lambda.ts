@@ -6,17 +6,6 @@
 import assert from "assert";
 import { inspect } from "util";
 import {
-    IDocumentMessage,
-    IDocumentSystemMessage,
-    ISequencedDocumentMessage,
-    ISummaryAck,
-    ISummaryNack,
-    MessageType,
-    ISequencedDocumentAugmentedMessage,
-    IProtocolState,
-    ScopeType,
-} from "@fluidframework/protocol-definitions";
-import {
     ControlMessageType,
     extractBoxcar,
     IContext,
@@ -35,6 +24,17 @@ import {
 import Deque from "double-ended-queue";
 import * as _ from "lodash";
 import { ProtocolOpHandler } from "../../protocol-base";
+import {
+    IDocumentMessage,
+    IDocumentSystemMessage,
+    ISequencedDocumentMessage,
+    ISummaryAck,
+    ISummaryNack,
+    MessageType,
+    ISequencedDocumentAugmentedMessage,
+    IProtocolState,
+    ScopeType,
+} from "../../protocol-definitions";
 import { ICheckpointManager, IPendingMessageReader, ISummaryReader, ISummaryWriter } from "./interfaces";
 import { initializeProtocol } from "./utils";
 

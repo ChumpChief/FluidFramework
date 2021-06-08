@@ -4,8 +4,8 @@
  */
 
 import { MongoManager } from "@fluidframework/server-services-core";
-import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 import { Router } from "express";
+import { ISequencedDocumentMessage } from "../../protocol-definitions";
 import { getParam, queryParamToNumber } from "../../utils";
 
 async function getDeltas(
