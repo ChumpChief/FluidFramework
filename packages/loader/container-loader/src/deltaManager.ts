@@ -1098,6 +1098,7 @@ export class DeltaManager
      * @param reason - Text description of disconnect reason to emit with disconnect event
      */
     private disconnectFromDeltaStream(reason: string) {
+        // This blocks autodisconnect
         if (!this.statefulConnection.connected) {
             return false;
         }
