@@ -613,7 +613,7 @@ export class DeltaManager
         }
 
         // The promise returned from connectCore will settle with a resolved connection or reject with error
-        const connectCore = async () => {
+        const repeatedlyAttemptConnectUntilSuccessful = async () => {
             let connection: IDocumentDeltaConnection | undefined;
             let delayMs = InitialReconnectDelayInMs;
             let connectRepeatCount = 0;
@@ -695,7 +695,7 @@ export class DeltaManager
             this.on("closed", cleanupAndReject);
 
             // Attempt the connection
-            connectCore().then((connection) => {
+            repeatedlyAttemptConnectUntilSuccessful().then((connection) => {
                 this.connectionP = undefined;
                 this.removeListener("closed", cleanupAndReject);
                 resolve(connection);
