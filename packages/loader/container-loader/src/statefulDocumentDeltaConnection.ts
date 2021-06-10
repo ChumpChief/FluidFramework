@@ -100,16 +100,15 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
     // The disconnectHandler maps to receiving a disconnect from the socket (as opposed to manually triggering a
     // disconnect).  Consumers of the stateful connection shouldn't care what the trigger was and should only
     // listen to "disconnected" emitted from the stateful connection.  Controllers will want to differentiate
-    // network errors from manual disconnects when deciding whether to attempt a reconnect, so the serverDisconnected
-    // event is provided for that purpose.
+    // network errors from manual disconnects when deciding whether to attempt a reconnect, so the additional
+    // serverDisconnected event is provided for that purpose.
+    // Consider, should a controller just listen to the "disconnect" event directly on the IDocumentDeltaConnection?
+    // If so, would the connection.close() call also move up to the controller?
     private readonly disconnectHandler = (disconnectReason) => {
         assert(this._deltaConnection !== undefined, "Received disconnect event while disconnected");
 
-        const connection = this._deltaConnection;
-        this.releaseCurrentConnection();
-        connection.close();
+        this.tearDownCurrentConnection();
 
-        this.emit("disconnected");
         this.emit("serverDisconnected", disconnectReason);
     };
 
@@ -142,29 +141,34 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
         this.emit("connected");
     }
 
+    // Consider, move this up to controller and make tearDownCurrentConnection public?
+    // This also seems like it would want the connection.close() call to move up to the controller.
+    // If so, then the StatefulDocumentDeltaConnection would not modify the connection at all.
     public disconnect() {
         if (this._deltaConnection === undefined) {
-            throw new Error("Tried to release current connection, but not currently connected");
+            throw new Error("Tried to disconnect, but not currently connected");
         }
 
-        const connection = this._deltaConnection;
-        this.releaseCurrentConnection();
-        // IDocumentDeltaConnection isn't designed to support reconnect, but we still must manually close it under
-        // current implementation.  The purpose of this call can be thought of as a handshake indicating we agree
-        // we are done with the object.
-        connection.close();
-
-        this.emit("disconnected");
+        this.tearDownCurrentConnection();
     }
 
-    private releaseCurrentConnection() {
+    private tearDownCurrentConnection() {
         assert(this._deltaConnection !== undefined, "No connection to tear down");
+
         this._deltaConnection.off("op", this.opHandler);
         this._deltaConnection.off("signal", this.signalHandler);
         this._deltaConnection.off("nack", this.nackHandler);
         this._deltaConnection.off("disconnect", this.disconnectHandler);
         this._deltaConnection.off("error", this.errorHandler);
         this._deltaConnection.off("pong", this.pongHandler);
+
+        // IDocumentDeltaConnection isn't designed to support reconnect, but we still must manually close it under
+        // current implementation.  The purpose of this call can be thought of as a handshake indicating we agree
+        // we are done with the object.
+        const connection = this._deltaConnection;
         this._deltaConnection = undefined;
+        connection.close();
+
+        this.emit("disconnected");
     }
 }
