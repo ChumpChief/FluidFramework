@@ -29,6 +29,12 @@ export class StatefulDocumentDeltaConnectionManager {
 
     public async connect() {
         const connection = await this.deltaStreamService.connectToDeltaStream(this.defaultClient);
+        // connection.on("nack")
+        // connection.on("disconnect")
+        // connection.on("error")
+        // connection.on("pong")
+
+        // Drop the new connection into the StatefulDocumentDeltaConnection so the consumer can observe it.
         this.statefulDocumentDeltaConnection.setNewConnection(connection);
     }
 }

@@ -10,7 +10,6 @@ import {
 } from "@fluidframework/driver-definitions";
 import {
     IDocumentMessage,
-    INack,
     ISequencedDocumentMessage,
     ISignalMessage,
 } from "@fluidframework/protocol-definitions";
@@ -53,6 +52,8 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
         return this.deltaConnection.version;
     }
 
+    // maybe hide these as public, and instead include them as args on the connect event?
+    // want to avoid manipulating the state of the connection somehow...
     public get initialMessages() {
         return this.deltaConnection.initialMessages;
     }
@@ -81,43 +82,12 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
         this.deltaConnection.submitSignal(message);
     }
 
-    public close() {
-        this.deltaConnection.close();
-    }
-
     private readonly opHandler = (documentId: string, messages: ISequencedDocumentMessage[]) => {
         this.emit("op", documentId, messages);
     };
 
     private readonly signalHandler = (message: ISignalMessage) => {
         this.emit("signal", message);
-    };
-
-    private readonly nackHandler = (documentId: string, messages: INack[]) => {
-        this.emit("nack", documentId, messages);
-    };
-
-    // The disconnectHandler maps to receiving a disconnect from the socket (as opposed to manually triggering a
-    // disconnect).  Consumers of the stateful connection shouldn't care what the trigger was and should only
-    // listen to "disconnected" emitted from the stateful connection.  Controllers will want to differentiate
-    // network errors from manual disconnects when deciding whether to attempt a reconnect, so the additional
-    // serverDisconnected event is provided for that purpose.
-    // Consider, should a controller just listen to the "disconnect" event directly on the IDocumentDeltaConnection?
-    // If so, would the connection.close() call also move up to the controller?
-    private readonly disconnectHandler = (disconnectReason) => {
-        assert(this._deltaConnection !== undefined, "Received disconnect event while disconnected");
-
-        this.tearDownCurrentConnection();
-
-        this.emit("serverDisconnected", disconnectReason);
-    };
-
-    private readonly errorHandler = (error) => {
-        this.emit("error", error);
-    };
-
-    private readonly pongHandler = (latency: number) => {
-        this.emit("pong", latency);
     };
 
     // Note that there is no "connect" event on IDocumentDeltaConnection.  Any existing non-closed
@@ -133,10 +103,6 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
         this._deltaConnection = connection;
         connection.on("op", this.opHandler);
         connection.on("signal", this.signalHandler);
-        connection.on("nack", this.nackHandler);
-        connection.on("disconnect", this.disconnectHandler);
-        connection.on("error", this.errorHandler);
-        connection.on("pong", this.pongHandler);
 
         this.emit("connected");
     }
@@ -157,17 +123,8 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
 
         this._deltaConnection.off("op", this.opHandler);
         this._deltaConnection.off("signal", this.signalHandler);
-        this._deltaConnection.off("nack", this.nackHandler);
-        this._deltaConnection.off("disconnect", this.disconnectHandler);
-        this._deltaConnection.off("error", this.errorHandler);
-        this._deltaConnection.off("pong", this.pongHandler);
 
-        // IDocumentDeltaConnection isn't designed to support reconnect, but we still must manually close it under
-        // current implementation.  The purpose of this call can be thought of as a handshake indicating we agree
-        // we are done with the object.
-        const connection = this._deltaConnection;
         this._deltaConnection = undefined;
-        connection.close();
 
         this.emit("disconnected");
     }
