@@ -1552,6 +1552,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private createDeltaManager() {
         // pass in stateful connection instead of service?  but still need the deltastorage.
         // so maybe pass in a callback to just get the deltastorage
+        // also, does it still need the client?
         const deltaManager: DeltaManager = new DeltaManager(
             () => this.service,
             this.client,
