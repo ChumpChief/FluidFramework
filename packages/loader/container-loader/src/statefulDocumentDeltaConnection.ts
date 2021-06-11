@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+import EventEmitter from "events";
 import { assert } from "@fluidframework/common-utils";
 import {
     IDocumentDeltaConnection,
@@ -13,7 +14,6 @@ import {
     ISequencedDocumentMessage,
     ISignalMessage,
 } from "@fluidframework/protocol-definitions";
-import EventEmitter from "node:events";
 
 export class StatefulDocumentDeltaConnection extends EventEmitter {
     private _deltaConnection: IDocumentDeltaConnection | undefined;
