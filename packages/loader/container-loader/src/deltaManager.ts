@@ -59,6 +59,7 @@ import {
     DataCorruptionError,
 } from "@fluidframework/container-utils";
 import { DeltaQueue } from "./deltaQueue";
+import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
 const MaxReconnectDelayInMs = 8000;
 const InitialReconnectDelayInMs = 1000;
@@ -424,13 +425,18 @@ export class DeltaManager
     }
 
     constructor(
+        // Should NOT be used for delta connection!  Only for delta storage and document storage
         private readonly serviceProvider: () => IDocumentService | undefined,
+        // Should be an IStatefulDocumentDeltaConnection, and even more specifically just the consumer side.
+        private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
         private client: IClient,
         private readonly logger: ITelemetryLogger,
         reconnectAllowed: boolean,
         private readonly _active: () => boolean,
     ) {
         super();
+
+        console.log(this.statefulDocumentDeltaConnection);
 
         this.clientDetails = this.client.details;
         this.defaultReconnectionMode = this.client.mode;
