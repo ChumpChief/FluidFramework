@@ -17,8 +17,8 @@ import {
     IThrottlingWarning,
     ReadOnlyInfo,
 } from "@fluidframework/container-definitions";
-import { assert, performance, TypedEventEmitter } from "@fluidframework/common-utils";
-import { TelemetryLogger, safeRaiseEvent, logIfFalse, LoggingError } from "@fluidframework/telemetry-utils";
+import { assert, TypedEventEmitter } from "@fluidframework/common-utils";
+import { safeRaiseEvent, logIfFalse, LoggingError } from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
     IDocumentService,
@@ -42,12 +42,7 @@ import {
     ScopeType,
 } from "@fluidframework/protocol-definitions";
 import {
-    canRetryOnError,
-    getRetryDelayFromError,
-    logNetworkFailure,
-    waitForConnectedState,
     NonRetryableError,
-    DeltaStreamConnectionForbiddenError,
 } from "@fluidframework/driver-utils";
 import {
     CreateContainerError,
@@ -57,8 +52,6 @@ import {
 import { DeltaQueue } from "./deltaQueue";
 import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
-const MaxReconnectDelayInMs = 8000;
-const InitialReconnectDelayInMs = 1000;
 const DefaultChunkSize = 16 * 1024;
 
 export interface IConnectionArgs {
@@ -598,68 +591,12 @@ export class DeltaManager
 
         // The promise returned from connectCore will settle with a resolved connection or reject with error
         const repeatedlyAttemptConnectUntilSuccessful = async () => {
-            let connection: IDocumentDeltaConnection | undefined;
-            let delayMs = InitialReconnectDelayInMs;
-            let connectRepeatCount = 0;
-            const connectStartTime = performance.now();
-
-            // This loop will keep trying to connect until successful, with a delay between each iteration.
-            while (connection === undefined) {
-                if (this.closed) {
-                    throw new Error("Attempting to connect a closed DeltaManager");
-                }
-                connectRepeatCount++;
-
-                try {
-                    this.client.mode = requestedMode;
-                    connection = await docService.connectToDeltaStream(this.client);
-                } catch (origError) {
-                    if (typeof origError === "object" && origError !== null &&
-                        origError?.errorType === DeltaStreamConnectionForbiddenError.errorType) {
-                        connection = new NoDeltaStream();
-                        requestedMode = "read";
-                        break;
-                    }
-
-                    const error = CreateContainerError(origError);
-
-                    // Socket.io error when we connect to wrong socket, or hit some multiplexing bug
-                    if (!canRetryOnError(origError)) {
-                        this.close(error);
-                        // eslint-disable-next-line @typescript-eslint/no-throw-literal
-                        throw error;
-                    }
-
-                    // Log error once - we get too many errors in logs when we are offline,
-                    // and unfortunately there is no reliable way to detect that.
-                    if (connectRepeatCount === 1) {
-                        logNetworkFailure(
-                            this.logger,
-                            {
-                                delay: delayMs, // milliseconds
-                                eventName: "DeltaConnectionFailureToConnect",
-                            },
-                            origError);
-                    }
-
-                    const retryDelayFromError = getRetryDelayFromError(origError);
-                    delayMs = retryDelayFromError ?? Math.min(delayMs * 2, MaxReconnectDelayInMs);
-
-                    if (retryDelayFromError !== undefined) {
-                        this.emitDelayInfo(this.deltaStreamDelayId, retryDelayFromError, error);
-                    }
-                    await waitForConnectedState(delayMs);
-                }
+            if (this.closed) {
+                throw new Error("Attempting to connect a closed DeltaManager");
             }
 
-            // If we retried more than once, log an event about how long it took
-            if (connectRepeatCount > 1) {
-                this.logger.sendTelemetryEvent({
-                    attempts: connectRepeatCount,
-                    duration: TelemetryLogger.formatTick(performance.now() - connectStartTime),
-                    eventName: "MultipleDeltaConnectionFailures",
-                });
-            }
+            this.client.mode = requestedMode;
+            const connection = await docService.connectToDeltaStream(this.client);
 
             this.setupNewSuccessfulConnection(connection, requestedMode);
 
