@@ -91,7 +91,6 @@ describe("Loader", () => {
                     new StatefulDocumentDeltaConnection(),
                     client as IClient,
                     logger,
-                    false,
                     () => false,
                 );
 

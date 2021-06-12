@@ -89,11 +89,6 @@ export class DeltaManager
     public readonly clientDetails: IClientDetails;
     public get IDeltaSender() { return this; }
 
-    /**
-     * Controls whether the DeltaManager will automatically reconnect to the delta stream after receiving a disconnect.
-     */
-    private _reconnectMode: ReconnectMode;
-
     // file ACL - whether user has only read-only access to a file
     private _readonlyPermissions: boolean | undefined;
 
@@ -278,14 +273,6 @@ export class DeltaManager
         return { readonly: false };
     }
 
-    /**
-     * Automatic reconnecting enabled or disabled.
-     * If set to Never, then reconnecting will never be allowed.
-     */
-    public get reconnectMode(): ReconnectMode {
-        return this._reconnectMode;
-    }
-
     public shouldJoinWrite(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
@@ -296,10 +283,8 @@ export class DeltaManager
      * Will throw an error if reconnectMode set to Never.
      */
     public setAutomaticReconnect(reconnect: boolean): void {
-        assert(
-            this._reconnectMode !== ReconnectMode.Never,
-            0x0e1 /* "Cannot toggle automatic reconnect if reconnect is set to Never." */);
-        this._reconnectMode = reconnect ? ReconnectMode.Enabled : ReconnectMode.Disabled;
+        // TODO This API should not be on deltamanager, but instead on the stateful connection
+        throw new Error("Not implemented");
     }
 
     /**
@@ -320,7 +305,7 @@ export class DeltaManager
      * @param readonly - set or clear force readonly.
      */
     public forceReadonly(readonly: boolean): void {
-        // This API should not be on deltamanager, but instead on the stateful connection
+        // TODO This API should not be on deltamanager, but instead on the stateful connection
         throw new Error("Not implemented");
     }
 
@@ -338,14 +323,12 @@ export class DeltaManager
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
         private client: IClient,
         private readonly logger: ITelemetryLogger,
-        reconnectAllowed: boolean,
         private readonly _active: () => boolean,
     ) {
         super();
 
         this.clientDetails = this.client.details;
         this.defaultReconnectionMode = this.client.mode;
-        this._reconnectMode = reconnectAllowed ? ReconnectMode.Enabled : ReconnectMode.Never;
 
         this._inbound = new DeltaQueue<ISequencedDocumentMessage>(
             (op) => {

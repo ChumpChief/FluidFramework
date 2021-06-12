@@ -1582,7 +1582,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.statefulDocumentDeltaConnection,
             this.client,
             ChildLogger.create(this.subLogger, "DeltaManager"),
-            this._canReconnect,
             () => this.activeConnection(),
         );
 
@@ -1658,7 +1657,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         let sequenceNumber: number | undefined;
         let opsBehind: number | undefined;
         if (value === ConnectionState.Disconnected) {
-            autoReconnect = this._deltaManager.reconnectMode;
+            // TODO this should either probe the stateful connection manager for the state
+            // or else come straight from here (the Container) as the authority (see this._canReconnect).
+            autoReconnect = ReconnectMode.Enabled;
         } else {
             connectionMode = this._deltaManager.connectionMode;
             sequenceNumber = this.deltaManager.lastSequenceNumber;
