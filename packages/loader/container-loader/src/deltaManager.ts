@@ -324,11 +324,10 @@ export class DeltaManager
         throw new Error("Not implemented");
     }
 
-    private set_readonlyPermissions(readonly: boolean) {
-        const oldValue = this.readonly;
-        this._readonlyPermissions = readonly;
-        if (oldValue !== this.readonly) {
-            safeRaiseEvent(this, this.logger, "readonly", this.readonly);
+    private raiseReadonlyEventIfNeeded(newReadonlyPermissions: boolean) {
+        if (newReadonlyPermissions !== this._readonlyPermissions) {
+            this._readonlyPermissions = newReadonlyPermissions;
+            safeRaiseEvent(this, this.logger, "readonly", this._readonlyPermissions);
         }
     }
 
@@ -731,7 +730,7 @@ export class DeltaManager
         // Notify everyone we are in read-only state.
         // Useful for data stores in case we hit some critical error,
         // to switch to a mode where user edits are not accepted
-        this.set_readonlyPermissions(true);
+        this.raiseReadonlyEventIfNeeded(true);
 
         // This needs to be the last thing we do (before removing listeners), as it causes
         // Container to dispose context and break ability of data stores / runtime to "hear"
@@ -798,7 +797,7 @@ export class DeltaManager
         assert(requestedMode === "read" || readonly === (this.connectionMode === "read"),
             0x0e7 /* "claims/connectionMode mismatch" */);
         assert(!readonly || this.connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
-        this.set_readonlyPermissions(readonly);
+        this.raiseReadonlyEventIfNeeded(readonly);
 
         this.refreshDelayInfo(this.deltaStreamDelayId);
 
