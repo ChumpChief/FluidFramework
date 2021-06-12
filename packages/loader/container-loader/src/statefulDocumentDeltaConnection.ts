@@ -107,18 +107,7 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
         this.emit("connected");
     }
 
-    // Consider, move this up to controller and make tearDownCurrentConnection public?
-    // This also seems like it would want the connection.close() call to move up to the controller.
-    // If so, then the StatefulDocumentDeltaConnection would not modify the connection at all.
-    public disconnect() {
-        if (this._deltaConnection === undefined) {
-            throw new Error("Tried to disconnect, but not currently connected");
-        }
-
-        this.tearDownCurrentConnection();
-    }
-
-    private tearDownCurrentConnection() {
+    public tearDownCurrentConnection() {
         assert(this._deltaConnection !== undefined, "No connection to tear down");
 
         this._deltaConnection.off("op", this.opHandler);

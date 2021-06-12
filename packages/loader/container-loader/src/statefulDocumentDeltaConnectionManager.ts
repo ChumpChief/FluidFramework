@@ -4,6 +4,7 @@
  */
 
 import {
+    IDocumentDeltaConnection,
     IDocumentService,
 } from "@fluidframework/driver-definitions";
 import {
@@ -22,6 +23,8 @@ export class StatefulDocumentDeltaConnectionManager {
         user: { id: "" },
     };
 
+    private currentConnection: IDocumentDeltaConnection | undefined;
+
     constructor(
         private readonly deltaStreamService: Pick<IDocumentService, "connectToDeltaStream">,
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
@@ -36,5 +39,16 @@ export class StatefulDocumentDeltaConnectionManager {
 
         // Drop the new connection into the StatefulDocumentDeltaConnection so the consumer can observe it.
         this.statefulDocumentDeltaConnection.setNewConnection(connection);
+    }
+
+    public async disconnect() {
+        if (this.currentConnection === undefined) {
+            throw new Error("Tried to disconnect, but not currently connected");
+        }
+
+        this.statefulDocumentDeltaConnection.tearDownCurrentConnection();
+        const connection = this.currentConnection;
+        this.currentConnection = undefined;
+        connection.close();
     }
 }
