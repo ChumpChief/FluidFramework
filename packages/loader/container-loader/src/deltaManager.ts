@@ -97,9 +97,6 @@ export class DeltaManager
     // file ACL - whether user has only read-only access to a file
     private _readonlyPermissions: boolean | undefined;
 
-    // tracks host requiring read-only mode.
-    private _forceReadonly = false;
-
     // Connection mode used when reconnecting on error or disconnect.
     private readonly defaultReconnectionMode: ConnectionMode;
 
@@ -254,9 +251,6 @@ export class DeltaManager
      * @deprecated - use readOnlyInfo
      */
     public get readonly() {
-        if (this._forceReadonly) {
-            return true;
-        }
         return this._readonlyPermissions;
     }
 
@@ -272,16 +266,16 @@ export class DeltaManager
 
     public get readOnlyInfo(): ReadOnlyInfo {
         // This should be probing the statefulDocumentDeltaConnection for readonly state most likely.
-        if (this._forceReadonly || this._readonlyPermissions === true) {
+        if (this._readonlyPermissions === true) {
             return {
                 readonly: true,
-                forced: this._forceReadonly,
+                forced: false,
                 permissions: this._readonlyPermissions,
                 storageOnly: false,
             };
         }
 
-        return { readonly: this._readonlyPermissions };
+        return { readonly: false };
     }
 
     /**
@@ -325,29 +319,9 @@ export class DeltaManager
      *
      * @param readonly - set or clear force readonly.
      */
-    public forceReadonly(readonly: boolean) {
-        if (readonly !== this._forceReadonly) {
-            this.logger.sendTelemetryEvent({
-                eventName: "ForceReadOnly",
-                value: readonly,
-            });
-        }
-        const oldValue = this.readonly;
-        this._forceReadonly = readonly;
-        if (oldValue !== this.readonly) {
-            let reconnect = false;
-            if (this.readonly === true) {
-                // If we switch to readonly while connected, we should disconnect first
-                // See comment in the "readonly" event handler to deltaManager set up by
-                // the ContainerRuntime constructor
-                reconnect = this.disconnectFromDeltaStream("Force readonly");
-            }
-            safeRaiseEvent(this, this.logger, "readonly", this.readonly);
-            if (reconnect) {
-                // reconnect if we disconnected from before.
-                this.triggerConnect({ reason: "forceReadonly", mode: "read", fetchOpsFromStorage: false });
-            }
-        }
+    public forceReadonly(readonly: boolean): void {
+        // This API should not be on deltamanager, but instead on the stateful connection
+        throw new Error("Not implemented");
     }
 
     private set_readonlyPermissions(readonly: boolean) {
@@ -480,21 +454,6 @@ export class DeltaManager
     public async connect(args: IConnectionArgs): Promise<IConnectionDetails> {
         const connection = await this.connectCore(args);
         return DeltaManager.detailsFromConnection(connection);
-    }
-
-    /**
-     * Start the connection. Any error should result in container being close.
-     * And report the error if it excape for any reason.
-     * @param args - The connection arguments
-     */
-    private triggerConnect(args: IConnectionArgs) {
-        this.connectCore(args).catch((err) => {
-            // Errors are raised as "error" event and close container.
-            // Have a catch-all case in case we missed something
-            if (!this.closed) {
-                this.logger.sendErrorEvent({ eventName: "ConnectException" }, err);
-            }
-        });
     }
 
     private async connectCore(args: IConnectionArgs): Promise<IDocumentDeltaConnection> {
