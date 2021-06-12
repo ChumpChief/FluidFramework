@@ -33,8 +33,6 @@ import {
     IClientConfiguration,
     IClientDetails,
     IDocumentMessage,
-    INack,
-    INackContent,
     ISequencedDocumentMessage,
     ISignalClient,
     ISignalMessage,
@@ -45,8 +43,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import {
     canRetryOnError,
-    createWriteError,
-    createGenericNetworkError,
     getRetryDelayFromError,
     logNetworkFailure,
     waitForConnectedState,
@@ -64,22 +60,6 @@ import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnecti
 const MaxReconnectDelayInMs = 8000;
 const InitialReconnectDelayInMs = 1000;
 const DefaultChunkSize = 16 * 1024;
-
-function getNackReconnectInfo(nackContent: INackContent) {
-    const reason = `Nack: ${nackContent.message}`;
-    const canRetry = nackContent.code !== 403;
-    const retryAfterMs = nackContent.retryAfter !== undefined ? nackContent.retryAfter * 1000 : undefined;
-    return createGenericNetworkError(reason, canRetry, retryAfterMs, { statusCode: nackContent.code });
-}
-
-function createReconnectError(prefix: string, err: any) {
-    const error = CreateContainerError(err);
-    const error2 = Object.create(error);
-    error2.message = `${prefix}: ${error.message}`;
-    error2.canRetry = true;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return error2;
-}
 
 export interface IConnectionArgs {
     mode?: ConnectionMode;
@@ -953,62 +933,6 @@ export class DeltaManager
         this._inboundSignal.push(message);
     };
 
-    // Always connect in write mode after getting nacked.
-    private readonly nackHandler = (documentId: string, messages: INack[]) => {
-        const message = messages[0];
-        // TODO: we should remove this check when service updates?
-        // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-        if (this._readonlyPermissions) {
-            this.close(createWriteError("WriteOnReadOnlyDocument"));
-        }
-
-        // check message.content for Back-compat with old service.
-        const reconnectInfo = message.content !== undefined
-            ? getNackReconnectInfo(message.content) :
-            createGenericNetworkError(`Nack: unknown reason`, true);
-
-        if (this.reconnectMode !== ReconnectMode.Enabled) {
-            this.logger.sendErrorEvent({
-                eventName: "NackWithNoReconnect",
-                reason: reconnectInfo.message,
-                mode: this.connectionMode,
-            });
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.reconnectOnError(
-            "write",
-            reconnectInfo,
-        );
-    };
-
-    // Connection mode is always read on disconnect/error unless the system mode was write.
-    private readonly disconnectHandler = (disconnectReason) => {
-        // Note: we might get multiple disconnect calls on same socket, as early disconnect notification
-        // ("server_disconnect", ODSP-specific) is mapped to "disconnect"
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.reconnectOnError(
-            this.defaultReconnectionMode,
-            createReconnectError("Disconnect", disconnectReason),
-        );
-    };
-
-    private readonly errorHandler = (error) => {
-        // Observation based on early pre-production telemetry:
-        // We are getting transport errors from WebSocket here, right before or after "disconnect".
-        // This happens only in Firefox.
-        logNetworkFailure(this.logger, { eventName: "DeltaConnectionError" }, error);
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.reconnectOnError(
-            this.defaultReconnectionMode,
-            createReconnectError("error", error),
-        );
-    };
-
-    private readonly pongHandler = (latency: number) => {
-        this.emit("pong", latency);
-    };
-
     /**
      * Once we've successfully gotten a connection, we need to set up state, attach event listeners, and process
      * initial messages.
@@ -1047,10 +971,6 @@ export class DeltaManager
 
         connection.on("op", this.opHandler);
         connection.on("signal", this.signalHandler);
-        connection.on("nack", this.nackHandler);
-        connection.on("disconnect", this.disconnectHandler);
-        connection.on("error", this.errorHandler);
-        connection.on("pong", this.pongHandler);
 
         // TODO These should move to the constuctor and never be removed.
         this.statefulDocumentDeltaConnection.on("op", this.opHandler);
@@ -1142,10 +1062,6 @@ export class DeltaManager
         // Remove listeners first so we don't try to retrigger this flow accidentally through reconnectOnError
         connection.off("op", this.opHandler);
         connection.off("signal", this.signalHandler);
-        connection.off("nack", this.nackHandler);
-        connection.off("disconnect", this.disconnectHandler);
-        connection.off("error", this.errorHandler);
-        connection.off("pong", this.pongHandler);
 
         // TODO These should only be removed in the dispose flow
         this.statefulDocumentDeltaConnection.off("op", this.opHandler);
@@ -1167,49 +1083,6 @@ export class DeltaManager
         this.connectionStateProps = {};
 
         return true;
-    }
-
-    /**
-     * Disconnect the current connection and reconnect.
-     * @param connection - The connection that wants to reconnect - no-op if it's different from this.connection
-     * @param requestedMode - Read or write
-     * @param reconnectInfo - Error reconnect information including whether or not to reconnect
-     * @returns A promise that resolves when the connection is reestablished or we stop trying
-     */
-    private async reconnectOnError(
-        requestedMode: ConnectionMode,
-        error: ICriticalContainerError,
-    ) {
-        // We quite often get protocol errors before / after observing nack/disconnect
-        // we do not want to run through same sequence twice.
-        // If we're already disconnected/disconnecting it's not appropriate to call this again.
-        assert(this.connection !== undefined, 0x0eb /* "Missing connection for reconnect" */);
-
-        this.disconnectFromDeltaStream(error.message);
-
-        // If reconnection is not an option, close the DeltaManager
-        const canRetry = canRetryOnError(error);
-        if (this.reconnectMode === ReconnectMode.Never || !canRetry) {
-            // Do not raise container error if we are closing just because we lost connection.
-            // Those errors (like IdleDisconnect) would show up in telemetry dashboards and
-            // are very misleading, as first initial reaction - some logic is broken.
-            this.close(canRetry ? undefined : error);
-        }
-
-        // If closed then we can't reconnect
-        if (this.closed) {
-            return;
-        }
-
-        if (this.reconnectMode === ReconnectMode.Enabled) {
-            const delayMs = getRetryDelayFromError(error);
-            if (delayMs !== undefined) {
-                this.emitDelayInfo(this.deltaStreamDelayId, delayMs, error);
-                await waitForConnectedState(delayMs);
-            }
-
-            this.triggerConnect({ reason: "reconnect", mode: requestedMode, fetchOpsFromStorage: false });
-        }
     }
 
     // returns parts of message (in string format) that should never change for a given message.

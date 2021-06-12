@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import EventEmitter from "events";
+import { EventEmitter } from "events";
 import { assert } from "@fluidframework/common-utils";
 import {
     IDocumentDeltaConnection,
