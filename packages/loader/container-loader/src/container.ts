@@ -1550,7 +1550,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 details: {
                     capabilities: { interactive: true },
                 },
-                mode: "read", // default reconnection mode on lost connection / connection error
+                mode: "write", // default reconnection mode on lost connection / connection error
                 permission: [],
                 scopes: [],
                 user: { id: "" },
