@@ -436,8 +436,6 @@ export class DeltaManager
     ) {
         super();
 
-        console.log(this.statefulDocumentDeltaConnection);
-
         this.clientDetails = this.client.details;
         this.defaultReconnectionMode = this.client.mode;
         this._reconnectMode = reconnectAllowed ? ReconnectMode.Enabled : ReconnectMode.Never;
@@ -1054,6 +1052,10 @@ export class DeltaManager
         connection.on("error", this.errorHandler);
         connection.on("pong", this.pongHandler);
 
+        // TODO These should move to the constuctor and never be removed.
+        this.statefulDocumentDeltaConnection.on("op", this.opHandler);
+        this.statefulDocumentDeltaConnection.on("signal", this.signalHandler);
+
         // Initial messages are always sorted. However, due to early op handler installed by drivers and appending those
         // ops to initialMessages, resulting set is no longer sorted, which would result in client hitting storage to
         // fill in gap. We will recover by cancelling this request once we process remaining ops, but it's a waste that
@@ -1144,6 +1146,10 @@ export class DeltaManager
         connection.off("disconnect", this.disconnectHandler);
         connection.off("error", this.errorHandler);
         connection.off("pong", this.pongHandler);
+
+        // TODO These should only be removed in the dispose flow
+        this.statefulDocumentDeltaConnection.off("op", this.opHandler);
+        this.statefulDocumentDeltaConnection.off("signal", this.signalHandler);
 
         // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
         // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
