@@ -484,16 +484,14 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @deprecated - use readOnlyInfo
      */
     public get readonlyPermissions() {
-        return this.statefulDocumentDeltaConnection.connected
-            ? this.statefulDocumentDeltaConnection.readonlyScope
-            : true;
+        throw new Error("Not implemented");
     }
 
     /**
      * {@inheritDoc DeltaManager.readOnlyInfo}
      */
     public get readOnlyInfo(): ReadOnlyInfo {
-        return this._deltaManager.readOnlyInfo;
+        throw new Error("Not implemented");
     }
 
     /**

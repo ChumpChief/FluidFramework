@@ -242,17 +242,7 @@ export class DeltaManager
     }
 
     public get readOnlyInfo(): ReadOnlyInfo {
-        // This should be probing the statefulDocumentDeltaConnection for readonly state most likely.
-        if (this.statefulDocumentDeltaConnection.readonlyScope === true) {
-            return {
-                readonly: true,
-                forced: false,
-                permissions: this.statefulDocumentDeltaConnection.readonlyScope,
-                storageOnly: false,
-            };
-        }
-
-        return { readonly: false };
+        throw new Error("Not implemented");
     }
 
     // Probably rename to "waitingForAcks()" or something like that.
@@ -396,14 +386,9 @@ export class DeltaManager
         // const serializedContent = JSON.stringify(this.messageBuffer);
         // const maxOpSize = this.context.deltaManager.maxMessageSize;
 
-        if (this.readonly === true) {
-            assert(this.readOnlyInfo.readonly === true, 0x1f0 /* "Unexpected mismatch in readonly" */);
+        if (this.statefulDocumentDeltaConnection.readonlyScope === true) {
             const error = new LoggingError("Op is sent in read-only document state", {
                 errorType: ContainerErrorType.genericError,
-                readonly: this.readOnlyInfo.readonly,
-                forcedReadonly: this.readOnlyInfo.forced,
-                readonlyPermissions: this.readOnlyInfo.permissions,
-                storageOnly: this.readOnlyInfo.storageOnly,
             });
             this.close(CreateContainerError(error));
             return -1;
