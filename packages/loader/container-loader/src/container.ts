@@ -1133,8 +1133,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.statefulDocumentDeltaConnectionManager !== undefined,
             "Connection manager not created before connect attempt",
         );
-        // this.statefulDocumentDeltaConnectionManager.connect();
-        return this._deltaManager.connect(args);
+        return this.statefulDocumentDeltaConnectionManager.connect();
+        // return this._deltaManager.connect(args);
     }
 
     /**
@@ -1161,7 +1161,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.statefulDocumentDeltaConnection,
         );
 
-        let startConnectionP: Promise<IConnectionDetails> | undefined;
+        let startConnectionP: Promise<void> | undefined;
 
         // Ideally we always connect as "read" by default.
         // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.
@@ -1233,8 +1233,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 startConnectionP = this.connectToDeltaStream(connectionArgs);
             }
             // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
-            const details = await startConnectionP;
-            this._existing = details.existing;
+            // TODO this isn't great, because we could theoretically lose and regain the connection
+            // before awaiting the promise.
+            await startConnectionP;
+            this._existing = this.statefulDocumentDeltaConnection.existing;
         }
 
         // LoadContext directly requires protocolHandler to be ready, and eventually calls
@@ -1584,6 +1586,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             ChildLogger.create(this.subLogger, "DeltaManager"),
             () => this.activeConnection(),
         );
+
+        if (window["foobar"] === undefined) {
+            window["foobar"] = this;
+        }
 
         // Disable inbound queues as Container is not ready to accept any ops until we are fully loaded!
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
