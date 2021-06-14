@@ -935,6 +935,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             this.summaryManager.setConnected(this.context.clientId!);
         }
 
+        // TODO This doesn't get raised anymore, probably put it on the container context?
         this.deltaManager.on("readonly", (readonly: boolean) => {
             // we accumulate ops while being in read-only state.
             // once user gets write permissions and we have active connection, flush all pending ops.

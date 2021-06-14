@@ -476,7 +476,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @deprecated - use readOnlyInfo
      */
     public get readonly() {
-        return this._deltaManager.readonly;
+        throw new Error("Not implemented");
     }
 
     /**
