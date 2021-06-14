@@ -497,7 +497,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * {@inheritDoc DeltaManager.forceReadonly}
      */
     public forceReadonly(readonly: boolean) {
-        this._deltaManager.forceReadonly(readonly);
+        // TODO This API should not be on container, but instead on the stateful connection
+        throw new Error("Not implemented");
     }
 
     public get closed(): boolean {
