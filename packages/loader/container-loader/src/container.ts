@@ -484,7 +484,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @deprecated - use readOnlyInfo
      */
     public get readonlyPermissions() {
-        return this._deltaManager.readonlyPermissions;
+        return this.statefulDocumentDeltaConnection.connected
+            ? this.statefulDocumentDeltaConnection.readonlyScope
+            : true;
     }
 
     /**

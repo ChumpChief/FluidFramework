@@ -18,7 +18,7 @@ import {
     ReadOnlyInfo,
 } from "@fluidframework/container-definitions";
 import { assert, TypedEventEmitter } from "@fluidframework/common-utils";
-import { safeRaiseEvent, LoggingError } from "@fluidframework/telemetry-utils";
+import { LoggingError } from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
     IDocumentService,
@@ -35,7 +35,6 @@ import {
     ISignalMessage,
     ITrace,
     MessageType,
-    ScopeType,
 } from "@fluidframework/protocol-definitions";
 import {
     NonRetryableError,
@@ -87,9 +86,6 @@ export class DeltaManager
 
     public readonly clientDetails: IClientDetails;
     public get IDeltaSender() { return this; }
-
-    // file ACL - whether user has only read-only access to a file
-    private _readonlyPermissions: boolean | undefined;
 
     private pending: ISequencedDocumentMessage[] = [];
     private fetchReason: string | undefined;
@@ -242,26 +238,16 @@ export class DeltaManager
      * @deprecated - use readOnlyInfo
      */
     public get readonly() {
-        return this._readonlyPermissions;
-    }
-
-    /**
-     * Tells if user has no write permissions for file in storage
-     * It is undefined if we have not yet established websocket connection
-     * and do not know if user has write access to a file.
-     * @deprecated - use readOnlyInfo
-     */
-    public get readonlyPermissions() {
-        return this._readonlyPermissions;
+        return this.statefulDocumentDeltaConnection.readonlyScope;
     }
 
     public get readOnlyInfo(): ReadOnlyInfo {
         // This should be probing the statefulDocumentDeltaConnection for readonly state most likely.
-        if (this._readonlyPermissions === true) {
+        if (this.statefulDocumentDeltaConnection.readonlyScope === true) {
             return {
                 readonly: true,
                 forced: false,
-                permissions: this._readonlyPermissions,
+                permissions: this.statefulDocumentDeltaConnection.readonlyScope,
                 storageOnly: false,
             };
         }
@@ -273,13 +259,6 @@ export class DeltaManager
     public shouldJoinWrite(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
-    }
-
-    private raiseReadonlyEventIfNeeded(newReadonlyPermissions: boolean) {
-        if (newReadonlyPermissions !== this._readonlyPermissions) {
-            this._readonlyPermissions = newReadonlyPermissions;
-            safeRaiseEvent(this, this.logger, "readonly", this._readonlyPermissions);
-        }
     }
 
     constructor(
@@ -589,11 +568,6 @@ export class DeltaManager
         // Drop pending messages - this will ensure catchUp() does not go into infinite loop
         this.pending = [];
 
-        // Notify everyone we are in read-only state.
-        // Useful for data stores in case we hit some critical error,
-        // to switch to a mode where user edits are not accepted
-        this.raiseReadonlyEventIfNeeded(true);
-
         // This needs to be the last thing we do (before removing listeners), as it causes
         // Container to dispose context and break ability of data stores / runtime to "hear"
         // from delta manager, including notification (above) about readonly state.
@@ -648,13 +622,6 @@ export class DeltaManager
      * @param connection - The newly established connection
      */
     private readonly connectedHandler = () => {
-        // Does information in scopes & mode matches?
-        // If we asked for "write" and got "read", then file is read-only
-        // But if we ask read, server can still give us write.
-        // TODO move this check out of deltaManager
-        const readonly = !this.statefulDocumentDeltaConnection.claims.scopes.includes(ScopeType.DocWrite);
-        this.raiseReadonlyEventIfNeeded(readonly);
-
         this.refreshDelayInfo(this.deltaStreamDelayId);
 
         // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.

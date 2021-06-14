@@ -12,6 +12,7 @@ import {
     IDocumentMessage,
     ISequencedDocumentMessage,
     ISignalMessage,
+    ScopeType,
 } from "@fluidframework/protocol-definitions";
 
 export class StatefulDocumentDeltaConnection extends EventEmitter {
@@ -38,6 +39,10 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
 
     public get mode() {
         return this.deltaConnection.mode;
+    }
+
+    public get readonlyScope() {
+        return !this.claims.scopes.includes(ScopeType.DocWrite);
     }
 
     public get existing() {

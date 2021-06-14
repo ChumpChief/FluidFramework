@@ -117,7 +117,7 @@ describe("No Delta Stream", () => {
         const deltaManager = container.deltaManager as DeltaManager;
         assert.strictEqual(deltaManager.active, false, "deltaManager.active");
         assert.strictEqual(deltaManager.readonly, true, "deltaManager.readonly");
-        assert.strictEqual(deltaManager.readonlyPermissions, true, "deltaManager.readonlyPermissions");
+        // assert.strictEqual(deltaManager.readonlyPermissions, true, "deltaManager.readonlyPermissions");
         // assert.strictEqual(deltaManager.connectionMode, "read", "deltaManager.connectionMode");
         assert.ok(deltaManager.readOnlyInfo.readonly, "deltaManager.readOnlyInfo.readonly");
         assert.ok(deltaManager.readOnlyInfo.permissions, "deltaManager.readOnlyInfo.permissions");
@@ -174,7 +174,7 @@ describe("No Delta Stream", () => {
         const deltaManager = container.deltaManager as DeltaManager;
         assert.strictEqual(deltaManager.active, false, "deltaManager.active");
         assert.strictEqual(deltaManager.readonly, true, "deltaManager.readonly");
-        assert.strictEqual(deltaManager.readonlyPermissions, true, "deltaManager.readonlyPermissions");
+        // assert.strictEqual(deltaManager.readonlyPermissions, true, "deltaManager.readonlyPermissions");
         // assert.strictEqual(deltaManager.connectionMode, "read", "deltaManager.connectionMode");
         assert.ok(deltaManager.readOnlyInfo.readonly, "deltaManager.readOnlyInfo.readonly");
         assert.ok(deltaManager.readOnlyInfo.permissions, "deltaManager.readOnlyInfo.permissions");
