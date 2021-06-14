@@ -495,7 +495,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * configuration details returned as part of the initial connection.
      */
     public get serviceConfiguration(): IClientConfiguration | undefined {
-        return this._deltaManager.serviceConfiguration;
+        return this.statefulDocumentDeltaConnection.connected
+            ? this.statefulDocumentDeltaConnection.serviceConfiguration
+            : undefined;
     }
 
     /**

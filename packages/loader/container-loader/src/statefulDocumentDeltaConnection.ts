@@ -15,6 +15,8 @@ import {
     ScopeType,
 } from "@fluidframework/protocol-definitions";
 
+const DefaultChunkSize = 16 * 1024;
+
 export class StatefulDocumentDeltaConnection extends EventEmitter {
     private _deltaConnection: IDocumentDeltaConnection | undefined;
 
@@ -50,7 +52,12 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
     }
 
     public get maxMessageSize() {
-        return this.deltaConnection.maxMessageSize;
+        if (!this.connected) {
+            return DefaultChunkSize;
+        }
+        return this.deltaConnection.serviceConfiguration?.maxMessageSize
+            ?? this.deltaConnection.maxMessageSize
+            ?? DefaultChunkSize;
     }
 
     public get version() {

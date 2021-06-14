@@ -7,7 +7,7 @@ import { strict as assert } from "assert";
 import { EventEmitter } from "events";
 import { ITelemetryLogger } from "@fluidframework/common-definitions";
 import { DebugLogger } from "@fluidframework/telemetry-utils";
-import { IClient, IDocumentMessage, MessageType } from "@fluidframework/protocol-definitions";
+import { IDocumentMessage, MessageType } from "@fluidframework/protocol-definitions";
 import { MockDocumentDeltaConnection, MockDocumentService } from "@fluidframework/test-loader-utils";
 import { SinonFakeTimers, useFakeTimers } from "sinon";
 import { DeltaManager } from "../deltaManager";
@@ -84,12 +84,10 @@ describe("Loader", () => {
                     undefined,
                     () => deltaConnection,
                 );
-                const client: Partial<IClient> = { mode: "write", details: { capabilities: { interactive: true } } };
 
                 deltaManager = new DeltaManager(
                     () => service,
                     new StatefulDocumentDeltaConnection(),
-                    client as IClient,
                     logger,
                     () => false,
                 );

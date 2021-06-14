@@ -46,8 +46,6 @@ import {
 import { DeltaQueue } from "./deltaQueue";
 import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
-const DefaultChunkSize = 16 * 1024;
-
 export interface IConnectionArgs {
     mode?: ConnectionMode;
     fetchOpsFromStorage?: boolean;
@@ -190,27 +188,17 @@ export class DeltaManager
         return this.minSequenceNumber;
     }
 
+    // TODO can this be private?  Seems like deltaManager should have the logic for chunking/reassembling an op.
     public get maxMessageSize(): number {
-        if (!this.statefulDocumentDeltaConnection.connected) {
-            return DefaultChunkSize;
-        }
-        return this.statefulDocumentDeltaConnection.serviceConfiguration?.maxMessageSize
-            ?? this.statefulDocumentDeltaConnection.maxMessageSize
-            ?? DefaultChunkSize;
+        return this.statefulDocumentDeltaConnection.maxMessageSize;
     }
 
     public get version(): string {
-        if (!this.statefulDocumentDeltaConnection.connected) {
-            throw new Error("Cannot check version without a connection");
-        }
-        return this.statefulDocumentDeltaConnection.version;
+        throw new Error("Not implemented");
     }
 
     public get serviceConfiguration(): IClientConfiguration | undefined {
-        if (!this.statefulDocumentDeltaConnection.connected) {
-            return undefined;
-        }
-        return this.statefulDocumentDeltaConnection.serviceConfiguration;
+        throw new Error("Not implemented");
     }
 
     // TODO Remove, still mandated by the definitions currently
