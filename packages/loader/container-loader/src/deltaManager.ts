@@ -325,8 +325,7 @@ export class DeltaManager
     }
 
     constructor(
-        // Should NOT be used for delta connection!  Only for delta storage and document storage
-        private readonly serviceProvider: () => IDocumentService | undefined,
+        private readonly serviceProvider: () => Pick<IDocumentService, "connectToDeltaStorage"> | undefined,
         // Should be an IStatefulDocumentDeltaConnection, and even more specifically just the consumer side.
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
         private readonly client: IClient,
@@ -429,20 +428,6 @@ export class DeltaManager
         if (!this.statefulDocumentDeltaConnection.connected) {
             return this.fetchMissingDeltasCore("DocumentOpen", cacheOnly, this.lastQueuedSequenceNumber, undefined);
         }
-    }
-
-    private static detailsFromConnection(connection: StatefulDocumentDeltaConnection): IConnectionDetails {
-        return {
-            claims: connection.claims,
-            clientId: connection.clientId,
-            existing: connection.existing,
-            checkpointSequenceNumber: connection.checkpointSequenceNumber,
-            get initialClients() { return connection.initialClients; },
-            maxMessageSize: connection.maxMessageSize,
-            mode: connection.mode,
-            serviceConfiguration: connection.serviceConfiguration,
-            version: connection.version,
-        };
     }
 
     public async connect(args: IConnectionArgs): Promise<IConnectionDetails> {
@@ -756,12 +741,24 @@ export class DeltaManager
             this.updateLatestKnownOpSeqNumber(last);
         }
 
+        const connectionDetails = {
+            claims: this.statefulDocumentDeltaConnection.claims,
+            clientId: this.statefulDocumentDeltaConnection.clientId,
+            existing: this.statefulDocumentDeltaConnection.existing,
+            checkpointSequenceNumber: this.statefulDocumentDeltaConnection.checkpointSequenceNumber,
+            initialClients: this.statefulDocumentDeltaConnection.initialClients,
+            maxMessageSize: this.statefulDocumentDeltaConnection.maxMessageSize,
+            mode: this.statefulDocumentDeltaConnection.mode,
+            serviceConfiguration: this.statefulDocumentDeltaConnection.serviceConfiguration,
+            version: this.statefulDocumentDeltaConnection.version,
+        };
+
         // Notify of the connection
         // WARNING: This has to happen before processInitialMessages() call below.
         // If not, we may not update Container.pendingClientId in time before seeing our own join session op.
         this.emit(
             "connect",
-            DeltaManager.detailsFromConnection(this.statefulDocumentDeltaConnection),
+            connectionDetails,
             this._hasCheckpointSequenceNumber ? this.lastObservedSeqNumber - this.lastSequenceNumber : undefined);
 
         this.enqueueMessages(
