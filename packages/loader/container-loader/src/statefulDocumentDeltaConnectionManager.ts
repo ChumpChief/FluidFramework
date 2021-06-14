@@ -23,6 +23,7 @@ export class StatefulDocumentDeltaConnectionManager {
         user: { id: "" },
     };
 
+    private connectionP: Promise<IDocumentDeltaConnection> | undefined;
     private currentConnection: IDocumentDeltaConnection | undefined;
 
     constructor(
@@ -30,8 +31,19 @@ export class StatefulDocumentDeltaConnectionManager {
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
     ) { }
 
-    public async connect() {
-        const connection = await this.deltaStreamService.connectToDeltaStream(this.defaultClient);
+    public async connect(): Promise<void> {
+        // TODO do I need an event indicating that it's starting to connect?  The deltaManager wants to request
+        // ops from storage at the start of connection.
+
+        if (this.connectionP !== undefined) {
+            // TODO If this eventually takes connection args, consider throwing (esp. if the args don't match)?
+            // Or just having a less-explicit connect method.
+            await this.connectionP;
+            return;
+        }
+
+        this.connectionP = this.deltaStreamService.connectToDeltaStream(this.defaultClient);
+        const connection = await this.connectionP;
         // connection.on("nack")
         // connection.on("disconnect")
         // connection.on("error")
@@ -45,6 +57,8 @@ export class StatefulDocumentDeltaConnectionManager {
         if (this.currentConnection === undefined) {
             throw new Error("Tried to disconnect, but not currently connected");
         }
+
+        // TODO abort any in-progress connection
 
         this.statefulDocumentDeltaConnection.tearDownCurrentConnection();
         const connection = this.currentConnection;

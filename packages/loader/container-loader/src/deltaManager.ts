@@ -273,6 +273,7 @@ export class DeltaManager
         return { readonly: false };
     }
 
+    // Probably rename to "waitingForAcks()" or something like that.
     public shouldJoinWrite(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
