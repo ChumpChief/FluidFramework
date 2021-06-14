@@ -23,19 +23,19 @@ import {
 import { MockDocumentDeltaConnection } from "@fluidframework/test-loader-utils";
 import {
     LocalCodeLoader,
-    TestObjectProvider,
+    // TestObjectProvider,
     LoaderContainerTracker,
-    TestContainerRuntimeFactory,
+    // TestContainerRuntimeFactory,
     ITestObjectProvider,
     TestFluidObjectFactory,
 } from "@fluidframework/test-utils";
 import { ensureFluidResolvedUrl } from "@fluidframework/driver-utils";
-import { requestFluidObject } from "@fluidframework/runtime-utils";
+// import { requestFluidObject } from "@fluidframework/runtime-utils";
 import { ChildLogger } from "@fluidframework/telemetry-utils";
 import {
-    getDataStoreFactory,
-    ITestDataObject,
-    TestDataObjectType,
+    // getDataStoreFactory,
+    // ITestDataObject,
+    // TestDataObjectType,
     describeNoCompat,
 } from "@fluidframework/test-version-utils";
 
@@ -231,28 +231,28 @@ describeNoCompat("Container", (getTestObjectProvider) => {
         deltaConnection.removeAllListeners();
     });
 
-    it("Delta manager receives readonly event when calling container.forceReadonly()", async () => {
-        const runtimeFactory = (_?: unknown) => new TestContainerRuntimeFactory(
-            TestDataObjectType,
-            getDataStoreFactory());
+    // it("Delta manager receives readonly event when calling container.forceReadonly()", async () => {
+    //     const runtimeFactory = (_?: unknown) => new TestContainerRuntimeFactory(
+    //         TestDataObjectType,
+    //         getDataStoreFactory());
 
-        const localTestObjectProvider = new TestObjectProvider(
-            Loader,
-            provider.driver,
-            runtimeFactory);
+    //     const localTestObjectProvider = new TestObjectProvider(
+    //         Loader,
+    //         provider.driver,
+    //         runtimeFactory);
 
-        const container = await localTestObjectProvider.makeTestContainer() as Container;
-        const dataObject = await requestFluidObject<ITestDataObject>(container, "default");
+    //     const container = await localTestObjectProvider.makeTestContainer() as Container;
+    //     const dataObject = await requestFluidObject<ITestDataObject>(container, "default");
 
-        let runCount = 0;
+    //     let runCount = 0;
 
-        dataObject._context.deltaManager.on("readonly", () => {
-            runCount++;
-        });
+    //     dataObject._context.deltaManager.on("readonly", () => {
+    //         runCount++;
+    //     });
 
-        container.forceReadonly(true);
-        assert.strictEqual(container.readonly, true);
+    //     container.forceReadonly(true);
+    //     assert.strictEqual(container.readonly, true);
 
-        assert.strictEqual(runCount, 1);
-    });
+    //     assert.strictEqual(runCount, 1);
+    // });
 });

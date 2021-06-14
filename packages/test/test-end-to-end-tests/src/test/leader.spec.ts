@@ -110,25 +110,25 @@ describeFullCompat("Leader", (getTestObjectProvider) => {
         assert(taskSubscription1.haveTask());
     });
 
-    it("force read only", async () => {
-        // write something to get out of view only mode and take leadership
-        dataObject1.root.set("blah", "blah");
-        await provider.ensureSynchronized();
+    // it("force read only", async () => {
+    //     // write something to get out of view only mode and take leadership
+    //     dataObject1.root.set("blah", "blah");
+    //     await provider.ensureSynchronized();
 
-        const config = {
-            taskSubscription: taskSubscription1,
-            name: "taskSubscription1",
-            gotTask: false,
-            lostTask: true,
-        };
-        setupListener(config);
+    //     const config = {
+    //         taskSubscription: taskSubscription1,
+    //         name: "taskSubscription1",
+    //         gotTask: false,
+    //         lostTask: true,
+    //     };
+    //     setupListener(config);
 
-        container1.forceReadonly(true);
-        await provider.ensureSynchronized();
+    //     container1.forceReadonly(true);
+    //     await provider.ensureSynchronized();
 
-        checkExpected(config);
-        assert(!taskSubscription1.haveTask());
-    });
+    //     checkExpected(config);
+    //     assert(!taskSubscription1.haveTask());
+    // });
 
     it("Events on close", async () => {
         // write something to get out of view only mode and take leadership

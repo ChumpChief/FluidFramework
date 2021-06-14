@@ -52,11 +52,11 @@ describe("Document Dirty", () => {
         return new Promise((resolve) => c.once("connected", () => resolve()));
     }
 
-    async function ensureContainerConnected(c: Container): Promise<void> {
-        if (!c.connected) {
-            return waitForContainerReconnection(c);
-        }
-    }
+    // async function ensureContainerConnected(c: Container): Promise<void> {
+    //     if (!c.connected) {
+    //         return waitForContainerReconnection(c);
+    //     }
+    // }
 
     /**
      * Increments clean count when the "saved" event is fired
@@ -328,59 +328,59 @@ describe("Document Dirty", () => {
             });
     });
 
-    describe("Force readonly", () => {
-        it(`sets operations when force readonly and then turn off force readonly to process them`, async () => {
-            container.forceReadonly(true);
-            await ensureContainerConnected(container);
+    // describe("Force readonly", () => {
+    //     it(`sets operations when force readonly and then turn off force readonly to process them`, async () => {
+    //         container.forceReadonly(true);
+    //         await ensureContainerConnected(container);
 
-            // Set values in DDSes in force read only state.
-            sharedMap.set("key", "value");
+    //         // Set values in DDSes in force read only state.
+    //         sharedMap.set("key", "value");
 
-            await loaderContainerTracker.ensureSynchronized();
+    //         await loaderContainerTracker.ensureSynchronized();
 
-            // Document should have been marked dirty again due to pending DDS ops
-            checkDirtyState("after value set while force readonly", true, 0);
+    //         // Document should have been marked dirty again due to pending DDS ops
+    //         checkDirtyState("after value set while force readonly", true, 0);
 
-            container.forceReadonly(false);
-            assert(container.connected, "Setting readonly to false should not cause disconnection");
+    //         container.forceReadonly(false);
+    //         assert(container.connected, "Setting readonly to false should not cause disconnection");
 
-            // Document should still be dirty right after turning off force readonly
-            checkDirtyState("after clear readonly and replayed ops", true, 0);
+    //         // Document should still be dirty right after turning off force readonly
+    //         checkDirtyState("after clear readonly and replayed ops", true, 0);
 
-            await loaderContainerTracker.ensureSynchronized();
+    //         await loaderContainerTracker.ensureSynchronized();
 
-            // Document will have been marked clean after process
-            checkDirtyState("after processing replayed ops", false, 1);
-        });
+    //         // Document will have been marked clean after process
+    //         checkDirtyState("after processing replayed ops", false, 1);
+    //     });
 
-        it(`sets ops then force readonly before sending ops, then turn off force readonly to process them`,
-            async () => {
-                // Set values in DDSes in write mode
-                sharedMap.set("key", "value");
+    //     it(`sets ops then force readonly before sending ops, then turn off force readonly to process them`,
+    //         async () => {
+    //             // Set values in DDSes in write mode
+    //             sharedMap.set("key", "value");
 
-                checkDirtyState("after value set", true, 0);
+    //             checkDirtyState("after value set", true, 0);
 
-                // force readonly
-                container.forceReadonly(true);
-                await ensureContainerConnected(container);
+    //             // force readonly
+    //             container.forceReadonly(true);
+    //             await ensureContainerConnected(container);
 
-                await loaderContainerTracker.ensureSynchronized();
+    //             await loaderContainerTracker.ensureSynchronized();
 
-                // Document should have been marked dirty again due to pending DDS ops
-                checkDirtyState("after value set while force readonly", true, 0);
+    //             // Document should have been marked dirty again due to pending DDS ops
+    //             checkDirtyState("after value set while force readonly", true, 0);
 
-                container.forceReadonly(false);
-                assert(container.connected, "Setting readonly to false should not cause disconnection");
+    //             container.forceReadonly(false);
+    //             assert(container.connected, "Setting readonly to false should not cause disconnection");
 
-                // Document should still be dirty right after turning off force readonly
-                checkDirtyState("after reconnect and replayed ops", true, 0);
+    //             // Document should still be dirty right after turning off force readonly
+    //             checkDirtyState("after reconnect and replayed ops", true, 0);
 
-                await loaderContainerTracker.ensureSynchronized();
+    //             await loaderContainerTracker.ensureSynchronized();
 
-                // Document will have been marked clean after process
-                checkDirtyState("after processing replayed ops", false, 1);
-            });
-    });
+    //             // Document will have been marked clean after process
+    //             checkDirtyState("after processing replayed ops", false, 1);
+    //         });
+    // });
 
     afterEach(async () => {
         await deltaConnectionServer.webSocketServer.close();

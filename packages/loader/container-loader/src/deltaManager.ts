@@ -227,26 +227,12 @@ export class DeltaManager
         return this.statefulDocumentDeltaConnection.claims.documentId;
     }
 
-    /**
-     * Tells if container is in read-only mode.
-     * Data stores should listen for "readonly" notifications and disallow user
-     * making changes to data stores.
-     * Readonly state can be because of no storage write permission,
-     * or due to host forcing readonly mode for container.
-     * It is undefined if we have not yet established websocket connection
-     * and do not know if user has write access to a file.
-     * @deprecated - use readOnlyInfo
-     */
-    public get readonly() {
-        return this.statefulDocumentDeltaConnection.readonlyScope;
-    }
-
+    // TODO Remove, still mandated by the definitions currently
     public get readOnlyInfo(): ReadOnlyInfo {
         throw new Error("Not implemented");
     }
 
-    // Probably rename to "waitingForAcks()" or something like that.
-    public shouldJoinWrite(): boolean {
+    public waitingForAcks(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
     }

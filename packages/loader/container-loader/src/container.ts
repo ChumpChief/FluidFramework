@@ -29,7 +29,6 @@ import {
     AttachState,
     IThrottlingWarning,
     IPendingLocalState,
-    ReadOnlyInfo,
     ILoaderOptions,
     IContainerLoadMode,
 } from "@fluidframework/container-definitions";
@@ -471,37 +470,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this._loadedFromVersion;
     }
 
-    /**
-     * {@inheritDoc DeltaManager.readonly}
-     * @deprecated - use readOnlyInfo
-     */
-    public get readonly() {
-        throw new Error("Not implemented");
-    }
-
-    /**
-     * {@inheritDoc DeltaManager.readonlyPermissions}
-     * @deprecated - use readOnlyInfo
-     */
-    public get readonlyPermissions() {
-        throw new Error("Not implemented");
-    }
-
-    /**
-     * {@inheritDoc DeltaManager.readOnlyInfo}
-     */
-    public get readOnlyInfo(): ReadOnlyInfo {
-        throw new Error("Not implemented");
-    }
-
-    /**
-     * {@inheritDoc DeltaManager.forceReadonly}
-     */
-    public forceReadonly(readonly: boolean) {
-        // TODO This API should not be on container, but instead on the stateful connection
-        throw new Error("Not implemented");
-    }
-
     public get closed(): boolean {
         return this._closed;
     }
@@ -646,7 +614,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 protocolHandler: () => this._protocolHandler,
                 logConnectionStateChangeTelemetry: (value, oldState, reason) =>
                     this.logConnectionStateChangeTelemetry(value, oldState, reason),
-                shouldClientJoinWrite: () => this._deltaManager.shouldJoinWrite(),
+                shouldClientJoinWrite: () => this._deltaManager.waitingForAcks(),
                 maxClientLeaveWaitTime: this.loader.services.options.maxClientLeaveWaitTime,
             },
             this.logger,
@@ -1630,10 +1598,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         deltaManager.on("throttled", (warning: IThrottlingWarning) => {
             this.raiseContainerWarning(warning);
-        });
-
-        deltaManager.on("readonly", (readonly) => {
-            this.emit("readonly", readonly);
         });
 
         deltaManager.on("closed", (error?: ICriticalContainerError) => {
