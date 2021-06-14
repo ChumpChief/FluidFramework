@@ -61,7 +61,8 @@ export class LoaderContainerTracker implements IOpProcessingController {
      */
     private addContainer(container: IContainer) {
         // ignore summarizer
-        if (!container.deltaManager.clientDetails.capabilities.interactive) { return; }
+        // TODO Fix this
+        // if (!container.clientDetails.capabilities.interactive) { return; }
 
         // don't add container that is already tracked
         if (this.containers.has(container)) { return; }

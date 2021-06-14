@@ -27,7 +27,6 @@ import {
 import { isSystemMessage } from "@fluidframework/protocol-base";
 import {
     ConnectionMode,
-    IClient,
     IClientConfiguration,
     IClientDetails,
     IDocumentMessage,
@@ -84,7 +83,8 @@ export class DeltaManager
 
     public get disposed() { return this.closed; }
 
-    public readonly clientDetails: IClientDetails;
+    // TODO Remove, currently required by definitions
+    public get clientDetails(): IClientDetails { throw new Error("Not implemented"); }
     public get IDeltaSender() { return this; }
 
     private pending: ISequencedDocumentMessage[] = [];
@@ -213,20 +213,6 @@ export class DeltaManager
         return this.statefulDocumentDeltaConnection.serviceConfiguration;
     }
 
-    public get scopes(): string[] | undefined {
-        if (!this.statefulDocumentDeltaConnection.connected) {
-            return undefined;
-        }
-        return this.statefulDocumentDeltaConnection.claims.scopes;
-    }
-
-    public get socketDocumentId(): string | undefined {
-        if (!this.statefulDocumentDeltaConnection.connected) {
-            return undefined;
-        }
-        return this.statefulDocumentDeltaConnection.claims.documentId;
-    }
-
     // TODO Remove, still mandated by the definitions currently
     public get readOnlyInfo(): ReadOnlyInfo {
         throw new Error("Not implemented");
@@ -241,13 +227,10 @@ export class DeltaManager
         private readonly serviceProvider: () => Pick<IDocumentService, "connectToDeltaStorage"> | undefined,
         // Should be an IStatefulDocumentDeltaConnection, and even more specifically just the consumer side.
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
-        private readonly client: IClient,
         private readonly logger: ITelemetryLogger,
         private readonly _active: () => boolean,
     ) {
         super();
-
-        this.clientDetails = this.client.details;
 
         this._inbound = new DeltaQueue<ISequencedDocumentMessage>(
             (op) => {
@@ -390,15 +373,11 @@ export class DeltaManager
             this.clientSequenceNumberObserved = 0;
         }
 
-        const service = this.clientDetails.type === undefined || this.clientDetails.type === ""
-            ? "unknown"
-            : this.clientDetails.type;
-
         // Start adding trace for the op.
         const traces: ITrace[] = [
             {
                 action: "start",
-                service,
+                service: "unknown", // should be clientDetails.type if defined and non-""?
                 timestamp: Date.now(),
             }];
 
@@ -892,12 +871,9 @@ export class DeltaManager
 
         // Add final ack trace.
         if (message.traces !== undefined && message.traces.length > 0) {
-            const service = this.clientDetails.type === undefined || this.clientDetails.type === ""
-                ? "unknown"
-                : this.clientDetails.type;
             message.traces.push({
                 action: "end",
-                service,
+                service: "unknown", // should be clientDetails.type if defined and non-""?
                 timestamp: Date.now(),
             });
         }

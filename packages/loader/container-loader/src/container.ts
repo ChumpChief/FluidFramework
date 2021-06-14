@@ -511,11 +511,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Set once this.connected is true, otherwise undefined
      */
     public get scopes(): string[] | undefined {
-        return this._deltaManager.scopes;
+        return this.statefulDocumentDeltaConnection.connected
+            ? this.statefulDocumentDeltaConnection.claims.scopes
+            : undefined;
     }
 
     public get clientDetails(): IClientDetails {
-        return this._deltaManager.clientDetails;
+        return this.client.details;
     }
 
     /**
@@ -1561,7 +1563,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const deltaManager: DeltaManager = new DeltaManager(
             () => this.service,
             this.statefulDocumentDeltaConnection,
-            this.client,
             ChildLogger.create(this.subLogger, "DeltaManager"),
             () => this.activeConnection(),
         );
@@ -1663,6 +1664,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
         }
 
+        const socketDocumentId = this.statefulDocumentDeltaConnection.connected
+            ? this.statefulDocumentDeltaConnection.claims.documentId
+            : undefined;
+
         this.logger.sendPerformanceEvent({
             eventName: `ConnectionStateChange_${ConnectionState[value]}`,
             from: ConnectionState[oldState],
@@ -1670,7 +1675,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             durationFromDisconnected,
             reason,
             connectionInitiationReason,
-            socketDocumentId: this._deltaManager.socketDocumentId,
+            socketDocumentId,
             pendingClientId: this.connectionStateHandler.pendingClientId,
             clientId: this.clientId,
             connectionMode,
