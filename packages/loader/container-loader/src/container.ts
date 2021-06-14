@@ -84,6 +84,7 @@ import {
     ISummaryTree,
     IPendingProposal,
     SummaryType,
+    ConnectionMode,
 } from "@fluidframework/protocol-definitions";
 import {
     ChildLogger,
@@ -918,11 +919,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
         }
 
-        this._deltaManager.setAutomaticReconnect(reconnect);
+        // this._deltaManager.setAutomaticReconnect(reconnect);
+        // TODO
+        // this.statefulDocumentDeltaConnectionManager.setAutomaticReconnect(reconnect);
 
         this.logger.sendTelemetryEvent({
             eventName: reconnect ? "AutoReconnectEnabled" : "AutoReconnectDisabled",
-            connectionMode: this._deltaManager.connectionMode,
+            connectionMode: this.connectionMode,
             connectionState: ConnectionState[this.connectionState],
         });
 
@@ -1011,6 +1014,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.getQuorum().propose("code", codeDetails)
             .then(()=>true)
             .catch(()=>false);
+    }
+
+    private get connectionMode(): ConnectionMode {
+        if (!this.statefulDocumentDeltaConnection.connected) {
+            return "read";
+        }
+        return this.statefulDocumentDeltaConnection.mode;
     }
 
     private async processCodeProposal(): Promise<void> {
@@ -1573,7 +1583,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * If it's not true, runtime is not in position to send ops.
      */
     private activeConnection() {
-        return this.connectionState === ConnectionState.Connected && this._deltaManager.connectionMode === "write";
+        return this.connectionState === ConnectionState.Connected && this.connectionMode === "write";
     }
 
     private createDeltaManager() {
@@ -1600,7 +1610,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {
             this.connectionStateHandler.receivedConnectEvent(
-                this._deltaManager.connectionMode,
+                this.connectionMode,
                 details,
                 opsBehind,
             );
@@ -1668,7 +1678,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // or else come straight from here (the Container) as the authority (see this._canReconnect).
             autoReconnect = ReconnectMode.Enabled;
         } else {
-            connectionMode = this._deltaManager.connectionMode;
+            connectionMode = this.connectionMode;
             sequenceNumber = this.deltaManager.lastSequenceNumber;
             if (value === ConnectionState.Connected) {
                 durationFromDisconnected = time - this.connectionTransitionTimes[ConnectionState.Disconnected];
@@ -1718,7 +1728,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const logOpsOnReconnect: boolean =
             this.connectionState === ConnectionState.Connected &&
             !this.firstConnection &&
-            this._deltaManager.connectionMode === "write";
+            this.connectionMode === "write";
         if (logOpsOnReconnect) {
             this.messageCountAfterDisconnection = 0;
         }

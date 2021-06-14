@@ -232,17 +232,6 @@ export class DeltaManager
     }
 
     /**
-     * The current connection mode, initially read.
-     */
-    public get connectionMode(): ConnectionMode {
-        // TODO convert calls to this to use the stateful connection directly
-        if (!this.statefulDocumentDeltaConnection.connected) {
-            return "read";
-        }
-        return this.statefulDocumentDeltaConnection.mode;
-    }
-
-    /**
      * Tells if container is in read-only mode.
      * Data stores should listen for "readonly" notifications and disallow user
      * making changes to data stores.
@@ -284,15 +273,6 @@ export class DeltaManager
     public shouldJoinWrite(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
-    }
-
-    /**
-     * Enables or disables automatic reconnecting.
-     * Will throw an error if reconnectMode set to Never.
-     */
-    public setAutomaticReconnect(reconnect: boolean): void {
-        // TODO This API should not be on deltamanager, but instead on the stateful connection
-        throw new Error("Not implemented");
     }
 
     private raiseReadonlyEventIfNeeded(newReadonlyPermissions: boolean) {
@@ -354,8 +334,8 @@ export class DeltaManager
 
         this.statefulDocumentDeltaConnection.on("op", this.opHandler);
         this.statefulDocumentDeltaConnection.on("signal", this.signalHandler);
-        this.statefulDocumentDeltaConnection.on("connected", this.connectHandler);
-        this.statefulDocumentDeltaConnection.on("disconnected", this.disconnectHandler);
+        this.statefulDocumentDeltaConnection.on("connected", this.connectedHandler);
+        this.statefulDocumentDeltaConnection.on("disconnected", this.disconnectedHandler);
 
         // Initially, all queues are created paused.
         // - outbound is flipped back and forth in setupNewSuccessfulConnection / disconnectFromDeltaStream
@@ -594,8 +574,8 @@ export class DeltaManager
 
         this.statefulDocumentDeltaConnection.off("op", this.opHandler);
         this.statefulDocumentDeltaConnection.off("signal", this.signalHandler);
-        this.statefulDocumentDeltaConnection.off("connected", this.connectHandler);
-        this.statefulDocumentDeltaConnection.off("disconnected", this.disconnectHandler);
+        this.statefulDocumentDeltaConnection.off("connected", this.connectedHandler);
+        this.statefulDocumentDeltaConnection.off("disconnected", this.disconnectedHandler);
 
         this._inbound.clear();
         this._outbound.clear();
@@ -667,13 +647,12 @@ export class DeltaManager
      * initial messages.
      * @param connection - The newly established connection
      */
-    private readonly connectHandler = () => {
+    private readonly connectedHandler = () => {
         // Does information in scopes & mode matches?
         // If we asked for "write" and got "read", then file is read-only
         // But if we ask read, server can still give us write.
         // TODO move this check out of deltaManager
         const readonly = !this.statefulDocumentDeltaConnection.claims.scopes.includes(ScopeType.DocWrite);
-        assert(!readonly || this.connectionMode === "read", 0x0e8 /* "readonly perf with write connection" */);
         this.raiseReadonlyEventIfNeeded(readonly);
 
         this.refreshDelayInfo(this.deltaStreamDelayId);
@@ -773,7 +752,7 @@ export class DeltaManager
      * Disconnect the current connection.
      * @param reason - Text description of disconnect reason to emit with disconnect event
      */
-    private readonly disconnectHandler = (reason: string) => {
+    private readonly disconnectedHandler = (reason: string) => {
         // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
         // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
         // but it's safe to assume (until better design is put into place) that batches should not exist
