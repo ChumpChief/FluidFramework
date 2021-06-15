@@ -8,11 +8,15 @@ import * as git from "isomorphic-git";
 import socketIo from "socket.io";
 
 import winston from "winston";
-import { TinyliciousResources } from "./resources";
 import { TinyliciousRunner } from "./runner";
 import {
     IDb,
     IDbFactory,
+    IDocumentStorage,
+    IOrdererManager,
+    IResources,
+    ITenantManager,
+    IWebServerFactory,
     MongoDatabaseManager,
     MongoManager,
     IResourcesFactory,
@@ -26,6 +30,22 @@ import {
     TinyliciousTenantManager,
     WebServerFactory,
 } from "./services";
+
+export class TinyliciousResources implements IResources {
+    constructor(
+        public orderManager: IOrdererManager,
+        public tenantManager: ITenantManager,
+        public storage: IDocumentStorage,
+        public mongoManager: MongoManager,
+        public port: any,
+        public webServerFactory: IWebServerFactory,
+    ) {
+    }
+
+    public async dispose(): Promise<void> {
+        await this.mongoManager.close();
+    }
+}
 
 const defaultTinyliciousPort = 7070;
 
