@@ -3,30 +3,11 @@
  * Licensed under the MIT License.
  */
 
-import { Deferred } from "../common-utils";
-
 export interface IQueuedMessage {
     topic: string;
     partition: number;
     offset: number;
     value: string | any;
-}
-
-export interface IPartition {
-    topic: string;
-    partition: number;
-    offset: number;
-}
-
-/**
- * A pending message the producer is holding on to
- */
-export interface IPendingMessage {
-    // The deferred is used to resolve a promise once the message is sent
-    deferred: Deferred<any>;
-
-    // The message to send
-    message: string;
 }
 
 export interface IProducer {
@@ -53,12 +34,4 @@ export interface IProducer {
         listener: (...args: any[]) => void): this;
     once(event: "connected" | "disconnected" | "closed" | "produced" | "throttled" | "error",
         listener: (...args: any[]) => void): this;
-}
-
-export interface IPendingBoxcar {
-    documentId: string;
-    tenantId: string;
-    deferred: Deferred<void>;
-    messages: any[];
-    partitionId?: number;
 }

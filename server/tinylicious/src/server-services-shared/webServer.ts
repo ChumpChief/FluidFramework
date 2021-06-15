@@ -6,11 +6,11 @@
 import * as http from "http";
 import { AddressInfo } from "net";
 import * as util from "util";
-import * as core from "../server-services-core";
+import { IHttpServer } from "../server-services-core";
 
 export type RequestListener = (request: http.IncomingMessage, response: http.ServerResponse) => void;
 
-export class HttpServer implements core.IHttpServer {
+export class HttpServer implements IHttpServer {
     constructor(private readonly server: http.Server) {
     }
 

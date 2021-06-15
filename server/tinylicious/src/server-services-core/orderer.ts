@@ -22,10 +22,6 @@ export interface INode {
     expiration: number;
 }
 
-export interface IOrdererSocket {
-    send(topic: string, op: string, id: string, data: any[]);
-}
-
 export interface IOrdererConnection {
     readonly clientId: string;
 
