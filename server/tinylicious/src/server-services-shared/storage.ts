@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import * as winston from "winston";
 import { toUtf8 } from "../common-utils";
 import { ICommit, ICommitDetails, ICreateCommitParams } from "../gitresources";
 import {
@@ -79,10 +78,6 @@ export class DocumentStorage implements IDocumentStorage {
             gitManager.getTree(handle, false),
         ]);
 
-        const messageMetaData = { documentId, tenantId };
-        winston.info(`protocolTree ${JSON.stringify(protocolTree)}`, { messageMetaData });
-        winston.info(`appSummaryTree ${JSON.stringify(appSummaryTree)}`, { messageMetaData });
-
         // Combine the app summary with .protocol
         const newTreeEntries = mergeAppAndProtocolTree(appSummaryTree, protocolTree);
 
@@ -100,8 +95,6 @@ export class DocumentStorage implements IDocumentStorage {
 
         const commit = await gitManager.createCommit(commitParams);
         await gitManager.createRef(documentId, commit.sha);
-
-        winston.info(`commit sha: ${JSON.stringify(commit.sha)}`, { messageMetaData });
 
         const deli: IDeliState = {
             clients: undefined,
@@ -245,8 +238,6 @@ export class DocumentStorage implements IDocumentStorage {
             const foundInSummaryP = this.readFromSummary(tenantId, documentId).then((result) => {
                 return result;
             }, (err) => {
-                winston.error(`Error while fetching summary for ${tenantId}/${documentId}`);
-                winston.error(err);
                 return false;
             });
 
@@ -302,7 +293,6 @@ export class DocumentStorage implements IDocumentStorage {
                         throw error;
                     }
                 });
-            winston.info(`Inserted ${dbOps.length} ops into deltas DB`);
             return true;
         } else {
             return false;
