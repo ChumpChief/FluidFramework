@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { ISubscriber, IPubSub } from "./memory-orderer";
+import { IPubSub } from "./memory-orderer";
 
 export class PubSubPublisher implements IPubSub {
     constructor(private readonly io: SocketIO.Server) {}
@@ -12,11 +12,4 @@ export class PubSubPublisher implements IPubSub {
     public publish(topic: string, event: string, ...args: any[]): void {
         this.io.to(topic).emit(event, ...args);
     }
-
-    // The sockets directly subscribe to the topic in `alfred` when document is connected. So, we do
-    // nothing here.
-    public subscribe(topic: string, subscriber: ISubscriber): void {}
-
-    // The sockets directly unsubscibe when the client disconnects. So, we do nothing here.
-    public unsubscribe(topic: string, subscriber: ISubscriber): void {}
 }

@@ -25,12 +25,6 @@ export class WebSocketSubscriber implements ISubscriber {
 }
 
 export interface IPubSub {
-    // Registers a subscriber for the given message
-    subscribe(topic: string, subscriber: ISubscriber): void;
-
-    // Removes the subscriber
-    unsubscribe(topic: string, subscriber: ISubscriber): void;
-
     // Publishes a message to the given topic
     publish(topic: string, event: string, ...args: any[]): void;
 }
