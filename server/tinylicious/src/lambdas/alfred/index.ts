@@ -18,7 +18,20 @@ import {
     MessageType,
     NackErrorType,
 } from "../../protocol-definitions";
-import * as core from "../../server-services-core";
+import {
+    DefaultServiceConfiguration,
+    IClientManager,
+    IDocumentStorage,
+    ILogger,
+    IMetricClient,
+    IOrdererConnection,
+    IOrdererManager,
+    ITenantManager,
+    IThrottler,
+    IWebSocket,
+    IWebSocketServer,
+    ThrottlingError,
+} from "../../server-services-core";
 import {
     canSummarize,
     canWrite,
@@ -56,7 +69,7 @@ const getMessageMetadata = (documentId: string, tenantId: string) => ({
     tenantId,
 });
 
-const handleServerError = async (logger: core.ILogger, errorMessage: string, documentId: string, tenantId: string) => {
+const handleServerError = async (logger: ILogger, errorMessage: string, documentId: string, tenantId: string) => {
     logger.error(
         errorMessage,
         getMessageMetadata(documentId, tenantId));
@@ -98,9 +111,9 @@ function selectProtocolVersion(connectVersions: string[]): string | undefined {
  * @returns ThrottlingError if throttled; undefined if not throttled or no throttler provided.
  */
 function checkThrottle(
-    throttler: core.IThrottler | undefined,
+    throttler: IThrottler | undefined,
     throttleId: string,
-    logger?: core.ILogger): core.ThrottlingError | undefined {
+    logger?: ILogger): ThrottlingError | undefined {
     if (!throttler) {
         return;
     }
@@ -108,7 +121,7 @@ function checkThrottle(
     try {
         throttler.incrementCount(throttleId);
     } catch (e) {
-        if (e instanceof core.ThrottlingError) {
+        if (e instanceof ThrottlingError) {
             return e;
         } else {
             logger?.error(
@@ -124,21 +137,21 @@ function checkThrottle(
 }
 
 export function configureWebSocketServices(
-    webSocketServer: core.IWebSocketServer,
-    orderManager: core.IOrdererManager,
-    tenantManager: core.ITenantManager,
-    storage: core.IDocumentStorage,
-    clientManager: core.IClientManager,
-    metricLogger: core.IMetricClient,
-    logger: core.ILogger,
+    webSocketServer: IWebSocketServer,
+    orderManager: IOrdererManager,
+    tenantManager: ITenantManager,
+    storage: IDocumentStorage,
+    clientManager: IClientManager,
+    metricLogger: IMetricClient,
+    logger: ILogger,
     maxNumberOfClientsPerDocument: number = 1000000,
     maxTokenLifetimeSec: number = 60 * 60,
     isTokenExpiryEnabled: boolean = false,
-    connectThrottler?: core.IThrottler,
-    submitOpThrottler?: core.IThrottler) {
-    webSocketServer.on("connection", (socket: core.IWebSocket) => {
+    connectThrottler?: IThrottler,
+    submitOpThrottler?: IThrottler) {
+    webSocketServer.on("connection", (socket: IWebSocket) => {
         // Map from client IDs on this connection to the object ID and user info.
-        const connectionsMap = new Map<string, core.IOrdererConnection>();
+        const connectionsMap = new Map<string, IOrdererConnection>();
         // Map from client IDs to room.
         const roomMap = new Map<string, IRoom>();
         // Map from client Ids to scope.
@@ -342,9 +355,9 @@ export function configureWebSocketServices(
                     maxMessageSize: 1024, // Readonly client can't send ops.
                     mode: "read",
                     serviceConfiguration: {
-                        blockSize: core.DefaultServiceConfiguration.blockSize,
-                        maxMessageSize: core.DefaultServiceConfiguration.maxMessageSize,
-                        summary: core.DefaultServiceConfiguration.summary,
+                        blockSize: DefaultServiceConfiguration.blockSize,
+                        maxMessageSize: DefaultServiceConfiguration.maxMessageSize,
+                        summary: DefaultServiceConfiguration.summary,
                     },
                     initialClients: clients,
                     initialMessages: [],
