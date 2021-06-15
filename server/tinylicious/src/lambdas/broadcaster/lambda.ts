@@ -6,7 +6,6 @@
 import { INack, ISequencedDocumentMessage } from "../../protocol-definitions";
 import {
     extractBoxcar,
-    IContext,
     INackMessage,
     IPartitionLambda,
     IPublisher,
@@ -45,7 +44,7 @@ export class BroadcasterLambda implements IPartitionLambda {
     private current = new Map<string, BroadcasterBatch>();
     private messageSendingTimerId: unknown | undefined;
 
-    constructor(private readonly publisher: IPublisher, protected context: IContext) {
+    constructor(private readonly publisher: IPublisher) {
     }
 
     public handler(message: IQueuedMessage) {
@@ -108,7 +107,6 @@ export class BroadcasterLambda implements IPartitionLambda {
         if (this.pending.size === 0) {
             // no pending work. checkpoint now if we have a pending offset
             if (this.pendingOffset) {
-                this.context.checkpoint(this.pendingOffset);
                 this.pendingOffset = undefined;
             }
             return;
@@ -116,8 +114,6 @@ export class BroadcasterLambda implements IPartitionLambda {
 
         // Invoke the next send after a delay to give IO time to create more batches
         this.messageSendingTimerId = taskScheduleFunction(async () => {
-            const batchOffset = this.pendingOffset;
-
             this.current = this.pending;
             this.pending = new Map<string, BroadcasterBatch>();
             this.pendingOffset = undefined;
@@ -133,7 +129,6 @@ export class BroadcasterLambda implements IPartitionLambda {
                 try {
                     await Promise.all(promises);
                 } catch (ex) {
-                    this.context.error(ex, { restart: true });
                     return;
                 }
             } else {
@@ -144,7 +139,6 @@ export class BroadcasterLambda implements IPartitionLambda {
 
             this.messageSendingTimerId = undefined;
 
-            this.context.checkpoint(batchOffset);
             this.current.clear();
             this.sendPending();
         });

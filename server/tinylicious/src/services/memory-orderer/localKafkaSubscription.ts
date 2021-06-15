@@ -53,9 +53,6 @@ export class LocalKafkaSubscription extends EventEmitter {
 
             this.emit("processed", this.queueOffset);
         } catch (ex) {
-            // Lambda failed to process the message
-            this.subscriber.context.error(ex, { restart: false });
-
             this.retryTimer = setTimeout(() => {
                 this.retryTimer = undefined;
                 void this.process();

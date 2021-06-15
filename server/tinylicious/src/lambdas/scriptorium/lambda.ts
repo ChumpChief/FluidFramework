@@ -3,11 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { inspect } from "util";
 import {
     extractBoxcar,
     ICollection,
-    IContext,
     IQueuedMessage,
     IPartitionLambda,
     ISequencedOperationMessage,
@@ -16,12 +14,9 @@ import {
 
 export class ScriptoriumLambda implements IPartitionLambda {
     private pending = new Map<string, ISequencedOperationMessage[]>();
-    private pendingOffset: IQueuedMessage | undefined;
     private current = new Map<string, ISequencedOperationMessage[]>();
 
-    constructor(
-        private readonly opCollection: ICollection<any>,
-        protected context: IContext) {
+    constructor(private readonly opCollection: ICollection<any>) {
     }
 
     public handler(message: IQueuedMessage) {
@@ -46,7 +41,6 @@ export class ScriptoriumLambda implements IPartitionLambda {
             }
         }
 
-        this.pendingOffset = message;
         this.sendPending();
 
         return undefined;
@@ -69,7 +63,6 @@ export class ScriptoriumLambda implements IPartitionLambda {
         const temp = this.current;
         this.current = this.pending;
         this.pending = temp;
-        const batchOffset = this.pendingOffset;
 
         const allProcessed: Promise<void>[] = [];
 
@@ -82,12 +75,8 @@ export class ScriptoriumLambda implements IPartitionLambda {
         Promise.all(allProcessed).then(
             () => {
                 this.current.clear();
-                this.context.checkpoint(batchOffset);
                 this.sendPending();
-            },
-            (error) => {
-                this.context.error(error, { restart: true });
-            });
+            }).catch(() => { });
     }
 
     private async processMongoCore(messages: ISequencedOperationMessage[]): Promise<void> {
@@ -102,8 +91,6 @@ export class ScriptoriumLambda implements IPartitionLambda {
         return this.opCollection
             .insertMany(dbOps, false)
             .catch(async (error) => {
-                this.context.log?.error(`Error inserting operation in the database: ${inspect(error)}`);
-
                 // Duplicate key errors are ignored since a replay may cause us to insert twice into Mongo.
                 // All other errors result in a rejected promise.
                 if (error.code !== 11000) {

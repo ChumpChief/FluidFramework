@@ -7,7 +7,6 @@ import { EventEmitter } from "events";
 import { IClient, IDocumentMessage } from "../../protocol-definitions";
 import {
     ICollection,
-    IContext,
     IDocument,
     IDocumentDetails,
     IOrderer,
@@ -67,7 +66,5 @@ export interface ILocalOrdererSetup {
 }
 
 export interface IKafkaSubscriber {
-    readonly context: IContext;
-
     process(message: IQueuedMessage): Promise<void> | undefined;
 }

@@ -7,7 +7,6 @@ import fs from "fs";
 import * as git from "isomorphic-git";
 import socketIo from "socket.io";
 
-import winston from "winston";
 import { TinyliciousRunner } from "./runner";
 import {
     IDb,
@@ -81,7 +80,6 @@ export class TinyliciousResources implements IResources {
                 const url = `http://localhost:${this.port}/repos/${encodeURIComponent(tenantId)}`;
                 return new Historian(url);
             },
-            winston,
             pubsub,
         );
     }

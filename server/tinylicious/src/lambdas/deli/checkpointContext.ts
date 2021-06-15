@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { IContext, IDeliState } from "../../server-services-core";
+import { IDeliState } from "../../server-services-core";
 import { ICheckpointParams, IDeliCheckpointManager } from "./checkpointManager";
 
 export class CheckpointContext {
@@ -12,12 +12,7 @@ export class CheckpointContext {
     private closed = false;
     private lastKafkaCheckpointOffset: number | undefined;
 
-    constructor(
-        private readonly tenantId: string,
-        private readonly id: string,
-        private readonly checkpointManager: IDeliCheckpointManager,
-        private readonly context: IContext) {
-    }
+    constructor(private readonly checkpointManager: IDeliCheckpointManager) { }
 
     public checkpoint(checkpoint: ICheckpointParams) {
         // Exit early if already closed
@@ -44,7 +39,6 @@ export class CheckpointContext {
                     (this.lastKafkaCheckpointOffset === undefined ||
                         kafkaCheckpointMessage.offset > this.lastKafkaCheckpointOffset)) {
                     this.lastKafkaCheckpointOffset = kafkaCheckpointMessage.offset;
-                    this.context.checkpoint(kafkaCheckpointMessage);
                 }
 
                 this.pendingUpdateP = undefined;
@@ -55,18 +49,7 @@ export class CheckpointContext {
                     this.pendingCheckpoint = undefined;
                     this.checkpoint(pendingCheckpoint);
                 }
-            },
-            (error) => {
-                // TODO flag context as error
-                this.context.log?.error(
-                    `Error writing checkpoint to MongoDB: ${JSON.stringify(error)}`,
-                    {
-                        messageMetaData: {
-                            documentId: this.id,
-                            tenantId: this.tenantId,
-                        },
-                    });
-            });
+            }).catch(() => { });
     }
 
     public close() {
@@ -92,14 +75,6 @@ export class CheckpointContext {
 
         // Retry the checkpoint on error
         return updateP.catch((error) => {
-            this.context.log?.error(
-                `Error writing checkpoint to MongoDB: ${JSON.stringify(error)}`,
-                {
-                    messageMetaData: {
-                        documentId: this.id,
-                        tenantId: this.tenantId,
-                    },
-                });
             return new Promise<void>((resolve, reject) => {
                 resolve(this.checkpointCore(checkpoint));
             });

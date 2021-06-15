@@ -17,7 +17,6 @@ import { ProtocolOpHandler } from "../../protocol-base";
 import { IClient } from "../../protocol-definitions";
 import {
     DefaultServiceConfiguration,
-    IContext,
     IDeliState,
     IDatabaseManager,
     IDocument,
@@ -30,11 +29,9 @@ import {
     IServiceConfiguration,
     ITopic,
     IWebSocket,
-    ILogger,
 } from "../../server-services-core";
 import { IGitManager } from "../services-client";
 import { ILocalOrdererSetup } from "./interfaces";
-import { LocalContext } from "./localContext";
 import { LocalKafka } from "./localKafka";
 import { LocalLambdaController } from "./localLambdaController";
 import { LocalOrdererConnection } from "./localOrdererConnection";
@@ -87,7 +84,6 @@ export class LocalOrderer implements IOrderer {
         databaseManager: IDatabaseManager,
         tenantId: string,
         documentId: string,
-        logger: ILogger,
         gitManager: IGitManager,
         pubSub: IPubSub,
     ) {
@@ -101,11 +97,6 @@ export class LocalOrderer implements IOrderer {
 
         const documentDetails = await setup.documentP();
 
-        const broadcasterContext: IContext = new LocalContext(logger);
-        const scriptoriumContext: IContext = new LocalContext(logger);
-        const scribeContext: IContext = new LocalContext(logger);
-        const deliContext: IContext = new LocalContext(logger);
-
         return new LocalOrderer(
             setup,
             documentDetails,
@@ -113,10 +104,6 @@ export class LocalOrderer implements IOrderer {
             documentId,
             gitManager,
             pubSub,
-            broadcasterContext,
-            scriptoriumContext,
-            scribeContext,
-            deliContext,
             DefaultServiceConfiguration,
         );
     }
@@ -140,10 +127,6 @@ export class LocalOrderer implements IOrderer {
         private readonly documentId: string,
         private readonly gitManager: IGitManager | undefined,
         private readonly pubSub: IPubSub,
-        private readonly broadcasterContext: IContext,
-        private readonly scriptoriumContext: IContext,
-        private readonly scribeContext: IContext,
-        private readonly deliContext: IContext,
         private readonly serviceConfiguration: IServiceConfiguration,
     ) {
         this.existing = details.existing;
@@ -210,37 +193,32 @@ export class LocalOrderer implements IOrderer {
         this.scriptoriumLambda = new LocalLambdaController(
             this.deltasKafka,
             this.setup,
-            this.scriptoriumContext,
-            async (lambdaSetup, context) => {
+            async (lambdaSetup) => {
                 const deltasCollection = await lambdaSetup.deltaCollectionP();
-                return new ScriptoriumLambda(deltasCollection, context);
+                return new ScriptoriumLambda(deltasCollection);
             });
 
         this.broadcasterLambda = new LocalLambdaController(
             this.deltasKafka,
             this.setup,
-            this.broadcasterContext,
-            async (_, context) => new BroadcasterLambda(this.socketPublisher, context));
+            async (_) => new BroadcasterLambda(this.socketPublisher));
 
         if (this.gitManager) {
             this.scribeLambda = new LocalLambdaController(
                 this.deltasKafka,
                 this.setup,
-                this.scribeContext,
-                (lambdaSetup, context) => this.startScribeLambda(lambdaSetup, context));
+                (lambdaSetup) => this.startScribeLambda(lambdaSetup));
         }
 
         this.deliLambda = new LocalLambdaController(
             this.rawDeltasKafka,
             this.setup,
-            this.deliContext,
-            async (lambdaSetup, context) => {
+            async (lambdaSetup) => {
                 const documentCollection = await lambdaSetup.documentCollectionP();
                 const lastCheckpoint = JSON.parse(this.dbObject.deli);
                 const checkpointManager =
                     createDeliCheckpointManagerFromCollection(this.tenantId, this.documentId, documentCollection);
                 return new DeliLambda(
-                    context,
                     this.tenantId,
                     this.documentId,
                     lastCheckpoint,
@@ -251,7 +229,7 @@ export class LocalOrderer implements IOrderer {
             });
     }
 
-    private async startScribeLambda(setup: ILocalOrdererSetup, context: IContext) {
+    private async startScribeLambda(setup: ILocalOrdererSetup) {
         // Scribe lambda
         const [
             documentCollection,
@@ -292,7 +270,6 @@ export class LocalOrderer implements IOrderer {
             documentCollection,
             scribeMessagesCollection);
         return new ScribeLambda(
-            context,
             this.tenantId,
             this.documentId,
             summaryWriter,

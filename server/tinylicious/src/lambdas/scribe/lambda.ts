@@ -4,7 +4,6 @@
  */
 
 import assert from "assert";
-import { inspect } from "util";
 import Deque from "double-ended-queue";
 import * as _ from "lodash";
 import { ProtocolOpHandler } from "../../protocol-base";
@@ -22,7 +21,6 @@ import {
 import {
     ControlMessageType,
     extractBoxcar,
-    IContext,
     IControlMessage,
     IProducer,
     IRawOperationMessage,
@@ -65,7 +63,6 @@ export class ScribeLambda implements IPartitionLambda {
     private closed: boolean = false;
 
     constructor(
-        protected readonly context: IContext,
         protected tenantId: string,
         protected documentId: string,
         private readonly summaryWriter: ISummaryWriter,
@@ -89,7 +86,6 @@ export class ScribeLambda implements IPartitionLambda {
         // Skip any log messages we have already processed. Can occur in the case Kafka needed to restart but
         // we had already checkpointed at a given offset.
         if (message.offset <= this.lastOffset) {
-            this.context.checkpoint(message);
             return;
         }
 
@@ -202,32 +198,12 @@ export class ScribeLambda implements IPartitionLambda {
                                 await this.sendSummaryAck(summaryResponse.message as ISummaryAck);
                                 await this.sendSummaryConfirmationMessage(operation.sequenceNumber, false);
                                 await this.updateProtocolHead(this.protocolHandler.sequenceNumber);
-                                this.context.log?.info(
-                                    `Client summary success @${value.operation.sequenceNumber}`,
-                                    {
-                                        messageMetaData: {
-                                            documentId: this.documentId,
-                                            tenantId: this.tenantId,
-                                        },
-                                    },
-                                );
                             } else {
                                 const nackMessage = summaryResponse.message as ISummaryNack;
                                 await this.sendSummaryNack(nackMessage);
-                                this.context.log?.error(
-                                    `Client summary failure @${value.operation.sequenceNumber}. `
-                                    + `Error: ${nackMessage.errorMessage}`,
-                                    {
-                                        messageMetaData: {
-                                            documentId: this.documentId,
-                                            tenantId: this.tenantId,
-                                        },
-                                    },
-                                );
                                 this.revertProtocolState(prevState.protocolState, prevState.pendingOps);
                             }
                         } catch (ex) {
-                            this.context.log?.error(`Failed to summarize the document. Exception: ${inspect(ex)}`);
                             this.revertProtocolState(prevState.protocolState, prevState.pendingOps);
                             // If this flag is set, we should ignore any storage specific error and move forward
                             // to process the next message.
@@ -271,29 +247,11 @@ export class ScribeLambda implements IPartitionLambda {
                                 await this.sendSummaryConfirmationMessage(
                                     operation.sequenceNumber,
                                     this.serviceConfiguration.scribe.clearCacheAfterServiceSummary);
-                                this.context.log?.info(
-                                    `Service summary success @${operation.sequenceNumber}`,
-                                    {
-                                        messageMetaData: {
-                                            documentId: this.documentId,
-                                            tenantId: this.tenantId,
-                                        },
-                                    },
-                                );
                             }
                         } catch (ex) {
                             // If this flag is set, we should ignore any storage speciic error and move forward
                             // to process the next message.
-                            if (this.serviceConfiguration.scribe.ignoreStorageException) {
-                                this.context.log?.error(
-                                    `Service summary failure @${operation.sequenceNumber}`,
-                                    {
-                                        messageMetaData: {
-                                            documentId: this.documentId,
-                                            tenantId: this.tenantId,
-                                        },
-                                    });
-                            } else {
+                            if (!this.serviceConfiguration.scribe.ignoreStorageException) {
                                 throw ex;
                             }
                         }
@@ -349,11 +307,6 @@ export class ScribeLambda implements IPartitionLambda {
                     this.protocolHandler.processMessage(message, false);
                 }
             } catch (error) {
-                this.context.log?.error(`Protocol error ${error}`,
-                    {
-                        documentId: this.documentId,
-                        tenantId: this.tenantId,
-                    });
             }
         }
     }
@@ -392,7 +345,6 @@ export class ScribeLambda implements IPartitionLambda {
         this.pendingP.then(
             () => {
                 this.pendingP = undefined;
-                this.context.checkpoint(queuedMessage);
 
                 const pendingScribe = this.pendingCheckpointScribe;
                 const pendingOffset = this.pendingCheckpointOffset;
@@ -401,14 +353,7 @@ export class ScribeLambda implements IPartitionLambda {
                     this.pendingCheckpointOffset = undefined;
                     this.checkpointCore(pendingScribe, pendingOffset, clearCache);
                 }
-            },
-            (error) => {
-                this.context.error(error, {
-                    restart: true,
-                    tenantId: this.tenantId,
-                    documentId: this.documentId,
-                });
-            });
+            }).catch(() => { });
     }
 
     private async writeCheckpoint(checkpoint: IScribe) {

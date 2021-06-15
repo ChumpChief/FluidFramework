@@ -20,7 +20,6 @@ import {
     ControlMessageType,
     extractBoxcar,
     IClientSequenceNumber,
-    IContext,
     IControlMessage,
     IDeliState,
     IMessage,
@@ -120,7 +119,6 @@ export class DeliLambda extends EventEmitter implements IPartitionLambda {
     private nackMessages: INackMessagesControlMessageContents | undefined;
 
     constructor(
-        private readonly context: IContext,
         private readonly tenantId: string,
         private readonly documentId: string,
         readonly lastCheckpoint: IDeliState,
@@ -159,7 +157,7 @@ export class DeliLambda extends EventEmitter implements IPartitionLambda {
         this.noActiveClients = msn === -1;
         this.minimumSequenceNumber = this.noActiveClients ? this.sequenceNumber : msn;
 
-        this.checkpointContext = new CheckpointContext(this.tenantId, this.documentId, checkpointManager, context);
+        this.checkpointContext = new CheckpointContext(checkpointManager);
 
         // start the activity idle timer when created
         this.setActivityIdleTimer();
@@ -175,10 +173,6 @@ export class DeliLambda extends EventEmitter implements IPartitionLambda {
         // In cases where we are reprocessing messages we have already checkpointed exit early
         if (rawMessage.offset <= this.logOffset) {
             kafkaCheckpointMessage = this.getKafkaCheckpointMessage(rawMessage);
-            if (kafkaCheckpointMessage) {
-                this.context.checkpoint(kafkaCheckpointMessage);
-            }
-
             return undefined;
         }
 
@@ -240,22 +234,7 @@ export class DeliLambda extends EventEmitter implements IPartitionLambda {
                     checkpoint.clear = true;
                 }
                 this.checkpointContext.checkpoint(checkpoint);
-            },
-            (error) => {
-                this.context.log?.error(
-                    `Could not send message to scriptorium: ${JSON.stringify(error)}`,
-                    {
-                        messageMetaData: {
-                            documentId: this.documentId,
-                            tenantId: this.tenantId,
-                        },
-                    });
-                this.context.error(error, {
-                    restart: true,
-                    tenantId: this.tenantId,
-                    documentId: this.documentId,
-                });
-            });
+            }).catch(() => { });
 
         // Start a timer to check inactivity on the document. To trigger idle client leave message,
         // we send a noop back to alfred. The noop should trigger a client leave message if there are any.
@@ -497,13 +476,6 @@ export class DeliLambda extends EventEmitter implements IPartitionLambda {
             const controlMessage = dataContent as IControlMessage;
             switch (controlMessage.type) {
                 case ControlMessageType.UpdateDSN: {
-                    this.context.log?.info(`Update DSN: ${JSON.stringify(controlMessage)}`, {
-                        messageMetaData: {
-                            documentId: this.documentId,
-                            tenantId: this.tenantId,
-                        },
-                    });
-
                     const controlContents = controlMessage.contents as IUpdateDSNControlMessageContents;
                     const dsn = controlContents.durableSequenceNumber;
                     if (dsn >= this.durableSequenceNumber) {
@@ -511,12 +483,6 @@ export class DeliLambda extends EventEmitter implements IPartitionLambda {
                         if (controlContents.clearCache && this.noActiveClients) {
                             instruction = InstructionType.ClearCache;
                             this.canClose = true;
-                            this.context.log?.info(`Deli cache will be cleared`, {
-                                messageMetaData: {
-                                    documentId: this.documentId,
-                                    tenantId: this.tenantId,
-                                },
-                            });
                         }
 
                         this.durableSequenceNumber = dsn;
@@ -635,21 +601,13 @@ export class DeliLambda extends EventEmitter implements IPartitionLambda {
         if (!client) {
             return IncomingMessageOrder.ConsecutiveOrSystem;
         }
-        const messageMetaData = {
-            documentId: this.documentId,
-            tenantId: this.tenantId,
-        };
         // Perform duplicate and gap detection - Check that we have a monotonically increasing CID
         const expectedClientSequenceNumber = client.clientSequenceNumber + 1;
         if (clientSequenceNumber === expectedClientSequenceNumber) {
             return IncomingMessageOrder.ConsecutiveOrSystem;
         } else if (clientSequenceNumber > expectedClientSequenceNumber) {
-            this.context.log?.info(
-                `Gap ${clientId}:${expectedClientSequenceNumber} > ${clientSequenceNumber}`, { messageMetaData });
             return IncomingMessageOrder.Gap;
         } else {
-            this.context.log?.info(
-                `Duplicate ${clientId}:${expectedClientSequenceNumber} < ${clientSequenceNumber}`, { messageMetaData });
             return IncomingMessageOrder.Duplicate;
         }
     }
@@ -662,19 +620,6 @@ export class DeliLambda extends EventEmitter implements IPartitionLambda {
         try {
             await this.reverseProducer.send([message], message.tenantId, message.documentId);
         } catch (error) {
-            this.context.log?.error(
-                `Could not send message to alfred: ${JSON.stringify(error)}`,
-                {
-                    messageMetaData: {
-                        documentId: this.documentId,
-                        tenantId: this.tenantId,
-                    },
-                });
-            this.context.error(error, {
-                restart: true,
-                tenantId: this.tenantId,
-                documentId: this.documentId,
-            });
         }
     }
 

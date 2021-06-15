@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from "events";
-import { IContext, IQueuedMessage, IPartitionLambda, LambdaCloseType } from "../../server-services-core";
+import { IQueuedMessage, IPartitionLambda, LambdaCloseType } from "../../server-services-core";
 import { IKafkaSubscriber, ILocalOrdererSetup } from "./interfaces";
 import { LocalKafka } from "./localKafka";
 
@@ -22,8 +22,7 @@ export class LocalLambdaController extends EventEmitter implements IKafkaSubscri
     constructor(
         private readonly kafaka: LocalKafka,
         private readonly setup: ILocalOrdererSetup,
-        public readonly context: IContext,
-        private readonly starter: (setup: ILocalOrdererSetup, context: IContext) => Promise<IPartitionLambda>) {
+        private readonly starter: (setup: ILocalOrdererSetup) => Promise<IPartitionLambda>) {
         super();
         this.kafaka.subscribe(this);
     }
@@ -37,7 +36,7 @@ export class LocalLambdaController extends EventEmitter implements IKafkaSubscri
             return;
         }
         try {
-            this.lambda = await this.starter(this.setup, this.context);
+            this.lambda = await this.starter(this.setup);
             if (this._state === "created") {
                 this._state = "started";
             }
@@ -49,9 +48,6 @@ export class LocalLambdaController extends EventEmitter implements IKafkaSubscri
                 this.close();
             }
         } catch (ex) {
-            // In the event a lambda fails to start, retry it
-            this.context.error(ex, { restart: true });
-
             this.startTimer = setTimeout(() => {
                 // eslint-disable-next-line @typescript-eslint/no-floating-promises
                 this.start();

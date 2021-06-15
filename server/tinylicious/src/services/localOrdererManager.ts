@@ -6,7 +6,6 @@
 import {
     IDatabaseManager,
     IDocumentStorage,
-    ILogger,
     IOrderer,
     IOrdererManager,
 } from "../server-services-core";
@@ -20,7 +19,6 @@ export class LocalOrdererManager implements IOrdererManager {
         private readonly storage: IDocumentStorage,
         private readonly databaseManager: IDatabaseManager,
         private readonly createHistorian: (tenant: string) => Promise<IHistorian>,
-        private readonly logger: ILogger,
         private readonly pubsub: IPubSub,
     ) {
     }
@@ -68,7 +66,6 @@ export class LocalOrdererManager implements IOrdererManager {
             this.databaseManager,
             tenantId,
             documentId,
-            this.logger,
             gitManager,
             this.pubsub,
         );
