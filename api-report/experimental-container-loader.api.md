@@ -117,7 +117,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     // (undocumented)
     get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     get existing(): boolean | undefined;
-    forceReadonly(readonly: boolean): void;
     // (undocumented)
     getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
     getQuorum(): IQuorum;
@@ -188,7 +187,6 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     emitDelayInfo(id: string, delayMs: number, error: ICriticalContainerError): void;
     // (undocumented)
     flush(): void;
-    forceReadonly(readonly: boolean): void;
     get hasCheckpointSequenceNumber(): boolean;
     // (undocumented)
     get IDeltaSender(): this;
