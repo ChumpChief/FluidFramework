@@ -20,7 +20,7 @@ export class TinyliciousTenant implements ITenant {
     constructor(
         private readonly url: string,
         private readonly historianUrl: string) {
-        const historian = new Historian(historianUrl, false, false);
+        const historian = new Historian(historianUrl);
         this.manager = new GitManager(historian);
     }
 

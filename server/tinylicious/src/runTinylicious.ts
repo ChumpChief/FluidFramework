@@ -71,7 +71,7 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
             databaseManager,
             async (tenantId: string) => {
                 const url = `http://localhost:${port}/repos/${encodeURIComponent(tenantId)}`;
-                return new Historian(url, false, false);
+                return new Historian(url);
             },
             winston,
             pubsub);

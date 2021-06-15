@@ -22,32 +22,15 @@ function endsWith(value: string, endings: string[]): boolean {
  */
 export class Historian implements IHistorian {
     private readonly defaultQueryString: Record<string, unknown> = {};
-    private readonly cacheBust: boolean;
+    private readonly cacheBust: boolean = false;
+    private readonly restWrapper: RestWrapper;
 
-    constructor(
-        public endpoint: string,
-        private readonly historianApi: boolean,
-        disableCache: boolean,
-        private readonly restWrapper?: RestWrapper,
-    ) {
-        if (disableCache && this.historianApi) {
-            this.defaultQueryString.disableCache = disableCache;
-            this.cacheBust = false;
-        } else {
-            this.cacheBust = disableCache;
-        }
-
-        if (this.restWrapper === undefined) {
-            this.restWrapper = new BasicRestWrapper(this.endpoint);
-        }
+    constructor(public endpoint: string) {
+        this.restWrapper = new BasicRestWrapper(this.endpoint);
     }
 
     public getHeader(sha: string): Promise<any> {
-        if (this.historianApi) {
-            return this.restWrapper.get(`/headers/${encodeURIComponent(sha)}`, this.getQueryString());
-        } else {
-            return this.getHeaderDirect(sha);
-        }
+        return this.getHeaderDirect(sha);
     }
 
     public getFullTree(sha: string): Promise<any> {
