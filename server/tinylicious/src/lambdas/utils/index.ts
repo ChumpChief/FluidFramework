@@ -4,4 +4,3 @@
  */
 
 export * from "./messageGenerator";
-export * from "./noOpLambda";
