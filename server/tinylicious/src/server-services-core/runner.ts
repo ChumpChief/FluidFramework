@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import type nconf from "nconf";
 import { ILogger } from "./lambdas";
 
 /**
@@ -30,16 +29,6 @@ export interface IResources {
      * Disposes fo the resources
      */
     dispose(): Promise<void>;
-}
-
-/**
- * A resource factory is used to create the resources needed by a runner
- */
-export interface IResourcesFactory<T extends IResources> {
-    /**
-     * Creates a new set of resources
-     */
-    create(config: nconf.Provider): Promise<T>;
 }
 
 /**
