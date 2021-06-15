@@ -12,7 +12,7 @@ import socketIo from "socket.io";
 import socketIoRedis from "socket.io-redis";
 import * as winston from "winston";
 import * as core from "../server-services-core";
-import * as redisSocketIoAdapter from "./redisSocketIoAdapter";
+import { ISocketIoRedisOptions, RedisSocketIoAdapter } from "./redisSocketIoAdapter";
 import { SocketIORedisConnection, SocketIoRedisSubscriptionConnection } from "./socketIoRedisConnection";
 
 const socketJoin = util.promisify(
@@ -112,17 +112,17 @@ export function create(
     let adapter: SocketIO.Adapter | undefined;
 
     if (socketIoAdapterConfig?.enableCustomSocketIoAdapter) {
-        const socketIoRedisOptions: redisSocketIoAdapter.ISocketIoRedisOptions =
+        const socketIoRedisOptions: ISocketIoRedisOptions =
         {
             pubConnection: new SocketIORedisConnection(pub),
             subConnection: new SocketIoRedisSubscriptionConnection(sub),
         };
 
-        redisSocketIoAdapter.RedisSocketIoAdapter.setup(
+        RedisSocketIoAdapter.setup(
             socketIoRedisOptions,
             socketIoAdapterConfig?.shouldDisableDefaultNamespace);
 
-        adapter = redisSocketIoAdapter.RedisSocketIoAdapter as any;
+        adapter = RedisSocketIoAdapter as any;
     }
     else {
         adapter = socketIoRedis({ pubClient: pub, subClient: sub });
