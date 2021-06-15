@@ -19,7 +19,6 @@ import {
     IWebServerFactory,
     MongoDatabaseManager,
     MongoManager,
-    IResourcesFactory,
 } from "./server-services-core";
 import { DocumentStorage } from "./server-services-shared";
 import {
@@ -31,22 +30,6 @@ import {
     WebServerFactory,
 } from "./services";
 
-export class TinyliciousResources implements IResources {
-    constructor(
-        public orderManager: IOrdererManager,
-        public tenantManager: ITenantManager,
-        public storage: IDocumentStorage,
-        public mongoManager: MongoManager,
-        public port: any,
-        public webServerFactory: IWebServerFactory,
-    ) {
-    }
-
-    public async dispose(): Promise<void> {
-        await this.mongoManager.close();
-    }
-}
-
 const defaultTinyliciousPort = 7070;
 
 class DbFactory implements IDbFactory {
@@ -57,10 +40,15 @@ class DbFactory implements IDbFactory {
     }
 }
 
-export class TinyliciousResourcesFactory implements IResourcesFactory<TinyliciousResources> {
-    public async create(): Promise<TinyliciousResources> {
-        // Pull in the default port off the config
-        const port = defaultTinyliciousPort;
+export class TinyliciousResources implements IResources {
+    public readonly orderManager: IOrdererManager;
+    public readonly tenantManager: ITenantManager;
+    public readonly storage: IDocumentStorage;
+    public readonly mongoManager: MongoManager;
+    public readonly port: number = defaultTinyliciousPort;
+    public readonly webServerFactory: IWebServerFactory;
+
+    constructor() {
         // hard coded from config
         const collectionNames = {
             deltas: "deltas",
@@ -69,40 +57,37 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
             scribeDeltas: "scribeDeltas",
         };
 
-        const tenantManager = new TinyliciousTenantManager(`http://localhost:${port}`);
+        this.tenantManager = new TinyliciousTenantManager(`http://localhost:${this.port}`);
         const dbFactory = new DbFactory();
-        const mongoManager = new MongoManager(dbFactory);
+        this.mongoManager = new MongoManager(dbFactory);
         const databaseManager = new MongoDatabaseManager(
-            mongoManager,
+            this.mongoManager,
             collectionNames.nodes,
             collectionNames.documents,
             collectionNames.deltas,
             collectionNames.scribeDeltas);
-        const storage = new DocumentStorage(databaseManager, tenantManager);
+        this.storage = new DocumentStorage(databaseManager, this.tenantManager);
         const io = socketIo();
         const pubsub = new PubSubPublisher(io);
-        const webServerFactory = new WebServerFactory(io);
+        this.webServerFactory = new WebServerFactory(io);
 
         // Initialize isomorphic-git
         git.plugins.set("fs", fs);
 
-        const orderManager = new LocalOrdererManager(
-            storage,
+        this.orderManager = new LocalOrdererManager(
+            this.storage,
             databaseManager,
             async (tenantId: string) => {
-                const url = `http://localhost:${port}/repos/${encodeURIComponent(tenantId)}`;
+                const url = `http://localhost:${this.port}/repos/${encodeURIComponent(tenantId)}`;
                 return new Historian(url);
             },
             winston,
-            pubsub);
+            pubsub,
+        );
+    }
 
-        return new TinyliciousResources(
-            orderManager,
-            tenantManager,
-            storage,
-            mongoManager,
-            port,
-            webServerFactory);
+    public async dispose(): Promise<void> {
+        await this.mongoManager.close();
     }
 }
 
@@ -110,9 +95,7 @@ export class TinyliciousResourcesFactory implements IResourcesFactory<Tinyliciou
  * Uses the provided factories to create and execute a runner.
  */
 async function run() {
-    const resourceFactory = new TinyliciousResourcesFactory();
-
-    const resources = await resourceFactory.create();
+    const resources = new TinyliciousResources();
 
     const runner = new TinyliciousRunner(
         resources.webServerFactory,
