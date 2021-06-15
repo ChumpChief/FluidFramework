@@ -106,6 +106,8 @@ import { ConnectionStateHandler, ILocalSequencedClient } from "./connectionState
 import { RetriableDocumentStorageService } from "./retriableDocumentStorageService";
 import { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService";
 import { ContainerStorageAdapter } from "./containerStorageAdapter";
+import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
+import { StatefulDocumentDeltaConnectionManager } from "./statefulDocumentDeltaConnectionManager";
 
 const detachedContainerRefSeqNumber = 0;
 
@@ -440,6 +442,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private cachedAttachSummary: ISummaryTree | undefined;
     private attachInProgress = false;
     private _dirtyContainer = false;
+
+    private readonly statefulDocumentDeltaConnection = new StatefulDocumentDeltaConnection();
+    // We can't successfully create it until we have a document service to give it.
+    // But once it is created, it is never dropped (maybe it should be disposed?)
+    private statefulDocumentDeltaConnectionManager: StatefulDocumentDeltaConnectionManager | undefined;
 
     private lastVisible: number | undefined;
     private readonly connectionStateHandler: ConnectionStateHandler;
@@ -848,6 +855,14 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     this.logger,
                 );
             }
+
+            // This is the earliest we can set up the manager in the attach flow.
+            // Setting it up does not trigger any automatic action, e.g. connection -- that must be done manually.
+            this.statefulDocumentDeltaConnectionManager = new StatefulDocumentDeltaConnectionManager(
+                this.service,
+                this.statefulDocumentDeltaConnection,
+            );
+
             const resolvedUrl = this.service.resolvedUrl;
             ensureFluidResolvedUrl(resolvedUrl);
             this._resolvedUrl = resolvedUrl;
@@ -1116,6 +1131,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             args.mode = "write";
         }
 
+        assert(
+            this.statefulDocumentDeltaConnectionManager !== undefined,
+            "Connection manager not created before connect attempt",
+        );
+        // this.statefulDocumentDeltaConnectionManager.connect();
+
         return this._deltaManager.connect(args);
     }
 
@@ -1136,6 +1157,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             throw new Error("Attempting to load without a resolved url");
         }
         this.service = await this.serviceFactory.createDocumentService(this._resolvedUrl, this.subLogger);
+
+        // This is the earliest we can set up the manager in the load flow.
+        // Setting it up does not trigger any automatic action, e.g. connection -- that must be done manually.
+        this.statefulDocumentDeltaConnectionManager = new StatefulDocumentDeltaConnectionManager(
+            this.service,
+            this.statefulDocumentDeltaConnection,
+        );
 
         let startConnectionP: Promise<IConnectionDetails> | undefined;
 
