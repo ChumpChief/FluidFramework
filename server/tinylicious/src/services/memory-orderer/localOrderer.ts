@@ -166,7 +166,7 @@ export class LocalOrderer implements IOrderer {
         return orderer;
     }
 
-    public connectInternal(
+    private connectInternal(
         subscriber: ISubscriber,
         clientId: string,
         client: IClient): IOrdererConnection {
@@ -174,7 +174,6 @@ export class LocalOrderer implements IOrderer {
         const connection = new LocalOrdererConnection(
             subscriber,
             this.existing,
-            this.details.value,
             this.rawDeltasKafka,
             this.tenantId,
             this.documentId,

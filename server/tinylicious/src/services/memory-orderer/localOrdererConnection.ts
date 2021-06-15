@@ -13,7 +13,6 @@ import {
 import {
     BoxcarType,
     IBoxcarMessage,
-    IDocument,
     IOrdererConnection,
     IProducer,
     IRawOperationMessage,
@@ -28,7 +27,6 @@ export class LocalOrdererConnection implements IOrdererConnection {
     constructor(
         public socket: ISubscriber,
         public readonly existing: boolean,
-        document: IDocument,
         private readonly producer: IProducer,
         public readonly tenantId: string,
         public readonly documentId: string,
