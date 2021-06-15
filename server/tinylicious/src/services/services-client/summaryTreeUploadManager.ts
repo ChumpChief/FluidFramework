@@ -7,7 +7,6 @@ import { assert, gitHashFile, IsoBuffer, Uint8ArrayToString, unreachableCase } f
 import { ICreateTreeEntry } from "../../gitresources";
 import { getGitMode, getGitType } from "../../protocol-base";
 import {
-    ISnapshotTreeEx,
     ISummaryTree,
     SummaryObject,
     SummaryType,
@@ -21,26 +20,21 @@ export class SummaryTreeUploadManager implements ISummaryUploadManager {
     constructor(
         private readonly manager: IGitManager,
         private readonly blobsShaCache: Map<string, string>,
-        private readonly getPreviousFullSnapshot:
-            (parentHandle: string) => Promise<ISnapshotTreeEx | null | undefined>,
-    ) {
-    }
+    ) { }
 
     public async writeSummaryTree(
         summaryTree: ISummaryTree,
         parentHandle: string,
     ): Promise<string> {
-        const previousFullSnapshot = await this.getPreviousFullSnapshot(parentHandle);
-        return this.writeSummaryTreeCore(summaryTree, previousFullSnapshot ?? undefined);
+        return this.writeSummaryTreeCore(summaryTree);
     }
 
     private async writeSummaryTreeCore(
         summaryTree: ISummaryTree,
-        previousFullSnapshot: ISnapshotTreeEx | undefined,
     ): Promise<string> {
         const entries = await Promise.all(Object.keys(summaryTree.tree).map(async (key) => {
             const entry = summaryTree.tree[key];
-            const pathHandle = await this.writeSummaryTreeObject(entry, previousFullSnapshot);
+            const pathHandle = await this.writeSummaryTreeObject(entry);
             const treeEntry: ICreateTreeEntry = {
                 mode: getGitMode(entry),
                 path: encodeURIComponent(key),
@@ -56,20 +50,16 @@ export class SummaryTreeUploadManager implements ISummaryUploadManager {
 
     private async writeSummaryTreeObject(
         object: SummaryObject,
-        previousFullSnapshot: ISnapshotTreeEx | undefined,
     ): Promise<string> {
         switch (object.type) {
             case SummaryType.Blob: {
                 return this.writeSummaryBlob(object.content);
             }
             case SummaryType.Handle: {
-                if (previousFullSnapshot === undefined) {
-                    throw Error("Parent summary does not exist to reference by handle.");
-                }
-                return this.getIdFromPath(object.handleType, object.handle, previousFullSnapshot);
+                throw Error("Parent summary does not exist to reference by handle.");
             }
             case SummaryType.Tree: {
-                return this.writeSummaryTreeCore(object, previousFullSnapshot);
+                return this.writeSummaryTreeCore(object);
             }
             case SummaryType.Attachment: {
                 return object.id;
@@ -93,49 +83,5 @@ export class SummaryTreeUploadManager implements ISummaryUploadManager {
             assert(hash === blob.sha, 0x0b6 /* "Blob.sha and hash do not match!!" */);
         }
         return hash;
-    }
-
-    private getIdFromPath(
-        handleType: SummaryType,
-        handlePath: string,
-        previousFullSnapshot: ISnapshotTreeEx,
-    ): string {
-        const path = handlePath.split("/").map((part) => decodeURIComponent(part));
-        if (path[0] === "") {
-            // root of tree should be unnamed
-            path.shift();
-        }
-        if (path.length === 0) {
-            return previousFullSnapshot.id;
-        }
-
-        return this.getIdFromPathCore(handleType, path, previousFullSnapshot);
-    }
-
-    private getIdFromPathCore(
-        handleType: SummaryType,
-        path: string[],
-        /** Previous snapshot, subtree relative to this path part */
-        previousSnapshot: ISnapshotTreeEx,
-    ): string {
-        assert(path.length > 0, 0x0b3 /* "Expected at least 1 path part" */);
-        const key = path[0];
-        if (path.length === 1) {
-            switch (handleType) {
-                case SummaryType.Blob: {
-                    const tryId = previousSnapshot.blobs[key];
-                    assert(!!tryId, 0x0b4 /* "Parent summary does not have blob handle for specified path." */);
-                    return tryId;
-                }
-                case SummaryType.Tree: {
-                    const tryId = previousSnapshot.trees[key]?.id;
-                    assert(!!tryId, 0x0b5 /* "Parent summary does not have tree handle for specified path." */);
-                    return tryId;
-                }
-                default:
-                    throw Error(`Unexpected handle summary object type: "${handleType}".`);
-            }
-        }
-        return this.getIdFromPathCore(handleType, path.slice(1), previousSnapshot.trees[key]);
     }
 }

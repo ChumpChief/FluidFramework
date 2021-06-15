@@ -62,7 +62,7 @@ export class DocumentStorage implements IDocumentStorage {
         const gitManager = tenant.gitManager;
 
         const blobsShaCache = new Map<string, string>();
-        const summaryTreeUploadManager = new SummaryTreeUploadManager(gitManager, blobsShaCache, () => undefined);
+        const summaryTreeUploadManager = new SummaryTreeUploadManager(gitManager, blobsShaCache);
         const handle = await summaryTreeUploadManager.writeSummaryTree(summary, "");
 
         // At this point the summary op and its data are all valid and we can perform the write to history
