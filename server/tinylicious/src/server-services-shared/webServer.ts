@@ -7,7 +7,7 @@ import * as http from "http";
 import { AddressInfo } from "net";
 import * as util from "util";
 import * as core from "../server-services-core";
-import * as socketIo from "./socketIoServer";
+import { create } from "./socketIoServer";
 
 export type RequestListener = (request: http.IncomingMessage, response: http.ServerResponse) => void;
 
@@ -55,7 +55,7 @@ export class SocketIoWebServerFactory implements core.IWebServerFactory {
         const server = http.createServer(requestListener);
         const httpServer = new HttpServer(server);
 
-        const socketIoServer = socketIo.create(this.redisConfig, server, this.socketIoAdapterConfig);
+        const socketIoServer = create(this.redisConfig, server, this.socketIoAdapterConfig);
 
         return new WebServer(httpServer, socketIoServer);
     }

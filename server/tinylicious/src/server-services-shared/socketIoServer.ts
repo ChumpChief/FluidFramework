@@ -11,7 +11,7 @@ import Redis from "ioredis";
 import socketIo from "socket.io";
 import socketIoRedis from "socket.io-redis";
 import * as winston from "winston";
-import * as core from "../server-services-core";
+import { IWebSocket, IWebSocketServer } from "../server-services-core";
 import { ISocketIoRedisOptions, RedisSocketIoAdapter } from "./redisSocketIoAdapter";
 import { SocketIORedisConnection, SocketIoRedisSubscriptionConnection } from "./socketIoRedisConnection";
 
@@ -20,7 +20,7 @@ const socketJoin = util.promisify(
         socket.join(roomId, callback);
     });
 
-class SocketIoSocket implements core.IWebSocket {
+class SocketIoSocket implements IWebSocket {
     public get id(): string {
         return this.socket.id;
     }
@@ -49,7 +49,7 @@ class SocketIoSocket implements core.IWebSocket {
     }
 }
 
-class SocketIoServer implements core.IWebSocketServer {
+class SocketIoServer implements IWebSocketServer {
     private readonly events = new EventEmitter();
 
     constructor(
@@ -79,7 +79,7 @@ class SocketIoServer implements core.IWebSocketServer {
 export function create(
     redisConfig: any,
     server: http.Server,
-    socketIoAdapterConfig?: any): core.IWebSocketServer {
+    socketIoAdapterConfig?: any): IWebSocketServer {
     const options: Redis.RedisOptions = {
         host: redisConfig.host,
         port: redisConfig.port,
