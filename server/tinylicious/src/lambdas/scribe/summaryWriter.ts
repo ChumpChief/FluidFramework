@@ -34,19 +34,7 @@ export class SummaryWriter implements ISummaryWriter {
         private readonly documentId: string,
         private readonly summaryStorage: IGitManager,
         private readonly opStorage: ICollection<ISequencedOperationMessage>,
-    ) {
-
-    }
-
-    /**
-     * The flag indicates whether the actual storing process happens locally or externally. As writing to external
-     * storage is an expensive process, a service provider may choose to use asynchronous out of process solution
-     * such as a job queue. If set to 'true', the return value of writeClientSummary/writeServiceSummary will not
-     * be used by the lambda. The external process will be responsible for sending the updates to the op stream.
-     */
-    public get isExternal(): boolean {
-        return false;
-    }
+    ) { }
 
     /**
      * Helper function that finalizes the summary sent by client. After validating the summary op,

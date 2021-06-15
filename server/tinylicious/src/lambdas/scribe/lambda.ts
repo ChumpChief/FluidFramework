@@ -196,40 +196,35 @@ export class ScribeLambda implements IPartitionLambda {
                                 this.pendingCheckpointMessages.toArray(),
                             );
 
-                            // This block is only executed if the writer is not external. For an external writer,
-                            // (e.g., job queue) the responsibility of sending ops to the stream is up to the
-                            // external writer.
-                            if (!this.summaryWriter.isExternal) {
-                                // On a successful write, send an ack message to clients and a control message to deli.
-                                // Otherwise send a nack and revert the protocol state back to pre summary state.
-                                if (summaryResponse.status) {
-                                    await this.sendSummaryAck(summaryResponse.message as ISummaryAck);
-                                    await this.sendSummaryConfirmationMessage(operation.sequenceNumber, false);
-                                    await this.updateProtocolHead(this.protocolHandler.sequenceNumber);
-                                    this.context.log?.info(
-                                        `Client summary success @${value.operation.sequenceNumber}`,
-                                        {
-                                            messageMetaData: {
-                                                documentId: this.documentId,
-                                                tenantId: this.tenantId,
-                                            },
+                            // On a successful write, send an ack message to clients and a control message to deli.
+                            // Otherwise send a nack and revert the protocol state back to pre summary state.
+                            if (summaryResponse.status) {
+                                await this.sendSummaryAck(summaryResponse.message as ISummaryAck);
+                                await this.sendSummaryConfirmationMessage(operation.sequenceNumber, false);
+                                await this.updateProtocolHead(this.protocolHandler.sequenceNumber);
+                                this.context.log?.info(
+                                    `Client summary success @${value.operation.sequenceNumber}`,
+                                    {
+                                        messageMetaData: {
+                                            documentId: this.documentId,
+                                            tenantId: this.tenantId,
                                         },
-                                    );
-                                } else {
-                                    const nackMessage = summaryResponse.message as ISummaryNack;
-                                    await this.sendSummaryNack(nackMessage);
-                                    this.context.log?.error(
-                                        `Client summary failure @${value.operation.sequenceNumber}. `
-                                        + `Error: ${nackMessage.errorMessage}`,
-                                        {
-                                            messageMetaData: {
-                                                documentId: this.documentId,
-                                                tenantId: this.tenantId,
-                                            },
+                                    },
+                                );
+                            } else {
+                                const nackMessage = summaryResponse.message as ISummaryNack;
+                                await this.sendSummaryNack(nackMessage);
+                                this.context.log?.error(
+                                    `Client summary failure @${value.operation.sequenceNumber}. `
+                                    + `Error: ${nackMessage.errorMessage}`,
+                                    {
+                                        messageMetaData: {
+                                            documentId: this.documentId,
+                                            tenantId: this.tenantId,
                                         },
-                                    );
-                                    this.revertProtocolState(prevState.protocolState, prevState.pendingOps);
-                                }
+                                    },
+                                );
+                                this.revertProtocolState(prevState.protocolState, prevState.pendingOps);
                             }
                         } catch (ex) {
                             this.context.log?.error(`Failed to summarize the document. Exception: ${inspect(ex)}`);
@@ -306,11 +301,6 @@ export class ScribeLambda implements IPartitionLambda {
                 } else if (value.operation.type === MessageType.SummaryAck) {
                     const content = value.operation.contents as ISummaryAck;
                     this.lastClientSummaryHead = content.handle;
-                    // An external summary writer can only update the protocolHead when the ack is sequenced
-                    // back to the stream.
-                    if (this.summaryWriter.isExternal) {
-                        await this.updateProtocolHead(content.summaryProposal.summarySequenceNumber);
-                    }
                 }
 
                 // check to see if this exact sequence number causes us to hit the max ops since last summary nack limit
