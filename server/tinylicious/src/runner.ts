@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import * as winston from "winston";
 import detect from "detect-port";
 import { createExpressApp } from "./app";
 import { Deferred } from "./common-utils";
@@ -52,7 +51,6 @@ export class TinyliciousRunner implements IRunner {
             this.storage,
             new TestClientManager(),
             new DefaultMetricClient(),
-            winston,
         );
 
         // Listen on provided port, on all network interfaces.

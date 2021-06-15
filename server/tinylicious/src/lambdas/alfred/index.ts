@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import safeStringify from "json-stringify-safe";
 import * as semver from "semver";
 import { v4 as uuid } from "uuid";
 
@@ -22,7 +21,6 @@ import {
     DefaultServiceConfiguration,
     IClientManager,
     IDocumentStorage,
-    ILogger,
     IMetricClient,
     IOrdererConnection,
     IOrdererManager,
@@ -64,15 +62,7 @@ function getRoomId(room: IRoom) {
     return `${room.tenantId}/${room.documentId}`;
 }
 
-const getMessageMetadata = (documentId: string, tenantId: string) => ({
-    documentId,
-    tenantId,
-});
-
-const handleServerError = async (logger: ILogger, errorMessage: string, documentId: string, tenantId: string) => {
-    logger.error(
-        errorMessage,
-        getMessageMetadata(documentId, tenantId));
+const handleServerError = async () => {
     // eslint-disable-next-line prefer-promise-reject-errors
     return Promise.reject({ code: 500, message: "Failed to connect client to document." });
 };
@@ -113,7 +103,7 @@ function selectProtocolVersion(connectVersions: string[]): string | undefined {
 function checkThrottle(
     throttler: IThrottler | undefined,
     throttleId: string,
-    logger?: ILogger): ThrottlingError | undefined {
+): ThrottlingError | undefined {
     if (!throttler) {
         return;
     }
@@ -123,15 +113,6 @@ function checkThrottle(
     } catch (e) {
         if (e instanceof ThrottlingError) {
             return e;
-        } else {
-            logger?.error(
-                `Throttle increment failed: ${safeStringify(e, undefined, 2)}`,
-                {
-                    messageMetaData: {
-                        key: throttleId,
-                        eventName: "throttling",
-                    },
-                });
         }
     }
 }
@@ -143,7 +124,6 @@ export function configureWebSocketServices(
     storage: IDocumentStorage,
     clientManager: IClientManager,
     metricLogger: IMetricClient,
-    logger: ILogger,
     maxNumberOfClientsPerDocument: number = 1000000,
     maxTokenLifetimeSec: number = 60 * 60,
     isTokenExpiryEnabled: boolean = false,
@@ -193,7 +173,7 @@ export function configureWebSocketServices(
             const throttleError = checkThrottle(
                 connectThrottler,
                 getSocketConnectThrottleId(message.tenantId),
-                logger);
+            );
             if (throttleError) {
                 return Promise.reject(throttleError);
             }
@@ -230,8 +210,7 @@ export function configureWebSocketServices(
                     socket.join(getRoomId(room)),
                     socket.join(`client#${clientId}`)]);
             } catch (err) {
-                const errMsg = `Could not subscribe to channels. Error: ${safeStringify(err, undefined, 2)}`;
-                return handleServerError(logger, errMsg, claims.documentId, claims.tenantId);
+                return handleServerError();
             }
 
             // Todo: should all the client details come from the claims???
@@ -260,14 +239,12 @@ export function configureWebSocketServices(
 
             const detailsP = storage.getOrCreateDocument(claims.tenantId, claims.documentId)
                 .catch(async (err) => {
-                    const errMsg = `Failed to get or create document. Error: ${safeStringify(err, undefined, 2)}`;
-                    return handleServerError(logger, errMsg, claims.documentId, claims.tenantId);
+                    return handleServerError();
                 });
 
             const clientsP = clientManager.getClients(claims.tenantId, claims.documentId)
                 .catch(async (err) => {
-                    const errMsg = `Failed to get clients. Error: ${safeStringify(err, undefined, 2)}`;
-                    return handleServerError(logger, errMsg, claims.documentId, claims.tenantId);
+                    return handleServerError();
                 });
 
             const [details, clients] = await Promise.all([detailsP, clientsP]);
@@ -288,8 +265,7 @@ export function configureWebSocketServices(
                     clientId,
                     messageClient as IClient);
             } catch (err) {
-                const errMsg = `Could not add client. Error: ${safeStringify(err, undefined, 2)}`;
-                return handleServerError(logger, errMsg, claims.documentId, claims.tenantId);
+                return handleServerError();
             }
 
             if (isTokenExpiryEnabled) {
@@ -301,31 +277,23 @@ export function configureWebSocketServices(
             if (isWriter(messageClient.scopes, details.existing, message.mode)) {
                 const orderer = await orderManager.getOrderer(claims.tenantId, claims.documentId)
                     .catch(async (err) => {
-                        const errMsg = `Failed to get orderer manager. Error: ${safeStringify(err, undefined, 2)}`;
-                        return handleServerError(logger, errMsg, claims.documentId, claims.tenantId);
+                        return handleServerError();
                     });
 
                 const connection = await orderer.connect(socket, clientId, messageClient as IClient, details)
                     .catch(async (err) => {
-                        const errMsg = `Failed to connect to orderer. Error: ${safeStringify(err, undefined, 2)}`;
-                        return handleServerError(logger, errMsg, claims.documentId, claims.tenantId);
+                        return handleServerError();
                     });
 
                 // Eventually we will send disconnect reason as headers to client.
                 connection.once("error", (error) => {
-                    const messageMetaData = getMessageMetadata(connection.documentId, connection.tenantId);
-
-                    // eslint-disable-next-line max-len
-                    logger.error(`Disconnecting socket on connection error: ${safeStringify(error, undefined, 2)}`, { messageMetaData });
                     clearExpirationTimer();
                     socket.disconnect(true);
                 });
 
                 connection.connect()
                     .catch(async (err) => {
-                        // eslint-disable-next-line max-len
-                        const errMsg = `Failed to connect to the orderer connection. Error: ${safeStringify(err, undefined, 2)}`;
-                        return handleServerError(logger, errMsg, claims.documentId, claims.tenantId);
+                        return handleServerError();
                     });
 
                 connectionsMap.set(clientId, connection);
@@ -389,11 +357,6 @@ export function configureWebSocketServices(
                     }
                 },
                 (error) => {
-                    const messageMetaData = {
-                        documentId: connectionMessage.id,
-                        tenantId: connectionMessage.tenantId,
-                    };
-                    logger.error(`Connect Document error: ${safeStringify(error, undefined, 2)}`, { messageMetaData });
                     socket.emit("connect_document_error", error);
                 });
         });
@@ -420,7 +383,7 @@ export function configureWebSocketServices(
                     const throttleError = checkThrottle(
                         submitOpThrottler,
                         getSubmitOpThrottleId(clientId, connection.tenantId),
-                        logger);
+                    );
                     if (throttleError) {
                         const nackMessage = createNackMessage(
                             throttleError.code,
@@ -438,10 +401,7 @@ export function configureWebSocketServices(
                                 if (message.type === MessageType.RoundTrip) {
                                     if (message.traces) {
                                         // End of tracking. Write traces.
-                                        metricLogger.writeLatencyMetric("latency", message.traces).catch(
-                                            (error) => {
-                                                logger.error(error.stack);
-                                            });
+                                        metricLogger.writeLatencyMetric("latency", message.traces).catch(() => { });
                                     }
                                     return false;
                                 } else {
@@ -487,23 +447,13 @@ export function configureWebSocketServices(
         socket.on("disconnect", async () => {
             clearExpirationTimer();
             // Send notification messages for all client IDs in the connection map
-            for (const [clientId, connection] of connectionsMap) {
-                const messageMetaData = {
-                    documentId: connection.documentId,
-                    tenantId: connection.tenantId,
-                };
-                logger.info(`Disconnect of ${clientId}`, { messageMetaData });
+            for (const [, connection] of connectionsMap) {
                 // eslint-disable-next-line @typescript-eslint/no-floating-promises
                 connection.disconnect();
             }
             // Send notification messages for all client IDs in the room map
             const removeP: Promise<void>[] = [];
             for (const [clientId, room] of roomMap) {
-                const messageMetaData = {
-                    documentId: room.documentId,
-                    tenantId: room.tenantId,
-                };
-                logger.info(`Disconnect of ${clientId} from room`, { messageMetaData });
                 removeP.push(clientManager.removeClient(room.tenantId, room.documentId, clientId));
                 socket.emitToRoom(getRoomId(room), "signal", createRoomLeaveMessage(clientId));
             }
