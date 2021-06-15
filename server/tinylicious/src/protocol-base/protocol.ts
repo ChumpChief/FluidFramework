@@ -56,7 +56,8 @@ export class ProtocolOpHandler {
         proposals: [number, ISequencedProposal, string[]][],
         values: [string, ICommittedProposal][],
         sendProposal: (key: string, value: any) => number,
-        sendReject: (sequenceNumber: number) => void) {
+        sendReject: (sequenceNumber: number) => void,
+    ) {
         this.term = term ?? 1;
         this.quorum = new Quorum(
             members,
