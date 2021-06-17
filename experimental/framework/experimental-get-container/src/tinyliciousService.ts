@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
+import { Container } from "@fluid-experimental/experimental-container-loader";
 import {
-    IContainer,
     IRuntimeFactory,
 } from "@fluidframework/container-definitions";
 import { IDocumentServiceFactory, IUrlResolver } from "@fluidframework/driver-definitions";
@@ -33,7 +33,8 @@ export async function getTinyliciousContainer(
     containerRuntimeFactory: IRuntimeFactory,
     createNew: boolean,
     tinyliciousPort?: number,
-): Promise<IContainer> {
+// TODO switch this return back to an IContainer once connectionManager is available on it.
+): Promise<Container> {
     const service = new TinyliciousService(tinyliciousPort);
 
     return getContainer(

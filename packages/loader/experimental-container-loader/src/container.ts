@@ -462,6 +462,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get IFluidRouter(): IFluidRouter { return this; }
 
+    public get connectionManager(): StatefulDocumentDeltaConnectionManager | undefined {
+        return this.statefulDocumentDeltaConnectionManager;
+    }
+
     public get resolvedUrl(): IResolvedUrl | undefined {
         return this._resolvedUrl;
     }

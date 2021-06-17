@@ -43,17 +43,17 @@ export class StatefulDocumentDeltaConnectionManager {
         }
 
         this.connectionP = this.deltaStreamService.connectToDeltaStream(this.defaultClient);
-        const connection = await this.connectionP;
+        this.currentConnection = await this.connectionP;
         // connection.on("nack")
         // connection.on("disconnect")
         // connection.on("error")
         // connection.on("pong")
 
         // Drop the new connection into the StatefulDocumentDeltaConnection so the consumer can observe it.
-        this.statefulDocumentDeltaConnection.setNewConnection(connection);
+        this.statefulDocumentDeltaConnection.setNewConnection(this.currentConnection);
     }
 
-    public async disconnect() {
+    public disconnect() {
         if (this.currentConnection === undefined) {
             throw new Error("Tried to disconnect, but not currently connected");
         }
