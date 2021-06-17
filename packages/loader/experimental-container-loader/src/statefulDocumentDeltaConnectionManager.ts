@@ -35,6 +35,9 @@ export class StatefulDocumentDeltaConnectionManager {
     public async connect(): Promise<void> {
         // TODO do I need an event indicating that it's starting to connect?  The deltaManager wants to request
         // ops from storage at the start of connection.
+        if (this.currentConnection !== undefined) {
+            return;
+        }
 
         if (this.connectionP !== undefined) {
             // TODO If this eventually takes connection args, consider throwing (esp. if the args don't match)?
@@ -45,6 +48,7 @@ export class StatefulDocumentDeltaConnectionManager {
 
         this.connectionP = this.deltaStreamService.connectToDeltaStream(this.defaultClient);
         this.currentConnection = await this.connectionP;
+        this.connectionP = undefined;
 
         this.currentConnection.on("nack", this.nackHandler);
         this.currentConnection.on("disconnect", this.disconnectHandler);

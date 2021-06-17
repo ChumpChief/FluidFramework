@@ -32,7 +32,7 @@ async function start(): Promise<void> {
     // flag to specify whether we're creating a new document or loading an existing one.
     const container = await getTinyliciousContainer(documentId, DiceRollerContainerRuntimeFactory, createNew);
     // eslint-disable-next-line @typescript-eslint/dot-notation
-    window["connectionManager"] = container.connectionManager;
+    window["container"] = container;
 
     // TODO get the connection manager off the container, demo some usage like controlling readonly and reconnect
     // Maybe would be better to pass in the stateful connection (so the host can bring their own connection policy)?

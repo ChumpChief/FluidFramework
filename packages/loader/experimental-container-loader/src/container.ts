@@ -734,9 +734,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._closed = true;
 
         this.collabWindowTracker.stopSequenceNumberUpdate();
+        // TODO Probably disconnect and tear down the stateful connection slightly differently --
+        // too much reentrancy here.
+        this.statefulDocumentDeltaConnectionManager?.disconnect();
         this._deltaManager.close(error);
-
-        // TODO Probably disconnect and tear down the stateful connection here.
 
         this._protocolHandler?.close();
 

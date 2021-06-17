@@ -18,7 +18,7 @@ import {
     ReadOnlyInfo,
 } from "@fluidframework/container-definitions";
 import { assert, TypedEventEmitter } from "@fluidframework/common-utils";
-import { safeRaiseEvent, LoggingError } from "@fluidframework/telemetry-utils";
+import { LoggingError } from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
     IDocumentService,
@@ -89,9 +89,6 @@ export class DeltaManager
      * Controls whether the DeltaManager will automatically reconnect to the delta stream after receiving a disconnect.
      */
     private _reconnectMode: ReconnectMode;
-
-    // file ACL - whether user has only read-only access to a file
-    private _readonlyPermissions: boolean | undefined;
 
     private pending: ISequencedDocumentMessage[] = [];
     private fetchReason: string | undefined;
@@ -244,7 +241,9 @@ export class DeltaManager
      * @deprecated - use readOnlyInfo
      */
     public get readonly() {
-        return this._readonlyPermissions;
+        return this.statefulDocumentDeltaConnection.connected
+            ? this.statefulDocumentDeltaConnection.readonlyScope
+            : true;
     }
 
     /**
@@ -254,20 +253,25 @@ export class DeltaManager
      * @deprecated - use readOnlyInfo
      */
     public get readonlyPermissions() {
-        return this._readonlyPermissions;
+        return this.statefulDocumentDeltaConnection.connected
+            ? this.statefulDocumentDeltaConnection.readonlyScope
+            : true;
     }
 
     public get readOnlyInfo(): ReadOnlyInfo {
-        if (this._readonlyPermissions === true) {
+        const readonlyPermissions = this.statefulDocumentDeltaConnection.connected
+            ? this.statefulDocumentDeltaConnection.readonlyScope
+            : true;
+        if (readonlyPermissions) {
             return {
                 readonly: true,
                 forced: false,
-                permissions: this._readonlyPermissions,
+                permissions: true,
                 storageOnly: false,
             };
         }
 
-        return { readonly: this._readonlyPermissions };
+        return { readonly: false };
     }
 
     /**
@@ -292,14 +296,6 @@ export class DeltaManager
             this._reconnectMode !== ReconnectMode.Never,
             0x0e1 /* "Cannot toggle automatic reconnect if reconnect is set to Never." */);
         this._reconnectMode = reconnect ? ReconnectMode.Enabled : ReconnectMode.Disabled;
-    }
-
-    private set_readonlyPermissions(readonly: boolean) {
-        const oldValue = this.readonly;
-        this._readonlyPermissions = readonly;
-        if (oldValue !== this.readonly) {
-            safeRaiseEvent(this, this.logger, "readonly", this.readonly);
-        }
     }
 
     constructor(
@@ -610,11 +606,6 @@ export class DeltaManager
         // Drop pending messages - this will ensure catchUp() does not go into infinite loop
         this.pending = [];
 
-        // Notify everyone we are in read-only state.
-        // Useful for data stores in case we hit some critical error,
-        // to switch to a mode where user edits are not accepted
-        this.set_readonlyPermissions(true);
-
         // This needs to be the last thing we do (before removing listeners), as it causes
         // Container to dispose context and break ability of data stores / runtime to "hear"
         // from delta manager, including notification (above) about readonly state.
@@ -669,8 +660,6 @@ export class DeltaManager
     // }
 
     private readonly connectedHandler = () => {
-        this.set_readonlyPermissions(this.statefulDocumentDeltaConnection.readonlyScope);
-
         // We cancel all ops on lost of connectivity, and rely on DDSes to resubmit them.
         // Semantics are not well defined for batches (and they are broken right now on disconnects anyway),
         // but it's safe to assume (until better design is put into place) that batches should not exist
