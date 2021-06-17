@@ -17,6 +17,7 @@ export class StatefulDocumentDeltaConnectionManager {
         details: {
             capabilities: { interactive: true },
         },
+        // TODO make this read by default
         mode: "write", // default reconnection mode on lost connection / connection error
         permission: [],
         scopes: [],
@@ -44,10 +45,11 @@ export class StatefulDocumentDeltaConnectionManager {
 
         this.connectionP = this.deltaStreamService.connectToDeltaStream(this.defaultClient);
         this.currentConnection = await this.connectionP;
-        // connection.on("nack")
-        // connection.on("disconnect")
-        // connection.on("error")
-        // connection.on("pong")
+
+        this.currentConnection.on("nack", this.nackHandler);
+        this.currentConnection.on("disconnect", this.disconnectHandler);
+        this.currentConnection.on("error", this.errorHandler);
+        this.currentConnection.on("pong", this.pongHandler);
 
         // Drop the new connection into the StatefulDocumentDeltaConnection so the consumer can observe it.
         this.statefulDocumentDeltaConnection.setNewConnection(this.currentConnection);
@@ -60,9 +62,36 @@ export class StatefulDocumentDeltaConnectionManager {
 
         // TODO abort any in-progress connection
 
+        this.currentConnection.off("nack", this.nackHandler);
+        this.currentConnection.off("disconnect", this.disconnectHandler);
+        this.currentConnection.off("error", this.errorHandler);
+        this.currentConnection.off("pong", this.pongHandler);
+
         this.statefulDocumentDeltaConnection.tearDownCurrentConnection();
         const connection = this.currentConnection;
         this.currentConnection = undefined;
         connection.close();
     }
+
+    private readonly nackHandler = () => {
+        this.disconnect();
+        // TODO When read mode is default, need to reconnect in write mode here.
+        // TODO Check if a reconnect attempt is allowed
+        this.connect();
+    };
+
+    private readonly disconnectHandler = () => {
+        this.disconnect();
+        // TODO Check if a reconnect attempt is allowed
+        this.connect();
+    };
+
+    private readonly errorHandler = () => {
+        this.disconnect();
+        // TODO Check if a reconnect attempt is allowed
+        this.connect();
+    };
+
+    private readonly pongHandler = () => {
+    };
 }
