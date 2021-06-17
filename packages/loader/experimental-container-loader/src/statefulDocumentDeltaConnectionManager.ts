@@ -77,19 +77,19 @@ export class StatefulDocumentDeltaConnectionManager {
         this.disconnect();
         // TODO When read mode is default, need to reconnect in write mode here.
         // TODO Check if a reconnect attempt is allowed
-        this.connect();
+        this.connect().catch(console.error);
     };
 
     private readonly disconnectHandler = () => {
         this.disconnect();
         // TODO Check if a reconnect attempt is allowed
-        this.connect();
+        this.connect().catch(console.error);
     };
 
     private readonly errorHandler = () => {
         this.disconnect();
         // TODO Check if a reconnect attempt is allowed
-        this.connect();
+        this.connect().catch(console.error);
     };
 
     private readonly pongHandler = () => {
