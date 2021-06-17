@@ -59,6 +59,7 @@ import {
     DataCorruptionError,
 } from "@fluidframework/container-utils";
 import { DeltaQueue } from "./deltaQueue";
+import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
 const MaxReconnectDelayInMs = 8000;
 const InitialReconnectDelayInMs = 1000;
@@ -377,6 +378,7 @@ export class DeltaManager
 
     constructor(
         private readonly serviceProvider: () => IDocumentService | undefined,
+        private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
         private client: IClient,
         private readonly logger: ITelemetryLogger,
         reconnectAllowed: boolean,
@@ -425,6 +427,9 @@ export class DeltaManager
         this._inboundSignal.on("error", (error) => {
             this.close(CreateContainerError(error));
         });
+
+        this.statefulDocumentDeltaConnection.on("op", this.opHandler);
+        this.statefulDocumentDeltaConnection.on("signal", this.signalHandler);
 
         // Initially, all queues are created paused.
         // - outbound is flipped back and forth in setupNewSuccessfulConnection / disconnectFromDeltaStream
@@ -830,6 +835,9 @@ export class DeltaManager
             return;
         }
         this.closed = true;
+
+        this.statefulDocumentDeltaConnection.off("op", this.opHandler);
+        this.statefulDocumentDeltaConnection.off("signal", this.signalHandler);
 
         this.closeAbortController.abort();
 

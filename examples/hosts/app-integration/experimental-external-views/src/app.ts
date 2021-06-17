@@ -31,6 +31,7 @@ async function start(): Promise<void> {
     // function takes the ID of the document we're creating or loading, the container code to load into it, and a
     // flag to specify whether we're creating a new document or loading an existing one.
     const container = await getTinyliciousContainer(documentId, DiceRollerContainerRuntimeFactory, createNew);
+    // eslint-disable-next-line @typescript-eslint/dot-notation
     window["connectionManager"] = container.connectionManager;
 
     // TODO get the connection manager off the container, demo some usage like controlling readonly and reconnect

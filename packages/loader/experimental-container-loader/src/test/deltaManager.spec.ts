@@ -12,6 +12,7 @@ import { MockDocumentDeltaConnection, MockDocumentService } from "@fluidframewor
 import { SinonFakeTimers, useFakeTimers } from "sinon";
 import { DeltaManager } from "../deltaManager";
 import { CollabWindowTracker } from "../container";
+import { StatefulDocumentDeltaConnection } from "../statefulDocumentDeltaConnection";
 
 describe("Loader", () => {
     describe("Container Loader", () => {
@@ -87,6 +88,8 @@ describe("Loader", () => {
 
                 deltaManager = new DeltaManager(
                     () => service,
+                    // TODO this needs to be a mock probably
+                    new StatefulDocumentDeltaConnection(),
                     client as IClient,
                     logger,
                     false,

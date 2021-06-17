@@ -1577,6 +1577,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private createDeltaManager() {
         const deltaManager: DeltaManager = new DeltaManager(
             () => this.service,
+            this.statefulDocumentDeltaConnection,
             this.client,
             ChildLogger.create(this.subLogger, "DeltaManager"),
             this._canReconnect,
