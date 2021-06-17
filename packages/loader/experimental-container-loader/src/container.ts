@@ -736,6 +736,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.collabWindowTracker.stopSequenceNumberUpdate();
         this._deltaManager.close(error);
 
+        // TODO Probably disconnect and tear down the stateful connection here.
+
         this._protocolHandler?.close();
 
         this._context?.dispose(error !== undefined ? new Error(error.message) : undefined);
@@ -1120,7 +1122,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
     }
 
-    private async connectToDeltaStream(args: IConnectionArgs) {
+    private async connectToDeltaStream(args: IConnectionArgs): Promise<void> {
         this.recordConnectStartTime();
 
         // All agents need "write" access, including summarizer.
@@ -1132,9 +1134,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.statefulDocumentDeltaConnectionManager !== undefined,
             "Connection manager not created before connect attempt",
         );
-        // this.statefulDocumentDeltaConnectionManager.connect();
-
-        return this._deltaManager.connect(args);
+        return this.statefulDocumentDeltaConnectionManager.connect();
     }
 
     /**
@@ -1162,7 +1162,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.statefulDocumentDeltaConnection,
         );
 
-        let startConnectionP: Promise<IConnectionDetails> | undefined;
+        let startConnectionP: Promise<void> | undefined;
 
         // Ideally we always connect as "read" by default.
         // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.
@@ -1234,8 +1234,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 startConnectionP = this.connectToDeltaStream(connectionArgs);
             }
             // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
-            const details = await startConnectionP;
-            this._existing = details.existing;
+            await startConnectionP;
+            // TODO this is incorrect if we disconnect before getting here
+            this._existing = this.statefulDocumentDeltaConnection.existing;
         }
 
         // LoadContext directly requires protocolHandler to be ready, and eventually calls
