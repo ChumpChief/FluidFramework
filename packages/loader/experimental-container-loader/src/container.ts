@@ -595,8 +595,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
 
         // Create logger for data stores to use
-        const type = this.client.details.type;
-        const interactive = this.client.details.capabilities.interactive;
+        const type = this.clientDetailsOverride?.type ?? undefined;
+        const interactive = this.clientDetailsOverride?.capabilities.interactive ?? true;
         const clientType =
             `${interactive ? "interactive" : "noninteractive"}${type !== undefined && type !== "" ? `/${type}` : ""}`;
         // Need to use the property getter for docId because for detached flow we don't have the docId initially.
