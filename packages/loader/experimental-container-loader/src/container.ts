@@ -47,8 +47,6 @@ import {
 } from "@fluidframework/driver-definitions";
 import {
     readAndParse,
-    OnlineStatus,
-    isOnline,
     ensureFluidResolvedUrl,
     combineAppAndProtocolSummary,
     readAndParseFromBlobs,
@@ -97,7 +95,7 @@ import {
 import { Audience } from "./audience";
 import { ContainerContext } from "./containerContext";
 import { debug } from "./debug";
-import { IConnectionArgs, DeltaManager, ReconnectMode } from "./deltaManager";
+import { IConnectionArgs, DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { Loader, RelativeLoader } from "./loader";
 import { pkgVersion } from "./packageVersion";
@@ -434,7 +432,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private resumedOpProcessingAfterLoad = false;
     private firstConnection = true;
-    private manualReconnectInProgress = false;
     private readonly connectionTransitionTimes: number[] = [];
     private messageCountAfterDisconnection: number = 0;
     private _loadedFromVersion: IVersion | undefined;
@@ -448,7 +445,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     // But once it is created, it is never dropped (maybe it should be disposed?)
     private statefulDocumentDeltaConnectionManager: StatefulDocumentDeltaConnectionManager | undefined;
 
-    private lastVisible: number | undefined;
     private readonly connectionStateHandler: ConnectionStateHandler;
 
     private _closed = false;
@@ -639,8 +635,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.connectionStateHandler = new ConnectionStateHandler(
             {
                 protocolHandler: () => this._protocolHandler,
-                logConnectionStateChangeTelemetry: (value, oldState, reason) =>
-                    this.logConnectionStateChangeTelemetry(value, oldState, reason),
                 shouldClientJoinWrite: () => this._deltaManager.shouldJoinWrite(),
                 maxClientLeaveWaitTime: this.loader.services.options.maxClientLeaveWaitTime,
             },
@@ -666,23 +660,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             },
             this.storageBlobs,
         );
-
-        const isDomAvailable = typeof document === "object" &&
-            document !== null &&
-            typeof document.addEventListener === "function" &&
-            document.addEventListener !== null;
-        // keep track of last time page was visible for telemetry
-        if (isDomAvailable) {
-            this.lastVisible = document.hidden ? performance.now() : undefined;
-            document.addEventListener("visibilitychange", () => {
-                if (document.hidden) {
-                    this.lastVisible = performance.now();
-                } else {
-                    // settimeout so this will hopefully fire after disconnect event if being hidden caused it
-                    setTimeout(() => this.lastVisible = undefined, 0);
-                }
-            });
-        }
 
         // We observed that most users of platform do not check Container.connected event on load, causing bugs.
         // As such, we are raising events when new listener pops up.
@@ -930,11 +907,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // If container state is not attached and resumed, then don't connect to delta stream. Also don't set the
         // manual reconnection flag to true as we haven't made the initial connection yet.
         if (reconnect && this._attachState === AttachState.Attached && this.resumedOpProcessingAfterLoad) {
-            if (this.connectionState === ConnectionState.Disconnected) {
-                // Only track this as a manual reconnection if we are truly the ones kicking it off.
-                this.manualReconnectInProgress = true;
-            }
-
             // Ensure connection to web socket
             this.connectToDeltaStream({ reason: "autoReconnect" }).catch((error) => {
                 // All errors are reported through events ("error" / "disconnected") and telemetry in DeltaManager
@@ -1609,7 +1581,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         });
 
         deltaManager.on("disconnect", (reason: string) => {
-            this.manualReconnectInProgress = false;
             this.connectionStateHandler.receivedDisconnectEvent(reason);
         });
 
@@ -1641,77 +1612,16 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             });
     }
 
-    private logConnectionStateChangeTelemetry(
-        value: ConnectionState,
-        oldState: ConnectionState,
-        reason?: string,
-    ) {
-        // Log actual event
-        const time = performance.now();
-        this.connectionTransitionTimes[value] = time;
-        const duration = time - this.connectionTransitionTimes[oldState];
-
-        let durationFromDisconnected: number | undefined;
-        let connectionMode: string | undefined;
-        let connectionInitiationReason: string | undefined;
-        let autoReconnect: ReconnectMode | undefined;
-        let checkpointSequenceNumber: number | undefined;
-        let sequenceNumber: number | undefined;
-        let opsBehind: number | undefined;
-        if (value === ConnectionState.Disconnected) {
-            autoReconnect = this._deltaManager.reconnectMode;
-        } else {
-            connectionMode = this._deltaManager.connectionMode;
-            sequenceNumber = this.deltaManager.lastSequenceNumber;
-            if (value === ConnectionState.Connected) {
-                durationFromDisconnected = time - this.connectionTransitionTimes[ConnectionState.Disconnected];
-                durationFromDisconnected = TelemetryLogger.formatTick(durationFromDisconnected);
-            } else {
-                // This info is of most interest on establishing connection only.
-                checkpointSequenceNumber = this.deltaManager.lastKnownSeqNumber;
-                if (this.deltaManager.hasCheckpointSequenceNumber) {
-                    opsBehind = checkpointSequenceNumber - sequenceNumber;
-                }
-            }
-            if (this.firstConnection) {
-                connectionInitiationReason = "InitialConnect";
-            } else if (this.manualReconnectInProgress) {
-                connectionInitiationReason = "ManualReconnect";
-            } else {
-                connectionInitiationReason = "AutoReconnect";
-            }
-        }
-
-        this.logger.sendPerformanceEvent({
-            eventName: `ConnectionStateChange_${ConnectionState[value]}`,
-            from: ConnectionState[oldState],
-            duration,
-            durationFromDisconnected,
-            reason,
-            connectionInitiationReason,
-            socketDocumentId: this._deltaManager.socketDocumentId,
-            pendingClientId: this.connectionStateHandler.pendingClientId,
-            clientId: this.clientId,
-            connectionMode,
-            autoReconnect,
-            opsBehind,
-            online: OnlineStatus[isOnline()],
-            lastVisible: this.lastVisible !== undefined ? performance.now() - this.lastVisible : undefined,
-            checkpointSequenceNumber,
-            sequenceNumber,
-        });
-
-        if (value === ConnectionState.Connected) {
-            this.firstConnection = false;
-            this.manualReconnectInProgress = false;
-        }
-    }
-
     private propagateConnectionState() {
         const logOpsOnReconnect: boolean =
             this.connectionState === ConnectionState.Connected &&
             !this.firstConnection &&
             this._deltaManager.connectionMode === "write";
+
+        if (this.connectionState === ConnectionState.Connected) {
+            this.firstConnection = false;
+        }
+
         if (logOpsOnReconnect) {
             this.messageCountAfterDisconnection = 0;
         }

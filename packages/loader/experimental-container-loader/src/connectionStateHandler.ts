@@ -13,8 +13,6 @@ import { ConnectionState } from "./container";
 
 export interface IConnectionStateHandler {
     protocolHandler: () => ProtocolOpHandler | undefined,
-    logConnectionStateChangeTelemetry:
-        (value: ConnectionState, oldState: ConnectionState, reason?: string | undefined) => void,
     shouldClientJoinWrite: () => boolean,
     maxClientLeaveWaitTime: number | undefined,
 }
@@ -125,7 +123,6 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         details: IConnectionDetails,
         opsBehind?: number,
     ) {
-        const oldState = this._connectionState;
         this._connectionState = ConnectionState.Connecting;
 
         // Stash the clientID to detect when transitioning from connecting (socket.io channel open) to connected
@@ -135,9 +132,6 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         // join message. after we see the join message for out new connection with our new client id,
         // we know there can no longer be outstanding ops that we sent with the previous client id.
         this._pendingClientId = details.clientId;
-
-        // Report telemetry after we set client id!
-        this.handler.logConnectionStateChangeTelemetry(ConnectionState.Connecting, oldState);
 
         const protocolHandler = this.handler.protocolHandler();
         // Check if we already processed our own join op through delta storage!
@@ -202,8 +196,5 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         }
 
         this.emit("connectionStateChanged");
-
-        // Report telemetry after we set client id!
-        this.handler.logConnectionStateChangeTelemetry(this._connectionState, oldState, reason);
     }
 }

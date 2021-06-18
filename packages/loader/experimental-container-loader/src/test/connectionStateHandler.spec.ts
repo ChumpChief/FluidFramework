@@ -71,7 +71,6 @@ describe("ConnectionStateHandler Tests", () => {
         };
         connectionStateHandler = new ConnectionStateHandler(
             {
-                logConnectionStateChangeTelemetry: () => undefined,
                 maxClientLeaveWaitTime: expectedTimeout,
                 protocolHandler: () => protocolHandler,
                 shouldClientJoinWrite: () => shouldClientJoinWrite,
