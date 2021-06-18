@@ -17,8 +17,7 @@ export class StatefulDocumentDeltaConnectionManager {
         details: {
             capabilities: { interactive: true },
         },
-        // TODO make this read by default
-        mode: "write", // default reconnection mode on lost connection / connection error
+        mode: "read", // default reconnection mode on lost connection / connection error
         permission: [],
         scopes: [],
         user: { id: "" },
@@ -77,12 +76,33 @@ export class StatefulDocumentDeltaConnectionManager {
         connection.close();
     }
 
+    public async setReadonlyMode(readonly: boolean): Promise<void> {
+        // Arbitrary policy -- we will reconnect if you were connected before, or stay disconnected if you weren't
+        let previouslyConnected = false;
+        if (
+            this.statefulDocumentDeltaConnection.connected
+            // Since Tinylicious lies about doc:write scope, we can't reliably know whether we have write permissions
+            /* && this.statefulDocumentDeltaConnection.readonlyScope */
+        ) {
+            previouslyConnected = true;
+            this.disconnect();
+        }
+
+        this.defaultClient.mode = readonly
+            ? "read"
+            : "write";
+
+        if (previouslyConnected) {
+            await this.connect();
+        }
+    }
+
     private readonly nackHandler = () => {
-        this.disconnect();
-        // TODO When read mode is default, need to reconnect in write mode here.
+        // Nack probably means we tried to send an op in read mode.
+        // Arbitrary policy is to disconnect and then reconnect in write mode.
         // TODO Check if a reconnect attempt is allowed
         // TODO Follow reconnect policy (delay, etc.)
-        this.connect().catch(console.error);
+        this.setReadonlyMode(false).catch(console.error);
     };
 
     private readonly disconnectHandler = () => {

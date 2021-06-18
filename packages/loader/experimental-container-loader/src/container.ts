@@ -1124,17 +1124,18 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private async connectToDeltaStream(args: IConnectionArgs): Promise<void> {
-        this.recordConnectStartTime();
-
-        // All agents need "write" access, including summarizer.
-        if (!this._canReconnect || !this.client.details.capabilities.interactive) {
-            args.mode = "write";
-        }
-
         assert(
             this.statefulDocumentDeltaConnectionManager !== undefined,
             "Connection manager not created before connect attempt",
         );
+
+        this.recordConnectStartTime();
+
+        // All agents need "write" access, including summarizer.
+        if (!this._canReconnect || !this.client.details.capabilities.interactive) {
+            await this.statefulDocumentDeltaConnectionManager.setReadonlyMode(false);
+        }
+
         return this.statefulDocumentDeltaConnectionManager.connect();
     }
 
