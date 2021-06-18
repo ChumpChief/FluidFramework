@@ -15,6 +15,12 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
+export enum ReconnectMode {
+    Never = "Never",
+    Disabled = "Disabled",
+    Enabled = "Enabled",
+}
+
 export class StatefulDocumentDeltaConnectionManager {
     // currentClient's properties may be modified over time
     private readonly currentClient: IClient = {
@@ -30,14 +36,22 @@ export class StatefulDocumentDeltaConnectionManager {
     private connectionP: Promise<IDocumentDeltaConnection> | undefined;
     private currentConnection: IDocumentDeltaConnection | undefined;
 
-    private autoReconnectEnabled: boolean = true;
+    private reconnectMode: ReconnectMode = ReconnectMode.Enabled;
 
     constructor(
         private readonly deltaStreamService: Pick<IDocumentService, "connectToDeltaStream">,
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
         clientDetailsOverride: IClientDetails | undefined,
+        reconnectPermitted: boolean,
     ) {
+        if (!reconnectPermitted) {
+            this.reconnectMode = ReconnectMode.Never;
+        }
         merge(this.currentClient.details, clientDetailsOverride);
+        // All agents need "write" access, including summarizer.
+        if (!reconnectPermitted || !this.currentClient.details.capabilities.interactive) {
+            this.currentClient.mode = "write";
+        }
     }
 
     public async connect(): Promise<void> {
@@ -103,13 +117,18 @@ export class StatefulDocumentDeltaConnectionManager {
 
         // TODO this is a little strange that sometimes you'll still be connected after setting readonly mode
         // and sometimes you won't
-        if (previouslyConnected && this.autoReconnectEnabled) {
+        if (previouslyConnected && this.reconnectMode === ReconnectMode.Enabled) {
             await this.connect();
         }
     }
 
     public setAutoReconnectMode(enable: boolean) {
-        this.autoReconnectEnabled = enable;
+        if (this.reconnectMode === ReconnectMode.Never) {
+            throw new Error("Cannot toggle automatic reconnect if reconnect is set to Never.");
+        }
+        this.reconnectMode = enable
+            ? ReconnectMode.Enabled
+            : ReconnectMode.Disabled;
     }
 
     private readonly nackHandler = () => {
@@ -124,7 +143,7 @@ export class StatefulDocumentDeltaConnectionManager {
         this.disconnect();
         // TODO Check if a reconnect attempt is allowed
         // TODO Follow reconnect policy (delay, inspect reason, etc.)
-        if (this.autoReconnectEnabled) {
+        if (this.reconnectMode === ReconnectMode.Enabled) {
             this.connect().catch(console.error);
         }
     };
@@ -133,7 +152,7 @@ export class StatefulDocumentDeltaConnectionManager {
         this.disconnect();
         // TODO Check if a reconnect attempt is allowed
         // TODO Follow reconnect policy (delay, inspect error, etc.)
-        if (this.autoReconnectEnabled) {
+        if (this.reconnectMode === ReconnectMode.Enabled) {
             this.connect().catch(console.error);
         }
     };

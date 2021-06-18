@@ -839,6 +839,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 this.service,
                 this.statefulDocumentDeltaConnection,
                 this.clientDetailsOverride,
+                this._canReconnect,
             );
 
             const resolvedUrl = this.service.resolvedUrl;
@@ -1104,11 +1105,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this.recordConnectStartTime();
 
-        // All agents need "write" access, including summarizer.
-        if (!this._canReconnect || !this.client.details.capabilities.interactive) {
-            await this.statefulDocumentDeltaConnectionManager.setReadonlyMode(false);
-        }
-
         return this.statefulDocumentDeltaConnectionManager.connect();
     }
 
@@ -1136,6 +1132,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.service,
             this.statefulDocumentDeltaConnection,
             this.clientDetailsOverride,
+            this._canReconnect,
         );
 
         let startConnectionP: Promise<void> | undefined;
