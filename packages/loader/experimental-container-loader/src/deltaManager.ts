@@ -27,7 +27,6 @@ import {
 import { isSystemMessage } from "@fluidframework/protocol-base";
 import {
     ConnectionMode,
-    IClient,
     IClientConfiguration,
     IClientDetails,
     IDocumentMessage,
@@ -82,7 +81,9 @@ export class DeltaManager
 
     public get disposed() { return this.closed; }
 
-    public readonly clientDetails: IClientDetails;
+    public get clientDetails(): IClientDetails {
+        throw new Error("Not implemented");
+    }
     public get IDeltaSender() { return this; }
 
     /**
@@ -301,15 +302,12 @@ export class DeltaManager
     constructor(
         private readonly serviceProvider: () => IDocumentService | undefined,
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
-        // TODO remove client from deltamanager entirely
-        private readonly client: IClient,
         private readonly logger: ITelemetryLogger,
         reconnectAllowed: boolean,
         private readonly _active: () => boolean,
     ) {
         super();
 
-        this.clientDetails = this.client.details;
         this._reconnectMode = reconnectAllowed ? ReconnectMode.Enabled : ReconnectMode.Never;
 
         this._inbound = new DeltaQueue<ISequencedDocumentMessage>(
@@ -461,9 +459,7 @@ export class DeltaManager
             this.clientSequenceNumberObserved = 0;
         }
 
-        const service = this.clientDetails.type === undefined || this.clientDetails.type === ""
-            ? "unknown"
-            : this.clientDetails.type;
+        const service = "client";
 
         // Start adding trace for the op.
         const traces: ITrace[] = [
@@ -956,9 +952,7 @@ export class DeltaManager
 
         // Add final ack trace.
         if (message.traces !== undefined && message.traces.length > 0) {
-            const service = this.clientDetails.type === undefined || this.clientDetails.type === ""
-                ? "unknown"
-                : this.clientDetails.type;
+            const service = "client";
             message.traces.push({
                 action: "end",
                 service,

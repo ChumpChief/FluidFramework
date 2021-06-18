@@ -3,8 +3,6 @@
  * Licensed under the MIT License.
  */
 
-// eslint-disable-next-line import/no-internal-modules
-import merge from "lodash/merge";
 import { v4 as uuid } from "uuid";
 import {
     IDisposable,
@@ -60,7 +58,6 @@ import {
 } from "@fluidframework/protocol-base";
 import {
     FileMode,
-    IClient,
     IClientConfiguration,
     IClientDetails,
     ICommittedProposal,
@@ -538,7 +535,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get clientDetails(): IClientDetails {
-        return this._deltaManager.clientDetails;
+        // TODO Really they should probably be undefined/throw in disconnected state too.
+        if (this.statefulDocumentDeltaConnectionManager === undefined) {
+            throw new Error("Client details don't exist until after attach or load");
+        }
+        return this.statefulDocumentDeltaConnectionManager.clientDetails;
     }
 
     /**
@@ -1518,26 +1519,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return pkg as IFluidCodeDetails;
     }
 
-    private get client(): IClient {
-        const client: IClient = this.options?.client !== undefined
-            ? (this.options.client as IClient)
-            : {
-                details: {
-                    capabilities: { interactive: true },
-                },
-                mode: "read", // default reconnection mode on lost connection / connection error
-                permission: [],
-                scopes: [],
-                user: { id: "" },
-            };
-
-        if (this.clientDetailsOverride !== undefined) {
-            merge(client.details, this.clientDetailsOverride);
-        }
-
-        return client;
-    }
-
     /**
      * Returns true if connection is active, i.e. it's "write" connection and
      * container runtime was notified about this connection (i.e. we are up-to-date and could send ops).
@@ -1552,7 +1533,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const deltaManager: DeltaManager = new DeltaManager(
             () => this.service,
             this.statefulDocumentDeltaConnection,
-            this.client,
             ChildLogger.create(this.subLogger, "DeltaManager"),
             this._canReconnect,
             () => this.activeConnection(),

@@ -54,6 +54,11 @@ export class StatefulDocumentDeltaConnectionManager {
         }
     }
 
+    // TODO Maybe this should live on the stateful connection and report the current connection's details?
+    public get clientDetails(): IClientDetails {
+        return this.currentClient.details;
+    }
+
     public async connect(): Promise<void> {
         // TODO do I need an event indicating that it's starting to connect?  The deltaManager wants to request
         // ops from storage at the start of connection.

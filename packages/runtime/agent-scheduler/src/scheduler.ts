@@ -107,7 +107,7 @@ class AgentScheduler extends TypedEventEmitter<IAgentSchedulerEvents> implements
         // We have a policy to disallow non-interactive clients from taking tasks.  Callers of pick() can
         // either perform this check proactively and call conditionally, or catch the error (in which case
         // they can know they will not get the task).
-        assert(this.context.deltaManager.clientDetails.capabilities.interactive,
+        assert(this.context.clientDetails.capabilities.interactive,
             0x118 /* "Bad client interactive check" */);
 
         // Check the current status and express interest if it's a new one (undefined) or currently unpicked (null).
