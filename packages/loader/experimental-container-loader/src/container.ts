@@ -169,65 +169,6 @@ export const getSnapshotTreeFromSerializedContainer = (detachedContainerSnapshot
     return snapshotTree;
 };
 
-/**
- * Waits until container connects to delta storage and gets up-to-date
- * Useful when resolving URIs and hitting 404, due to container being loaded from (stale) snapshot and not being
- * up to date. Host may chose to wait in such case and retry resolving URI.
- * Warning: Will wait infinitely for connection to establish if there is no connection.
- * May result in deadlock if Container.setAutoReconnect(false) is called and never switched back to auto-reconnect.
- * @returns true: container is up to date, it processed all the ops that were know at the time of first connection
- *          false: storage does not provide indication of how far the client is. Container processed
- *          all the ops known to it, but it maybe still behind.
- */
-export async function waitContainerToCatchUp(container: Container) {
-    // Make sure we stop waiting if container is closed.
-    if (container.closed) {
-        throw new Error("Container is closed");
-    }
-
-    return new Promise<boolean>((accept, reject) => {
-        const deltaManager = container.deltaManager;
-
-        container.on("closed", reject);
-
-        const waitForOps = () => {
-            assert(container.connectionState !== ConnectionState.Disconnected,
-                0x0cd /* "Container disconnected while waiting for ops!" */);
-            const hasCheckpointSequenceNumber = deltaManager.hasCheckpointSequenceNumber;
-
-            const connectionOpSeqNumber = deltaManager.lastKnownSeqNumber;
-            if (deltaManager.lastSequenceNumber === connectionOpSeqNumber) {
-                accept(hasCheckpointSequenceNumber);
-                return;
-            }
-            const callbackOps = (message) => {
-                if (connectionOpSeqNumber <= message.sequenceNumber) {
-                    accept(hasCheckpointSequenceNumber);
-                    deltaManager.off("op", callbackOps);
-                }
-            };
-            deltaManager.on("op", callbackOps);
-        };
-
-        // We can leverage DeltaManager's "connect" event here and test for ConnectionState.Disconnected
-        // But that works only if service provides us checkPointSequenceNumber
-        // Our internal testing is based on R11S that does not, but almost all tests connect as "write" and
-        // use this function to catch up, so leveraging our own join op as a fence/barrier
-        if (container.connectionState === ConnectionState.Connected) {
-            waitForOps();
-            return;
-        }
-
-        const callback = () => {
-            container.off(connectedEventName, callback);
-            waitForOps();
-        };
-        container.on(connectedEventName, callback);
-
-        container.resume();
-    });
-}
-
 export class CollabWindowTracker {
     private opsCountSinceNoop = 0;
     private lastNoopTime: number  | undefined;
@@ -455,6 +396,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get IFluidRouter(): IFluidRouter { return this; }
 
+    // TODO Pass in rather than instantiate internally?  Want the host to be in control of the manager primarily.
     public get connectionManager(): StatefulDocumentDeltaConnectionManager | undefined {
         return this.statefulDocumentDeltaConnectionManager;
     }
@@ -894,7 +836,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
     }
 
-    public resume() {
+    private resume() {
         if (!this.closed) {
             // Note: no need to fetch ops as we do it preemptively as part of DeltaManager.attachOpHandler().
             // If there is gap, we will learn about it once connected, but the gap should be small (if any),
