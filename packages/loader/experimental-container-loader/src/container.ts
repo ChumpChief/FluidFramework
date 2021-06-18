@@ -838,6 +838,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.statefulDocumentDeltaConnectionManager = new StatefulDocumentDeltaConnectionManager(
                 this.service,
                 this.statefulDocumentDeltaConnection,
+                this.clientDetailsOverride,
             );
 
             const resolvedUrl = this.service.resolvedUrl;
@@ -1134,6 +1135,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.statefulDocumentDeltaConnectionManager = new StatefulDocumentDeltaConnectionManager(
             this.service,
             this.statefulDocumentDeltaConnection,
+            this.clientDetailsOverride,
         );
 
         let startConnectionP: Promise<void> | undefined;

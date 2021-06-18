@@ -3,12 +3,15 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-internal-modules
+import merge from "lodash/merge";
 import {
     IDocumentDeltaConnection,
     IDocumentService,
 } from "@fluidframework/driver-definitions";
 import {
     IClient,
+    IClientDetails,
 } from "@fluidframework/protocol-definitions";
 import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
@@ -32,7 +35,10 @@ export class StatefulDocumentDeltaConnectionManager {
     constructor(
         private readonly deltaStreamService: Pick<IDocumentService, "connectToDeltaStream">,
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
-    ) { }
+        clientDetailsOverride: IClientDetails | undefined,
+    ) {
+        merge(this.currentClient.details, clientDetailsOverride);
+    }
 
     public async connect(): Promise<void> {
         // TODO do I need an event indicating that it's starting to connect?  The deltaManager wants to request
