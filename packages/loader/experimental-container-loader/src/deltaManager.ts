@@ -256,7 +256,7 @@ export class DeltaManager
     }
 
     constructor(
-        private readonly serviceProvider: () => IDocumentService | undefined,
+        private readonly serviceProvider: () => Pick<IDocumentService, "connectToDeltaStorage"> | undefined,
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
         private readonly logger: ITelemetryLogger,
         private readonly _active: () => boolean,
