@@ -15,7 +15,7 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
-export enum ReconnectMode {
+enum ReconnectMode {
     Never = "Never",
     Disabled = "Disabled",
     Enabled = "Enabled",

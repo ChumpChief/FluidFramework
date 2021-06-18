@@ -52,12 +52,6 @@ export interface IConnectionArgs {
     reason: string;
 }
 
-export enum ReconnectMode {
-    Never = "Never",
-    Disabled = "Disabled",
-    Enabled = "Enabled",
-}
-
 /**
  * Includes events emitted by the concrete implementation DeltaManager
  * but not exposed on the public interface IDeltaManager
@@ -85,11 +79,6 @@ export class DeltaManager
         throw new Error("Not implemented");
     }
     public get IDeltaSender() { return this; }
-
-    /**
-     * Controls whether the DeltaManager will automatically reconnect to the delta stream after receiving a disconnect.
-     */
-    private _reconnectMode: ReconnectMode;
 
     private pending: ISequencedDocumentMessage[] = [];
     private fetchReason: string | undefined;
@@ -275,40 +264,18 @@ export class DeltaManager
         return { readonly: false };
     }
 
-    /**
-     * Automatic reconnecting enabled or disabled.
-     * If set to Never, then reconnecting will never be allowed.
-     */
-    public get reconnectMode(): ReconnectMode {
-        return this._reconnectMode;
-    }
-
     public shouldJoinWrite(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
-    }
-
-    /**
-     * Enables or disables automatic reconnecting.
-     * Will throw an error if reconnectMode set to Never.
-     */
-    public setAutomaticReconnect(reconnect: boolean): void {
-        assert(
-            this._reconnectMode !== ReconnectMode.Never,
-            0x0e1 /* "Cannot toggle automatic reconnect if reconnect is set to Never." */);
-        this._reconnectMode = reconnect ? ReconnectMode.Enabled : ReconnectMode.Disabled;
     }
 
     constructor(
         private readonly serviceProvider: () => IDocumentService | undefined,
         private readonly statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection,
         private readonly logger: ITelemetryLogger,
-        reconnectAllowed: boolean,
         private readonly _active: () => boolean,
     ) {
         super();
-
-        this._reconnectMode = reconnectAllowed ? ReconnectMode.Enabled : ReconnectMode.Never;
 
         this._inbound = new DeltaQueue<ISequencedDocumentMessage>(
             (op) => {

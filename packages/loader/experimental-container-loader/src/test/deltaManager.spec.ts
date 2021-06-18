@@ -89,7 +89,6 @@ describe("Loader", () => {
                     // TODO this needs to be a mock probably
                     new StatefulDocumentDeltaConnection(),
                     logger,
-                    false,
                     () => false,
                 );
 

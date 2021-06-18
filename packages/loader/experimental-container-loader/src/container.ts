@@ -894,33 +894,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         }
     }
 
-    public setAutoReconnect(reconnect: boolean) {
-        if (reconnect && this.closed) {
-            throw new Error("Attempting to setAutoReconnect() a closed DeltaManager");
-        }
-
-        this._deltaManager.setAutomaticReconnect(reconnect);
-
-        this.logger.sendTelemetryEvent({
-            eventName: reconnect ? "AutoReconnectEnabled" : "AutoReconnectDisabled",
-            connectionMode: this._deltaManager.connectionMode,
-            connectionState: ConnectionState[this.connectionState],
-        });
-
-        // If container state is not attached and resumed, then don't connect to delta stream. Also don't set the
-        // manual reconnection flag to true as we haven't made the initial connection yet.
-        if (reconnect && this._attachState === AttachState.Attached && this.resumedOpProcessingAfterLoad) {
-            // Ensure connection to web socket
-            this.connectToDeltaStream({ reason: "autoReconnect" }).catch((error) => {
-                // All errors are reported through events ("error" / "disconnected") and telemetry in DeltaManager
-                // So there shouldn't be a need to record error here.
-                // But we have number of cases where reconnects do not happen, and no errors are recorded, so
-                // adding this log point for easier diagnostics
-                this.logger.sendTelemetryEvent({ eventName: "setAutoReconnectError" }, error);
-            });
-        }
-    }
-
     public resume() {
         if (!this.closed) {
             // Note: no need to fetch ops as we do it preemptively as part of DeltaManager.attachOpHandler().
@@ -1534,7 +1507,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             () => this.service,
             this.statefulDocumentDeltaConnection,
             ChildLogger.create(this.subLogger, "DeltaManager"),
-            this._canReconnect,
             () => this.activeConnection(),
         );
 
