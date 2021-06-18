@@ -480,14 +480,14 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * @deprecated - use readOnlyInfo
      */
     public get readonlyPermissions() {
-        return this._deltaManager.readonlyPermissions;
+        throw new Error("Not implemented");
     }
 
     /**
      * {@inheritDoc DeltaManager.readOnlyInfo}
      */
     public get readOnlyInfo(): ReadOnlyInfo {
-        return this._deltaManager.readOnlyInfo;
+        throw new Error("Not implemented");
     }
 
     public get closed(): boolean {
@@ -636,7 +636,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.connectionStateHandler = new ConnectionStateHandler(
             {
                 protocolHandler: () => this._protocolHandler,
-                shouldClientJoinWrite: () => this._deltaManager.shouldJoinWrite(),
+                shouldClientJoinWrite: () => this._deltaManager.expectingAcks(),
                 maxClientLeaveWaitTime: this.loader.services.options.maxClientLeaveWaitTime,
             },
             this.logger,

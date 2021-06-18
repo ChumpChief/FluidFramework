@@ -243,28 +243,14 @@ export class DeltaManager
      * @deprecated - use readOnlyInfo
      */
     public get readonlyPermissions() {
-        return this.statefulDocumentDeltaConnection.connected
-            ? this.statefulDocumentDeltaConnection.readonlyScope
-            : true;
+        throw new Error("Not implemented");
     }
 
     public get readOnlyInfo(): ReadOnlyInfo {
-        const readonlyPermissions = this.statefulDocumentDeltaConnection.connected
-            ? this.statefulDocumentDeltaConnection.readonlyScope
-            : true;
-        if (readonlyPermissions) {
-            return {
-                readonly: true,
-                forced: false,
-                permissions: true,
-                storageOnly: false,
-            };
-        }
-
-        return { readonly: false };
+        throw new Error("Not implemented");
     }
 
-    public shouldJoinWrite(): boolean {
+    public expectingAcks(): boolean {
         // We don't have to wait for ack for topmost NoOps. So subtract those.
         return this.clientSequenceNumberObserved < (this.clientSequenceNumber - this.trailingNoopCount);
     }
@@ -401,13 +387,8 @@ export class DeltaManager
         // const maxOpSize = this.context.deltaManager.maxMessageSize;
 
         if (this.readonly === true) {
-            assert(this.readOnlyInfo.readonly === true, 0x1f0 /* "Unexpected mismatch in readonly" */);
             const error = new LoggingError("Op is sent in read-only document state", {
                 errorType: ContainerErrorType.genericError,
-                readonly: this.readOnlyInfo.readonly,
-                forcedReadonly: this.readOnlyInfo.forced,
-                readonlyPermissions: this.readOnlyInfo.permissions,
-                storageOnly: this.readOnlyInfo.storageOnly,
             });
             this.close(CreateContainerError(error));
             return -1;
