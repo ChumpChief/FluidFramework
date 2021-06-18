@@ -13,11 +13,12 @@ import {
 import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
 export class StatefulDocumentDeltaConnectionManager {
-    private readonly defaultClient: IClient = {
+    // currentClient's properties may be modified over time
+    private readonly currentClient: IClient = {
         details: {
             capabilities: { interactive: true },
         },
-        mode: "read", // default reconnection mode on lost connection / connection error
+        mode: "read",
         permission: [],
         scopes: [],
         user: { id: "" },
@@ -25,6 +26,8 @@ export class StatefulDocumentDeltaConnectionManager {
 
     private connectionP: Promise<IDocumentDeltaConnection> | undefined;
     private currentConnection: IDocumentDeltaConnection | undefined;
+
+    private autoReconnectEnabled: boolean = true;
 
     constructor(
         private readonly deltaStreamService: Pick<IDocumentService, "connectToDeltaStream">,
@@ -45,7 +48,7 @@ export class StatefulDocumentDeltaConnectionManager {
             return;
         }
 
-        this.connectionP = this.deltaStreamService.connectToDeltaStream(this.defaultClient);
+        this.connectionP = this.deltaStreamService.connectToDeltaStream(this.currentClient);
         this.currentConnection = await this.connectionP;
         this.connectionP = undefined;
 
@@ -76,7 +79,7 @@ export class StatefulDocumentDeltaConnectionManager {
         connection.close();
     }
 
-    public async setReadonlyMode(readonly: boolean): Promise<void> {
+    public async setReadonlyMode(enable: boolean): Promise<void> {
         // Arbitrary policy -- we will reconnect if you were connected before, or stay disconnected if you weren't
         let previouslyConnected = false;
         if (
@@ -88,35 +91,45 @@ export class StatefulDocumentDeltaConnectionManager {
             this.disconnect();
         }
 
-        this.defaultClient.mode = readonly
+        this.currentClient.mode = enable
             ? "read"
             : "write";
 
-        if (previouslyConnected) {
+        // TODO this is a little strange that sometimes you'll still be connected after setting readonly mode
+        // and sometimes you won't
+        if (previouslyConnected && this.autoReconnectEnabled) {
             await this.connect();
         }
+    }
+
+    public setAutoReconnectMode(enable: boolean) {
+        this.autoReconnectEnabled = enable;
     }
 
     private readonly nackHandler = () => {
         // Nack probably means we tried to send an op in read mode.
         // Arbitrary policy is to disconnect and then reconnect in write mode.
         // TODO Check if a reconnect attempt is allowed
-        // TODO Follow reconnect policy (delay, etc.)
+        // TODO Follow reconnect policy (delay, inspect error, etc.)
         this.setReadonlyMode(false).catch(console.error);
     };
 
     private readonly disconnectHandler = () => {
         this.disconnect();
         // TODO Check if a reconnect attempt is allowed
-        // TODO Follow reconnect policy (delay, etc.)
-        this.connect().catch(console.error);
+        // TODO Follow reconnect policy (delay, inspect reason, etc.)
+        if (this.autoReconnectEnabled) {
+            this.connect().catch(console.error);
+        }
     };
 
     private readonly errorHandler = () => {
         this.disconnect();
         // TODO Check if a reconnect attempt is allowed
-        // TODO Follow reconnect policy (delay, etc.)
-        this.connect().catch(console.error);
+        // TODO Follow reconnect policy (delay, inspect error, etc.)
+        if (this.autoReconnectEnabled) {
+            this.connect().catch(console.error);
+        }
     };
 
     private readonly pongHandler = () => {
