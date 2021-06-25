@@ -3,21 +3,31 @@
  * Licensed under the MIT License.
  */
 
-import { EventEmitter } from "events";
-import { assert } from "@fluidframework/common-utils";
+import { IEvent } from "@fluidframework/common-definitions";
+import { assert, TypedEventEmitter } from "@fluidframework/common-utils";
 import {
     IDocumentDeltaConnection,
 } from "@fluidframework/driver-definitions";
 import {
+    ConnectionMode,
+    IClientConfiguration,
     IDocumentMessage,
     ISequencedDocumentMessage,
+    ISignalClient,
     ISignalMessage,
+    ITokenClaims,
     ScopeType,
 } from "@fluidframework/protocol-definitions";
 
 const DefaultChunkSize = 16 * 1024;
 
-export class StatefulDocumentDeltaConnection extends EventEmitter {
+export interface IStatefulDocumentDeltaConnectionEvents extends IEvent {
+    (event: "connected" | "disconnected", listener: () => void);
+    (event: "op", listener: (documentId: string, messages: ISequencedDocumentMessage[]) => void);
+    (event: "signal", listener: (message: ISignalMessage) => void);
+}
+
+export class StatefulDocumentDeltaConnection extends TypedEventEmitter<IStatefulDocumentDeltaConnectionEvents> {
     private _deltaConnection: IDocumentDeltaConnection | undefined;
 
     public get connected() {
@@ -35,11 +45,11 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
         return this.deltaConnection.clientId;
     }
 
-    public get claims() {
+    public get claims(): ITokenClaims {
         return this.deltaConnection.claims;
     }
 
-    public get mode() {
+    public get mode(): ConnectionMode {
         return this.deltaConnection.mode;
     }
 
@@ -74,11 +84,11 @@ export class StatefulDocumentDeltaConnection extends EventEmitter {
         return this.deltaConnection.initialSignals;
     }
 
-    public get initialClients() {
+    public get initialClients(): ISignalClient[] {
         return this.deltaConnection.initialClients;
     }
 
-    public get serviceConfiguration() {
+    public get serviceConfiguration(): IClientConfiguration {
         return this.deltaConnection.serviceConfiguration;
     }
 

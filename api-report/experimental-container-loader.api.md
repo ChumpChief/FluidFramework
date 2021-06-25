@@ -25,11 +25,13 @@ import { IDeltaManager } from '@fluidframework/container-definitions';
 import { IDeltaManagerEvents } from '@fluidframework/container-definitions';
 import { IDeltaQueue } from '@fluidframework/container-definitions';
 import { IDisposable } from '@fluidframework/common-definitions';
+import { IDocumentDeltaConnection } from '@fluidframework/driver-definitions';
 import { IDocumentMessage } from '@fluidframework/protocol-definitions';
 import { IDocumentService } from '@fluidframework/driver-definitions';
 import { IDocumentServiceFactory } from '@fluidframework/driver-definitions';
 import { IDocumentStorageService } from '@fluidframework/driver-definitions';
 import { IDocumentStorageServicePolicies } from '@fluidframework/driver-definitions';
+import { IEvent } from '@fluidframework/common-definitions';
 import { IEventProvider } from '@fluidframework/common-definitions';
 import { IFluidCodeDetails } from '@fluidframework/core-interfaces';
 import { IFluidObject } from '@fluidframework/core-interfaces';
@@ -44,6 +46,7 @@ import { IRequest } from '@fluidframework/core-interfaces';
 import { IResolvedUrl } from '@fluidframework/driver-definitions';
 import { IResponse } from '@fluidframework/core-interfaces';
 import { ISequencedDocumentMessage } from '@fluidframework/protocol-definitions';
+import { ISignalClient } from '@fluidframework/protocol-definitions';
 import { ISignalMessage } from '@fluidframework/protocol-definitions';
 import { ISnapshotTree } from '@fluidframework/protocol-definitions';
 import { ISummaryContext } from '@fluidframework/driver-definitions';
@@ -52,6 +55,7 @@ import { ISummaryTree } from '@fluidframework/protocol-definitions';
 import { ITelemetryBaseLogger } from '@fluidframework/common-definitions';
 import { ITelemetryLogger } from '@fluidframework/common-definitions';
 import { IThrottlingWarning } from '@fluidframework/container-definitions';
+import { ITokenClaims } from '@fluidframework/protocol-definitions';
 import { ITree } from '@fluidframework/protocol-definitions';
 import { IUrlResolver } from '@fluidframework/driver-definitions';
 import { IVersion } from '@fluidframework/protocol-definitions';
@@ -112,6 +116,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     // (undocumented)
     get connected(): boolean;
     // (undocumented)
+    get connectionManager(): StatefulDocumentDeltaConnectionManager | undefined;
+    // (undocumented)
     get connectionState(): ConnectionState;
     static createDetached(loader: Loader, codeDetails: IFluidCodeDetails): Promise<Container>;
     // (undocumented)
@@ -134,26 +140,22 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     proposeCodeDetails(codeDetails: IFluidCodeDetails): Promise<boolean>;
     raiseContainerWarning(warning: ContainerWarning): void;
     // @deprecated
-    get readonly(): boolean | undefined;
+    get readonly(): boolean;
     // (undocumented)
     get readOnlyInfo(): ReadOnlyInfo;
     // @deprecated
-    get readonlyPermissions(): boolean | undefined;
+    get readonlyPermissions(): void;
     static rehydrateDetachedFromSnapshot(loader: Loader, snapshot: string): Promise<Container>;
     // (undocumented)
     request(path: IRequest): Promise<IResponse>;
     // (undocumented)
     get resolvedUrl(): IResolvedUrl | undefined;
     // (undocumented)
-    resume(): void;
-    // (undocumented)
     protected resumeInternal(args: IConnectionArgs): void;
     get scopes(): string[] | undefined;
     // (undocumented)
     serialize(): string;
     get serviceConfiguration(): IClientConfiguration | undefined;
-    // (undocumented)
-    setAutoReconnect(reconnect: boolean): void;
     // (undocumented)
     snapshot(tagMessage: string, fullTree?: boolean): Promise<void>;
     // (undocumented)
@@ -169,12 +171,13 @@ export function convertProtocolAndAppSummaryToSnapshotTree(protocolSummaryTree: 
 
 // @public
 export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents> implements IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>, IEventProvider<IDeltaManagerInternalEvents> {
-    constructor(serviceProvider: () => IDocumentService | undefined, client: IClient, logger: ITelemetryLogger, reconnectAllowed: boolean, _active: () => boolean);
+    // Warning: (ae-forgotten-export) The symbol "StatefulDocumentDeltaConnection" needs to be exported by the entry point index.d.ts
+    constructor(serviceProvider: () => Pick<IDocumentService, "connectToDeltaStorage"> | undefined, statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection, logger: ITelemetryLogger, _active: () => boolean);
     // (undocumented)
     get active(): boolean;
     attachOpHandler(minSequenceNumber: number, sequenceNumber: number, term: number, handler: IDeltaHandlerStrategy): void;
     // (undocumented)
-    readonly clientDetails: IClientDetails;
+    get clientDetails(): IClientDetails;
     close(error?: ICriticalContainerError): void;
     // (undocumented)
     connect(args: IConnectionArgs): Promise<IConnectionDetails>;
@@ -185,6 +188,8 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     get disposed(): boolean;
     // (undocumented)
     emitDelayInfo(id: string, delayMs: number, error: ICriticalContainerError): void;
+    // (undocumented)
+    expectingAcks(): boolean;
     // (undocumented)
     flush(): void;
     get hasCheckpointSequenceNumber(): boolean;
@@ -211,12 +216,11 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     // (undocumented)
     preFetchOps(cacheOnly: boolean): Promise<void>;
     // @deprecated
-    get readonly(): boolean | undefined;
+    get readonly(): boolean;
     // (undocumented)
     get readOnlyInfo(): ReadOnlyInfo;
     // @deprecated
-    get readonlyPermissions(): boolean | undefined;
-    get reconnectMode(): ReconnectMode;
+    get readonlyPermissions(): void;
     // (undocumented)
     get referenceTerm(): number;
     // (undocumented)
@@ -225,9 +229,6 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     get scopes(): string[] | undefined;
     // (undocumented)
     get serviceConfiguration(): IClientConfiguration | undefined;
-    setAutomaticReconnect(reconnect: boolean): void;
-    // (undocumented)
-    shouldJoinWrite(): boolean;
     // (undocumented)
     get socketDocumentId(): string | undefined;
     submit(type: MessageType, contents: any, batch?: boolean, metadata?: any): number;
@@ -333,16 +334,6 @@ export class Loader implements IHostLoader {
 export function parseUrl(url: string): IParsedUrl | undefined;
 
 // @public (undocumented)
-export enum ReconnectMode {
-    // (undocumented)
-    Disabled = "Disabled",
-    // (undocumented)
-    Enabled = "Enabled",
-    // (undocumented)
-    Never = "Never"
-}
-
-// @public (undocumented)
 export class RelativeLoader implements ILoader {
     constructor(container: Container, loader: ILoader | undefined);
     // (undocumented)
@@ -380,8 +371,20 @@ export class RetriableDocumentStorageService implements IDocumentStorageService,
     write(tree: ITree, parents: string[], message: string, ref: string): Promise<IVersion>;
 }
 
-// @public
-export function waitContainerToCatchUp(container: Container): Promise<boolean>;
+// @public (undocumented)
+export class StatefulDocumentDeltaConnectionManager {
+    constructor(deltaStreamService: Pick<IDocumentService, "connectToDeltaStream">, statefulDocumentDeltaConnection: StatefulDocumentDeltaConnection, clientDetailsOverride: IClientDetails | undefined, reconnectPermitted: boolean);
+    // (undocumented)
+    get clientDetails(): IClientDetails;
+    // (undocumented)
+    connect(): Promise<void>;
+    // (undocumented)
+    disconnect(): void;
+    // (undocumented)
+    setAutoReconnectMode(enable: boolean): void;
+    // (undocumented)
+    setReadonlyMode(enable: boolean): Promise<void>;
+    }
 
 
 // (No @packageDocumentation comment for this package)
