@@ -5,6 +5,7 @@
 
 export * from "./getSessionStorageContainer";
 export * from "./getContainer";
+export * from "./getExperimentalContainer";
 export * from "./routerliciousService";
 export * from "./tinyliciousService";
 export { InsecureTinyliciousUrlResolver } from "@fluidframework/tinylicious-driver";

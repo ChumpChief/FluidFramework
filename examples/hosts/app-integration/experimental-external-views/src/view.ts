@@ -64,11 +64,15 @@ export function renderConnectionControls(
 
     const setReadonlyModeTrueButton = document.createElement("button");
     setReadonlyModeTrueButton.textContent = "connectionManager.setReadonlyMode(true)";
-    setReadonlyModeTrueButton.addEventListener("click", () => { connectionManager.setReadonlyMode(true); });
+    setReadonlyModeTrueButton.addEventListener("click", () => {
+        connectionManager.setReadonlyMode(true).catch(console.error);
+    });
 
     const setReadonlyModeFalseButton = document.createElement("button");
     setReadonlyModeFalseButton.textContent = "connectionManager.setReadonlyMode(false)";
-    setReadonlyModeFalseButton.addEventListener("click", () => { connectionManager.setReadonlyMode(false); });
+    setReadonlyModeFalseButton.addEventListener("click", () => {
+        connectionManager.setReadonlyMode(false).catch(console.error);
+    });
 
     wrapperDiv.append(
         connectButton,
