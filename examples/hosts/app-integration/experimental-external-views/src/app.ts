@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { getTinyliciousContainer } from "@fluid-experimental/experimental-get-container";
+import { getExperimentalContainer, TinyliciousService } from "@fluid-experimental/get-container";
 
 import { DiceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
@@ -30,7 +30,13 @@ async function start(): Promise<void> {
     // production service, but ultimately we'll still be getting a reference to a Container object.  The helper
     // function takes the ID of the document we're creating or loading, the container code to load into it, and a
     // flag to specify whether we're creating a new document or loading an existing one.
-    const container = await getTinyliciousContainer(documentId, DiceRollerContainerRuntimeFactory, createNew);
+    const service = new TinyliciousService();
+    const container = await getExperimentalContainer(
+        service,
+        documentId,
+        DiceRollerContainerRuntimeFactory,
+        createNew,
+    );
     // eslint-disable-next-line @typescript-eslint/dot-notation
     window["container"] = container;
 

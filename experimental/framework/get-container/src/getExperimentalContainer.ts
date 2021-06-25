@@ -12,6 +12,8 @@ import {
 } from "./getContainer";
 
 /**
+ * getExperimentalContainer does the same thing as getContainer but uses the experimental Loader
+ * (and therefore the experimental Container as well).
  * @alpha
  */
 export async function getExperimentalContainer(
