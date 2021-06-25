@@ -27,7 +27,6 @@ import {
     AttachState,
     IThrottlingWarning,
     IPendingLocalState,
-    ReadOnlyInfo,
     ILoaderOptions,
     IContainerLoadMode,
 } from "@fluidframework/container-definitions";
@@ -407,29 +406,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     public get loadedFromVersion(): IVersion | undefined {
         return this._loadedFromVersion;
-    }
-
-    /**
-     * {@inheritDoc DeltaManager.readonly}
-     * @deprecated - use readOnlyInfo
-     */
-    public get readonly() {
-        return this._deltaManager.readonly;
-    }
-
-    /**
-     * {@inheritDoc DeltaManager.readonlyPermissions}
-     * @deprecated - use readOnlyInfo
-     */
-    public get readonlyPermissions() {
-        throw new Error("Not implemented");
-    }
-
-    /**
-     * {@inheritDoc DeltaManager.readOnlyInfo}
-     */
-    public get readOnlyInfo(): ReadOnlyInfo {
-        throw new Error("Not implemented");
     }
 
     public get closed(): boolean {
