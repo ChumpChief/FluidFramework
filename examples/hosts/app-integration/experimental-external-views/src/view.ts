@@ -45,17 +45,43 @@ export function renderConnectionControls(
 ) {
     const wrapperDiv = document.createElement("div");
     wrapperDiv.style.textAlign = "center";
+
     const connectButton = document.createElement("button");
     connectButton.textContent = "connectionManager.connect()";
     connectButton.addEventListener("click", () => { connectionManager.connect().catch(console.error); });
+
     const disconnectButton = document.createElement("button");
     disconnectButton.textContent = "connectionManager.disconnect()";
     disconnectButton.addEventListener("click", () => { connectionManager.disconnect(); });
+
+    const setAutoReconnectModeTrueButton = document.createElement("button");
+    setAutoReconnectModeTrueButton.textContent = "connectionManager.setAutoReconnectMode(true)";
+    setAutoReconnectModeTrueButton.addEventListener("click", () => { connectionManager.setAutoReconnectMode(true); });
+
+    const setAutoReconnectModeFalseButton = document.createElement("button");
+    setAutoReconnectModeFalseButton.textContent = "connectionManager.setAutoReconnectMode(false)";
+    setAutoReconnectModeFalseButton.addEventListener("click", () => { connectionManager.setAutoReconnectMode(false); });
+
+    const setReadonlyModeTrueButton = document.createElement("button");
+    setReadonlyModeTrueButton.textContent = "connectionManager.setReadonlyMode(true)";
+    setReadonlyModeTrueButton.addEventListener("click", () => { connectionManager.setReadonlyMode(true); });
+
+    const setReadonlyModeFalseButton = document.createElement("button");
+    setReadonlyModeFalseButton.textContent = "connectionManager.setReadonlyMode(false)";
+    setReadonlyModeFalseButton.addEventListener("click", () => { connectionManager.setReadonlyMode(false); });
+
     wrapperDiv.append(
         connectButton,
         document.createElement("br"),
         disconnectButton,
         document.createElement("br"),
+        setAutoReconnectModeTrueButton,
+        document.createElement("br"),
+        setAutoReconnectModeFalseButton,
+        document.createElement("br"),
+        setReadonlyModeTrueButton,
+        document.createElement("br"),
+        setReadonlyModeFalseButton,
     );
     div.append(wrapperDiv);
 }
