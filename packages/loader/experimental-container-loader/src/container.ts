@@ -441,7 +441,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {
-        return this._deltaManager;
+        throw new Error("Not implemented");
     }
 
     public get connectionState(): ConnectionState {
@@ -566,9 +566,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                     containerLoadedFromVersionId: () => this.loadedFromVersion?.id,
                     containerLoadedFromVersionDate: () => this.loadedFromVersion?.date,
                     // message information to associate errors with the specific execution state
-                    dmLastMsqSeqNumber: () => this.deltaManager?.lastMessage?.sequenceNumber,
-                    dmLastMsqSeqTimestamp: () => this.deltaManager?.lastMessage?.timestamp,
-                    dmLastMsqSeqClientId: () => this.deltaManager?.lastMessage?.clientId,
+                    dmLastMsqSeqNumber: () => this._deltaManager?.lastMessage?.sequenceNumber,
+                    dmLastMsqSeqTimestamp: () => this._deltaManager?.lastMessage?.timestamp,
+                    dmLastMsqSeqClientId: () => this._deltaManager?.lastMessage?.clientId,
                 },
             });
 
@@ -645,6 +645,25 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      */
     public getQuorum(): IQuorum {
         return this.protocolHandler.quorum;
+    }
+
+    public async waitUntilOpProcessed(sequenceNumber: number): Promise<void> {
+        // Resolve immediately if we've already processed it
+        if (this._deltaManager.lastSequenceNumber >= sequenceNumber) {
+            return;
+        }
+
+        // TODO consider rejecting if container gets disposed or we otherwise know we cannot process the target op.
+        return new Promise<void>((resolve) => {
+            const opHandler = (message: ISequencedDocumentMessage) => {
+                if (message.sequenceNumber >= sequenceNumber) {
+                    resolve();
+                    this.off("op", opHandler);
+                }
+            };
+
+            this.on("op", opHandler);
+        });
     }
 
     public close(error?: ICriticalContainerError) {
@@ -737,7 +756,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this.attachInProgress = true;
         try {
-            assert(this.deltaManager.inbound.length === 0, 0x0d6 /* "Inbound queue should be empty when attaching" */);
+            assert(this._deltaManager.inbound.length === 0, 0x0d6 /* "Inbound queue should be empty when attaching" */);
             // Only take a summary if the container is in detached state, otherwise we could have local changes.
             // In failed attach call, we would already have a summary cached.
             if (this._attachState === AttachState.Detached) {
@@ -826,13 +845,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Stop inbound message processing while we complete the snapshot
         try {
-            await this.deltaManager.inbound.pause();
+            await this._deltaManager.inbound.pause();
             await this.snapshotCore(tagMessage, fullTree);
         } catch (ex) {
             this.logger.sendErrorEvent({ eventName: "SnapshotExceptionError" }, ex);
             throw ex;
         } finally {
-            this.deltaManager.inbound.resume();
+            this._deltaManager.inbound.resume();
         }
     }
 
@@ -908,12 +927,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const codeDetails = this.getCodeDetailsFromQuorum();
 
         await Promise.all([
-            this.deltaManager.inbound.pause(),
-            this.deltaManager.inboundSignal.pause()]);
+            this._deltaManager.inbound.pause(),
+            this._deltaManager.inboundSignal.pause()]);
 
         if ((await this.context.satisfies(codeDetails) === true)) {
-            this.deltaManager.inbound.resume();
-            this.deltaManager.inboundSignal.resume();
+            this._deltaManager.inbound.resume();
+            this._deltaManager.inboundSignal.resume();
             return;
         }
 

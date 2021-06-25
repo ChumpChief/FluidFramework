@@ -164,6 +164,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     subLogger: TelemetryLogger;
     // (undocumented)
     static version: string;
+    // (undocumented)
+    waitUntilOpProcessed(sequenceNumber: number): Promise<void>;
 }
 
 // @public

@@ -31,7 +31,6 @@ import {
     IResolvedUrl,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
-import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 import {
     ensureFluidResolvedUrl,
     MultiUrlResolver,
@@ -375,18 +374,7 @@ export class Loader implements IHostLoader {
                     pendingLocalState?.pendingRuntimeState);
         }
 
-        if (container.deltaManager.lastSequenceNumber <= fromSequenceNumber) {
-            await new Promise<void>((resolve, reject) => {
-                function opHandler(message: ISequencedDocumentMessage) {
-                    if (message.sequenceNumber > fromSequenceNumber) {
-                        resolve();
-                        container.removeListener("op", opHandler);
-                    }
-                }
-
-                container.on("op", opHandler);
-            });
-        }
+        await container.waitUntilOpProcessed(fromSequenceNumber);
 
         return { container, parsed };
     }
