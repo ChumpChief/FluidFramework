@@ -9,3 +9,4 @@ export * from "./deltaManager";
 export * from "./loader";
 export * from "./utils";
 export * from "./retriableDocumentStorageService";
+export * from "./statefulDocumentDeltaConnectionManager";

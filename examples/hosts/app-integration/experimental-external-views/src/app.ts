@@ -7,7 +7,7 @@ import { getTinyliciousContainer } from "@fluid-experimental/experimental-get-co
 
 import { DiceRollerContainerRuntimeFactory } from "./containerCode";
 import { IDiceRoller } from "./dataObject";
-import { renderDiceRoller } from "./view";
+import { renderConnectionControls, renderDiceRoller } from "./view";
 
 // In interacting with the service, we need to be explicit about whether we're creating a new document vs. loading
 // an existing one.  We also need to provide the unique ID for the document we are creating or loading from.
@@ -52,9 +52,17 @@ async function start(): Promise<void> {
     // In this app, we know our container code provides a default data object that is an IDiceRoller.
     const diceRoller: IDiceRoller = response.value;
 
+    if (container.connectionManager === undefined) {
+        throw new Error("Should have a connection manager at this point");
+    }
+
     // Given an IDiceRoller, we can render the value and provide controls for users to roll it.
-    const div = document.getElementById("content") as HTMLDivElement;
-    renderDiceRoller(diceRoller, div);
+    const contentDiv = document.getElementById("content") as HTMLDivElement;
+    const diceRollerDiv = document.createElement("div");
+    const connectionControlsDiv = document.createElement("div");
+    contentDiv.append(diceRollerDiv, connectionControlsDiv);
+    renderDiceRoller(diceRoller, diceRollerDiv);
+    renderConnectionControls(container.connectionManager, connectionControlsDiv);
 }
 
 start().catch((error) => console.error(error));

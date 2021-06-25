@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+import { StatefulDocumentDeltaConnectionManager } from "@fluid-experimental/experimental-container-loader";
 import { IDiceRoller } from "./dataObject";
 
 /**
@@ -36,4 +37,25 @@ export function renderDiceRoller(diceRoller: IDiceRoller, div: HTMLDivElement) {
 
     // Use the diceRolled event to trigger the rerender whenever the value changes.
     diceRoller.on("diceRolled", updateDiceChar);
+}
+
+export function renderConnectionControls(
+    connectionManager: StatefulDocumentDeltaConnectionManager,
+    div: HTMLDivElement,
+) {
+    const wrapperDiv = document.createElement("div");
+    wrapperDiv.style.textAlign = "center";
+    const connectButton = document.createElement("button");
+    connectButton.textContent = "connectionManager.connect()";
+    connectButton.addEventListener("click", () => { connectionManager.connect().catch(console.error); });
+    const disconnectButton = document.createElement("button");
+    disconnectButton.textContent = "connectionManager.disconnect()";
+    disconnectButton.addEventListener("click", () => { connectionManager.disconnect(); });
+    wrapperDiv.append(
+        connectButton,
+        document.createElement("br"),
+        disconnectButton,
+        document.createElement("br"),
+    );
+    div.append(wrapperDiv);
 }
