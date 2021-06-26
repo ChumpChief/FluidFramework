@@ -419,6 +419,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         throw new Error("Not implemented");
     }
 
+    public get connected(): boolean {
+        return this.connectionStateHandler.connected;
+    }
+
     /**
      * Service configuration details. If running in offline mode will be undefined otherwise will contain service
      * configuration details returned as part of the initial connection.
@@ -1610,7 +1614,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const loader = new RelativeLoader(this, this.loader);
         this._context = await ContainerContext.createOrLoad(
             this,
-            this.statefulDocumentDeltaConnection,
             this.scope,
             this.codeLoader,
             codeDetails,

@@ -43,14 +43,12 @@ import {
 import { PerformanceEvent } from "@fluidframework/telemetry-utils";
 import { assert, LazyPromise } from "@fluidframework/common-utils";
 import { Container } from "./container";
-import { StatefulDocumentDeltaConnection } from "./statefulDocumentDeltaConnection";
 
 const PackageNotFactoryError = "Code package does not implement IRuntimeFactory";
 
 export class ContainerContext implements IContainerContext {
     public static async createOrLoad(
         container: Container,
-        connection: StatefulDocumentDeltaConnection,
         scope: IFluidObject,
         codeLoader: ICodeLoader,
         codeDetails: IFluidCodeDetails,
@@ -69,7 +67,6 @@ export class ContainerContext implements IContainerContext {
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
             container,
-            connection,
             scope,
             codeLoader,
             codeDetails,
@@ -112,7 +109,7 @@ export class ContainerContext implements IContainerContext {
     }
 
     public get connected(): boolean {
-        return this.connection.connected;
+        return this.container.connected;
     }
 
     public get canSummarize(): boolean {
@@ -170,8 +167,6 @@ export class ContainerContext implements IContainerContext {
 
     constructor(
         private readonly container: Container,
-        // TODO Should this only pass the ability to inspect connection state?  E.g. should this allow listening to op
-        private readonly connection: StatefulDocumentDeltaConnection,
         public readonly scope: IFluidObject,
         private readonly codeLoader: ICodeLoader,
         public readonly codeDetails: IFluidCodeDetails,

@@ -114,6 +114,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     // (undocumented)
     get codeDetails(): IFluidCodeDetails | undefined;
     // (undocumented)
+    get connected(): boolean;
+    // (undocumented)
     get connectionManager(): StatefulDocumentDeltaConnectionManager | undefined;
     static createDetached(loader: Loader, codeDetails: IFluidCodeDetails): Promise<Container>;
     // (undocumented)
