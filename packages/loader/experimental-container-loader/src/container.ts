@@ -419,10 +419,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         throw new Error("Not implemented");
     }
 
-    public get connectionState(): ConnectionState {
-        return this.connectionStateHandler.connectionState;
-    }
-
     /**
      * Service configuration details. If running in offline mode will be undefined otherwise will contain service
      * configuration details returned as part of the initial connection.
@@ -618,7 +614,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this._context?.dispose(error !== undefined ? new Error(error.message) : undefined);
 
-        assert(this.connectionState === ConnectionState.Disconnected, 0x0cf /* "disconnect event was not raised!" */);
+        assert(
+            this.connectionStateHandler.connectionState === ConnectionState.Disconnected,
+            0x0cf /* "disconnect event was not raised!" */,
+        );
 
         this._storageService?.dispose();
 
@@ -1396,7 +1395,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * If it's not true, runtime is not in position to send ops.
      */
     private activeConnection() {
-        return this.connectionState === ConnectionState.Connected && this._deltaManager.connectionMode === "write";
+        return this.connectionStateHandler.connectionState === ConnectionState.Connected
+            && this._deltaManager.connectionMode === "write";
     }
 
     private createDeltaManager() {
@@ -1462,11 +1462,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private propagateConnectionState() {
         const logOpsOnReconnect: boolean =
-            this.connectionState === ConnectionState.Connected &&
+            this.connectionStateHandler.connectionState === ConnectionState.Connected &&
             !this.firstConnection &&
             this._deltaManager.connectionMode === "write";
 
-        if (this.connectionState === ConnectionState.Connected) {
+        if (this.connectionStateHandler.connectionState === ConnectionState.Connected) {
             this.firstConnection = false;
         }
 
@@ -1474,7 +1474,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.messageCountAfterDisconnection = 0;
         }
 
-        const state = this.connectionState === ConnectionState.Connected;
+        const state = this.connectionStateHandler.connectionState === ConnectionState.Connected;
         if (!this.context.disposed) {
             this.context.setConnectionState(state, this.clientId);
         }
@@ -1503,7 +1503,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private submitMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
-        if (this.connectionState !== ConnectionState.Connected) {
+        if (this.connectionStateHandler.connectionState !== ConnectionState.Connected) {
             this.logger.sendErrorEvent({ eventName: "SubmitMessageWithNoConnection", type });
             return -1;
         }
