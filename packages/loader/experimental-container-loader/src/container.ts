@@ -85,8 +85,6 @@ import {
     PerformanceEvent,
     raiseConnectedEvent,
     TelemetryLogger,
-    connectedEventName,
-    disconnectedEventName,
 } from "@fluidframework/telemetry-utils";
 import { Audience } from "./audience";
 import { ContainerContext } from "./containerContext";
@@ -178,6 +176,7 @@ export class CollabWindowTracker {
         private readonly NoopTimeFrequency: number = 2000,
         private readonly NoopCountFrequency: number = 300,
     ) {}
+
     /**
      * Schedules as ack to the server to update the reference sequence number
      */
@@ -424,10 +423,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.connectionStateHandler.connectionState;
     }
 
-    public get connected(): boolean {
-        return this.connectionStateHandler.connected;
-    }
-
     /**
      * Service configuration details. If running in offline mode will be undefined otherwise will contain service
      * configuration details returned as part of the initial connection.
@@ -579,41 +574,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             },
             this.storageBlobs,
         );
-
-        // We observed that most users of platform do not check Container.connected event on load, causing bugs.
-        // As such, we are raising events when new listener pops up.
-        // Note that we can raise both "disconnected" & "connect" events at the same time,
-        // if we are in connecting stage.
-        this.on("newListener", (event: string, listener: (...args: any[]) => void) => {
-            // Fire events on the end of JS turn, giving a chance for caller to be in consistent state.
-            Promise.resolve().then(() => {
-                switch (event) {
-                    case dirtyContainerEvent:
-                        if (this._dirtyContainer) {
-                            listener(this._dirtyContainer);
-                        }
-                        break;
-                    case savedContainerEvent:
-                        if (!this._dirtyContainer) {
-                            listener(this._dirtyContainer);
-                        }
-                        break;
-                    case connectedEventName:
-                         if (this.connected) {
-                            listener(event, this.clientId);
-                         }
-                         break;
-                    case disconnectedEventName:
-                        if (!this.connected) {
-                            listener(event);
-                        }
-                        break;
-                    default:
-                }
-            }).catch((error) =>  {
-                this.logger.sendErrorEvent({ eventName: "RaiseConnectedEventError" }, error);
-            });
-        });
     }
 
     /**
@@ -1650,6 +1610,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const loader = new RelativeLoader(this, this.loader);
         this._context = await ContainerContext.createOrLoad(
             this,
+            this.statefulDocumentDeltaConnection,
             this.scope,
             this.codeLoader,
             codeDetails,
