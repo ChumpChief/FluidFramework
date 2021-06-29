@@ -129,11 +129,8 @@ export class ContainerContext implements IContainerContext {
     }
 
     public get configuration(): IFluidConfiguration {
-        // TODO this could probably consult the stateful connection
-        const config: Partial<IFluidConfiguration> = {
-            scopes: this.container.scopes,
-        };
-        return config as IFluidConfiguration;
+        // TODO this could possibly consult the stateful connection
+        throw new Error("Not implemented");
     }
 
     public get baseSnapshot() {

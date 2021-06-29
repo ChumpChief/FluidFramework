@@ -439,14 +439,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.connectionStateHandler.clientId;
     }
 
-    /**
-     * The server provided claims of the client.
-     * Set once this.connected is true, otherwise undefined
-     */
-    public get scopes(): string[] | undefined {
-        throw new Error("Not implemented");
-    }
-
     public get clientDetails(): IClientDetails {
         // TODO Really they should probably be undefined/throw in disconnected state too.
         if (this.statefulDocumentDeltaConnectionManager === undefined) {

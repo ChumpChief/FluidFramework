@@ -142,7 +142,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     get resolvedUrl(): IResolvedUrl | undefined;
     // (undocumented)
     protected resumeInternal(args: IConnectionArgs): void;
-    get scopes(): string[] | undefined;
     // (undocumented)
     serialize(): string;
     get serviceConfiguration(): IClientConfiguration | undefined;
