@@ -140,10 +140,8 @@ export class DeltaManager
      * Tells if  current connection has checkpoint information.
      * I.e. we know how far behind the client was at the time of establishing connection
      */
-    public get hasCheckpointSequenceNumber() {
-        // Valid to be called only if we have active connection.
-        assert(this.statefulDocumentDeltaConnection.connected, 0x0df /* "Missing active connection" */);
-        return this._hasCheckpointSequenceNumber;
+    public get hasCheckpointSequenceNumber(): boolean {
+        throw new Error("Not implemented");
     }
 
     public get inbound(): IDeltaQueue<ISequencedDocumentMessage> {
@@ -187,10 +185,7 @@ export class DeltaManager
     }
 
     public get version(): string {
-        if (!this.statefulDocumentDeltaConnection.connected) {
-            throw new Error("Cannot check version without a connection");
-        }
-        return this.statefulDocumentDeltaConnection.version;
+        throw new Error("Not implemented");
     }
 
     public get serviceConfiguration(): IClientConfiguration | undefined {
