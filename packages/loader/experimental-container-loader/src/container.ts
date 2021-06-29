@@ -1405,7 +1405,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.connectionStateHandler.receivedConnectEvent(
                 // TODO should this be checking the connection state?  Should we even have a connectionStateHandler?
                 this.statefulDocumentDeltaConnection.mode,
-                details,
+                details.clientId,
             );
 
             // Back-compat for new client and old server.

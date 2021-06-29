@@ -4,7 +4,6 @@
  */
 
 import { IEvent } from "@fluidframework/common-definitions";
-import { IConnectionDetails } from "@fluidframework/container-definitions";
 import { ConnectionMode, ISequencedClient, IQuorum } from "@fluidframework/protocol-definitions";
 import { EventEmitterWithErrorHandling } from "@fluidframework/telemetry-utils";
 import { assert, Timer } from "@fluidframework/common-utils";
@@ -96,7 +95,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
 
     public receivedConnectEvent(
         connectionMode: ConnectionMode,
-        details: IConnectionDetails,
+        clientId: string,
     ) {
         this._connectionState = ConnectionState.Connecting;
 
@@ -106,7 +105,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         // ops sent by this client, so we should keep the old client id until we see our own client's
         // join message. after we see the join message for out new connection with our new client id,
         // we know there can no longer be outstanding ops that we sent with the previous client id.
-        this._pendingClientId = details.clientId;
+        this._pendingClientId = clientId;
 
         const quorum = this.handler.quorum();
         // Check if we already processed our own join op through delta storage!
@@ -114,7 +113,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         // Given async processes, it's possible that we have already processed our own join message before
         // connection was fully established.
         // Note that we might be still initializing quorum - connection is established proactively on load!
-        if ((quorum !== undefined && quorum.getMember(details.clientId) !== undefined)
+        if ((quorum !== undefined && quorum.getMember(clientId) !== undefined)
             || connectionMode === "read"
         ) {
             this.setConnectionState(ConnectionState.Connected);
