@@ -114,14 +114,13 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         }
     }
 
-    public receivedDisconnectEvent(reason: string) {
-        this.setConnectionState(ConnectionState.Disconnected, reason);
+    public receivedDisconnectEvent() {
+        this.setConnectionState(ConnectionState.Disconnected);
     }
 
     public receivedConnectEvent(
         connectionMode: ConnectionMode,
         details: IConnectionDetails,
-        opsBehind?: number,
     ) {
         this._connectionState = ConnectionState.Connecting;
 
@@ -146,9 +145,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         }
     }
 
-    private setConnectionState(value: ConnectionState.Disconnected, reason: string);
-    private setConnectionState(value: ConnectionState.Connected);
-    private setConnectionState(value: ConnectionState, reason?: string) {
+    private setConnectionState(value: ConnectionState) {
         if (this.connectionState === value) {
             // Already in the desired state - exit early
             this.logger.sendErrorEvent({ eventName: "setConnectionStateSame", value });

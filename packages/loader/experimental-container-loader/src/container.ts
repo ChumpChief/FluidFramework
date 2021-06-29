@@ -1403,12 +1403,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         deltaManager.inboundSignal.pause();
 
-        deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {
+        deltaManager.on("connect", (details: IConnectionDetails) => {
             this.connectionStateHandler.receivedConnectEvent(
                 // TODO should this be checking the connection state?  Should we even have a connectionStateHandler?
                 this.statefulDocumentDeltaConnection.mode,
                 details,
-                opsBehind,
             );
 
             // Back-compat for new client and old server.
@@ -1420,7 +1419,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         });
 
         deltaManager.on("disconnect", (reason: string) => {
-            this.connectionStateHandler.receivedDisconnectEvent(reason);
+            this.connectionStateHandler.receivedDisconnectEvent();
         });
 
         deltaManager.on("throttled", (warning: IThrottlingWarning) => {

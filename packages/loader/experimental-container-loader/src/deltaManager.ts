@@ -130,10 +130,6 @@ export class DeltaManager
 
     private connectionStateProps: Record<string, string | number> = {};
 
-    // True if current connection has checkpoint information
-    // I.e. we know how far behind the client was at the time of establishing connection
-    private _hasCheckpointSequenceNumber = false;
-
     private readonly closeAbortController = new AbortController();
 
     /**
@@ -601,12 +597,10 @@ export class DeltaManager
             clientId: this.statefulDocumentDeltaConnection.clientId,
             mode: this.statefulDocumentDeltaConnection.mode,
         };
-        this._hasCheckpointSequenceNumber = false;
 
         // Some storages may provide checkpointSequenceNumber to identify how far client is behind.
         const checkpointSequenceNumber = this.statefulDocumentDeltaConnection.checkpointSequenceNumber;
         if (checkpointSequenceNumber !== undefined) {
-            this._hasCheckpointSequenceNumber = true;
             this.updateLatestKnownOpSeqNumber(checkpointSequenceNumber);
         }
 
@@ -615,7 +609,6 @@ export class DeltaManager
         // so duplicating update logic here as well.
         const last = initialMessages.length > 0 ? initialMessages[initialMessages.length - 1].sequenceNumber : -1;
         if (initialMessages.length > 0) {
-            this._hasCheckpointSequenceNumber = true;
             this.updateLatestKnownOpSeqNumber(last);
         }
 
@@ -637,7 +630,7 @@ export class DeltaManager
         this.emit(
             "connect",
             connectionDetails,
-            this._hasCheckpointSequenceNumber ? this.lastObservedSeqNumber - this.lastSequenceNumber : undefined);
+        );
 
         this.enqueueMessages(
             initialMessages,
