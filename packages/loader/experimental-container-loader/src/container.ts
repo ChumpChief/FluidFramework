@@ -533,7 +533,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         this.connectionStateHandler = new ConnectionStateHandler(
             {
-                protocolHandler: () => this._protocolHandler,
+                quorum: () => this._protocolHandler?.quorum,
                 shouldClientJoinWrite: () => this._deltaManager.expectingAcks(),
                 maxClientLeaveWaitTime: this.loader.services.options.maxClientLeaveWaitTime,
             },

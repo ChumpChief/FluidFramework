@@ -5,14 +5,13 @@
 
 import { IEvent } from "@fluidframework/common-definitions";
 import { IConnectionDetails } from "@fluidframework/container-definitions";
-import { ProtocolOpHandler } from "@fluidframework/protocol-base";
-import { ConnectionMode, ISequencedClient } from "@fluidframework/protocol-definitions";
+import { ConnectionMode, ISequencedClient, IQuorum } from "@fluidframework/protocol-definitions";
 import { EventEmitterWithErrorHandling } from "@fluidframework/telemetry-utils";
 import { assert, Timer } from "@fluidframework/common-utils";
 import { ConnectionState } from "./container";
 
 export interface IConnectionStateHandler {
-    protocolHandler: () => ProtocolOpHandler | undefined,
+    quorum: () => IQuorum | undefined,
     shouldClientJoinWrite: () => boolean,
     maxClientLeaveWaitTime: number | undefined,
 }
@@ -71,13 +70,13 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
     }
 
     private applyForConnectedState() {
-        const protocolHandler = this.handler.protocolHandler();
+        const quorum = this.handler.quorum();
         // Move to connected state only if we are in Connecting state, we have seen our join op
         // and there is no timer running which means we are not waiting for previous client to leave
         // or timeout has occured while doing so.
         if (this.pendingClientId !== this.clientId
             && this.pendingClientId !== undefined
-            && protocolHandler !== undefined && protocolHandler.quorum.getMember(this.pendingClientId) !== undefined
+            && quorum !== undefined && quorum.getMember(this.pendingClientId) !== undefined
             && !this.prevClientLeftTimer.hasTimer
         ) {
             this.setConnectionState(ConnectionState.Connected);
@@ -110,13 +109,13 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         // we know there can no longer be outstanding ops that we sent with the previous client id.
         this._pendingClientId = details.clientId;
 
-        const protocolHandler = this.handler.protocolHandler();
+        const quorum = this.handler.quorum();
         // Check if we already processed our own join op through delta storage!
         // we are fetching ops from storage in parallel to connecting to ordering service
         // Given async processes, it's possible that we have already processed our own join message before
         // connection was fully established.
         // Note that we might be still initializing quorum - connection is established proactively on load!
-        if ((protocolHandler !== undefined && protocolHandler.quorum.getMember(details.clientId) !== undefined)
+        if ((quorum !== undefined && quorum.getMember(details.clientId) !== undefined)
             || connectionMode === "read"
         ) {
             this.setConnectionState(ConnectionState.Connected);
@@ -131,7 +130,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
 
         const oldState = this._connectionState;
         this._connectionState = value;
-        const quorum = this.handler.protocolHandler()?.quorum;
+        const quorum = this.handler.quorum();
         let client: ILocalSequencedClient | undefined;
         if (this._clientId !== undefined) {
             client = quorum?.getMember(this._clientId);
