@@ -199,12 +199,6 @@ export class DeltaManager
             : undefined;
     }
 
-    public get socketDocumentId(): string | undefined {
-        return this.statefulDocumentDeltaConnection.connected
-            ? this.statefulDocumentDeltaConnection.claims.documentId
-            : undefined;
-    }
-
     /**
      * The current connection mode, initially read.
      */

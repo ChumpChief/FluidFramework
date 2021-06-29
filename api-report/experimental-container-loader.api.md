@@ -100,8 +100,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     // (undocumented)
     get attachState(): AttachState;
     get audience(): IAudience;
-    // @deprecated (undocumented)
-    get chaincodePackage(): IFluidCodeDetails | undefined;
     // (undocumented)
     get clientDetails(): IClientDetails;
     get clientId(): string | undefined;
@@ -221,8 +219,6 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     refreshDelayInfo(id: string): void;
     // (undocumented)
     get serviceConfiguration(): IClientConfiguration | undefined;
-    // (undocumented)
-    get socketDocumentId(): string | undefined;
     submit(type: MessageType, contents: any, batch?: boolean, metadata?: any): number;
     // (undocumented)
     submitSignal(content: any): void;

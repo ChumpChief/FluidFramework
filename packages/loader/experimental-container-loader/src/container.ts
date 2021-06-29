@@ -455,13 +455,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return this.statefulDocumentDeltaConnectionManager.clientDetails;
     }
 
-    /**
-     * @deprecated use codeDetails
-     */
-    public get chaincodePackage(): IFluidCodeDetails | undefined {
-        return this.codeDetails;
-    }
-
     public get codeDetails(): IFluidCodeDetails | undefined {
         return this._context?.codeDetails ?? this.getCodeDetailsFromQuorum();
     }
