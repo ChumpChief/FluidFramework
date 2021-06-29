@@ -172,7 +172,6 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     close(error?: ICriticalContainerError): void;
     // (undocumented)
     connect(args: IConnectionArgs): Promise<IConnectionDetails>;
-    get connectionMode(): ConnectionMode;
     // (undocumented)
     dispose(): void;
     // (undocumented)

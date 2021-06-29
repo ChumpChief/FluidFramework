@@ -200,15 +200,6 @@ export class DeltaManager
     }
 
     /**
-     * The current connection mode, initially read.
-     */
-    public get connectionMode(): ConnectionMode {
-        return this.statefulDocumentDeltaConnection.connected
-            ? this.statefulDocumentDeltaConnection.mode
-            : "read";
-    }
-
-    /**
      * Tells if container is in read-only mode.
      * Data stores should listen for "readonly" notifications and disallow user
      * making changes to data stores.

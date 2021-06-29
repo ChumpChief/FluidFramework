@@ -1384,8 +1384,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * If it's not true, runtime is not in position to send ops.
      */
     private activeConnection() {
+        // TODO should this be the stateful connection state?
         return this.connectionStateHandler.connectionState === ConnectionState.Connected
-            && this._deltaManager.connectionMode === "write";
+            && this.statefulDocumentDeltaConnection.mode === "write";
     }
 
     private createDeltaManager() {
@@ -1404,7 +1405,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         deltaManager.on("connect", (details: IConnectionDetails, opsBehind?: number) => {
             this.connectionStateHandler.receivedConnectEvent(
-                this._deltaManager.connectionMode,
+                // TODO should this be checking the connection state?  Should we even have a connectionStateHandler?
+                this.statefulDocumentDeltaConnection.mode,
                 details,
                 opsBehind,
             );
@@ -1451,9 +1453,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     private propagateConnectionState() {
         const logOpsOnReconnect: boolean =
+            // TODO should this be checking the stateful connection state instead?
             this.connectionStateHandler.connectionState === ConnectionState.Connected &&
             !this.firstConnection &&
-            this._deltaManager.connectionMode === "write";
+            this.statefulDocumentDeltaConnection.mode === "write";
 
         if (this.connectionStateHandler.connectionState === ConnectionState.Connected) {
             this.firstConnection = false;
