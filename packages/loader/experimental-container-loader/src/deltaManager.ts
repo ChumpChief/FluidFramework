@@ -199,12 +199,6 @@ export class DeltaManager
             : undefined;
     }
 
-    public get scopes(): string[] | undefined {
-        return this.statefulDocumentDeltaConnection.connected
-            ? this.statefulDocumentDeltaConnection.claims.scopes
-            : undefined;
-    }
-
     public get socketDocumentId(): string | undefined {
         return this.statefulDocumentDeltaConnection.connected
             ? this.statefulDocumentDeltaConnection.claims.documentId

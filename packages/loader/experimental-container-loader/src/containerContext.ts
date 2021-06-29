@@ -129,6 +129,7 @@ export class ContainerContext implements IContainerContext {
     }
 
     public get configuration(): IFluidConfiguration {
+        // TODO this could probably consult the stateful connection
         const config: Partial<IFluidConfiguration> = {
             scopes: this.container.scopes,
         };

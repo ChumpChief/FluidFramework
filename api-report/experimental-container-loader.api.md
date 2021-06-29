@@ -220,8 +220,6 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     // (undocumented)
     refreshDelayInfo(id: string): void;
     // (undocumented)
-    get scopes(): string[] | undefined;
-    // (undocumented)
     get serviceConfiguration(): IClientConfiguration | undefined;
     // (undocumented)
     get socketDocumentId(): string | undefined;

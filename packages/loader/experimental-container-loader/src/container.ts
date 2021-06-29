@@ -444,7 +444,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Set once this.connected is true, otherwise undefined
      */
     public get scopes(): string[] | undefined {
-        return this._deltaManager.scopes;
+        throw new Error("Not implemented");
     }
 
     public get clientDetails(): IClientDetails {
