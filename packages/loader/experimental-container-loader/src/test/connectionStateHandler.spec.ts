@@ -70,7 +70,6 @@ describe("ConnectionStateHandler Tests", () => {
         };
         connectionStateHandler = new ConnectionStateHandler(
             {
-                maxClientLeaveWaitTime: expectedTimeout,
                 quorum: () => protocolHandler.quorum,
                 shouldClientJoinWrite: () => shouldClientJoinWrite,
             },

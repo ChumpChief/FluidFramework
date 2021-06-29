@@ -535,7 +535,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             {
                 quorum: () => this._protocolHandler?.quorum,
                 shouldClientJoinWrite: () => this._deltaManager.expectingAcks(),
-                maxClientLeaveWaitTime: this.loader.services.options.maxClientLeaveWaitTime,
             },
         );
 

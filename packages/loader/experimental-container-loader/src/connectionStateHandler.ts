@@ -13,7 +13,6 @@ import { ConnectionState } from "./container";
 export interface IConnectionStateHandler {
     quorum: () => IQuorum | undefined,
     shouldClientJoinWrite: () => boolean,
-    maxClientLeaveWaitTime: number | undefined,
 }
 
 export interface ILocalSequencedClient extends ISequencedClient {
@@ -55,7 +54,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         super();
         this.prevClientLeftTimer = new Timer(
             // Default is 90 sec for which we are going to wait for its own "leave" message.
-            this.handler.maxClientLeaveWaitTime ?? 90000,
+            90000,
             () => {
                 this.applyForConnectedState();
             },
