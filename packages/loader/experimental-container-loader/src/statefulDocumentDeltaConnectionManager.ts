@@ -105,25 +105,30 @@ export class StatefulDocumentDeltaConnectionManager {
     }
 
     public async setReadonlyMode(enable: boolean): Promise<void> {
-        // Arbitrary policy -- we will reconnect if you were connected before, or stay disconnected if you weren't
-        let previouslyConnected = false;
-        if (
-            this.statefulDocumentDeltaConnection.connected
-            // Since Tinylicious lies about doc:write scope, we can't reliably know whether we have write permissions
-            /* && this.statefulDocumentDeltaConnection.readonlyScope */
-        ) {
-            previouslyConnected = true;
-            this.disconnect();
-        }
-
-        this.currentClient.mode = enable
+        const requestedMode = enable
             ? "read"
             : "write";
 
-        // TODO this is a little strange that sometimes you'll still be connected after setting readonly mode
-        // and sometimes you won't
-        if (previouslyConnected && this.reconnectMode === ReconnectMode.Enabled) {
-            await this.connect();
+        // Proactively set the currentClient's mode regardless of other checks, so that reconnects do the expected
+        // thing, e.g. if we currently have a readonly connection even if our currentClient requested write originally
+        this.currentClient.mode = requestedMode;
+
+        if (
+            this.statefulDocumentDeltaConnection.connected
+            && this.statefulDocumentDeltaConnection.mode === requestedMode
+        ) {
+            // Do nothing if we are already connected in the requested mode
+            return;
+        }
+
+        // Arbitrary policy -- if you're not already connected, we won't establish a connection automatically
+        // but we will reconnect in the new mode if you're currently connected.
+        if (this.statefulDocumentDeltaConnection.connected) {
+            // Our current connection does not match the requested mode, so our policy will be to disconnect
+            this.disconnect();
+            if (this.reconnectMode === ReconnectMode.Enabled) {
+                await this.connect();
+            }
         }
     }
 
