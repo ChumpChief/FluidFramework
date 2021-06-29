@@ -537,7 +537,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 shouldClientJoinWrite: () => this._deltaManager.expectingAcks(),
                 maxClientLeaveWaitTime: this.loader.services.options.maxClientLeaveWaitTime,
             },
-            this.logger,
         );
 
         this.connectionStateHandler.on("connectionStateChanged", () => {

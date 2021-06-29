@@ -3,11 +3,11 @@
  * Licensed under the MIT License.
  */
 
-import { IEvent, ITelemetryLogger } from "@fluidframework/common-definitions";
+import { IEvent } from "@fluidframework/common-definitions";
 import { IConnectionDetails } from "@fluidframework/container-definitions";
 import { ProtocolOpHandler } from "@fluidframework/protocol-base";
 import { ConnectionMode, ISequencedClient } from "@fluidframework/protocol-definitions";
-import { EventEmitterWithErrorHandling, PerformanceEvent } from "@fluidframework/telemetry-utils";
+import { EventEmitterWithErrorHandling } from "@fluidframework/telemetry-utils";
 import { assert, Timer } from "@fluidframework/common-utils";
 import { ConnectionState } from "./container";
 
@@ -33,7 +33,6 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
     private _pendingClientId: string | undefined;
     private _clientId: string | undefined;
     private readonly prevClientLeftTimer: Timer;
-    private waitEvent: PerformanceEvent | undefined;
 
     public get connectionState(): ConnectionState {
         return this._connectionState;
@@ -47,20 +46,19 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         return this._clientId;
     }
 
-    public get pendingClientId(): string | undefined {
+    private get pendingClientId(): string | undefined {
         return this._pendingClientId;
     }
 
     constructor(
         private readonly handler: IConnectionStateHandler,
-        private readonly logger: ITelemetryLogger,
     ) {
         super();
         this.prevClientLeftTimer = new Timer(
             // Default is 90 sec for which we are going to wait for its own "leave" message.
             this.handler.maxClientLeaveWaitTime ?? 90000,
             () => {
-                this.applyForConnectedState("timeout");
+                this.applyForConnectedState();
             },
         );
     }
@@ -68,19 +66,11 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
     public receivedAddMemberEvent(clientId: string) {
         // This is the only one that requires the pending client ID
         if (clientId === this.pendingClientId) {
-            // Start the event in case we are waiting for leave or timeout.
-            if (this.prevClientLeftTimer.hasTimer) {
-                this.waitEvent = PerformanceEvent.start(this.logger, {
-                    eventName: "WaitBeforeClientLeave",
-                    waitOnClientId: this._clientId,
-                    hadOutstandingOps: this.handler.shouldClientJoinWrite(),
-                });
-            }
-            this.applyForConnectedState("addMemberEvent");
+            this.applyForConnectedState();
         }
     }
 
-    private applyForConnectedState(source: "removeMemberEvent" | "addMemberEvent" | "timeout") {
+    private applyForConnectedState() {
         const protocolHandler = this.handler.protocolHandler();
         // Move to connected state only if we are in Connecting state, we have seen our join op
         // and there is no timer running which means we are not waiting for previous client to leave
@@ -90,19 +80,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
             && protocolHandler !== undefined && protocolHandler.quorum.getMember(this.pendingClientId) !== undefined
             && !this.prevClientLeftTimer.hasTimer
         ) {
-            this.waitEvent?.end({ source });
             this.setConnectionState(ConnectionState.Connected);
-        } else {
-            // Adding this event temporarily so that we can get help debugging if something goes wrong.
-            this.logger.sendTelemetryEvent({
-                eventName: "connectedStateRejected",
-                source,
-                pendingClientId: this.pendingClientId,
-                clientId: this.clientId,
-                hasTimer: this.prevClientLeftTimer.hasTimer,
-                inQuorum: protocolHandler !== undefined && this.pendingClientId !== undefined
-                    && protocolHandler.quorum.getMember(this.pendingClientId) !== undefined,
-            });
         }
     }
 
@@ -110,7 +88,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         // If the client which has left was us, then finish the timer.
         if (this.clientId === clientId) {
             this.prevClientLeftTimer.clear();
-            this.applyForConnectedState("removeMemberEvent");
+            this.applyForConnectedState();
         }
     }
 
@@ -148,7 +126,6 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
     private setConnectionState(value: ConnectionState) {
         if (this.connectionState === value) {
             // Already in the desired state - exit early
-            this.logger.sendErrorEvent({ eventName: "setConnectionStateSame", value });
             return;
         }
 
@@ -181,14 +158,6 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
                 && this.prevClientLeftTimer.hasTimer === false
             ) {
                 this.prevClientLeftTimer.restart();
-            } else {
-                // Adding this event temporarily so that we can get help debugging if something goes wrong.
-                this.logger.sendTelemetryEvent({
-                    eventName: "noWaitOnDisconnected",
-                    inQuorum: client !== undefined,
-                    hasTimer: this.prevClientLeftTimer.hasTimer,
-                    shouldClientJoinWrite: this.handler.shouldClientJoinWrite(),
-                });
             }
         }
 
