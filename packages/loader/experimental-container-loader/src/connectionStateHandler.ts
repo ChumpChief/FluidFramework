@@ -6,7 +6,7 @@
 import { IEvent } from "@fluidframework/common-definitions";
 import { ConnectionMode, ISequencedClient, IQuorum } from "@fluidframework/protocol-definitions";
 import { EventEmitterWithErrorHandling } from "@fluidframework/telemetry-utils";
-import { assert, Timer } from "@fluidframework/common-utils";
+import { assert } from "@fluidframework/common-utils";
 import { ConnectionState } from "./container";
 
 export interface IConnectionStateHandler {
@@ -29,14 +29,14 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
     private _connectionState = ConnectionState.Disconnected;
     private _pendingClientId: string | undefined;
     private _clientId: string | undefined;
-    private readonly prevClientLeftTimer: Timer;
+    private waitingForPrevClientToLeave: boolean = false;
 
     public get connectionState(): ConnectionState {
         return this._connectionState;
     }
 
     public get connected(): boolean {
-        return this.connectionState === ConnectionState.Connected;
+        return this._connectionState === ConnectionState.Connected;
     }
 
     public get clientId(): string | undefined {
@@ -51,13 +51,6 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         private readonly handler: IConnectionStateHandler,
     ) {
         super();
-        this.prevClientLeftTimer = new Timer(
-            // Default is 90 sec for which we are going to wait for its own "leave" message.
-            90000,
-            () => {
-                this.applyForConnectedState();
-            },
-        );
     }
 
     public receivedAddMemberEvent(clientId: string) {
@@ -75,7 +68,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
         if (this.pendingClientId !== this.clientId
             && this.pendingClientId !== undefined
             && quorum !== undefined && quorum.getMember(this.pendingClientId) !== undefined
-            && !this.prevClientLeftTimer.hasTimer
+            && !this.waitingForPrevClientToLeave
         ) {
             this.setConnectionState(ConnectionState.Connected);
         }
@@ -84,7 +77,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
     public receivedRemoveMemberEvent(clientId: string) {
         // If the client which has left was us, then finish the timer.
         if (this.clientId === clientId) {
-            this.prevClientLeftTimer.clear();
+            this.waitingForPrevClientToLeave = false;
             this.applyForConnectedState();
         }
     }
@@ -121,7 +114,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
     }
 
     private setConnectionState(value: ConnectionState) {
-        if (this.connectionState === value) {
+        if (this._connectionState === value) {
             // Already in the desired state - exit early
             return;
         }
@@ -152,9 +145,9 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
             // don't want to reset the timer as we still want to wait on original client which started this timer.
             if (client !== undefined
                 && this.handler.shouldClientJoinWrite()
-                && this.prevClientLeftTimer.hasTimer === false
+                && !this.waitingForPrevClientToLeave
             ) {
-                this.prevClientLeftTimer.restart();
+                this.waitingForPrevClientToLeave = true;
             }
         }
 
