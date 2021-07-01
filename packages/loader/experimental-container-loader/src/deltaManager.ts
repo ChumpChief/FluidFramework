@@ -129,10 +129,6 @@ export class DeltaManager
 
     private readonly closeAbortController = new AbortController();
 
-    /**
-     * Tells if  current connection has checkpoint information.
-     * I.e. we know how far behind the client was at the time of establishing connection
-     */
     public get hasCheckpointSequenceNumber(): boolean {
         throw new Error("Not implemented");
     }
@@ -349,10 +345,6 @@ export class DeltaManager
      * op is submitted.
      */
     public submit(type: MessageType, contents: any, batch = false, metadata?: any): number {
-        // TODO need to fail if gets too large
-        // const serializedContent = JSON.stringify(this.messageBuffer);
-        // const maxOpSize = this.context.deltaManager.maxMessageSize;
-
         if (this.readonly === true) {
             const error = new LoggingError("Op is sent in read-only document state", {
                 errorType: ContainerErrorType.genericError,
@@ -374,13 +366,11 @@ export class DeltaManager
             this.clientSequenceNumberObserved = 0;
         }
 
-        const service = "client";
-
         // Start adding trace for the op.
         const traces: ITrace[] = [
             {
                 action: "start",
-                service,
+                service: "client",
                 timestamp: Date.now(),
             }];
 
@@ -780,10 +770,9 @@ export class DeltaManager
 
         // Add final ack trace.
         if (message.traces !== undefined && message.traces.length > 0) {
-            const service = "client";
             message.traces.push({
                 action: "end",
-                service,
+                service: "client",
                 timestamp: Date.now(),
             });
         }

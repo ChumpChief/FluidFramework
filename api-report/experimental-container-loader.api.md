@@ -182,6 +182,7 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     expectingAcks(): boolean;
     // (undocumented)
     flush(): void;
+    // (undocumented)
     get hasCheckpointSequenceNumber(): boolean;
     // (undocumented)
     get IDeltaSender(): this;
