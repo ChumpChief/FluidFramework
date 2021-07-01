@@ -127,8 +127,6 @@ export class DeltaManager
     private readonly throttlingIdSet = new Set<string>();
     private timeTillThrottling: number = 0;
 
-    private connectionStateProps: Record<string, string | number> = {};
-
     private readonly closeAbortController = new AbortController();
 
     /**
@@ -453,13 +451,6 @@ export class DeltaManager
                 // And in practice that does look like the case. The place where this code gets hit is if we lost
                 // connection and reconnected (likely to another box), and new socket's initial ops contains these ops.
                 if (op.sequenceNumber >= to) {
-                    this.logger.sendPerformanceEvent({
-                        reason: this.fetchReason,
-                        eventName: "ExtraStorageCall",
-                        from,
-                        to,
-                        ...this.connectionStateProps,
-                    });
                     controller.abort();
                     this._inbound.off("push", listener);
                 }
@@ -590,13 +581,6 @@ export class DeltaManager
             (a, b) => a.sequenceNumber - b.sequenceNumber,
         );
 
-        this.connectionStateProps = {
-            connectionLastQueuedSequenceNumber : this.lastQueuedSequenceNumber,
-            connectionLastObservedSeqNumber: this.lastObservedSeqNumber,
-            clientId: this.statefulDocumentDeltaConnection.clientId,
-            mode: this.statefulDocumentDeltaConnection.mode,
-        };
-
         // Some storages may provide checkpointSequenceNumber to identify how far client is behind.
         const checkpointSequenceNumber = this.statefulDocumentDeltaConnection.checkpointSequenceNumber;
         if (checkpointSequenceNumber !== undefined) {
@@ -656,9 +640,6 @@ export class DeltaManager
             } else if (this.statefulDocumentDeltaConnection.mode !== "write") {
                 this.fetchMissingDeltas("AfterConnection", this.lastQueuedSequenceNumber);
             }
-        } else {
-            this.connectionStateProps.connectionInitialOpsFrom = initialMessages[0].sequenceNumber;
-            this.connectionStateProps.connectionInitialOpsTo = last + 1;
         }
 
         this.connectFirstConnection = false;
@@ -676,8 +657,6 @@ export class DeltaManager
         this._outbound.pause();
         this._outbound.clear();
         this.emit("disconnect");
-
-        this.connectionStateProps = {};
     };
 
     // returns parts of message (in string format) that should never change for a given message.
