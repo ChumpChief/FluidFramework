@@ -99,7 +99,6 @@ export class DeltaManager
     private lastProcessedMessage: ISequencedDocumentMessage | undefined;
     private baseTerm: number = 0;
 
-    private prevEnqueueMessagesReason: string | undefined;
     private previouslyProcessedMessage: ISequencedDocumentMessage | undefined;
 
     // The sequence number we initially loaded from
@@ -719,66 +718,6 @@ export class DeltaManager
             return;
         }
 
-        const from = messages[0].sequenceNumber;
-        const last = messages[messages.length - 1].sequenceNumber;
-
-        // Report stats about missing and duplicate ops
-        // This helps better understand why we fetch ops from storage, and thus may delay
-        // getting current / sending ops
-        // It's possible that this batch is already too late - do not bother
-        if (last > this.lastQueuedSequenceNumber) {
-            let prev = from - 1;
-            const initialGap = prev - this.lastQueuedSequenceNumber;
-            let firstMissing: number | undefined;
-            let duplicate = 0;
-            let gap = 0;
-
-            // Count all gaps and duplicates
-            for (const message of messages) {
-                if (message.sequenceNumber === prev) {
-                    duplicate++;
-                } else if (message.sequenceNumber !== prev + 1) {
-                    gap++;
-                    if (firstMissing === undefined) {
-                        firstMissing = prev + 1;
-                    }
-                }
-                prev = message.sequenceNumber;
-            }
-
-            let eventName: string | undefined;
-
-            // Report if we found some issues
-            if (duplicate !== 0 || gap !== 0 && !allowGaps || initialGap > 0 && this.fetchReason === undefined) {
-                eventName = "enqueueMessages";
-            // Also report if we are fetching ops, and same range comes in, thus making this fetch obsolete.
-            } else if (this.fetchReason !== undefined && this.fetchReason !== reason &&
-                    (from <= this.lastQueuedSequenceNumber + 1 && last > this.lastQueuedSequenceNumber)) {
-                eventName = "enqueueMessagesExtraFetch";
-            }
-
-            // Report if there is something to report
-            // Do not report when pending fetch is in progress, as such reporting will not
-            // correctly take into account pending ops.
-            if (eventName !== undefined) {
-                this.logger.sendPerformanceEvent({
-                    eventName,
-                    reason,
-                    previousReason: this.prevEnqueueMessagesReason,
-                    from,
-                    to: last + 1, // exclusive, being consistent with the other telemetry / APIs
-                    length: messages.length,
-                    fetchReason: this.fetchReason,
-                    duplicate: duplicate > 0 ? duplicate : undefined,
-                    initialGap: initialGap !== 0 ? initialGap : undefined,
-                    gap: gap > 0 ? gap : undefined,
-                    firstMissing,
-                    dmInitialSeqNumber: this.initialSequenceNumber,
-                    ...this.connectionStateProps,
-                });
-            }
-        }
-
         this.updateLatestKnownOpSeqNumber(messages[messages.length - 1].sequenceNumber);
 
         const n = this.previouslyProcessedMessage?.sequenceNumber;
@@ -819,11 +758,6 @@ export class DeltaManager
                 this._inbound.push(message);
             }
         }
-
-        // When / if we report a gap in ops in the future, we want telemetry to correctly reflect source
-        // of prior ops. But if we have some out of order ops (this.pending), then reporting current reason
-        // becomes not accurate, as the gap existed before current batch, so we should just report "unknown".
-        this.prevEnqueueMessagesReason = this.pending.length > 0 ? "unknown" : reason;
     }
 
     private processInboundMessage(message: ISequencedDocumentMessage): void {
