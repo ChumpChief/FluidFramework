@@ -584,25 +584,10 @@ export class DeltaManager
             this.updateLatestKnownOpSeqNumber(last);
         }
 
-        const connectionDetails = {
-            claims: this.statefulDocumentDeltaConnection.claims,
-            clientId: this.statefulDocumentDeltaConnection.clientId,
-            existing: this.statefulDocumentDeltaConnection.existing,
-            checkpointSequenceNumber: this.statefulDocumentDeltaConnection.checkpointSequenceNumber,
-            initialClients: this.statefulDocumentDeltaConnection.initialClients,
-            maxMessageSize: this.statefulDocumentDeltaConnection.maxMessageSize,
-            mode: this.statefulDocumentDeltaConnection.mode,
-            serviceConfiguration: this.statefulDocumentDeltaConnection.serviceConfiguration,
-            version: this.statefulDocumentDeltaConnection.version,
-        };
-
         // Notify of the connection
         // WARNING: This has to happen before processInitialMessages() call below.
         // If not, we may not update Container.pendingClientId in time before seeing our own join session op.
-        this.emit(
-            "connect",
-            connectionDetails,
-        );
+        this.emit("connect");
 
         this.enqueueMessages(initialMessages);
 

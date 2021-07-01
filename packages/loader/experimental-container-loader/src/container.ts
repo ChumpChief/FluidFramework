@@ -18,7 +18,6 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IAudience,
-    IConnectionDetails,
     IContainer,
     IContainerEvents,
     IDeltaManager,
@@ -1401,17 +1400,17 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         deltaManager.inboundSignal.pause();
 
-        deltaManager.on("connect", (details: IConnectionDetails) => {
+        deltaManager.on("connect", () => {
             this.connectionStateHandler.receivedConnectEvent(
                 // TODO should this be checking the connection state?  Should we even have a connectionStateHandler?
                 this.statefulDocumentDeltaConnection.mode,
-                details.clientId,
+                this.statefulDocumentDeltaConnection.clientId,
             );
 
             // Back-compat for new client and old server.
             this._audience.clear();
 
-            for (const priorClient of details.initialClients ?? []) {
+            for (const priorClient of this.statefulDocumentDeltaConnection.initialClients ?? []) {
                 this._audience.addMember(priorClient.clientId, priorClient.client);
             }
         });
