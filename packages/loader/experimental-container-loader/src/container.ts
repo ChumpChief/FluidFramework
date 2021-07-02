@@ -366,9 +366,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private resumedOpProcessingAfterLoad = false;
-    private firstConnection = true;
     private readonly connectionTransitionTimes: number[] = [];
-    private messageCountAfterDisconnection: number = 0;
     private _loadedFromVersion: IVersion | undefined;
     private _resolvedUrl: IFluidResolvedUrl | undefined;
     private cachedAttachSummary: ISummaryTree | undefined;
@@ -1448,20 +1446,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private propagateConnectionState() {
-        const logOpsOnReconnect: boolean =
-            // TODO should this be checking the stateful connection state instead?
-            this.connectionStateHandler.connectionState === ConnectionState.Connected &&
-            !this.firstConnection &&
-            this.statefulDocumentDeltaConnection.mode === "write";
-
-        if (this.connectionStateHandler.connectionState === ConnectionState.Connected) {
-            this.firstConnection = false;
-        }
-
-        if (logOpsOnReconnect) {
-            this.messageCountAfterDisconnection = 0;
-        }
-
         const state = this.connectionStateHandler.connectionState === ConnectionState.Connected;
         if (!this.context.disposed) {
             this.context.setConnectionState(state, this.clientId);
@@ -1469,11 +1453,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         assert(this.protocolHandler !== undefined, 0x0dc /* "Protocol handler should be set here" */);
         this.protocolHandler.quorum.setConnectionState(state, this.clientId);
         raiseConnectedEvent(this.logger, this, state, this.clientId);
-
-        if (logOpsOnReconnect) {
-            this.logger.sendTelemetryEvent(
-                { eventName: "OpsSentOnReconnect", count: this.messageCountAfterDisconnection });
-        }
     }
 
     private submitContainerMessage(type: MessageType, contents: any, batch?: boolean, metadata?: any): number {
@@ -1496,7 +1475,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             return -1;
         }
 
-        this.messageCountAfterDisconnection += 1;
         this.collabWindowTracker.stopSequenceNumberUpdate();
         return this._deltaManager.submit(type, contents, batch, metadata);
     }
