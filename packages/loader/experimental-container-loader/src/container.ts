@@ -8,7 +8,7 @@ import {
     IDisposable,
     ITelemetryLogger,
 } from "@fluidframework/common-definitions";
-import { assert, performance, unreachableCase } from "@fluidframework/common-utils";
+import { assert, unreachableCase } from "@fluidframework/common-utils";
 import {
     IRequest,
     IResponse,
@@ -88,7 +88,7 @@ import {
 import { Audience } from "./audience";
 import { ContainerContext } from "./containerContext";
 import { debug } from "./debug";
-import { IConnectionArgs, DeltaManager } from "./deltaManager";
+import { DeltaManager } from "./deltaManager";
 import { DeltaManagerProxy } from "./deltaManagerProxy";
 import { Loader, RelativeLoader } from "./loader";
 import { pkgVersion } from "./packageVersion";
@@ -366,7 +366,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     private resumedOpProcessingAfterLoad = false;
-    private readonly connectionTransitionTimes: number[] = [];
     private _loadedFromVersion: IVersion | undefined;
     private _resolvedUrl: IFluidResolvedUrl | undefined;
     private cachedAttachSummary: ISummaryTree | undefined;
@@ -737,7 +736,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // Propagate current connection state through the system.
             this.propagateConnectionState();
             if (!this.closed) {
-                this.resumeInternal({ fetchOpsFromStorage: false, reason: "createDetached" });
+                this.resumeInternal();
             }
         } catch(error) {
             if (!canRetryOnError(error)) {
@@ -779,11 +778,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // Note: no need to fetch ops as we do it preemptively as part of DeltaManager.attachOpHandler().
             // If there is gap, we will learn about it once connected, but the gap should be small (if any),
             // assuming that resume() is called quickly after initial container boot.
-            this.resumeInternal({ reason: "DocumentOpenResume", fetchOpsFromStorage: false });
+            this.resumeInternal();
         }
     }
 
-    protected resumeInternal(args: IConnectionArgs) {
+    protected resumeInternal() {
         assert(!this.closed, 0x0d9 /* "Attempting to setAutoReconnect() a closed DeltaManager" */);
 
         // Resume processing ops
@@ -795,7 +794,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Ensure connection to web socket
         // All errors are reported through events ("error" / "disconnected") and telemetry in DeltaManager
-        this.connectToDeltaStream(args).catch(() => { });
+        this.connectToDeltaStream().catch(() => { });
     }
 
     /**
@@ -945,19 +944,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return versions[0];
     }
 
-    private recordConnectStartTime() {
-        if (this.connectionTransitionTimes[ConnectionState.Disconnected] === undefined) {
-            this.connectionTransitionTimes[ConnectionState.Disconnected] = performance.now();
-        }
-    }
-
-    private async connectToDeltaStream(args: IConnectionArgs): Promise<void> {
+    private async connectToDeltaStream(): Promise<void> {
         assert(
             this.statefulDocumentDeltaConnectionManager !== undefined,
             "Connection manager not created before connect attempt",
         );
-
-        this.recordConnectStartTime();
 
         return this.statefulDocumentDeltaConnectionManager.connect();
     }
@@ -991,21 +982,10 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         let startConnectionP: Promise<void> | undefined;
 
-        // Ideally we always connect as "read" by default.
-        // Currently that works with SPO & r11s, because we get "write" connection when connecting to non-existing file.
-        // We should not rely on it by (one of them will address the issue, but we need to address both)
-        // 1) switching create new flow to one where we create file by posting snapshot
-        // 2) Fixing quorum workflows (have retry logic)
-        // That all said, "read" does not work with memorylicious workflows (that opens two simultaneous
-        // connections to same file) in two ways:
-        // A) creation flow breaks (as one of the clients "sees" file as existing, and hits #2 above)
-        // B) Once file is created, transition from view-only connection to write does not work - some bugs to be fixed.
-        const connectionArgs: IConnectionArgs = { reason: "DocumentOpen", mode: "write", fetchOpsFromStorage: false };
-
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
         if (loadMode.deltaConnection === undefined) {
-            startConnectionP = this.connectToDeltaStream(connectionArgs);
+            startConnectionP = this.connectToDeltaStream();
             startConnectionP.catch((error) => { });
         }
 
@@ -1058,7 +1038,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             // THIS IS LEGACY PATH
             //
             if (startConnectionP === undefined) {
-                startConnectionP = this.connectToDeltaStream(connectionArgs);
+                startConnectionP = this.connectToDeltaStream();
             }
             // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
             await startConnectionP;
