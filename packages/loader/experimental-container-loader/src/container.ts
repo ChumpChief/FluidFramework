@@ -46,7 +46,6 @@ import {
     ensureFluidResolvedUrl,
     combineAppAndProtocolSummary,
     readAndParseFromBlobs,
-    canRetryOnError,
     runWithRetry,
 } from "@fluidframework/driver-utils";
 import {
@@ -513,14 +512,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 // specific error or class of errors
                 error: {
                     // load information to associate errors with the specific load point
-                    dmInitialSeqNumber: () => this._deltaManager?.initialSequenceNumber,
-                    dmLastKnownSeqNumber: () => this._deltaManager?.lastKnownSeqNumber,
                     containerLoadedFromVersionId: () => this.loadedFromVersion?.id,
                     containerLoadedFromVersionDate: () => this.loadedFromVersion?.date,
-                    // message information to associate errors with the specific execution state
-                    dmLastMsqSeqNumber: () => this._deltaManager?.lastMessage?.sequenceNumber,
-                    dmLastMsqSeqTimestamp: () => this._deltaManager?.lastMessage?.timestamp,
-                    dmLastMsqSeqClientId: () => this._deltaManager?.lastMessage?.clientId,
                 },
             });
 
@@ -591,7 +584,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // TODO Probably disconnect and tear down the stateful connection slightly differently --
         // too much reentrancy here.
         this.statefulDocumentDeltaConnectionManager?.disconnect();
-        this._deltaManager.close(error);
+        this._deltaManager.close();
 
         this._protocolHandler?.close();
 
@@ -738,11 +731,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             if (!this.closed) {
                 this.resumeInternal();
             }
-        } catch(error) {
-            if (!canRetryOnError(error)) {
-                this.close(error);
-            }
-            throw error;
         } finally {
             this.attachInProgress = false;
         }

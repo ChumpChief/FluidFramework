@@ -63,8 +63,7 @@ export class ConnectionStateHandler extends EventEmitterWithErrorHandling<IConne
     private applyForConnectedState() {
         const quorum = this.handler.quorum();
         // Move to connected state only if we are in Connecting state, we have seen our join op
-        // and there is no timer running which means we are not waiting for previous client to leave
-        // or timeout has occured while doing so.
+        // and we're not waiting for previous client to leave
         if (this.pendingClientId !== this.clientId
             && this.pendingClientId !== undefined
             && quorum !== undefined && quorum.getMember(this.pendingClientId) !== undefined

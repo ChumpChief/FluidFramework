@@ -169,7 +169,7 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     attachOpHandler(minSequenceNumber: number, sequenceNumber: number, term: number, handler: IDeltaHandlerStrategy): void;
     // (undocumented)
     get clientDetails(): IClientDetails;
-    close(error?: ICriticalContainerError): void;
+    close(): void;
     // (undocumented)
     connect(args: IConnectionArgs): Promise<IConnectionDetails>;
     // (undocumented)

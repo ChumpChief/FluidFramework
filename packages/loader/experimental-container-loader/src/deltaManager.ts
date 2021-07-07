@@ -18,11 +18,9 @@ import {
     ReadOnlyInfo,
 } from "@fluidframework/container-definitions";
 import { assert, TypedEventEmitter } from "@fluidframework/common-utils";
-import { LoggingError } from "@fluidframework/telemetry-utils";
 import {
     IDocumentDeltaStorageService,
     IDocumentService,
-    DriverErrorType,
 } from "@fluidframework/driver-definitions";
 import { isSystemMessage } from "@fluidframework/protocol-base";
 import {
@@ -36,11 +34,7 @@ import {
     MessageType,
 } from "@fluidframework/protocol-definitions";
 import {
-    NonRetryableError,
-} from "@fluidframework/driver-utils";
-import {
     CreateContainerError,
-    CreateProcessingError,
     DataCorruptionError,
 } from "@fluidframework/container-utils";
 import { DeltaQueue } from "./deltaQueue";
@@ -231,7 +225,8 @@ export class DeltaManager
             });
 
         this._inbound.on("error", (error) => {
-            this.close(CreateProcessingError(error, this.lastMessage));
+            // TODO error outward rather than self-close?
+            this.close();
         });
 
         // Outbound message queue. The outbound queue is represented as a queue of an array of ops. Ops contained
@@ -245,7 +240,8 @@ export class DeltaManager
             });
 
         this._outbound.on("error", (error) => {
-            this.close(CreateContainerError(error));
+            // TODO error outward rather than self-close?
+            this.close();
         });
 
         // Inbound signal queue
@@ -260,7 +256,8 @@ export class DeltaManager
         });
 
         this._inboundSignal.on("error", (error) => {
-            this.close(CreateContainerError(error));
+            // TODO error outward rather than self-close?
+            this.close();
         });
 
         this.statefulDocumentDeltaConnection.on("op", this.opHandler);
@@ -345,10 +342,8 @@ export class DeltaManager
      */
     public submit(type: MessageType, contents: any, batch = false, metadata?: any): number {
         if (this.readonly === true) {
-            const error = new LoggingError("Op is sent in read-only document state", {
-                errorType: ContainerErrorType.genericError,
-            });
-            this.close(CreateContainerError(error));
+            // TODO error outward rather than self-close?
+            this.close();
             return -1;
         }
 
@@ -474,7 +469,7 @@ export class DeltaManager
     /**
      * Closes the connection and clears inbound & outbound queues.
      */
-    public close(error?: ICriticalContainerError): void {
+    public close(): void {
         if (this.closed) {
             return;
         }
@@ -502,7 +497,7 @@ export class DeltaManager
         // This needs to be the last thing we do (before removing listeners), as it causes
         // Container to dispose context and break ability of data stores / runtime to "hear"
         // from delta manager, including notification (above) about readonly state.
-        this.emit("closed", error);
+        this.emit("closed");
 
         this.removeAllListeners();
     }
@@ -681,20 +676,8 @@ export class DeltaManager
                     const message1 = this.comparableMessagePayload(this.previouslyProcessedMessage);
                     const message2 = this.comparableMessagePayload(message);
                     if (message1 !== message2) {
-                        const clientId = this.statefulDocumentDeltaConnection.connected
-                            ? this.statefulDocumentDeltaConnection.clientId
-                            : undefined;
-                        const error = new NonRetryableError(
-                            "Two messages with same seq# and different payload!",
-                            DriverErrorType.fileOverwrittenInStorage,
-                            {
-                                clientId,
-                                sequenceNumber: message.sequenceNumber,
-                                message1,
-                                message2,
-                            },
-                        );
-                        this.close(error);
+                        // TODO probably throw rather than self-close?
+                        this.close();
                     }
                 }
             } else if (message.sequenceNumber !== this.lastQueuedSequenceNumber + 1) {
@@ -848,7 +831,7 @@ export class DeltaManager
                 cacheOnly);
         } catch (error) {
             this.logger.sendErrorEvent({eventName: "GetDeltas_Exception"}, error);
-            this.close(CreateContainerError(error));
+            this.close();
         } finally {
             this.refreshDelayInfo(this.deltaStorageDelayId);
             this.fetchingDeltasFromStorage = false;
