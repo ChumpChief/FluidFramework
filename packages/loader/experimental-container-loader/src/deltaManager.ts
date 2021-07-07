@@ -312,12 +312,13 @@ export class DeltaManager
     }
 
     public flush() {
+        throw new Error("Not implemented");
+    }
+
+    private flushInternal() {
         if (this.messageBuffer.length === 0) {
             return;
         }
-
-        // The prepareFlush event allows listeners to append metadata to the batch prior to submission.
-        this.emit("prepareSend", this.messageBuffer);
 
         this._outbound.push(this.messageBuffer);
         this.messageBuffer = [];
@@ -326,10 +327,6 @@ export class DeltaManager
     /**
      * Submits the given delta returning the client sequence number for the message. Contents is the actual
      * contents of the message. appData is optional metadata that can be attached to the op by the app.
-     *
-     * If batch is set to true then the submit will be batched - and as a result guaranteed to be ordered sequentially
-     * in the global sequencing space. The batch will be flushed either when flush is called or when a non-batched
-     * op is submitted.
      */
     public submit(type: MessageType, contents: any, batch = false, metadata?: any): number {
         if (this.readonly === true) {
@@ -374,15 +371,8 @@ export class DeltaManager
             this.trailingNoopCount = 0;
         }
 
-        this.emit("submitOp", message);
-
-        if (!batch) {
-            this.flush();
-            this.messageBuffer.push(message);
-            this.flush();
-        } else {
-            this.messageBuffer.push(message);
-        }
+        this.messageBuffer.push(message);
+        this.flushInternal();
 
         return message.clientSequenceNumber;
     }
