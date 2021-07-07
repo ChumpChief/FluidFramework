@@ -19,13 +19,11 @@ import {
 } from "@fluidframework/protocol-definitions";
 import { IDisposable, ITelemetryLogger } from "@fluidframework/common-definitions";
 import { runWithRetry } from "@fluidframework/driver-utils";
-import { DeltaManager } from "./deltaManager";
 
 export class RetriableDocumentStorageService implements IDocumentStorageService, IDisposable {
     private _disposed = false;
     constructor(
         private readonly internalStorageService: IDocumentStorageService,
-        private readonly deltaManager: Pick<DeltaManager, "emitDelayInfo" | "refreshDelayInfo">,
         private readonly logger: ITelemetryLogger,
     ) {
     }
@@ -105,9 +103,8 @@ export class RetriableDocumentStorageService implements IDocumentStorageService,
         return runWithRetry(
             api,
             callName,
-            (id: string) => this.deltaManager.refreshDelayInfo(id),
-            (id: string, delayMs: number, error: any) =>
-                this.deltaManager.emitDelayInfo(id, delayMs, CreateContainerError(error)),
+            (id: string) => { },
+            (id: string, delayMs: number, error: any) => { },
             this.logger,
             () => this.checkStorageDisposed(),
         );

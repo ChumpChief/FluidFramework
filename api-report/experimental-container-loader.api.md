@@ -54,7 +54,6 @@ import { ISummaryHandle } from '@fluidframework/protocol-definitions';
 import { ISummaryTree } from '@fluidframework/protocol-definitions';
 import { ITelemetryBaseLogger } from '@fluidframework/common-definitions';
 import { ITelemetryLogger } from '@fluidframework/common-definitions';
-import { IThrottlingWarning } from '@fluidframework/container-definitions';
 import { ITokenClaims } from '@fluidframework/protocol-definitions';
 import { ITree } from '@fluidframework/protocol-definitions';
 import { IUrlResolver } from '@fluidframework/driver-definitions';
@@ -177,8 +176,6 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     // (undocumented)
     get disposed(): boolean;
     // (undocumented)
-    emitDelayInfo(id: string, delayMs: number, error: ICriticalContainerError): void;
-    // (undocumented)
     expectingAcks(): boolean;
     // (undocumented)
     flush(): void;
@@ -214,8 +211,6 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     get readonlyPermissions(): void;
     // (undocumented)
     get referenceTerm(): number;
-    // (undocumented)
-    refreshDelayInfo(id: string): void;
     // (undocumented)
     get serviceConfiguration(): IClientConfiguration | undefined;
     submit(type: MessageType, contents: any, batch?: boolean, metadata?: any): number;
@@ -259,8 +254,6 @@ export interface IContainerLoadOptions {
 
 // @public
 export interface IDeltaManagerInternalEvents extends IDeltaManagerEvents {
-    // (undocumented)
-    (event: "throttled", listener: (error: IThrottlingWarning) => void): any;
     // (undocumented)
     (event: "closed", listener: (error?: ICriticalContainerError) => void): any;
 }
@@ -333,7 +326,7 @@ export class RelativeLoader implements ILoader {
 
 // @public (undocumented)
 export class RetriableDocumentStorageService implements IDocumentStorageService, IDisposable {
-    constructor(internalStorageService: IDocumentStorageService, deltaManager: Pick<DeltaManager, "emitDelayInfo" | "refreshDelayInfo">, logger: ITelemetryLogger);
+    constructor(internalStorageService: IDocumentStorageService, logger: ITelemetryLogger);
     // (undocumented)
     createBlob(file: ArrayBufferLike): Promise<ICreateBlobResponse>;
     // (undocumented)

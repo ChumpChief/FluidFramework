@@ -4,7 +4,6 @@
  */
 
 import { default as AbortController } from "abort-controller";
-import { v4 as uuid } from "uuid";
 import { ITelemetryLogger, IEventProvider } from "@fluidframework/common-definitions";
 import {
     IConnectionDetails,
@@ -13,8 +12,6 @@ import {
     IDeltaManagerEvents,
     IDeltaQueue,
     ICriticalContainerError,
-    ContainerErrorType,
-    IThrottlingWarning,
     ReadOnlyInfo,
 } from "@fluidframework/container-definitions";
 import { assert, TypedEventEmitter } from "@fluidframework/common-utils";
@@ -34,7 +31,6 @@ import {
     MessageType,
 } from "@fluidframework/protocol-definitions";
 import {
-    CreateContainerError,
     DataCorruptionError,
 } from "@fluidframework/container-utils";
 import { DeltaQueue } from "./deltaQueue";
@@ -51,7 +47,6 @@ export interface IConnectionArgs {
  * but not exposed on the public interface IDeltaManager
  */
 export interface IDeltaManagerInternalEvents extends IDeltaManagerEvents {
-    (event: "throttled", listener: (error: IThrottlingWarning) => void);
     (event: "closed", listener: (error?: ICriticalContainerError) => void);
 }
 
@@ -107,7 +102,6 @@ export class DeltaManager
     // Counts the number of noops sent by the client which may not be acked.
     private trailingNoopCount = 0;
     private closed = false;
-    private readonly deltaStorageDelayId = uuid();
 
     // track clientId used last time when we sent any ops
     private lastSubmittedClientId: string | undefined;
@@ -116,9 +110,6 @@ export class DeltaManager
     private deltaStorage: IDocumentDeltaStorageService | undefined;
 
     private messageBuffer: IDocumentMessage[] = [];
-
-    private readonly throttlingIdSet = new Set<string>();
-    private timeTillThrottling: number = 0;
 
     private readonly closeAbortController = new AbortController();
 
@@ -502,37 +493,6 @@ export class DeltaManager
         this.removeAllListeners();
     }
 
-    public refreshDelayInfo(id: string) {
-        this.throttlingIdSet.delete(id);
-        if (this.throttlingIdSet.size === 0) {
-            this.timeTillThrottling = 0;
-        }
-    }
-
-    public emitDelayInfo(
-        id: string,
-        delayMs: number,
-        error: ICriticalContainerError,
-    ) {
-        const timeNow = Date.now();
-        this.throttlingIdSet.add(id);
-        if (delayMs > 0 && (timeNow + delayMs > this.timeTillThrottling)) {
-            this.timeTillThrottling = timeNow + delayMs;
-
-            // Add 'throttling' properties to an error with safely extracted properties:
-            const throttlingWarning: IThrottlingWarning = {
-                errorType: ContainerErrorType.throttlingError,
-                message: `Service busy/throttled: ${error.message}`,
-                retryAfterSeconds: delayMs / 1000,
-            };
-            const reconfiguredError: IThrottlingWarning = {
-                ...CreateContainerError(error),
-                ...throttlingWarning,
-            };
-            this.emit("throttled", reconfiguredError);
-        }
-    }
-
     private readonly opHandler = (documentId: string, messagesArg: ISequencedDocumentMessage[]) => {
         const messages = Array.isArray(messagesArg) ? messagesArg : [messagesArg];
         this.enqueueMessages(messages);
@@ -825,7 +785,6 @@ export class DeltaManager
                 from,
                 to,
                 (messages) => {
-                    this.refreshDelayInfo(this.deltaStorageDelayId);
                     this.enqueueMessages(messages);
                 },
                 cacheOnly);
@@ -833,7 +792,6 @@ export class DeltaManager
             this.logger.sendErrorEvent({eventName: "GetDeltas_Exception"}, error);
             this.close();
         } finally {
-            this.refreshDelayInfo(this.deltaStorageDelayId);
             this.fetchingDeltasFromStorage = false;
             this.processPendingOps();
         }

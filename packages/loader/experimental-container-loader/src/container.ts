@@ -24,7 +24,6 @@ import {
     ICriticalContainerError,
     ContainerWarning,
     AttachState,
-    IThrottlingWarning,
     IPendingLocalState,
     ILoaderOptions,
     IContainerLoadMode,
@@ -699,9 +698,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                         this.subLogger,
                     ),
                     "containerAttach",
-                    (id: string) => this._deltaManager.refreshDelayInfo(id),
-                    (id: string, delayMs: number, error: any) =>
-                        this._deltaManager.emitDelayInfo(id, delayMs, CreateContainerError(error)),
+                    (id: string) => { },
+                    (id: string, delayMs: number, error: any) => { },
                     this.logger,
                 );
             }
@@ -1166,7 +1164,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             storageService = new PrefetchDocumentStorageService(storageService);
         }
 
-        this._storageService = new RetriableDocumentStorageService(storageService, this._deltaManager, this.logger);
+        this._storageService = new RetriableDocumentStorageService(storageService, this.logger);
 
         // ensure we did not lose that policy in the process of wrapping
         assert(storageService.policies?.minBlobSize === this.storageService.policies?.minBlobSize,
@@ -1383,10 +1381,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         deltaManager.on("disconnect", (reason: string) => {
             this.connectionStateHandler.receivedDisconnectEvent();
-        });
-
-        deltaManager.on("throttled", (warning: IThrottlingWarning) => {
-            this.raiseContainerWarning(warning);
         });
 
         deltaManager.on("readonly", (readonly) => {
