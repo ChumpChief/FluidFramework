@@ -26,7 +26,6 @@ import {
     AttachState,
     IPendingLocalState,
     ILoaderOptions,
-    IContainerLoadMode,
 } from "@fluidframework/container-definitions";
 import {
     CreateContainerError,
@@ -113,14 +112,6 @@ export interface IContainerLoadOptions {
      */
     clientDetailsOverride?: IClientDetails;
     resolvedUrl: IFluidResolvedUrl;
-    /**
-     * Control which snapshot version to load from.  See IParsedUrl for detailed information.
-     */
-    version: string | undefined;
-    /**
-     * Loads the Container in paused state if true, unpaused otherwise.
-     */
-    loadMode?: IContainerLoadMode;
 }
 
 export interface IContainerConfig {
@@ -254,14 +245,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             container.logger,
             { eventName: "Load" },
             async (event) => new Promise<Container>((res, rej) => {
-                const version = loadOptions.version;
-
                 const onClosed = (err?: ICriticalContainerError) => {
                     rej(err ?? CreateContainerError("Container closed without an error"));
                 };
                 container.on("closed", onClosed);
 
-                container.load(version)
+                container.load()
                     .finally(() => {
                         container.removeListener("closed", onClosed);
                     })
@@ -939,7 +928,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      *   - otherwise, version sha to load snapshot
      * @param pause - start the container in a paused state
      */
-    private async load(specifiedVersion: string | undefined) {
+    private async load() {
         if (this._resolvedUrl === undefined) {
             throw new Error("Attempting to load without a resolved url");
         }
@@ -963,7 +952,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._attachState = AttachState.Attached;
 
         // Fetch specified snapshot.
-        const { snapshot, versionId } = await this.fetchSnapshotTree(specifiedVersion);
+        const { snapshot, versionId } = await this.fetchSnapshotTree();
 
         const attributes = await this.getDocumentAttributes(this.storageService, snapshot);
 
@@ -1436,18 +1425,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
     /**
      * Get the most recent snapshot, or a specific version.
-     * @param specifiedVersion - The specific version of the snapshot to retrieve
      * @returns The snapshot requested, or the latest snapshot if no version was specified, plus version ID
      */
-    private async fetchSnapshotTree(specifiedVersion: string | undefined):
+    private async fetchSnapshotTree():
         Promise<{snapshot?: ISnapshotTree; versionId?: string}>
     {
-        const version = await this.getVersion(specifiedVersion ?? this.id);
+        const version = await this.getVersion(this.id);
 
-        if (version === undefined && specifiedVersion !== undefined) {
-            // We should have a defined version to load from if specified version requested
-            this.logger.sendErrorEvent({ eventName: "NoVersionFoundWhenSpecified", id: specifiedVersion });
-        }
         this._loadedFromVersion = version;
         const snapshot = await this.storageService.getSnapshotTree(version) ?? undefined;
 

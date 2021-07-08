@@ -17,7 +17,6 @@ import { ICodeLoader } from '@fluidframework/container-definitions';
 import { IConnectionDetails } from '@fluidframework/container-definitions';
 import { IContainer } from '@fluidframework/container-definitions';
 import { IContainerEvents } from '@fluidframework/container-definitions';
-import { IContainerLoadMode } from '@fluidframework/container-definitions';
 import { ICreateBlobResponse } from '@fluidframework/protocol-definitions';
 import { ICriticalContainerError } from '@fluidframework/container-definitions';
 import { IDeltaHandlerStrategy } from '@fluidframework/container-definitions';
@@ -246,10 +245,8 @@ export interface IContainerConfig {
 export interface IContainerLoadOptions {
     canReconnect?: boolean;
     clientDetailsOverride?: IClientDetails;
-    loadMode?: IContainerLoadMode;
     // (undocumented)
     resolvedUrl: IFluidResolvedUrl;
-    version: string | undefined;
 }
 
 // @public

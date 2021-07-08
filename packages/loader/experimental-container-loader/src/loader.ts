@@ -8,7 +8,6 @@ import { ITelemetryBaseLogger, ITelemetryLogger } from "@fluidframework/common-d
 import {
     IFluidObject,
     IRequest,
-    IRequestHeader,
     IResponse,
     IFluidRouter,
     IFluidCodeDetails,
@@ -69,7 +68,6 @@ export class RelativeLoader implements ILoader {
                         canReconnect: request.headers?.[LoaderHeader.reconnect],
                         clientDetailsOverride: request.headers?.[LoaderHeader.clientDetails],
                         resolvedUrl: {...resolvedUrl},
-                        version: request.headers?.[LoaderHeader.version] ?? undefined,
                     },
                 );
                 return container;
@@ -301,13 +299,6 @@ export class Loader implements IHostLoader {
         });
     }
 
-    private getKeyForContainerCache(request: IRequest, parsedUrl: IParsedUrl): string {
-        const key = request.headers?.[LoaderHeader.version] !== undefined
-            ? `${parsedUrl.id}@${request.headers[LoaderHeader.version]}`
-            : parsedUrl.id;
-        return key;
-    }
-
     private addToContainerCache(key: string, containerP: Promise<Container>) {
         this.containers.set(key, containerP);
         containerP.then((container) => {
@@ -332,11 +323,11 @@ export class Loader implements IHostLoader {
             throw new Error(`Invalid URL ${resolvedAsFluid.url}`);
         }
 
-        const { canCache, fromSequenceNumber } = this.parseHeader(parsed, request);
+        const { canCache, fromSequenceNumber } = this.parseHeader(request);
 
         let container: Container;
         if (canCache) {
-            const key = this.getKeyForContainerCache(request, parsed);
+            const key = parsed.id;
             const maybeContainer = await this.containers.get(key);
             if (maybeContainer !== undefined) {
                 container = maybeContainer;
@@ -365,11 +356,7 @@ export class Loader implements IHostLoader {
         return this.services.options.cache !== false;
     }
 
-    private canCacheForRequest(headers: IRequestHeader): boolean {
-        return this.cachingEnabled && headers[LoaderHeader.cache] !== false;
-    }
-
-    private parseHeader(parsed: IParsedUrl, request: IRequest) {
+    private parseHeader(request: IRequest) {
         let fromSequenceNumber = -1;
 
         request.headers = request.headers ?? {};
@@ -379,11 +366,7 @@ export class Loader implements IHostLoader {
             fromSequenceNumber = headerSeqNum;
         }
 
-        // If set in both query string and headers, use query string
-        request.headers[LoaderHeader.version] = parsed.version ?? request.headers[LoaderHeader.version];
-
-        const canCache = this.canCacheForRequest(request.headers);
-        debug(`${canCache} ${request.headers[LoaderHeader.version]}`);
+        const canCache = this.cachingEnabled && request.headers[LoaderHeader.cache] !== false;
 
         return {
             canCache,
@@ -401,7 +384,6 @@ export class Loader implements IHostLoader {
                 canReconnect: request.headers?.[LoaderHeader.reconnect],
                 clientDetailsOverride: request.headers?.[LoaderHeader.clientDetails],
                 resolvedUrl: resolved,
-                version: request.headers?.[LoaderHeader.version] ?? undefined,
             },
         );
     }
