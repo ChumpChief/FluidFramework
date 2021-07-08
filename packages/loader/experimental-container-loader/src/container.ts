@@ -611,11 +611,11 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._deltaManager.close();
 
         assert(this.attachState === AttachState.Attached, 0x0d1 /* "Container should be attached before close" */);
-        assert(this.resolvedUrl !== undefined && this.resolvedUrl.type === "fluid",
+        assert(this._resolvedUrl !== undefined && this._resolvedUrl.type === "fluid",
             0x0d2 /* "resolved url should be valid Fluid url" */);
         const pendingState: IPendingLocalState = {
             pendingRuntimeState: this.context.getPendingLocalState(),
-            url: this.resolvedUrl.url,
+            url: this._resolvedUrl.url,
         };
 
         this.close();
@@ -779,14 +779,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public async getAbsoluteUrl(relativeUrl: string): Promise<string | undefined> {
-        if (this.resolvedUrl === undefined) {
-            return undefined;
-        }
-
-        return this.urlResolver.getAbsoluteUrl(
-            this.resolvedUrl,
-            relativeUrl,
-            this._context?.codeDetails);
+        throw new Error("Not implemented");
     }
 
     public async proposeCodeDetails(codeDetails: IFluidCodeDetails) {
