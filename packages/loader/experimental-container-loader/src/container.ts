@@ -954,11 +954,9 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this._canReconnect,
         );
 
-        let startConnectionP: Promise<void> | undefined;
-
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-        startConnectionP = this.connectToDeltaStream();
+        const startConnectionP = this.connectToDeltaStream();
         startConnectionP.catch((error) => { });
 
         await this.connectStorageService();
@@ -977,30 +975,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         const protocolHandlerP =
             this.loadAndInitializeProtocolState(attributes, this.storageService, snapshot);
 
-        let opsBeforeReturnP: Promise<void> | undefined;
-
-        // Initialize document details - if loading a snapshot use that - otherwise we need to wait on
-        // the initial details
-        if (snapshot !== undefined) {
-            this._existing = true;
-            opsBeforeReturnP = this._deltaManager.preFetchOps(true);
-            // Keep going with fetching ops from storage once we have all cached ops in.
-            // Ops processing will start once cached ops are in and and will stop when queue is empty
-            // (which in most cases will happen when we are done processing cached ops)
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            opsBeforeReturnP.then(async () => this._deltaManager.preFetchOps(false));
-        } else {
-            //
-            // THIS IS LEGACY PATH
-            //
-            if (startConnectionP === undefined) {
-                startConnectionP = this.connectToDeltaStream();
-            }
-            // Intentionally don't .catch on this promise - we'll let any error throw below in the await.
-            await startConnectionP;
-            // TODO this is incorrect if we disconnect before getting here
-            this._existing = this.statefulDocumentDeltaConnection.existing;
-        }
+        this._existing = true;
+        const opsBeforeReturnP = this._deltaManager.preFetchOps(true);
+        // Keep going with fetching ops from storage once we have all cached ops in.
+        // Ops processing will start once cached ops are in and and will stop when queue is empty
+        // (which in most cases will happen when we are done processing cached ops)
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        opsBeforeReturnP.then(async () => this._deltaManager.preFetchOps(false));
 
         // LoadContext directly requires protocolHandler to be ready, and eventually calls
         // instantiateRuntime which will want to know existing state.
@@ -1018,15 +999,13 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // We might have hit some failure that did not manifest itself in exception in this flow,
         // do not start op processing in such case - static version of Container.load() will handle it correctly.
         if (!this.closed) {
-            if (opsBeforeReturnP !== undefined) {
-                this._deltaManager.inbound.resume();
+            this._deltaManager.inbound.resume();
 
-                await opsBeforeReturnP;
-                await this._deltaManager.inbound.waitTillProcessingDone();
+            await opsBeforeReturnP;
+            await this._deltaManager.inbound.waitTillProcessingDone();
 
-                // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                this._deltaManager.inbound.pause();
-            }
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            this._deltaManager.inbound.pause();
 
             this.resume();
         }
