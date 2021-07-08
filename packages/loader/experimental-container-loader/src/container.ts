@@ -8,7 +8,7 @@ import {
     IDisposable,
     ITelemetryLogger,
 } from "@fluidframework/common-definitions";
-import { assert, unreachableCase } from "@fluidframework/common-utils";
+import { assert } from "@fluidframework/common-utils";
 import {
     IRequest,
     IResponse,
@@ -256,17 +256,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             async (event) => new Promise<Container>((res, rej) => {
                 const version = loadOptions.version;
 
-                // always load unpaused with pending ops!
-                // It is also default mode in general.
-                const defaultMode: IContainerLoadMode = { opsBeforeReturn: "cached" };
-                const mode: IContainerLoadMode = loadOptions.loadMode ?? defaultMode;
-
                 const onClosed = (err?: ICriticalContainerError) => {
                     rej(err ?? CreateContainerError("Container closed without an error"));
                 };
                 container.on("closed", onClosed);
 
-                container.load(version, mode)
+                container.load(version)
                     .finally(() => {
                         container.removeListener("closed", onClosed);
                     })
@@ -944,10 +939,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      *   - otherwise, version sha to load snapshot
      * @param pause - start the container in a paused state
      */
-    private async load(
-        specifiedVersion: string | undefined,
-        loadMode: IContainerLoadMode,
-    ) {
+    private async load(specifiedVersion: string | undefined) {
         if (this._resolvedUrl === undefined) {
             throw new Error("Attempting to load without a resolved url");
         }
@@ -966,10 +958,8 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
 
         // Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
         // DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-        if (loadMode.deltaConnection === undefined) {
-            startConnectionP = this.connectToDeltaStream();
-            startConnectionP.catch((error) => { });
-        }
+        startConnectionP = this.connectToDeltaStream();
+        startConnectionP.catch((error) => { });
 
         await this.connectStorageService();
         this._attachState = AttachState.Attached;
@@ -993,28 +983,12 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         // the initial details
         if (snapshot !== undefined) {
             this._existing = true;
-            switch (loadMode.opsBeforeReturn) {
-                case undefined:
-                    if (loadMode.deltaConnection !== "none") {
-                        // Start prefetch, but not set opsBeforeReturnP - boot is not blocked by it!
-                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                        this._deltaManager.preFetchOps(false);
-                    }
-                    break;
-                case "cached":
-                    opsBeforeReturnP = this._deltaManager.preFetchOps(true);
-                    // Keep going with fetching ops from storage once we have all cached ops in.
-                    // Ops processing will start once cached ops are in and and will stop when queue is empty
-                    // (which in most cases will happen when we are done processing cached ops)
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                    opsBeforeReturnP.then(async () => this._deltaManager.preFetchOps(false));
-                    break;
-                case "all":
-                    opsBeforeReturnP = this._deltaManager.preFetchOps(false);
-                    break;
-                default:
-                    unreachableCase(loadMode.opsBeforeReturn);
-            }
+            opsBeforeReturnP = this._deltaManager.preFetchOps(true);
+            // Keep going with fetching ops from storage once we have all cached ops in.
+            // Ops processing will start once cached ops are in and and will stop when queue is empty
+            // (which in most cases will happen when we are done processing cached ops)
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            opsBeforeReturnP.then(async () => this._deltaManager.preFetchOps(false));
         } else {
             //
             // THIS IS LEGACY PATH
@@ -1054,20 +1028,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 this._deltaManager.inbound.pause();
             }
 
-            switch (loadMode.deltaConnection) {
-                case undefined:
-                    this.resume();
-                    break;
-                case "delayed":
-                    this.resumedOpProcessingAfterLoad = true;
-                    this._deltaManager.inbound.resume();
-                    this._deltaManager.inboundSignal.resume();
-                    break;
-                case "none":
-                    break;
-                default:
-                    unreachableCase(loadMode.deltaConnection);
-            }
+            this.resume();
         }
 
         // Safety net: static version of Container.load() should have got this message through "closed" handler.

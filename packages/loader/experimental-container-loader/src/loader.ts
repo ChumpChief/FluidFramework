@@ -70,7 +70,6 @@ export class RelativeLoader implements ILoader {
                         clientDetailsOverride: request.headers?.[LoaderHeader.clientDetails],
                         resolvedUrl: {...resolvedUrl},
                         version: request.headers?.[LoaderHeader.version] ?? undefined,
-                        loadMode: request.headers?.[LoaderHeader.loadMode],
                     },
                 );
                 return container;
@@ -403,7 +402,6 @@ export class Loader implements IHostLoader {
                 clientDetailsOverride: request.headers?.[LoaderHeader.clientDetails],
                 resolvedUrl: resolved,
                 version: request.headers?.[LoaderHeader.version] ?? undefined,
-                loadMode: request.headers?.[LoaderHeader.loadMode],
             },
         );
     }
