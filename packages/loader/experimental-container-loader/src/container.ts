@@ -608,12 +608,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public serialize(): string {
-        assert(this.attachState === AttachState.Detached, 0x0d3 /* "Should only be called in detached container" */);
-
-        const appSummary: ISummaryTree = this.context.createSummary();
-        const protocolSummary = this.captureProtocolSummary();
-        const combinedSummary = combineAppAndProtocolSummary(appSummary, protocolSummary);
-        return JSON.stringify(combinedSummary);
+        throw new Error("Not implemented");
     }
 
     public async attach(request: IRequest): Promise<void> {
