@@ -26,7 +26,6 @@ import { ChildLogger, DebugLogger, PerformanceEvent } from "@fluidframework/tele
 import {
     IDocumentServiceFactory,
     IFluidResolvedUrl,
-    IResolvedUrl,
     IUrlResolver,
 } from "@fluidframework/driver-definitions";
 import {
@@ -38,40 +37,27 @@ import { Container } from "./container";
 import { debug } from "./debug";
 import { IParsedUrl, parseUrl } from "./utils";
 
-function canUseCache(request: IRequest): boolean {
-    if (request.headers === undefined) {
-        return true;
-    }
-
-    return request.headers[LoaderHeader.cache] !== false;
-}
-
 export class RelativeLoader implements ILoader {
     constructor(
         private readonly container: Container,
         private readonly loader: ILoader | undefined,
-    ) {
-    }
+    ) { }
 
     public get IFluidRouter(): IFluidRouter { return this; }
 
     public async resolve(request: IRequest): Promise<IContainer> {
         if (request.url.startsWith("/")) {
-            if (canUseCache(request)) {
-                return this.container;
-            } else {
-                const resolvedUrl = this.container.resolvedUrl;
-                ensureFluidResolvedUrl(resolvedUrl);
-                const container = await Container.load(
-                    this.loader as Loader,
-                    {
-                        canReconnect: request.headers?.[LoaderHeader.reconnect],
-                        clientDetailsOverride: request.headers?.[LoaderHeader.clientDetails],
-                        resolvedUrl: {...resolvedUrl},
-                    },
-                );
-                return container;
-            }
+            const resolvedUrl = this.container.resolvedUrl;
+            ensureFluidResolvedUrl(resolvedUrl);
+            const container = await Container.load(
+                this.loader as Loader,
+                {
+                    canReconnect: request.headers?.[LoaderHeader.reconnect],
+                    clientDetailsOverride: request.headers?.[LoaderHeader.clientDetails],
+                    resolvedUrl: {...resolvedUrl},
+                },
+            );
+            return container;
         }
 
         if (this.loader === undefined) {
@@ -95,22 +81,6 @@ export class RelativeLoader implements ILoader {
         }
         return this.loader.request(request);
     }
-}
-
-function createCachedResolver(resolver: IUrlResolver) {
-    const cacheResolver = Object.create(resolver) as IUrlResolver;
-    const resolveCache = new Map<string, Promise<IResolvedUrl | undefined>>();
-    cacheResolver.resolve = async (request: IRequest): Promise<IResolvedUrl | undefined> => {
-        if (!canUseCache(request)) {
-            return resolver.resolve(request);
-        }
-        if (!resolveCache.has(request.url)) {
-            resolveCache.set(request.url, resolver.resolve(request));
-        }
-
-        return resolveCache.get(request.url);
-    };
-    return cacheResolver;
 }
 
 /**
@@ -209,7 +179,6 @@ export interface ILoaderServices {
  * Manages Fluid resource loading
  */
 export class Loader implements IHostLoader {
-    private readonly containers = new Map<string, Promise<Container>>();
     public readonly services: ILoaderServices;
     private readonly logger: ITelemetryLogger;
 
@@ -220,7 +189,7 @@ export class Loader implements IHostLoader {
         }
 
         this.services = {
-            urlResolver: createCachedResolver(MultiUrlResolver.create(loaderProps.urlResolver)),
+            urlResolver: MultiUrlResolver.create(loaderProps.urlResolver),
             documentServiceFactory: MultiDocumentServiceFactory.create(loaderProps.documentServiceFactory),
             codeLoader: loaderProps.codeLoader,
             options: loaderProps.options ?? {},
@@ -236,22 +205,10 @@ export class Loader implements IHostLoader {
     public async createDetachedContainer(codeDetails: IFluidCodeDetails): Promise<Container> {
         debug(`Container creating in detached state: ${performance.now()} `);
 
-        const container = await Container.createDetached(
+        return Container.createDetached(
             this,
             codeDetails,
         );
-
-        if (this.cachingEnabled) {
-            container.once("attached", () => {
-                ensureFluidResolvedUrl(container.resolvedUrl);
-                const parsedUrl = parseUrl(container.resolvedUrl.url);
-                if (parsedUrl !== undefined) {
-                    this.addToContainerCache(parsedUrl.id, Promise.resolve(container));
-                }
-            });
-        }
-
-        return container;
     }
 
     public async rehydrateDetachedContainerFromSnapshot(snapshot: string): Promise<Container> {
@@ -275,20 +232,6 @@ export class Loader implements IHostLoader {
         });
     }
 
-    private addToContainerCache(key: string, containerP: Promise<Container>) {
-        this.containers.set(key, containerP);
-        containerP.then((container) => {
-            // If the container is closed or becomes closed after we resolve it, remove it from the cache.
-            if (container.closed) {
-                this.containers.delete(key);
-            } else {
-                container.once("closed", () => {
-                    this.containers.delete(key);
-                });
-            }
-        }).catch((error) => {});
-    }
-
     private async resolveCore(request: IRequest): Promise<{ container: Container; parsed: IParsedUrl }> {
         const resolvedAsFluid = await this.services.urlResolver.resolve(request);
         ensureFluidResolvedUrl(resolvedAsFluid);
@@ -299,37 +242,16 @@ export class Loader implements IHostLoader {
             throw new Error(`Invalid URL ${resolvedAsFluid.url}`);
         }
 
-        const { canCache, fromSequenceNumber } = this.parseHeader(request);
+        const { fromSequenceNumber } = this.parseHeader(request);
 
-        let container: Container;
-        if (canCache) {
-            const key = parsed.id;
-            const maybeContainer = await this.containers.get(key);
-            if (maybeContainer !== undefined) {
-                container = maybeContainer;
-            } else {
-                const containerP =
-                    this.loadContainer(
-                        request,
-                        resolvedAsFluid);
-                this.addToContainerCache(key, containerP);
-                container = await containerP;
-            }
-        } else {
-            container =
-                await this.loadContainer(
-                    request,
-                    resolvedAsFluid,
-                );
-        }
+        const container = await this.loadContainer(
+            request,
+            resolvedAsFluid,
+        );
 
         await container.waitUntilOpProcessed(fromSequenceNumber);
 
         return { container, parsed };
-    }
-
-    private get cachingEnabled() {
-        return this.services.options.cache !== false;
     }
 
     private parseHeader(request: IRequest) {
@@ -342,10 +264,7 @@ export class Loader implements IHostLoader {
             fromSequenceNumber = headerSeqNum;
         }
 
-        const canCache = this.cachingEnabled && request.headers[LoaderHeader.cache] !== false;
-
         return {
-            canCache,
             fromSequenceNumber,
         };
     }
