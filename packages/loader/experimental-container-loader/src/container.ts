@@ -280,22 +280,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         return container;
     }
 
-    /**
-     * Create a new container in a detached state that is initialized with a
-     * snapshot from a previous detached container.
-     */
-    public static async rehydrateDetachedFromSnapshot(
-        loader: Loader,
-        snapshot: string,
-    ): Promise<Container> {
-        const container = new Container(
-            loader,
-            {});
-        const deserializedSummary = JSON.parse(snapshot) as ISummaryTree;
-        await container.rehydrateDetachedFromSnapshot(deserializedSummary);
-        return container;
-    }
-
     public subLogger: TelemetryLogger;
 
     // Tells if container can reconnect on losing fist connection
@@ -922,27 +906,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this.propagateConnectionState();
 
         this.loaded = true;
-    }
-
-    private async rehydrateDetachedFromSnapshot(detachedContainerSnapshot: ISummaryTree) {
-        const snapshotTree: ISnapshotTree = getSnapshotTreeFromSerializedContainer(detachedContainerSnapshot);
-        const attributes = await this.getDocumentAttributes(undefined, snapshotTree);
-        assert(attributes.sequenceNumber === 0, 0x0db /* "Seq number in detached container should be 0!!" */);
-        this.attachDeltaManagerOpHandler(attributes);
-
-        // We know this is create detached flow with snapshot.
-        this._existing = true;
-
-        // ...load in the existing quorum
-        // Initialize the protocol handler
-        this._protocolHandler =
-            await this.loadAndInitializeProtocolState(attributes, undefined, snapshotTree);
-
-        await this.createDetachedContext(attributes, snapshotTree);
-
-        this.loaded = true;
-
-        this.propagateConnectionState();
     }
 
     private async connectStorageService(): Promise<void> {

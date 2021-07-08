@@ -212,9 +212,7 @@ export class Loader implements IHostLoader {
     }
 
     public async rehydrateDetachedContainerFromSnapshot(snapshot: string): Promise<Container> {
-        debug(`Container creating in detached state: ${performance.now()} `);
-
-        return Container.rehydrateDetachedFromSnapshot(this, snapshot);
+        throw new Error("Not implemented");
     }
 
     public async resolve(request: IRequest): Promise<Container> {
