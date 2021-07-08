@@ -418,7 +418,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public get codeDetails(): IFluidCodeDetails | undefined {
-        return this._context?.codeDetails ?? this.getCodeDetailsFromQuorum();
+        throw new Error("Not implemented");
     }
 
     /**

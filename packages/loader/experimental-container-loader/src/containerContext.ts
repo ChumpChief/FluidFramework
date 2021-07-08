@@ -166,7 +166,7 @@ export class ContainerContext implements IContainerContext {
         private readonly container: Container,
         public readonly scope: IFluidObject,
         private readonly codeLoader: ICodeLoader,
-        public readonly codeDetails: IFluidCodeDetails,
+        private readonly codeDetails: IFluidCodeDetails,
         private readonly _baseSnapshot: ISnapshotTree | undefined,
         private readonly attributes: IDocumentAttributes,
         public readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
