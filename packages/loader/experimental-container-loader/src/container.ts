@@ -511,7 +511,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * Retrieves the quorum associated with the document
      */
     public getQuorum(): IQuorum {
-        return this.protocolHandler.quorum;
+        throw new Error("Not implemented");
     }
 
     public async waitUntilOpProcessed(sequenceNumber: number): Promise<void> {
@@ -736,7 +736,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             }
         }
 
-        return this.getQuorum().propose("code", codeDetails)
+        return this.protocolHandler.quorum.propose("code", codeDetails)
             .then(()=>true)
             .catch(()=>false);
     }
@@ -1203,7 +1203,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         if (message.clientId != null) {
             let errorMsg: string | undefined;
             const client: ILocalSequencedClient | undefined =
-                this.getQuorum().getMember(message.clientId);
+                this.protocolHandler.quorum.getMember(message.clientId);
             if (client === undefined && message.type !== MessageType.ClientJoin) {
                 errorMsg = "messageClientIdMissingFromQuorum";
             } else if (client?.shouldHaveLeft === true && message.type !== MessageType.NoOp) {
