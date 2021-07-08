@@ -144,8 +144,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     serialize(): string;
     get serviceConfiguration(): IClientConfiguration | undefined;
     // (undocumented)
-    snapshot(tagMessage: string, fullTree?: boolean): Promise<void>;
-    // (undocumented)
     readonly storage: IDocumentStorageService;
     // (undocumented)
     subLogger: TelemetryLogger;
