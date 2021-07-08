@@ -24,7 +24,6 @@ import {
     ICriticalContainerError,
     ContainerWarning,
     AttachState,
-    IPendingLocalState,
     ILoaderOptions,
 } from "@fluidframework/container-definitions";
 import {
@@ -605,22 +604,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     }
 
     public closeAndGetPendingLocalState(): string {
-        // runtime matches pending ops to successful ones by clientId and client seq num, so we need to close the
-        // container at the same time we get pending state, otherwise this container could reconnect and resubmit with
-        // a new clientId and a future container using stale pending state without the new clientId would resubmit them
-        this._deltaManager.close();
-
-        assert(this.attachState === AttachState.Attached, 0x0d1 /* "Container should be attached before close" */);
-        assert(this._resolvedUrl !== undefined && this._resolvedUrl.type === "fluid",
-            0x0d2 /* "resolved url should be valid Fluid url" */);
-        const pendingState: IPendingLocalState = {
-            pendingRuntimeState: this.context.getPendingLocalState(),
-            url: this._resolvedUrl.url,
-        };
-
-        this.close();
-
-        return JSON.stringify(pendingState);
+        throw new Error("Not implemented");
     }
 
     public get attachState(): AttachState {
