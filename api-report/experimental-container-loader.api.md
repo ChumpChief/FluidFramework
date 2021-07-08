@@ -6,7 +6,6 @@
 
 import { AttachState } from '@fluidframework/container-definitions';
 import { ConnectionMode } from '@fluidframework/protocol-definitions';
-import { ContainerWarning } from '@fluidframework/container-definitions';
 import { EventEmitter } from 'events';
 import { EventEmitterWithErrorHandling } from '@fluidframework/telemetry-utils';
 import { IAudience } from '@fluidframework/container-definitions';
@@ -132,7 +131,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     get options(): ILoaderOptions;
     // (undocumented)
     proposeCodeDetails(codeDetails: IFluidCodeDetails): Promise<boolean>;
-    raiseContainerWarning(warning: ContainerWarning): void;
     // (undocumented)
     request(path: IRequest): Promise<IResponse>;
     // (undocumented)

@@ -709,7 +709,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
      * For critical errors, please call Container.close(error).
      * @param error - an error to raise
      */
-    public raiseContainerWarning(warning: ContainerWarning) {
+    private raiseContainerWarning(warning: ContainerWarning) {
         // Some "warning" events come from outside the container and are logged
         // elsewhere (e.g. summarizing container). We shouldn't log these here.
         if (warning.logged !== true) {
