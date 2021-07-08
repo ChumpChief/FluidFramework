@@ -63,7 +63,6 @@ export class ContainerContext implements IContainerContext {
         closeFn: (error?: ICriticalContainerError) => void,
         version: string,
         updateDirtyContainerState: (dirty: boolean) => void,
-        pendingLocalState?: unknown,
     ): Promise<ContainerContext> {
         const context = new ContainerContext(
             container,
@@ -81,7 +80,7 @@ export class ContainerContext implements IContainerContext {
             closeFn,
             version,
             updateDirtyContainerState,
-            pendingLocalState);
+        );
         await context.load();
         return context;
     }
@@ -179,8 +178,6 @@ export class ContainerContext implements IContainerContext {
         public readonly closeFn: (error?: ICriticalContainerError) => void,
         public readonly version: string,
         public readonly updateDirtyContainerState: (dirty: boolean) => void,
-        public readonly pendingLocalState?: unknown,
-
     ) {
         this.logger = container.subLogger;
         this.attachListener();

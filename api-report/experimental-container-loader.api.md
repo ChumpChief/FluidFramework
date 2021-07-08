@@ -126,7 +126,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     // (undocumented)
     get IFluidRouter(): IFluidRouter;
     get isDirty(): boolean;
-    static load(loader: Loader, loadOptions: IContainerLoadOptions, pendingLocalState?: unknown): Promise<Container>;
+    static load(loader: Loader, loadOptions: IContainerLoadOptions): Promise<Container>;
     // (undocumented)
     get loadedFromVersion(): IVersion | undefined;
     // (undocumented)
@@ -305,7 +305,7 @@ export class Loader implements IHostLoader {
     // (undocumented)
     request(request: IRequest): Promise<IResponse>;
     // (undocumented)
-    resolve(request: IRequest, pendingLocalState?: string): Promise<Container>;
+    resolve(request: IRequest): Promise<Container>;
     // (undocumented)
     readonly services: ILoaderServices;
 }

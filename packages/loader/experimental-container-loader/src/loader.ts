@@ -18,7 +18,6 @@ import {
     IContainer,
     IHostLoader,
     ILoader,
-    IPendingLocalState,
     ILoaderOptions,
     IProxyLoaderFactory,
     LoaderHeader,
@@ -288,13 +287,10 @@ export class Loader implements IHostLoader {
         return Container.rehydrateDetachedFromSnapshot(this, snapshot);
     }
 
-    public async resolve(request: IRequest, pendingLocalState?: string): Promise<Container> {
-        const eventName = pendingLocalState === undefined ? "Resolve" : "ResolveWithPendingState";
+    public async resolve(request: IRequest): Promise<Container> {
+        const eventName = "Resolve";
         return PerformanceEvent.timedExecAsync(this.logger, { eventName }, async () => {
-            const resolved = await this.resolveCore(
-                request,
-                pendingLocalState !== undefined ? JSON.parse(pendingLocalState) : undefined,
-            );
+            const resolved = await this.resolveCore(request);
             return resolved.container;
         });
     }
@@ -327,10 +323,7 @@ export class Loader implements IHostLoader {
         }).catch((error) => {});
     }
 
-    private async resolveCore(
-        request: IRequest,
-        pendingLocalState?: IPendingLocalState,
-    ): Promise<{ container: Container; parsed: IParsedUrl }> {
+    private async resolveCore(request: IRequest): Promise<{ container: Container; parsed: IParsedUrl }> {
         const resolvedAsFluid = await this.services.urlResolver.resolve(request);
         ensureFluidResolvedUrl(resolvedAsFluid);
 
@@ -340,20 +333,10 @@ export class Loader implements IHostLoader {
             throw new Error(`Invalid URL ${resolvedAsFluid.url}`);
         }
 
-        if (pendingLocalState !== undefined) {
-            const parsedPendingUrl = parseUrl(pendingLocalState.url);
-            if (parsedPendingUrl?.id !== parsed.id ||
-                parsedPendingUrl?.path.replace(/\/$/, "") !== parsed.path.replace(/\/$/, "")) {
-                const message = `URL ${resolvedAsFluid.url} does not match pending state URL ${pendingLocalState.url}`;
-                throw new Error(message);
-            }
-        }
-
         const { canCache, fromSequenceNumber } = this.parseHeader(parsed, request);
-        const shouldCache = pendingLocalState !== undefined ? false : canCache;
 
         let container: Container;
-        if (shouldCache) {
+        if (canCache) {
             const key = this.getKeyForContainerCache(request, parsed);
             const maybeContainer = await this.containers.get(key);
             if (maybeContainer !== undefined) {
@@ -371,7 +354,7 @@ export class Loader implements IHostLoader {
                 await this.loadContainer(
                     request,
                     resolvedAsFluid,
-                    pendingLocalState?.pendingRuntimeState);
+                );
         }
 
         await container.waitUntilOpProcessed(fromSequenceNumber);
@@ -412,7 +395,6 @@ export class Loader implements IHostLoader {
     private async loadContainer(
         request: IRequest,
         resolved: IFluidResolvedUrl,
-        pendingLocalState?: unknown,
     ): Promise<Container> {
         return Container.load(
             this,
@@ -423,7 +405,6 @@ export class Loader implements IHostLoader {
                 version: request.headers?.[LoaderHeader.version] ?? undefined,
                 loadMode: request.headers?.[LoaderHeader.loadMode],
             },
-            pendingLocalState,
         );
     }
 }

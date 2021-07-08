@@ -241,7 +241,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     public static async load(
         loader: Loader,
         loadOptions: IContainerLoadOptions,
-        pendingLocalState?: unknown,
     ): Promise<Container> {
         const container = new Container(
             loader,
@@ -260,8 +259,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 // always load unpaused with pending ops!
                 // It is also default mode in general.
                 const defaultMode: IContainerLoadMode = { opsBeforeReturn: "cached" };
-                assert(pendingLocalState === undefined || loadOptions.loadMode === undefined,
-                    0x1e1 /* "pending state requires immidiate connection!" */);
                 const mode: IContainerLoadMode = loadOptions.loadMode ?? defaultMode;
 
                 const onClosed = (err?: ICriticalContainerError) => {
@@ -269,7 +266,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 };
                 container.on("closed", onClosed);
 
-                container.load(version, mode, pendingLocalState)
+                container.load(version, mode)
                     .finally(() => {
                         container.removeListener("closed", onClosed);
                     })
@@ -950,8 +947,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
     private async load(
         specifiedVersion: string | undefined,
         loadMode: IContainerLoadMode,
-        pendingLocalState?: unknown)
-    {
+    ) {
         if (this._resolvedUrl === undefined) {
             throw new Error("Attempting to load without a resolved url");
         }
@@ -1037,7 +1033,7 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         this._protocolHandler = await protocolHandlerP;
 
         const codeDetails = this.getCodeDetailsFromQuorum();
-        await this.loadContext(codeDetails, attributes, snapshot, pendingLocalState);
+        await this.loadContext(codeDetails, attributes, snapshot);
 
         // Propagate current connection state through the system.
         this.propagateConnectionState();
@@ -1525,7 +1521,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         codeDetails: IFluidCodeDetails,
         attributes: IDocumentAttributes,
         snapshot?: ISnapshotTree,
-        pendingLocalState?: unknown,
     ) {
         assert(this._context?.disposed !== false, 0x0dd /* "Existing context not disposed" */);
         // If this assert fires, our state tracking is likely not synchronized between COntainer & runtime.
@@ -1555,7 +1550,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
                 this._dirtyContainer = dirty;
                 this.emit(dirty ? dirtyContainerEvent : savedContainerEvent);
             },
-            pendingLocalState,
         );
 
         this.emit("contextChanged", codeDetails);
