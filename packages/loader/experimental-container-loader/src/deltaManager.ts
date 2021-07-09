@@ -486,7 +486,7 @@ export class DeltaManager
 
     // TODO consider if we need this
     // private readonly connectingHandler = () => {
-    //     this.fetchMissingDeltas(args.reason, this.lastQueuedSequenceNumber);
+    //     this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
     // }
 
     private readonly connectedHandler = () => {
@@ -543,11 +543,11 @@ export class DeltaManager
             if (checkpointSequenceNumber !== undefined) {
                 // We know how far we are behind (roughly). If it's non-zero gap, fetch ops right away.
                 if (checkpointSequenceNumber > this.lastQueuedSequenceNumber) {
-                    this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
+                    this.fetchMissingDeltas(this.lastQueuedSequenceNumber).catch((error) => { console.error(error); });
                 }
             // we do not know the gap, and we will not learn about it if socket is quite - have to ask.
             } else if (this.statefulDocumentDeltaConnection.mode !== "write") {
-                this.fetchMissingDeltas(this.lastQueuedSequenceNumber);
+                this.fetchMissingDeltas(this.lastQueuedSequenceNumber).catch((error) => { console.error(error); });
             }
         }
     };
@@ -577,10 +577,7 @@ export class DeltaManager
         return `${m.clientId}-${m.type}-${m.minimumSequenceNumber}-${m.referenceSequenceNumber}-${m.timestamp}`;
     }
 
-    private enqueueMessages(
-        messages: ISequencedDocumentMessage[],
-        allowGaps = false,
-    ): void {
+    private enqueueMessages(messages: ISequencedDocumentMessage[]): void {
         if (this.handler === undefined) {
             // We did not setup handler yet.
             // This happens when we connect to web socket faster than we get attributes for container
@@ -624,7 +621,8 @@ export class DeltaManager
                 }
             } else if (message.sequenceNumber !== this.lastQueuedSequenceNumber + 1) {
                 this.pending.push(message);
-                this.fetchMissingDeltas(this.lastQueuedSequenceNumber, message.sequenceNumber);
+                this.fetchMissingDeltas(this.lastQueuedSequenceNumber, message.sequenceNumber)
+                    .catch((error) => { console.error(error); });
             } else {
                 this.lastQueuedSequenceNumber = message.sequenceNumber;
                 this.previouslyProcessedMessage = message;
@@ -719,21 +717,13 @@ export class DeltaManager
         this.emit("op", message, endTime - startTime);
     }
 
-    /**
-     * Retrieves the missing deltas between the given sequence numbers
-     */
-     private fetchMissingDeltas(lastKnowOp: number, to?: number) {
-         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-         this.fetchMissingDeltasCore(lastKnowOp, to);
-     }
-
      /**
      * Retrieves the missing deltas between the given sequence numbers
      */
-    private async fetchMissingDeltasCore(
+    private async fetchMissingDeltas(
         lastKnowOp: number,
-        to?: number)
-    {
+        to?: number,
+    ) {
         // Exit out early if we're already fetching deltas
         if (this.fetchingDeltasFromStorage) {
             return;
@@ -787,7 +777,7 @@ export class DeltaManager
             this.pending = [];
             // Given that we do not track where these ops came from any more, it's not very
             // actionably to report gaps in this range.
-            this.enqueueMessages(pendingSorted, true /* allowGaps */);
+            this.enqueueMessages(pendingSorted);
         }
     }
 
