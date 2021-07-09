@@ -817,12 +817,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
             this.loadAndInitializeProtocolState(attributes, this.storageService, snapshot);
 
         this._existing = true;
-        const opsBeforeReturnP = this._deltaManager.preFetchOps(true);
-        // Keep going with fetching ops from storage once we have all cached ops in.
-        // Ops processing will start once cached ops are in and and will stop when queue is empty
-        // (which in most cases will happen when we are done processing cached ops)
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        opsBeforeReturnP.then(async () => this._deltaManager.preFetchOps(false));
 
         // LoadContext directly requires protocolHandler to be ready, and eventually calls
         // instantiateRuntime which will want to know existing state.
@@ -842,7 +836,6 @@ export class Container extends EventEmitterWithErrorHandling<IContainerEvents> i
         if (!this.closed) {
             this._deltaManager.inbound.resume();
 
-            await opsBeforeReturnP;
             await this._deltaManager.inbound.waitTillProcessingDone();
 
             // eslint-disable-next-line @typescript-eslint/no-floating-promises

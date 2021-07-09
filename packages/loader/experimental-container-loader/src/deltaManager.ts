@@ -299,14 +299,6 @@ export class DeltaManager
         }
     }
 
-    public async preFetchOps(cacheOnly: boolean) {
-        // Note that might already got connected to delta stream by now.
-        // If we did, then we proactively fetch ops at the end of setupNewSuccessfulConnection to ensure
-        if (!this.statefulDocumentDeltaConnection.connected) {
-            return this.fetchMissingDeltasCore(cacheOnly, this.lastQueuedSequenceNumber, undefined);
-        }
-    }
-
     public async connect(args: IConnectionArgs): Promise<IConnectionDetails> {
         throw new Error("Not implemented");
     }
@@ -389,8 +381,7 @@ export class DeltaManager
         from: number, // inclusive
         to: number | undefined, // exclusive
         callback: (messages: ISequencedDocumentMessage[]) => void,
-        cacheOnly: boolean)
-    {
+    ) {
         const docService = this.serviceProvider();
         if (docService === undefined) {
             throw new Error("Delta manager is not attached");
@@ -429,7 +420,8 @@ export class DeltaManager
                 from, // inclusive
                 to, // exclusive
                 controller.signal,
-                cacheOnly);
+                false, // cacheOnly
+            );
 
             // eslint-disable-next-line no-constant-condition
             while (true) {
@@ -732,14 +724,13 @@ export class DeltaManager
      */
      private fetchMissingDeltas(lastKnowOp: number, to?: number) {
          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-         this.fetchMissingDeltasCore(false /* cacheOnly */, lastKnowOp, to);
+         this.fetchMissingDeltasCore(lastKnowOp, to);
      }
 
      /**
      * Retrieves the missing deltas between the given sequence numbers
      */
     private async fetchMissingDeltasCore(
-        cacheOnly: boolean,
         lastKnowOp: number,
         to?: number)
     {
@@ -777,7 +768,7 @@ export class DeltaManager
                 (messages) => {
                     this.enqueueMessages(messages);
                 },
-                cacheOnly);
+            );
         } catch (error) {
             this.logger.sendErrorEvent({eventName: "GetDeltas_Exception"}, error);
             this.close();

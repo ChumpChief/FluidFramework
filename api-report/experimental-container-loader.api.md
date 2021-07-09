@@ -193,8 +193,6 @@ export class DeltaManager extends TypedEventEmitter<IDeltaManagerInternalEvents>
     get minimumSequenceNumber(): number;
     // (undocumented)
     get outbound(): IDeltaQueue<IDocumentMessage[]>;
-    // (undocumented)
-    preFetchOps(cacheOnly: boolean): Promise<void>;
     // @deprecated
     get readonly(): boolean;
     // (undocumented)
