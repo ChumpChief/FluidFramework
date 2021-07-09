@@ -566,17 +566,6 @@ export class DeltaManager
         this.emit("disconnect");
     };
 
-    // returns parts of message (in string format) that should never change for a given message.
-    // Used for message comparison. It attempts to avoid comparing fields that potentially may differ.
-    // for example, it's not clear if serverMetadata or timestamp property is a property of message or server state.
-    // We only extract the most obvious fields that are sufficient (with high probability) to detect sequence number
-    // reuse.
-    // Also payload goes to telemetry, so no PII, including content!!
-    // Note: It's possible for a duplicate op to be broadcasted and have everything the same except the timestamp.
-    private comparableMessagePayload(m: ISequencedDocumentMessage) {
-        return `${m.clientId}-${m.type}-${m.minimumSequenceNumber}-${m.referenceSequenceNumber}-${m.timestamp}`;
-    }
-
     private enqueueMessages(messages: ISequencedDocumentMessage[]): void {
         if (this.handler === undefined) {
             // We did not setup handler yet.
@@ -609,16 +598,7 @@ export class DeltaManager
         for (const message of messages) {
             // Check that the messages are arriving in the expected order
             if (message.sequenceNumber <= this.lastQueuedSequenceNumber) {
-                // Validate that we do not have data loss, i.e. sequencing is reset and started again
-                // with numbers that this client already observed before.
-                if (this.previouslyProcessedMessage?.sequenceNumber === message.sequenceNumber) {
-                    const message1 = this.comparableMessagePayload(this.previouslyProcessedMessage);
-                    const message2 = this.comparableMessagePayload(message);
-                    if (message1 !== message2) {
-                        // TODO probably throw rather than self-close?
-                        this.close();
-                    }
-                }
+                throw new Error("Tried to enqueue an op that we should have already processed");
             } else if (message.sequenceNumber !== this.lastQueuedSequenceNumber + 1) {
                 this.pending.push(message);
                 this.fetchMissingDeltas(this.lastQueuedSequenceNumber, message.sequenceNumber)
@@ -736,19 +716,7 @@ export class DeltaManager
 
         try {
             assert(lastKnowOp === this.lastQueuedSequenceNumber, 0x0f1 /* "from arg" */);
-            let from = lastKnowOp + 1;
-
-            const n = this.previouslyProcessedMessage?.sequenceNumber;
-            if (n !== undefined) {
-                // If we already processed at least one op, then we have this.previouslyProcessedMessage populated
-                // and can use it to validate that we are operating on same file, i.e. it was not overwritten.
-                // Knowing about this mechanism, we could ask for op we already observed to increase validation.
-                // This is especially useful when coming out of offline mode or loading from
-                // very old cached (by client / driver) snapshot.
-                assert(n === lastKnowOp, 0x0f2 /* "previouslyProcessedMessage" */);
-                assert(from > 1, 0x0f3 /* "not positive" */);
-                from--;
-            }
+            const from = lastKnowOp + 1;
 
             this.fetchingDeltasFromStorage = true;
 
