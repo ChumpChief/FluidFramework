@@ -9,10 +9,10 @@ import {
     defaultRouteRequestHandler,
 } from "@fluidframework/aqueduct";
 import { IContainer, IContainerContext, IRuntime, IRuntimeFactory } from "@fluidframework/container-definitions";
-import { ContainerRuntime, IContainerRuntimeOptions } from "@fluidframework/container-runtime";
+import { ContainerRuntime } from "@fluidframework/container-runtime";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
 import { IFluidLoadable } from "@fluidframework/core-interfaces";
-import { FlushMode, NamedFluidDataStoreRegistryEntries } from "@fluidframework/runtime-definitions";
+import { FlushMode } from "@fluidframework/runtime-definitions";
 import { requestFluidObject } from "@fluidframework/runtime-utils";
 import { makeModelRequestHandler } from "../modelLoader";
 import {
@@ -195,14 +195,27 @@ export class DOProviderContainerRuntimeFactory extends BaseContainerRuntimeFacto
 export abstract class DOProviderModelContainerRuntimeFactory<ModelType> implements IRuntimeFactory {
     public get IRuntimeFactory() { return this; }
 
+    private readonly rootDataObjectFactory: DataObjectFactory<RootDataObject, {
+        InitialState: RootDataObjectProps;
+    }>;
+
+    private readonly initialObjects: LoadableObjectClassRecord;
+
     /**
      * @param registryEntries - The data store registry for containers produced
      * @param runtimeOptions - The runtime options passed to the ContainerRuntime when instantiating it
      */
-    constructor(
-        private readonly registryEntries: NamedFluidDataStoreRegistryEntries,
-        private readonly runtimeOptions?: IContainerRuntimeOptions,
-    ) { }
+    constructor(schema: ContainerSchema) {
+        const [registryEntries, sharedObjects] = parseDataObjectsFromSharedObjects(schema);
+        this.rootDataObjectFactory = new DataObjectFactory(
+            "rootDO",
+            RootDataObject,
+            sharedObjects,
+            {},
+            registryEntries,
+        );
+        this.initialObjects = schema.initialObjects;
+    }
 
     public async instantiateRuntime(
         context: IContainerContext,
@@ -211,9 +224,11 @@ export abstract class DOProviderModelContainerRuntimeFactory<ModelType> implemen
         const fromExisting = existing ?? context.existing ?? false;
         const runtime = await ContainerRuntime.load(
             context,
-            this.registryEntries,
+            [this.rootDataObjectFactory.registryEntry],
             makeModelRequestHandler(this.createModel.bind(this)),
-            this.runtimeOptions,
+            // temporary workaround to disable message batching until the message batch size issue is resolved
+            // resolution progress is tracked by the Feature 465 work item in AzDO
+            { flushMode: FlushMode.Immediate },
             undefined, // scope
             existing,
         );
@@ -231,7 +246,14 @@ export abstract class DOProviderModelContainerRuntimeFactory<ModelType> implemen
      * is created. This likely includes creating any initial data stores that are expected to be there at the outset.
      * @param runtime - The container runtime for the container being initialized
      */
-    protected async containerInitializingFirstTime(runtime: IContainerRuntime): Promise<void> { }
+    protected async containerInitializingFirstTime(runtime: IContainerRuntime): Promise<void> {
+        // The first time we create the container we create the RootDataObject
+        await this.rootDataObjectFactory.createRootInstance(
+            rootDataStoreId,
+            runtime,
+            { initialObjects: this.initialObjects },
+        );
+    }
 
     /**
      * Subclasses may override containerHasInitialized to perform any steps after the container has initialized.
