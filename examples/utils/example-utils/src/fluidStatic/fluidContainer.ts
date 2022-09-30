@@ -182,7 +182,7 @@ export class FluidContainer extends TypedEventEmitter<IFluidContainerEvents> imp
     /**
      * {@inheritDoc IFluidContainer.isDirty}
      */
-     public get isDirty(): boolean {
+    public get isDirty(): boolean {
         return this.container.isDirty;
     }
 
@@ -203,7 +203,7 @@ export class FluidContainer extends TypedEventEmitter<IFluidContainerEvents> imp
     /**
      * {@inheritDoc IFluidContainer.connectionState}
      */
-     public get connectionState(): ConnectionState {
+    public get connectionState(): ConnectionState {
         return this.container.connectionState;
     }
 
