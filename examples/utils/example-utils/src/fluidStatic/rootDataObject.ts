@@ -15,6 +15,7 @@ import { IFluidLoadable } from "@fluidframework/core-interfaces";
 import { FlushMode } from "@fluidframework/runtime-definitions";
 import { requestFluidObject } from "@fluidframework/runtime-utils";
 import { makeModelRequestHandler } from "../modelLoader";
+import { FluidContainer } from "./fluidContainer";
 import {
     ContainerSchema,
     DataObjectClass,
@@ -192,7 +193,12 @@ export class DOProviderContainerRuntimeFactory extends BaseContainerRuntimeFacto
     }
 }
 
-export abstract class DOProviderModelContainerRuntimeFactory<ModelType> implements IRuntimeFactory {
+export interface IDOProviderModelType {
+    container: FluidContainer;
+    services?: any;
+}
+
+export class DOProviderModelContainerRuntimeFactory implements IRuntimeFactory {
     public get IRuntimeFactory() { return this; }
 
     private readonly rootDataObjectFactory: DataObjectFactory<RootDataObject, {
@@ -205,7 +211,10 @@ export abstract class DOProviderModelContainerRuntimeFactory<ModelType> implemen
      * @param registryEntries - The data store registry for containers produced
      * @param runtimeOptions - The runtime options passed to the ContainerRuntime when instantiating it
      */
-    constructor(schema: ContainerSchema) {
+    public constructor(
+        schema: ContainerSchema,
+        private readonly servicesCallback?: (container: IContainer) => any,
+    ) {
         const [registryEntries, sharedObjects] = parseDataObjectsFromSharedObjects(schema);
         this.rootDataObjectFactory = new DataObjectFactory(
             "rootDO",
@@ -246,7 +255,7 @@ export abstract class DOProviderModelContainerRuntimeFactory<ModelType> implemen
      * is created. This likely includes creating any initial data stores that are expected to be there at the outset.
      * @param runtime - The container runtime for the container being initialized
      */
-    protected async containerInitializingFirstTime(runtime: IContainerRuntime): Promise<void> {
+    private async containerInitializingFirstTime(runtime: IContainerRuntime): Promise<void> {
         // The first time we create the container we create the RootDataObject
         await this.rootDataObjectFactory.createRootInstance(
             rootDataStoreId,
@@ -260,12 +269,21 @@ export abstract class DOProviderModelContainerRuntimeFactory<ModelType> implemen
      * This likely includes loading any data stores that are expected to be there at the outset.
      * @param runtime - The container runtime for the container being initialized
      */
-    protected async containerHasInitialized(runtime: IContainerRuntime): Promise<void> { }
+    private async containerHasInitialized(runtime: IContainerRuntime): Promise<void> { }
 
     /**
      * Subclasses must implement createModel, which should build a ModelType given the runtime and container.
      * @param runtime - The container runtime for the container being initialized
      * @param container - The container being initialized
      */
-    protected abstract createModel(runtime: IContainerRuntime, container: IContainer): Promise<ModelType>;
+    private async createModel(runtime: IContainerRuntime, container: IContainer): Promise<IDOProviderModelType> {
+        const rootDataObject = await requestFluidObject<RootDataObject>(
+            await runtime.getRootDataStore(rootDataStoreId),
+            "",
+        );
+        return {
+            container: new FluidContainer(container, rootDataObject),
+            services: this.servicesCallback?.(container),
+        };
+    }
 }
