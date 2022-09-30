@@ -64,7 +64,11 @@ export class TinyliciousClient {
      */
     public async createContainer(
         containerSchema: ContainerSchema,
-    ): Promise<{ container: IFluidContainer; services: TinyliciousContainerServices; }> {
+    ): Promise<{
+        container: IFluidContainer;
+        services: TinyliciousContainerServices;
+        attach: () => Promise<string>;
+    }> {
         const loader = this.createLoader(containerSchema);
 
         // We're not actually using the code proposal (our code loader always loads the same module
@@ -77,21 +81,21 @@ export class TinyliciousClient {
 
         const rootDataObject = await requestFluidObject<RootDataObject>(container, "/");
 
-        const fluidContainer = new (class extends FluidContainer {
-            async attach() {
-                if (this.attachState !== AttachState.Detached) {
-                    throw new Error("Cannot attach container. Container is not in detached state");
-                }
-                const request = createTinyliciousCreateNewRequest();
-                await container.attach(request);
-                const resolved = container.resolvedUrl;
-                ensureFluidResolvedUrl(resolved);
-                return resolved.id;
+        const fluidContainer = new FluidContainer(container, rootDataObject);
+
+        const attach = async () => {
+            if (fluidContainer.attachState !== AttachState.Detached) {
+                throw new Error("Cannot attach container. Container is not in detached state");
             }
-        })(container, rootDataObject);
+            const request = createTinyliciousCreateNewRequest();
+            await container.attach(request);
+            const resolved = container.resolvedUrl;
+            ensureFluidResolvedUrl(resolved);
+            return resolved.id;
+        };
 
         const services = this.getContainerServices(container);
-        return { container: fluidContainer, services };
+        return { container: fluidContainer, services, attach };
     }
 
     /**

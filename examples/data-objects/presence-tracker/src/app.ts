@@ -87,14 +87,15 @@ async function start(): Promise<void> {
     const client = new TinyliciousClient();
     let container: IFluidContainer;
     let services: TinyliciousContainerServices;
+    let attach: () => Promise<string>;
     let containerId: string;
 
     // Get or create the document depending if we are running through the create new flow
     const createNew = !location.hash;
     if (createNew) {
         // The client will create a new container using the schema
-        ({ container, services } = await client.createContainer(containerSchema));
-        containerId = await container.attach();
+        ({ container, services, attach } = await client.createContainer(containerSchema));
+        containerId = await attach();
         // The new container has its own unique ID that can be used to access it in another session
         location.hash = containerId;
     } else {
