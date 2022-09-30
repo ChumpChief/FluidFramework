@@ -3,16 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import { Signaler } from "@fluid-experimental/data-objects";
 import {
-    IFluidContainer,
     ContainerSchema,
-} from "fluid-framework";
-import {
+    IFluidContainer,
     TinyliciousClient,
     TinyliciousMember,
     TinyliciousContainerServices,
-} from "@fluidframework/tinylicious-client";
+} from "@fluid-example/example-utils";
+import { Signaler } from "@fluid-experimental/data-objects";
 import { FocusTracker } from "./FocusTracker";
 import { MouseTracker } from "./MouseTracker";
 

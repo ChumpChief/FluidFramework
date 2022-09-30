@@ -3,14 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import { Signaler } from "@fluid-experimental/data-objects";
-import { IEvent } from "@fluidframework/common-definitions";
-import { TypedEventEmitter } from "@fluidframework/common-utils";
 import {
     IFluidContainer,
     IMember,
     IServiceAudience,
-} from "fluid-framework";
+} from "@fluid-example/example-utils";
+import { Signaler } from "@fluid-experimental/data-objects";
+import { IEvent } from "@fluidframework/common-definitions";
+import { TypedEventEmitter } from "@fluidframework/common-utils";
 
 export interface IFocusTrackerEvents extends IEvent {
     (event: "focusChanged", listener: () => void): void;

@@ -5,6 +5,7 @@
 
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const path = require("path");
+const webpack = require("webpack");
 const { merge } = require("webpack-merge");
 
 module.exports = env => {
@@ -33,6 +34,9 @@ module.exports = env => {
             libraryTarget: "umd"
         },
         plugins: [
+            new webpack.ProvidePlugin({
+                process: 'process/browser'
+            }),
             new HtmlWebpackPlugin({
                 template: "./src/index.html",
             }),
