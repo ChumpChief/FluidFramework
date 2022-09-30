@@ -7,6 +7,7 @@ import {
     ContainerSchema,
     IFluidContainer,
     TinyliciousClient,
+    TinyliciousClientModel,
     TinyliciousMember,
     TinyliciousContainerServices,
 } from "@fluid-example/example-utils";
@@ -83,8 +84,9 @@ function renderMousePresence(mouseTracker: MouseTracker, focusTracker: FocusTrac
   }
 
 async function start(): Promise<void> {
+    const useModel = true;
     // Get or create the document depending if we are running through the create new flow
-    const client = new TinyliciousClient();
+    const client = useModel ? new TinyliciousClientModel() : new TinyliciousClient();
     let container: IFluidContainer;
     let services: TinyliciousContainerServices;
     let attach: () => Promise<string>;

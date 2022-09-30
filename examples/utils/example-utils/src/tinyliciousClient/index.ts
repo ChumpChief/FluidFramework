@@ -19,5 +19,6 @@ import { TinyliciousClient } from "./TinyliciousClient";
 export * from "./interfaces";
 export * from "./TinyliciousAudience";
 export * from "./TinyliciousClient";
+export * from "./TinyliciousClientModel";
 // eslint-disable-next-line import/no-default-export
 export default TinyliciousClient;

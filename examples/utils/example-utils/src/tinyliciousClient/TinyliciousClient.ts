@@ -126,6 +126,7 @@ export class TinyliciousClient {
     }
 
     private createLoader(containerSchema: ContainerSchema) {
+        console.log("MAKING NON-MODEL LOADER");
         const containerRuntimeFactory = new DOProviderContainerRuntimeFactory(
             containerSchema,
         );
