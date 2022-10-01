@@ -51,6 +51,13 @@ export class TinyliciousClientModel {
         // no proposal.  So we'll use a fake proposal.
         const { model, attach } = await loader.createDetached("no-dynamic-package");
         const { container, services } = model;
+        // Back compat workaround -- instead of calling the attach method on the FluidContainer, customers should
+        // call the attach method that is directly returned.
+        container.attach = async () => {
+            console.warn("Calling FluidContainer.attach() is deprecated and will be removed in an upcoming release");
+            console.warn("Instead, call the attach() function returned directly by the createContainer() call");
+            return attach();
+        };
         return { container, services, attach };
     }
 
