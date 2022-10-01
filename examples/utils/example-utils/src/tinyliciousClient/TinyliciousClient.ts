@@ -81,10 +81,8 @@ export class TinyliciousClient {
 
         const rootDataObject = await requestFluidObject<RootDataObject>(container, "/");
 
-        const fluidContainer = new FluidContainer(container, rootDataObject);
-
         const attach = async () => {
-            if (fluidContainer.attachState !== AttachState.Detached) {
+            if (container.attachState !== AttachState.Detached) {
                 throw new Error("Cannot attach container. Container is not in detached state");
             }
             const request = createTinyliciousCreateNewRequest();
@@ -93,6 +91,8 @@ export class TinyliciousClient {
             ensureFluidResolvedUrl(resolved);
             return resolved.id;
         };
+
+        const fluidContainer = new FluidContainer(container, rootDataObject, attach);
 
         const services = this.getContainerServices(container);
         return { container: fluidContainer, services, attach };
