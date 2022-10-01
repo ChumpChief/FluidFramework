@@ -107,6 +107,21 @@ export interface IFluidContainer extends IEventProvider<IFluidContainerEvents> {
     readonly attachState: AttachState;
 
     /**
+     * A newly created container starts detached from the collaborative service.
+     * Calling `attach()` uploads the new container to the service and connects to the collaborative service.
+     *
+     * @remarks
+     *
+     * This should only be called when the container is in the
+     * {@link @fluidframework/container-definitions#AttachState.Detatched} state.
+     *
+     * This can be determined by observing {@link IFluidContainer.attachState}.
+     *
+     * @returns A promise which resolves when the attach is complete, with the string identifier of the container.
+     */
+    attach(): Promise<string>;
+
+    /**
      * Attempts to connect the container to the delta stream and process operations.
      * Will throw an error if unsuccessful.
      *
@@ -170,8 +185,12 @@ export class FluidContainer extends TypedEventEmitter<IFluidContainerEvents> imp
     public constructor(
         private readonly container: IContainer,
         private readonly rootDataObject: RootDataObject,
+        attach?: () => Promise<string>,
     ) {
         super();
+        if (attach !== undefined) {
+            this.attach = attach;
+        }
         container.on("connected", this.connectedHandler);
         container.on("closed", this.disposedHandler);
         container.on("disconnected", this.disconnectedHandler);
@@ -212,6 +231,25 @@ export class FluidContainer extends TypedEventEmitter<IFluidContainerEvents> imp
      */
     public get initialObjects() {
         return this.rootDataObject.initialObjects;
+    }
+
+    /**
+     * Incomplete base implementation of {@link IFluidContainer.attach}.
+     *
+     * @remarks
+     *
+     * Note: this implementation will unconditionally throw.
+     * Consumers who rely on this will need to utilize or provide a service specific implementation of this base type
+     * that provides an implementation of this method.
+     *
+     * The reason is because externally we are presenting a separation between the service and the `FluidContainer`,
+     * but internally this separation is not there.
+     */
+    public async attach(): Promise<string> {
+        if (this.container.attachState !== AttachState.Detached) {
+            throw new Error("Cannot attach container. Container is not in detached state.");
+        }
+        throw new Error("Cannot attach container. Attach method not provided.");
     }
 
     /**
