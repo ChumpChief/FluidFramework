@@ -5,7 +5,6 @@
 
 import {
     IContainer,
-    IFluidModuleWithDetails,
 } from "@fluidframework/container-definitions";
 import {
     ContainerSchema,
@@ -13,7 +12,7 @@ import {
     IDOProviderModelType,
     IFluidContainer,
 } from "../fluidStatic";
-import { TinyliciousModelLoader } from "../modelLoader";
+import { StaticCodeLoader, TinyliciousModelLoader } from "../modelLoader";
 import {
     TinyliciousContainerServices,
 } from "./interfaces";
@@ -77,14 +76,8 @@ export class TinyliciousClientModel {
             containerSchema,
             getContainerServices,
         );
-        const load = async (): Promise<IFluidModuleWithDetails> => {
-            return {
-                module: { fluidExport: containerRuntimeFactory },
-                details: { package: "no-dynamic-package", config: {} },
-            };
-        };
 
-        const codeLoader = { load };
+        const codeLoader = new StaticCodeLoader(containerRuntimeFactory);
         const loader = new TinyliciousModelLoader<IDOProviderModelType>(codeLoader);
         return loader;
     }
