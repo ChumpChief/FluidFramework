@@ -193,12 +193,12 @@ export class DOProviderContainerRuntimeFactory extends BaseContainerRuntimeFacto
     }
 }
 
-export interface IDOProviderModelType {
+export interface IDOProviderModelType<ContainerServicesType> {
     container: FluidContainer;
-    services?: any;
+    services: ContainerServicesType;
 }
 
-export class DOProviderModelContainerRuntimeFactory implements IRuntimeFactory {
+export class DOProviderModelContainerRuntimeFactory<ContainerServicesType> implements IRuntimeFactory {
     public get IRuntimeFactory() { return this; }
 
     private readonly rootDataObjectFactory: DataObjectFactory<RootDataObject, {
@@ -213,7 +213,7 @@ export class DOProviderModelContainerRuntimeFactory implements IRuntimeFactory {
      */
     public constructor(
         schema: ContainerSchema,
-        private readonly servicesCallback?: (container: IContainer) => any,
+        private readonly servicesCallback: (container: IContainer) => ContainerServicesType,
     ) {
         const [registryEntries, sharedObjects] = parseDataObjectsFromSharedObjects(schema);
         this.rootDataObjectFactory = new DataObjectFactory(
@@ -276,14 +276,17 @@ export class DOProviderModelContainerRuntimeFactory implements IRuntimeFactory {
      * @param runtime - The container runtime for the container being initialized
      * @param container - The container being initialized
      */
-    private async createModel(runtime: IContainerRuntime, container: IContainer): Promise<IDOProviderModelType> {
+    private async createModel(
+        runtime: IContainerRuntime,
+        container: IContainer,
+    ): Promise<IDOProviderModelType<ContainerServicesType>> {
         const rootDataObject = await requestFluidObject<RootDataObject>(
             await runtime.getRootDataStore(rootDataStoreId),
             "",
         );
         return {
             container: new FluidContainer(container, rootDataObject),
-            services: this.servicesCallback?.(container),
+            services: this.servicesCallback(container),
         };
     }
 }

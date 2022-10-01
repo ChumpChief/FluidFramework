@@ -18,7 +18,7 @@ import {
 } from "./interfaces";
 import { TinyliciousAudience } from "./TinyliciousAudience";
 
-function getContainerServices(
+function getTinyliciousContainerServices(
     container: IContainer,
 ): TinyliciousContainerServices {
     return {
@@ -81,11 +81,11 @@ export class TinyliciousClientModel {
         console.log("MAKING MODEL LOADER");
         const containerRuntimeFactory = new DOProviderModelContainerRuntimeFactory(
             containerSchema,
-            getContainerServices,
+            getTinyliciousContainerServices,
         );
 
         const codeLoader = new StaticCodeLoader(containerRuntimeFactory);
-        const loader = new TinyliciousModelLoader<IDOProviderModelType>(codeLoader);
+        const loader = new TinyliciousModelLoader<IDOProviderModelType<TinyliciousContainerServices>>(codeLoader);
         return loader;
     }
     // #endregion
