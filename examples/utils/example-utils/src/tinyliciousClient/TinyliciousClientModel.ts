@@ -8,7 +8,7 @@ import {
 } from "@fluidframework/container-definitions";
 import {
     ContainerSchema,
-    DOProviderModelContainerRuntimeFactory,
+    DOProviderContainerRuntimeFactory,
     IDOProviderModelType,
     IFluidContainer,
 } from "../fluidStatic";
@@ -79,7 +79,7 @@ export class TinyliciousClientModel {
     // #region private
     private createLoader(containerSchema: ContainerSchema) {
         console.log("MAKING MODEL LOADER");
-        const containerRuntimeFactory = new DOProviderModelContainerRuntimeFactory(
+        const containerRuntimeFactory = new DOProviderContainerRuntimeFactory(
             containerSchema,
             getTinyliciousContainerServices,
         );

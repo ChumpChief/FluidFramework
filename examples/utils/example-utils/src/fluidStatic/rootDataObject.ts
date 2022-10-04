@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 import {
-    BaseContainerRuntimeFactory,
     DataObject,
     DataObjectFactory,
     defaultRouteRequestHandler,
@@ -12,6 +11,7 @@ import { IContainer, IContainerContext, IRuntime, IRuntimeFactory } from "@fluid
 import { ContainerRuntime } from "@fluidframework/container-runtime";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions";
 import { IFluidLoadable } from "@fluidframework/core-interfaces";
+import { buildRuntimeRequestHandler } from "@fluidframework/request-handler";
 import { FlushMode } from "@fluidframework/runtime-definitions";
 import { requestFluidObject } from "@fluidframework/runtime-utils";
 import { makeModelRequestHandler } from "../modelLoader";
@@ -144,61 +144,12 @@ export class RootDataObject extends DataObject<{ InitialState: RootDataObjectPro
 
 const rootDataStoreId = "rootDOId";
 
-/**
- * Container code that provides a single {@link RootDataObject}.
- *
- * @remarks
- *
- * This data object is dynamically customized (registry and initial objects) based on the schema provided.
- * to the container runtime factory.
- */
-export class DOProviderContainerRuntimeFactory extends BaseContainerRuntimeFactory {
-    private readonly rootDataObjectFactory: DataObjectFactory<RootDataObject, {
-        InitialState: RootDataObjectProps;
-    }>;
-
-    private readonly initialObjects: LoadableObjectClassRecord;
-
-    constructor(schema: ContainerSchema) {
-        const [registryEntries, sharedObjects] = parseDataObjectsFromSharedObjects(schema);
-        const rootDataObjectFactory =
-            new DataObjectFactory(
-                "rootDO",
-                RootDataObject,
-                sharedObjects,
-                {},
-                registryEntries,
-            );
-        super(
-            [rootDataObjectFactory.registryEntry],
-            undefined,
-            [defaultRouteRequestHandler(rootDataStoreId)],
-            // temporary workaround to disable message batching until the message batch size issue is resolved
-            // resolution progress is tracked by the Feature 465 work item in AzDO
-            { flushMode: FlushMode.Immediate },
-        );
-        this.rootDataObjectFactory = rootDataObjectFactory;
-        this.initialObjects = schema.initialObjects;
-    }
-
-    /**
-     * {@inheritDoc @fluidframework/aqueduct#BaseContainerRuntimeFactory.containerInitializingFirstTime}
-     */
-    protected async containerInitializingFirstTime(runtime: IContainerRuntime) {
-        // The first time we create the container we create the RootDataObject
-        await this.rootDataObjectFactory.createRootInstance(
-            rootDataStoreId,
-            runtime,
-            { initialObjects: this.initialObjects });
-    }
-}
-
 export interface IDOProviderModelType<ContainerServicesType> {
     container: FluidContainer;
     services: ContainerServicesType;
 }
 
-export class DOProviderModelContainerRuntimeFactory<ContainerServicesType> implements IRuntimeFactory {
+export class DOProviderContainerRuntimeFactory<ContainerServicesType> implements IRuntimeFactory {
     public get IRuntimeFactory() { return this; }
 
     private readonly rootDataObjectFactory: DataObjectFactory<RootDataObject, {
@@ -207,13 +158,21 @@ export class DOProviderModelContainerRuntimeFactory<ContainerServicesType> imple
 
     private readonly initialObjects: LoadableObjectClassRecord;
 
+    private readonly _servicesCallback: ((container: IContainer) => ContainerServicesType) | undefined;
+    private get servicesCallback(): (container: IContainer) => ContainerServicesType {
+        if (this._servicesCallback === undefined) {
+            throw new Error("servicesCallback not provided");
+        }
+        return this._servicesCallback;
+    }
+
     /**
      * @param registryEntries - The data store registry for containers produced
      * @param runtimeOptions - The runtime options passed to the ContainerRuntime when instantiating it
      */
     public constructor(
         schema: ContainerSchema,
-        private readonly servicesCallback: (container: IContainer) => ContainerServicesType,
+        servicesCallback?: (container: IContainer) => ContainerServicesType,
     ) {
         const [registryEntries, sharedObjects] = parseDataObjectsFromSharedObjects(schema);
         this.rootDataObjectFactory = new DataObjectFactory(
@@ -224,6 +183,7 @@ export class DOProviderModelContainerRuntimeFactory<ContainerServicesType> imple
             registryEntries,
         );
         this.initialObjects = schema.initialObjects;
+        this._servicesCallback = servicesCallback;
     }
 
     public async instantiateRuntime(
@@ -234,7 +194,12 @@ export class DOProviderModelContainerRuntimeFactory<ContainerServicesType> imple
         const runtime = await ContainerRuntime.load(
             context,
             [this.rootDataObjectFactory.registryEntry],
-            makeModelRequestHandler(this.createModel.bind(this)),
+            buildRuntimeRequestHandler(
+                makeModelRequestHandler(this.createModel.bind(this)),
+                // For compatibility with the previous version of the client which isn't expecting model loading.
+                // Since the old clients don't include the containerRef header, the request will fall through.
+                defaultRouteRequestHandler(rootDataStoreId),
+            ),
             // temporary workaround to disable message batching until the message batch size issue is resolved
             // resolution progress is tracked by the Feature 465 work item in AzDO
             { flushMode: FlushMode.Immediate },
@@ -280,6 +245,9 @@ export class DOProviderModelContainerRuntimeFactory<ContainerServicesType> imple
         runtime: IContainerRuntime,
         container: IContainer,
     ): Promise<IDOProviderModelType<ContainerServicesType>> {
+        if (this.servicesCallback === undefined) {
+            throw new Error("Need a services callback to be used with model loading.");
+        }
         const rootDataObject = await requestFluidObject<RootDataObject>(
             await runtime.getRootDataStore(rootDataStoreId),
             "",

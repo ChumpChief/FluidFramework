@@ -11,6 +11,7 @@ import {
 import {
     IContainerRuntime,
 } from "@fluidframework/container-runtime-definitions";
+import { buildRuntimeRequestHandler } from "@fluidframework/request-handler";
 import {
     NamedFluidDataStoreRegistryEntries,
 } from "@fluidframework/runtime-definitions";
@@ -40,7 +41,7 @@ export abstract class ModelContainerRuntimeFactory<ModelType> implements IRuntim
         const runtime = await ContainerRuntime.load(
             context,
             this.registryEntries,
-            makeModelRequestHandler(this.createModel.bind(this)),
+            buildRuntimeRequestHandler(makeModelRequestHandler(this.createModel.bind(this))),
             this.runtimeOptions,
             undefined, // scope
             existing,
