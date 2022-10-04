@@ -84,7 +84,7 @@ function renderMousePresence(mouseTracker: MouseTracker, focusTracker: FocusTrac
   }
 
 async function start(): Promise<void> {
-    const useModel = true;
+    const useModel = false;
     // Get or create the document depending if we are running through the create new flow
     const client = useModel ? new TinyliciousClientModel() : new TinyliciousClient();
     let container: IFluidContainer;
