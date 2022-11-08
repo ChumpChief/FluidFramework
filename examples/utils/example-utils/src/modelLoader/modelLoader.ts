@@ -121,7 +121,7 @@ export class ModelLoader<ModelType> implements IModelLoader<ModelType> {
                     // Here we use "all" to ensure we are caught up before returning.  This is particularly important
                     // for direct-link scenarios, where the user might have a direct link to a data object that was
                     // just attached (i.e. the "attach" op and the "set" of the handle into some map is in the
-                    // trailing ops).
+                    // trailing ops).  If we don't fully process those ops, the expected object won't be found.
                     opsBeforeReturn: "all",
                 },
             },
