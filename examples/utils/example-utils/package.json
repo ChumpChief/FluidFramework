@@ -45,6 +45,7 @@
 		"@fluidframework/core-interfaces": ">=2.0.0-internal.3.2.0 <2.0.0-internal.4.0.0",
 		"@fluidframework/driver-definitions": ">=2.0.0-internal.3.2.0 <2.0.0-internal.4.0.0",
 		"@fluidframework/driver-utils": ">=2.0.0-internal.3.2.0 <2.0.0-internal.4.0.0",
+		"@fluidframework/hack-local-driver": ">=2.0.0-internal.3.2.0 <2.0.0-internal.4.0.0",
 		"@fluidframework/local-driver": ">=2.0.0-internal.3.2.0 <2.0.0-internal.4.0.0",
 		"@fluidframework/register-collection": ">=2.0.0-internal.3.2.0 <2.0.0-internal.4.0.0",
 		"@fluidframework/request-handler": ">=2.0.0-internal.3.2.0 <2.0.0-internal.4.0.0",

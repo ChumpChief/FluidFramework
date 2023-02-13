@@ -16,5 +16,7 @@ export {
 	RouterliciousDocumentServiceFactory,
 } from "./documentServiceFactory";
 
+export { DocumentStorageService } from "./documentStorageService";
+
 // Configuration
 export { IRouterliciousDriverPolicies } from "./policies";
