@@ -26,6 +26,7 @@ export {
 	ModelLoader,
 	ModelMakerCallback,
 	SessionStorageModelLoader,
+	SharedWorkerModelLoader,
 	StaticCodeLoader,
 	TinyliciousModelLoader,
 } from "./modelLoader";

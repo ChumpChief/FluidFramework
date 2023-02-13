@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { StaticCodeLoader, TinyliciousModelLoader } from "@fluid-example/example-utils";
+import { StaticCodeLoader, SharedWorkerModelLoader } from "@fluid-example/example-utils";
 
 import { DiceRollerContainerRuntimeFactory, IDiceRollerAppModel } from "./containerCode";
 import { renderDiceRoller } from "./view";
@@ -14,7 +14,7 @@ import { renderDiceRoller } from "./view";
  * @remarks We wrap this in an async function so we can await Fluid's async calls.
  */
 async function start() {
-	const tinyliciousModelLoader = new TinyliciousModelLoader<IDiceRollerAppModel>(
+	const sharedWorkerModelLoader = new SharedWorkerModelLoader<IDiceRollerAppModel>(
 		new StaticCodeLoader(new DiceRollerContainerRuntimeFactory()),
 	);
 
@@ -25,12 +25,12 @@ async function start() {
 		// Normally our code loader is expected to match up with the version passed here.
 		// But since we're using a StaticCodeLoader that always loads the same runtime factory regardless,
 		// the version doesn't actually matter.
-		const createResponse = await tinyliciousModelLoader.createDetached("1.0");
+		const createResponse = await sharedWorkerModelLoader.createDetached("1.0");
 		model = createResponse.model;
 		id = await createResponse.attach();
 	} else {
 		id = location.hash.substring(1);
-		model = await tinyliciousModelLoader.loadExisting(id);
+		model = await sharedWorkerModelLoader.loadExisting(id);
 	}
 
 	// update the browser URL and the window title with the actual container ID
