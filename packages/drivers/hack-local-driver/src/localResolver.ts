@@ -44,7 +44,7 @@ export class LocalResolver implements IUrlResolver {
      */
     public async resolve(request: IRequest): Promise<IResolvedUrl> {
         const parsedUrl = new URL(request.url);
-        const fullPath = `${parsedUrl.pathname.substr(1)}${parsedUrl.search}`;
+        const fullPath = `${parsedUrl.pathname.slice(1)}${parsedUrl.search}`;
         const documentId = fullPath.split("/")[0];
         const scopes = [ScopeType.DocRead, ScopeType.DocWrite, ScopeType.SummaryWrite];
         const resolved: IFluidResolvedUrl = {
@@ -65,7 +65,7 @@ export class LocalResolver implements IUrlResolver {
     public async getAbsoluteUrl(resolvedUrl: IResolvedUrl, relativeUrl: string): Promise<string> {
         let url = relativeUrl;
         if (url.startsWith("/")) {
-            url = url.substr(1);
+            url = url.slice(1);
         }
         const fluidResolvedUrl = resolvedUrl as IFluidResolvedUrl;
 
@@ -73,7 +73,7 @@ export class LocalResolver implements IUrlResolver {
         if (parsedUrl.pathname === null) {
             throw new Error("Url should contain tenant and docId!!");
         }
-        const [, , documentId] = parsedUrl.pathname.split("/");
+        const documentId = parsedUrl.pathname.split("/")[2];
         assert(!!documentId, 0x09a /* "'documentId' must be a defined, non-zero length string." */);
 
         return `http://localhost:3000/${documentId}/${url}`;

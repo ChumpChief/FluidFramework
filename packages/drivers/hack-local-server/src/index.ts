@@ -3,8 +3,38 @@
  * Licensed under the MIT License.
  */
 
-export * from "./indexedDbCreateContainer";
-export * from "./localOrdererManager";
-export * from "./localWebSocketServer";
-export * from "./messageInterfaces";
-export * from "./sharedWorkerServer";
+export { indexedDbCreateContainer } from "./indexedDbCreateContainer";
+export {
+	IDeltaStorageMessageToServer,
+	IDocumentDeltaConnectionMessageToServer,
+    IHistorianCreateBlobPayloadFromServer,
+    IHistorianCreateBlobPayloadToServer,
+    IHistorianCreateCommitPayloadFromServer,
+    IHistorianCreateCommitPayloadToServer,
+    IHistorianCreateRefPayloadFromServer,
+    IHistorianCreateRefPayloadToServer,
+    IHistorianCreateTreePayloadFromServer,
+    IHistorianCreateTreePayloadToServer,
+    IHistorianGetBlobPayloadFromServer,
+    IHistorianGetBlobPayloadToServer,
+    IHistorianGetCommitPayloadFromServer,
+    IHistorianGetCommitPayloadToServer,
+    IHistorianGetCommitsPayloadFromServer,
+    IHistorianGetCommitsPayloadToServer,
+    IHistorianGetContentPayloadFromServer,
+    IHistorianGetContentPayloadToServer,
+    IHistorianGetHeaderPayloadFromServer,
+    IHistorianGetHeaderPayloadToServer,
+    IHistorianGetRefPayloadFromServer,
+    IHistorianGetRefPayloadToServer,
+    IHistorianGetTreePayloadFromServer,
+    IHistorianGetTreePayloadToServer,
+    IHistorianMessageToServer,
+    IHistorianPayloadFromServer,
+    IHistorianPayloadToServer,
+    IHistorianUpdateRefPayloadFromServer,
+    IHistorianUpdateRefPayloadToServer,
+    ISharedWorkerMessageFromServer,
+	ISharedWorkerPortConnectionMessageToServer
+} from "./messageInterfaces";
+export { SharedWorkerServer } from "./sharedWorkerServer";

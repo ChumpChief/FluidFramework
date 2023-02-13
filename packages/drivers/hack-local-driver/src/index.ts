@@ -3,8 +3,5 @@
  * Licensed under the MIT License.
  */
 
-export * from "./localResolver";
-export * from "./sharedWorkerDeltaStorageService";
-export * from "./sharedWorkerDocumentDeltaConnection";
-export * from "./sharedWorkerDocumentService";
-export * from "./sharedWorkerDocumentServiceFactory";
+export { createLocalResolverCreateNewRequest, LocalResolver } from "./localResolver";
+export { SharedWorkerDocumentServiceFactory } from "./sharedWorkerDocumentServiceFactory";

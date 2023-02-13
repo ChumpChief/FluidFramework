@@ -8,6 +8,15 @@ import { KJUR as jsrsasign } from "jsrsasign";
 import { v4 as uuid } from "uuid";
 import { getRandomName } from "@fluidframework/server-services-client";
 
+function generateUser(): IUser & { name: string; } {
+    const randomUser: IUser & { name: string; } = {
+        id: uuid(),
+        name: getRandomName(" ", true),
+    };
+
+    return randomUser;
+}
+
 /**
  * Generates a JWT token to authorize against. We do not use the implementation in
  * services-client since it cannot run in the browser without polyfills.
@@ -26,7 +35,7 @@ export function generateToken(
     }
 
     // Current time in seconds
-    const now = Math.round((new Date()).getTime() / 1000);
+    const now = Math.round(Date.now() / 1000);
 
     const claims: ITokenClaims = {
         documentId,
@@ -39,14 +48,6 @@ export function generateToken(
     };
 
     const utf8Key = { utf8: key };
+    // eslint-disable-next-line unicorn/no-null
     return jsrsasign.jws.JWS.sign(null, JSON.stringify({ alg: "HS256", typ: "JWT" }), claims, utf8Key);
-}
-
-export function generateUser(): IUser {
-    const randomUser = {
-        id: uuid(),
-        name: getRandomName(" ", true),
-    };
-
-    return randomUser;
 }
