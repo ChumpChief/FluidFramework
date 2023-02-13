@@ -44,4 +44,9 @@ module.exports = {
             ignored: "**/node_modules/**",
         }
     },
+    plugins: [
+        new webpack.ProvidePlugin({
+            process: "process/browser",
+        }),
+    ],
 };
