@@ -110,6 +110,7 @@ describe("Container Runtime", () => {
 						client as IClient,
 						false,
 						createDebugLogger({ namespace: "fluid:testConnectionManager" }),
+						() => {},
 						props,
 					),
 			);
@@ -313,6 +314,7 @@ describe("Container Runtime", () => {
 						client as IClient,
 						true,
 						createDebugLogger({ namespace: "fluid:testConnectionManager" }),
+						() => {},
 						props,
 					),
 			);

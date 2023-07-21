@@ -5,9 +5,13 @@
 
 import { ITelemetryProperties, TelemetryEventCategory } from "@fluidframework/core-interfaces";
 import { assert, Timer } from "@fluidframework/common-utils";
-import { IConnectionDetailsInternal, IDeltaManager } from "@fluidframework/container-definitions";
+import {
+	IAudience,
+	IConnectionDetailsInternal,
+	IDeltaManager,
+} from "@fluidframework/container-definitions";
 import { IAnyDriverError } from "@fluidframework/driver-definitions";
-import { ISequencedClient, IClient } from "@fluidframework/protocol-definitions";
+import { ISequencedClient, IClient, IQuorumClients } from "@fluidframework/protocol-definitions";
 import {
 	ITelemetryLoggerExt,
 	PerformanceEvent,
@@ -15,7 +19,6 @@ import {
 } from "@fluidframework/telemetry-utils";
 import { ConnectionState } from "./connectionState";
 import { CatchUpMonitor, ICatchUpMonitor } from "./catchUpMonitor";
-import { IProtocolHandler } from "./protocol";
 
 // Based on recent data, it looks like majority of cases where we get stuck are due to really slow or
 // timing out ops fetches. So attempt recovery infrequently. Also fetch uses 30 second timeout, so
@@ -58,7 +61,7 @@ export interface IConnectionStateHandler {
 
 	containerSaved(): void;
 	dispose(): void;
-	initProtocol(protocol: IProtocolHandler): void;
+	initQuorumAndAudience(quourm: IQuorumClients, audience: IAudience): void;
 	receivedConnectEvent(details: IConnectionDetailsInternal): void;
 	receivedDisconnectEvent(reason: string, error?: IAnyDriverError): void;
 	establishingConnection(reason: string): void;
@@ -146,8 +149,8 @@ class ConnectionStateHandlerPassThrough
 	public dispose() {
 		return this.pimpl.dispose();
 	}
-	public initProtocol(protocol: IProtocolHandler) {
-		return this.pimpl.initProtocol(protocol);
+	public initQuorumAndAudience(quorum: IQuorumClients, audience: IAudience) {
+		return this.pimpl.initQuorumAndAudience(quorum, audience);
 	}
 	public receivedDisconnectEvent(reason: string, error?: IAnyDriverError) {
 		return this.pimpl.receivedDisconnectEvent(reason, error);
@@ -318,7 +321,8 @@ class ConnectionStateHandler implements IConnectionStateHandler {
 	private _pendingClientId: string | undefined;
 	private readonly prevClientLeftTimer: Timer;
 	private readonly joinOpTimer: Timer;
-	private protocol?: IProtocolHandler;
+	private quorum: IQuorumClients | undefined;
+	private audience: IAudience | undefined;
 	private connection?: IConnectionDetailsInternal;
 	private _clientId?: string;
 
@@ -364,7 +368,7 @@ class ConnectionStateHandler implements IConnectionStateHandler {
 					return;
 				}
 				const details = {
-					protocolInitialized: this.protocol !== undefined,
+					protocolInitialized: this.quorum !== undefined && this.audience !== undefined,
 					pendingClientId: this.pendingClientId,
 					clientJoined: this.hasMember(this.pendingClientId),
 					waitingForLeaveOp: this.waitingForLeaveOp,
@@ -448,7 +452,7 @@ class ConnectionStateHandler implements IConnectionStateHandler {
 		source: "removeMemberEvent" | "addMemberEvent" | "timeout" | "containerSaved",
 	) {
 		assert(
-			this.protocol !== undefined,
+			this.quorum !== undefined && this.audience !== undefined,
 			0x236 /* "In all cases it should be already installed" */,
 		);
 
@@ -604,8 +608,7 @@ class ConnectionStateHandler implements IConnectionStateHandler {
 		// The code below ensures that we do not send ops until we know that old "write" client's disconnect
 		// produced (and sequenced) leave op
 		const currentClientInQuorum =
-			this._clientId !== undefined &&
-			this.protocol?.quorum?.getMember(this._clientId) !== undefined;
+			this._clientId !== undefined && this.quorum?.getMember(this._clientId) !== undefined;
 		if (value === ConnectionState.Connected) {
 			assert(
 				oldState === ConnectionState.CatchingUp,
@@ -662,16 +665,16 @@ class ConnectionStateHandler implements IConnectionStateHandler {
 		// But only if it's superset of quorum, i.e. when filtered to "write" clients, they are always identical!
 		// It's safer to assume that we have bugs and engaging kill-bit switch should bring us back to well-known
 		// and tested state!
-		return this.readClientsWaitForJoinSignal ? this.protocol?.audience : this.protocol?.quorum;
+		return this.readClientsWaitForJoinSignal ? this.audience : this.quorum;
 	}
 
-	public initProtocol(protocol: IProtocolHandler) {
-		this.protocol = protocol;
+	public initQuorumAndAudience(quorum: IQuorumClients, audience: IAudience) {
+		this.quorum = quorum;
+		this.audience = audience;
 
 		this.membership?.on("addMember", (clientId, details) => {
 			assert(
-				(details as IClient).mode === "read" ||
-					protocol.quorum.getMember(clientId) !== undefined,
+				(details as IClient).mode === "read" || quorum.getMember(clientId) !== undefined,
 				0x4b5 /* Audience is subset of quorum */,
 			);
 			this.receivedAddMemberEvent(clientId);
@@ -679,7 +682,7 @@ class ConnectionStateHandler implements IConnectionStateHandler {
 
 		this.membership?.on("removeMember", (clientId) => {
 			assert(
-				protocol.quorum.getMember(clientId) === undefined,
+				quorum.getMember(clientId) === undefined,
 				0x4b6 /* Audience is subset of quorum */,
 			);
 			this.receivedRemoveMemberEvent(clientId);

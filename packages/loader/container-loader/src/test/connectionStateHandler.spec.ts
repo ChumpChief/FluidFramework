@@ -47,6 +47,7 @@ describe("ConnectionStateHandler Tests", () => {
 	let handlerInputs: IConnectionStateHandlerInputs;
 	let connectionStateHandler: IConnectionStateHandler;
 	let protocolHandler: ProtocolHandler;
+	let audience: Audience;
 	let shouldClientJoinWrite: boolean;
 	let connectionDetails: IConnectionDetailsInternal;
 	let connectionDetails2: IConnectionDetailsInternal;
@@ -90,7 +91,7 @@ describe("ConnectionStateHandler Tests", () => {
 			deltaManagerForCatchingUp as any,
 			undefined,
 		);
-		handler.initProtocol(protocolHandler);
+		handler.initQuorumAndAudience(protocolHandler.quorum, audience);
 		return handler;
 	}
 
@@ -140,8 +141,14 @@ describe("ConnectionStateHandler Tests", () => {
 			{ minimumSequenceNumber: 0, sequenceNumber: 0, term: 1 }, // attributes
 			{ members: [], proposals: [], values: [] }, // quorumSnapshot
 			(key, value) => 0, // sendProposal
-			new Audience(),
 		);
+		audience = new Audience();
+		protocolHandler.quorum.on("addMember", (clientId, details) => {
+			audience.addMember(clientId, details.client);
+		});
+		protocolHandler.quorum.on("removeMember", (clientId) => {
+			audience.removeMember(clientId);
+		});
 		shouldClientJoinWrite = false;
 		handlerInputs = {
 			maxClientLeaveWaitTime: expectedTimeout,
@@ -172,7 +179,7 @@ describe("ConnectionStateHandler Tests", () => {
 			protocolHandler.quorum.removeMember(id);
 		};
 		connectionStateHandler_receivedJoinSignalEvent = (details: IConnectionDetailsInternal) => {
-			protocolHandler.audience.addMember(details.clientId, {
+			audience.addMember(details.clientId, {
 				mode: details.mode,
 			} as any as IClient);
 		};
@@ -444,7 +451,7 @@ describe("ConnectionStateHandler Tests", () => {
 		);
 
 		// init protocol
-		connectionStateHandler.initProtocol(protocolHandler);
+		connectionStateHandler.initQuorumAndAudience(protocolHandler.quorum, audience);
 
 		connectionStateHandler_receivedAddMemberEvent(pendingClientId);
 
@@ -490,7 +497,7 @@ describe("ConnectionStateHandler Tests", () => {
 		connectionStateHandler_receivedAddMemberEvent(pendingClientId);
 
 		// init protocol
-		connectionStateHandler.initProtocol(protocolHandler);
+		connectionStateHandler.initQuorumAndAudience(protocolHandler.quorum, audience);
 
 		assert.strictEqual(
 			connectionStateHandler.connectionState,

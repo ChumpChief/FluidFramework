@@ -64,7 +64,7 @@ import {
 	MessageType2,
 	canBeCoalescedByService,
 } from "@fluidframework/driver-utils";
-import { IQuorumSnapshot } from "@fluidframework/protocol-base";
+import { IProtocolHandler, IQuorumSnapshot } from "@fluidframework/protocol-base";
 import {
 	IClient,
 	IClientDetails,
@@ -76,6 +76,7 @@ import {
 	ISequencedClient,
 	ISequencedDocumentMessage,
 	ISequencedProposal,
+	ISignalClient,
 	ISignalMessage,
 	ISnapshotTree,
 	ISummaryContent,
@@ -115,13 +116,7 @@ import { initQuorumValuesFromCodeDetails } from "./quorum";
 import { NoopHeuristic } from "./noopHeuristic";
 import { ConnectionManager } from "./connectionManager";
 import { ConnectionState } from "./connectionState";
-import {
-	IProtocolHandler,
-	OnlyValidTermValue,
-	ProtocolHandler,
-	ProtocolHandlerBuilder,
-	protocolHandlerShouldProcessSignal,
-} from "./protocol";
+import { OnlyValidTermValue, ProtocolHandler, ProtocolHandlerBuilder } from "./protocol";
 
 const detachedContainerRefSeqNumber = 0;
 
@@ -351,6 +346,25 @@ export interface IPendingContainerState {
 }
 
 const summarizerClientType = "summarizer";
+
+// ADO: #1986: Start using enum from protocol-base.
+enum SignalType {
+	ClientJoin = "join", // same value as MessageType.ClientJoin,
+	ClientLeave = "leave", // same value as MessageType.ClientLeave,
+	Clear = "clear", // used only by client for synthetic signals
+}
+
+function isAudienceSignal(message: ISignalMessage) {
+	if (message.clientId === null) {
+		const innerContent = message.content as { content: unknown; type: string };
+		return (
+			innerContent.type === SignalType.Clear ||
+			innerContent.type === SignalType.ClientJoin ||
+			innerContent.type === SignalType.ClientLeave
+		);
+	}
+	return false;
+}
 
 interface IContainerLifecycleEvents extends IEvent {
 	(event: "runtimeInstantiated", listener: () => void): void;
@@ -660,8 +674,9 @@ export class Container
 	/**
 	 * Retrieves the audience associated with the document
 	 */
+	private readonly _audience: Audience;
 	public get audience(): IAudience {
-		return this.protocolHandler.audience;
+		return this._audience;
 	}
 
 	/**
@@ -748,7 +763,8 @@ export class Container
 		this.scope = scope;
 		this.detachedBlobStorage = detachedBlobStorage;
 		this.protocolHandlerBuilder =
-			protocolHandlerBuilder ?? ((...args) => new ProtocolHandler(...args, new Audience()));
+			protocolHandlerBuilder ?? ((...args) => new ProtocolHandler(...args));
+		this._audience = new Audience();
 
 		// Note that we capture the createProps here so we can replicate the creation call when we want to clone.
 		this.clone = async (
@@ -1791,7 +1807,7 @@ export class Container
 		});
 
 		// Track membership changes and update connection state accordingly
-		this.connectionStateHandler.initProtocol(protocol);
+		this.connectionStateHandler.initQuorumAndAudience(protocol.quorum, this.audience);
 
 		protocol.quorum.on("addProposal", (proposal: ISequencedProposal) => {
 			if (proposal.key === "code" || proposal.key === "code2") {
@@ -1813,6 +1829,19 @@ export class Container
 				});
 			}
 		});
+
+		// Set up the audience to watch for quorum member changes and populate with existing members
+		// Join/leave signals are ignored for "write" clients in favor of join/leave ops
+		protocol.quorum.on("addMember", (clientId, details) => {
+			this._audience.addMember(clientId, details.client);
+		});
+		protocol.quorum.on("removeMember", (clientId) => {
+			this._audience.removeMember(clientId);
+		});
+		for (const [clientId, details] of protocol.quorum.getMembers()) {
+			this._audience.addMember(clientId, details.client);
+		}
+
 		// we need to make sure this member get set in a synchronous context,
 		// or other things can happen after the object that will be set is created, but not yet set
 		// this was breaking this._initialClients handling
@@ -1904,6 +1933,7 @@ export class Container
 					this.client,
 					this._canReconnect,
 					createChildLogger({ logger: this.subLogger, namespace: "ConnectionManager" }),
+					(clients: ISignalClient[]) => this._audience.setMembers(clients),
 					props,
 				),
 		);
@@ -2228,8 +2258,37 @@ export class Container
 
 	private processSignal(message: ISignalMessage) {
 		// No clientId indicates a system signal message.
-		if (protocolHandlerShouldProcessSignal(message)) {
-			this.protocolHandler.processSignal(message);
+		if (isAudienceSignal(message)) {
+			const innerContent = message.content as { content: any; type: string };
+			switch (innerContent.type) {
+				case SignalType.Clear: {
+					const members = this.audience.getMembers();
+					for (const [clientId, client] of members) {
+						if (client.mode === "read") {
+							this._audience.removeMember(clientId);
+						}
+					}
+					break;
+				}
+				case SignalType.ClientJoin: {
+					const newClient = innerContent.content as ISignalClient;
+					// Ignore write clients - quorum will control such clients.
+					if (newClient.client.mode === "read") {
+						this._audience.addMember(newClient.clientId, newClient.client);
+					}
+					break;
+				}
+				case SignalType.ClientLeave: {
+					const leftClientId = innerContent.content as string;
+					// Ignore write clients - quorum will control such clients.
+					if (this.audience.getMember(leftClientId)?.mode === "read") {
+						this._audience.removeMember(leftClientId);
+					}
+					break;
+				}
+				default:
+					break;
+			}
 		} else {
 			const local = this.clientId === message.clientId;
 			this.runtime.processSignal(message, local);
@@ -2309,7 +2368,7 @@ export class Container
 			this._deltaManager,
 			this.storageAdapter,
 			this.protocolHandler.quorum,
-			this.protocolHandler.audience,
+			this.audience,
 			loader,
 			(type, contents, batch, metadata) =>
 				this.submitContainerMessage(type, contents, batch, metadata),

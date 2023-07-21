@@ -15,4 +15,4 @@ export {
 	Loader,
 	requestResolvedObjectFromContainer,
 } from "./loader";
-export { IProtocolHandler, ProtocolHandlerBuilder } from "./protocol";
+export { ProtocolHandlerBuilder } from "./protocol";

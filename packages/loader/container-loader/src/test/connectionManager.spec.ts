@@ -82,6 +82,7 @@ describe("connectionManager", () => {
 			client as IClient,
 			true /* reconnectAllowed */,
 			mockLogger,
+			() => {},
 			props,
 		);
 	}

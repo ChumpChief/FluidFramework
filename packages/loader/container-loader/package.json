@@ -112,6 +112,10 @@
 		"broken": {
 			"InterfaceDeclaration_IContainerExperimental": {
 				"backCompat": false
+			},
+			"RemovedInterfaceDeclaration_IProtocolHandler": {
+				"backCompat": false,
+				"forwardCompat": false
 			}
 		}
 	}

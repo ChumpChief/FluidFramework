@@ -209,26 +209,14 @@ use_old_InterfaceDeclaration_ILoaderServices(
 /*
 * Validate forward compat by using old type in place of current type
 * If breaking change required, add in package.json under typeValidation.broken:
-* "InterfaceDeclaration_IProtocolHandler": {"forwardCompat": false}
+* "RemovedInterfaceDeclaration_IProtocolHandler": {"forwardCompat": false}
 */
-declare function get_old_InterfaceDeclaration_IProtocolHandler():
-    TypeOnly<old.IProtocolHandler>;
-declare function use_current_InterfaceDeclaration_IProtocolHandler(
-    use: TypeOnly<current.IProtocolHandler>);
-use_current_InterfaceDeclaration_IProtocolHandler(
-    get_old_InterfaceDeclaration_IProtocolHandler());
 
 /*
 * Validate back compat by using current type in place of old type
 * If breaking change required, add in package.json under typeValidation.broken:
-* "InterfaceDeclaration_IProtocolHandler": {"backCompat": false}
+* "RemovedInterfaceDeclaration_IProtocolHandler": {"backCompat": false}
 */
-declare function get_current_InterfaceDeclaration_IProtocolHandler():
-    TypeOnly<current.IProtocolHandler>;
-declare function use_old_InterfaceDeclaration_IProtocolHandler(
-    use: TypeOnly<old.IProtocolHandler>);
-use_old_InterfaceDeclaration_IProtocolHandler(
-    get_current_InterfaceDeclaration_IProtocolHandler());
 
 /*
 * Validate forward compat by using old type in place of current type

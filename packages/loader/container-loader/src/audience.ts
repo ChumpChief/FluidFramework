@@ -5,7 +5,7 @@
 import { EventEmitter } from "events";
 import { assert } from "@fluidframework/common-utils";
 import { IAudienceOwner } from "@fluidframework/container-definitions";
-import { IClient } from "@fluidframework/protocol-definitions";
+import { IClient, ISignalClient } from "@fluidframework/protocol-definitions";
 
 /**
  * Audience represents all clients connected to the op stream.
@@ -67,4 +67,11 @@ export class Audience extends EventEmitter implements IAudienceOwner {
 	public getMember(clientId: string): IClient | undefined {
 		return this.members.get(clientId);
 	}
+
+	public readonly setMembers = (members: ISignalClient[]) => {
+		this.members.clear();
+		for (const member of members) {
+			this.members.set(member.clientId, member.client);
+		}
+	};
 }

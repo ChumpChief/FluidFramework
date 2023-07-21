@@ -65,6 +65,7 @@ describe("Loader", () => {
 							client as IClient,
 							reconnectAllowed,
 							logger,
+							() => {},
 							props,
 						),
 				);

@@ -5,7 +5,6 @@
 ```ts
 
 import { FluidObject } from '@fluidframework/core-interfaces';
-import { IAudienceOwner } from '@fluidframework/container-definitions';
 import { IConfigProviderBase } from '@fluidframework/telemetry-utils';
 import { IContainer } from '@fluidframework/container-definitions';
 import { IDocumentAttributes } from '@fluidframework/protocol-definitions';
@@ -16,13 +15,12 @@ import { IFluidModule } from '@fluidframework/container-definitions';
 import { IFluidRouter } from '@fluidframework/core-interfaces';
 import { IHostLoader } from '@fluidframework/container-definitions';
 import { ILoaderOptions as ILoaderOptions_2 } from '@fluidframework/container-definitions';
-import { IProtocolHandler as IProtocolHandler_2 } from '@fluidframework/protocol-base';
+import { IProtocolHandler } from '@fluidframework/protocol-base';
 import { IProvideFluidCodeDetailsComparer } from '@fluidframework/container-definitions';
 import { IQuorumSnapshot } from '@fluidframework/protocol-base';
 import { IRequest } from '@fluidframework/core-interfaces';
 import { IRequestHeader } from '@fluidframework/core-interfaces';
 import { IResponse } from '@fluidframework/core-interfaces';
-import { ISignalMessage } from '@fluidframework/protocol-definitions';
 import { ITelemetryBaseLogger } from '@fluidframework/core-interfaces';
 import { ITelemetryLoggerExt } from '@fluidframework/telemetry-utils';
 import { IUrlResolver } from '@fluidframework/driver-definitions';
@@ -87,14 +85,6 @@ export interface ILoaderServices {
     readonly scope: FluidObject;
     readonly subLogger: ITelemetryLoggerExt;
     readonly urlResolver: IUrlResolver;
-}
-
-// @public (undocumented)
-export interface IProtocolHandler extends IProtocolHandler_2 {
-    // (undocumented)
-    readonly audience: IAudienceOwner;
-    // (undocumented)
-    processSignal(message: ISignalMessage): any;
 }
 
 // @public
