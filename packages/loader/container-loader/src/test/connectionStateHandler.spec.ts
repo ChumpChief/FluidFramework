@@ -6,20 +6,21 @@
 import { strict as assert } from "assert";
 import { TypedEventEmitter } from "@fluidframework/common-utils";
 import {
+	IConnectionDetailsInternal,
+	IDeltaManager,
+	IDeltaManagerEvents,
+} from "@fluidframework/container-definitions";
+import { ITelemetryProperties, TelemetryEventCategory } from "@fluidframework/core-interfaces";
+import { ProtocolOpHandler } from "@fluidframework/protocol-base";
+import {
 	IClient,
 	IClientConfiguration,
 	ConnectionMode,
 	ITokenClaims,
 	ISequencedClient,
 } from "@fluidframework/protocol-definitions";
-import {
-	IConnectionDetailsInternal,
-	IDeltaManager,
-	IDeltaManagerEvents,
-} from "@fluidframework/container-definitions";
-import { SinonFakeTimers, useFakeTimers } from "sinon";
-import { ITelemetryProperties, TelemetryEventCategory } from "@fluidframework/core-interfaces";
 import { createChildLogger } from "@fluidframework/telemetry-utils";
+import { SinonFakeTimers, useFakeTimers } from "sinon";
 import { ConnectionState } from "../connectionState";
 import {
 	IConnectionStateHandlerInputs,
@@ -27,7 +28,6 @@ import {
 	createConnectionStateHandlerCore,
 } from "../connectionStateHandler";
 import { Audience } from "../audience";
-import { ProtocolHandler } from "../protocol";
 
 class MockDeltaManagerForCatchingUp
 	extends TypedEventEmitter<IDeltaManagerEvents>
@@ -46,7 +46,7 @@ describe("ConnectionStateHandler Tests", () => {
 	let clock: SinonFakeTimers;
 	let handlerInputs: IConnectionStateHandlerInputs;
 	let connectionStateHandler: IConnectionStateHandler;
-	let protocolHandler: ProtocolHandler;
+	let protocolHandler: ProtocolOpHandler;
 	let audience: Audience;
 	let shouldClientJoinWrite: boolean;
 	let connectionDetails: IConnectionDetailsInternal;
@@ -137,10 +137,14 @@ describe("ConnectionStateHandler Tests", () => {
 			reason: "test",
 		};
 
-		protocolHandler = new ProtocolHandler(
-			{ minimumSequenceNumber: 0, sequenceNumber: 0, term: 1 }, // attributes
-			{ members: [], proposals: [], values: [] }, // quorumSnapshot
-			(key, value) => 0, // sendProposal
+		protocolHandler = new ProtocolOpHandler(
+			0, // minimumSequenceNumber,
+			0, // sequenceNumber,
+			1, // term,
+			[], // members,
+			[], // proposals,
+			[], // values,
+			() => 0, // sendProposal,
 		);
 		audience = new Audience();
 		protocolHandler.quorum.on("addMember", (clientId, details) => {

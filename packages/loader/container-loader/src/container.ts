@@ -64,7 +64,11 @@ import {
 	MessageType2,
 	canBeCoalescedByService,
 } from "@fluidframework/driver-utils";
-import { IProtocolHandler, IQuorumSnapshot } from "@fluidframework/protocol-base";
+import {
+	IProtocolHandler,
+	IQuorumSnapshot,
+	ProtocolOpHandler,
+} from "@fluidframework/protocol-base";
 import {
 	IClient,
 	IClientDetails,
@@ -116,7 +120,7 @@ import { initQuorumValuesFromCodeDetails } from "./quorum";
 import { NoopHeuristic } from "./noopHeuristic";
 import { ConnectionManager } from "./connectionManager";
 import { ConnectionState } from "./connectionState";
-import { OnlyValidTermValue, ProtocolHandler, ProtocolHandlerBuilder } from "./protocol";
+import { OnlyValidTermValue, ProtocolHandlerBuilder } from "./protocol";
 
 const detachedContainerRefSeqNumber = 0;
 
@@ -760,7 +764,21 @@ export class Container
 		this.scope = scope;
 		this.detachedBlobStorage = detachedBlobStorage;
 		this.protocolHandlerBuilder =
-			protocolHandlerBuilder ?? ((...args) => new ProtocolHandler(...args));
+			protocolHandlerBuilder ??
+			((
+				attributes: IDocumentAttributes,
+				quorumSnapshot: IQuorumSnapshot,
+				sendProposal: (key: string, value: any) => number,
+			) =>
+				new ProtocolOpHandler(
+					attributes.minimumSequenceNumber,
+					attributes.sequenceNumber,
+					OnlyValidTermValue,
+					quorumSnapshot.members,
+					quorumSnapshot.proposals,
+					quorumSnapshot.values,
+					sendProposal,
+				));
 		this._audience = new Audience();
 
 		// Note that we capture the createProps here so we can replicate the creation call when we want to clone.
