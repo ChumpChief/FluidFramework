@@ -69,6 +69,11 @@ export class Audience extends EventEmitter implements IAudienceOwner {
 	}
 
 	public readonly setMembers = (members: ISignalClient[]) => {
+		for (const [clientId, client] of this.members) {
+			if (client.mode === "read") {
+				this.removeMember(clientId);
+			}
+		}
 		this.members.clear();
 		for (const member of members) {
 			this.members.set(member.clientId, member.client);
