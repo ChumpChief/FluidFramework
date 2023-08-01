@@ -351,14 +351,12 @@ const summarizerClientType = "summarizer";
 enum SignalType {
 	ClientJoin = "join", // same value as MessageType.ClientJoin,
 	ClientLeave = "leave", // same value as MessageType.ClientLeave,
-	Clear = "clear", // used only by client for synthetic signals
 }
 
 function isAudienceSignal(message: ISignalMessage) {
 	if (message.clientId === null) {
 		const innerContent = message.content as { content: unknown; type: string };
 		return (
-			innerContent.type === SignalType.Clear ||
 			innerContent.type === SignalType.ClientJoin ||
 			innerContent.type === SignalType.ClientLeave
 		);
@@ -2261,15 +2259,6 @@ export class Container
 		if (isAudienceSignal(message)) {
 			const innerContent = message.content as { content: any; type: string };
 			switch (innerContent.type) {
-				case SignalType.Clear: {
-					const members = this.audience.getMembers();
-					for (const [clientId, client] of members) {
-						if (client.mode === "read") {
-							this._audience.removeMember(clientId);
-						}
-					}
-					break;
-				}
 				case SignalType.ClientJoin: {
 					const newClient = innerContent.content as ISignalClient;
 					// Ignore write clients - quorum will control such clients.
