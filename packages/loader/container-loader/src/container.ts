@@ -347,7 +347,6 @@ export interface IPendingContainerState {
 
 const summarizerClientType = "summarizer";
 
-// ADO: #1986: Start using enum from protocol-base.
 enum SignalType {
 	ClientJoin = "join", // same value as MessageType.ClientJoin,
 	ClientLeave = "leave", // same value as MessageType.ClientLeave,
