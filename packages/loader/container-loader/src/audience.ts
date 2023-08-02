@@ -76,7 +76,7 @@ export class Audience extends EventEmitter implements IAudienceOwner {
 		}
 		this.members.clear();
 		for (const member of members) {
-			this.members.set(member.clientId, member.client);
+			this.addMember(member.clientId, member.client);
 		}
 	};
 }
