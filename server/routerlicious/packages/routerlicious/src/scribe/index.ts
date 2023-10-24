@@ -48,7 +48,6 @@ export async function scribeCreate(
 	const sendTopic = config.get("lambdas:deli:topic");
 	const kafkaClientId = config.get("scribe:kafkaClientId");
 	const mongoExpireAfterSeconds = config.get("mongo:expireAfterSeconds") as number;
-	const enableWholeSummaryUpload = config.get("storage:enableWholeSummaryUpload") as boolean;
 	const internalHistorianUrl = config.get("worker:internalBlobStorageUrl");
 	const internalAlfredUrl = config.get("worker:alfredUrl");
 	const getDeltasViaAlfred = config.get("scribe:getDeltasViaAlfred") as boolean;
@@ -160,7 +159,7 @@ export async function scribeCreate(
 		deltaManager,
 		tenantManager,
 		serviceConfiguration,
-		enableWholeSummaryUpload,
+		true, // enableWholeSummaryUpload
 		getDeltasViaAlfred,
 		verifyLastOpPersistence,
 		transientTenants,

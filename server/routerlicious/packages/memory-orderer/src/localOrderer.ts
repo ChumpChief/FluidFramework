@@ -346,7 +346,7 @@ export class LocalOrderer implements IOrderer {
 			this.tenantId,
 			this.documentId,
 			this.gitManager,
-			false,
+			true, // enableWholeSummaryUpload
 		);
 		const latestSummary = await summaryReader.readLastSummary();
 		const summaryWriter = new SummaryWriter(

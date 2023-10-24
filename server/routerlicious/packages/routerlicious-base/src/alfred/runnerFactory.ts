@@ -459,7 +459,6 @@ export class AlfredResourcesFactory implements core.IResourcesFactory<AlfredReso
 			scribeCollectionName,
 		);
 
-		const enableWholeSummaryUpload = config.get("storage:enableWholeSummaryUpload") as boolean;
 		const opsCollection = await databaseManager.getDeltaCollection(undefined, undefined);
 		const storagePerDocEnabled = (config.get("storage:perDocEnabled") as boolean) ?? false;
 		const storageNameAllocator = storagePerDocEnabled
@@ -468,7 +467,7 @@ export class AlfredResourcesFactory implements core.IResourcesFactory<AlfredReso
 		const storage = new services.DocumentStorage(
 			documentRepository,
 			tenantManager,
-			enableWholeSummaryUpload,
+			true, // enableWholeSummaryUpload
 			opsCollection,
 			storageNameAllocator,
 		);

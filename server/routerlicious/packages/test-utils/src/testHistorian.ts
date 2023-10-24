@@ -192,7 +192,8 @@ export class TestHistorian implements IHistorian {
 	}
 
 	public async createSummary(summary: IWholeSummaryPayload): Promise<IWriteSummaryResponse> {
-		throw new Error("Not Supported");
+		// throw new Error("Not Supported");
+		return { id: "foobar" };
 	}
 
 	public async deleteSummary(softDelete: boolean): Promise<void> {

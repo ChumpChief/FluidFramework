@@ -52,7 +52,6 @@ alfred:
   getDeltasRequestMaxOpsRange: 2000
 
 storage:
-  enableWholeSummaryUpload: true
   storageUrl: storage_url
 
 checkpoints:

@@ -77,7 +77,7 @@ export class ScribeLambdaFactory
 		private readonly deltaManager: IDeltaService,
 		private readonly tenantManager: ITenantManager,
 		private readonly serviceConfiguration: IServiceConfiguration,
-		private readonly enableWholeSummaryUpload: boolean,
+		private readonly enableWholeSummaryUpload: true,
 		private readonly getDeltasViaAlfred: boolean,
 		private readonly verifyLastOpPersistence: boolean,
 		private readonly transientTenants: string[],

@@ -54,7 +54,7 @@ export class SummaryWriter implements ISummaryWriter {
 		private readonly summaryStorage: IGitManager,
 		private readonly deltaService: IDeltaService,
 		private readonly opStorage: ICollection<ISequencedOperationMessage>,
-		private readonly enableWholeSummaryUpload: boolean,
+		private readonly enableWholeSummaryUpload: true,
 		private readonly lastSummaryMessages: ISequencedDocumentMessage[],
 		private readonly getDeltasViaAlfred: boolean,
 		private readonly maxRetriesOnError: number = 6,

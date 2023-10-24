@@ -36,7 +36,7 @@ export class SummaryReader implements ISummaryReader {
 		private readonly tenantId: string,
 		private readonly documentId: string,
 		private readonly summaryStorage: IGitManager,
-		private readonly enableWholeSummaryUpload: boolean,
+		private readonly enableWholeSummaryUpload: true,
 		private readonly maxRetriesOnError: number = 6,
 	) {
 		this.lumberProperties = getLumberBaseProperties(this.documentId, this.tenantId);

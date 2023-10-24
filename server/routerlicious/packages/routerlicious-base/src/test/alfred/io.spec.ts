@@ -106,7 +106,7 @@ describe("Routerlicious", () => {
 					const testStorage = new services.DocumentStorage(
 						testDocumentRepository,
 						testTenantManager,
-						false,
+						true, // enableWholeSummaryUpload
 						await databaseManager.getDeltaCollection(undefined, undefined),
 						undefined,
 					);
@@ -567,7 +567,7 @@ Submitted Messages: ${JSON.stringify(messages, undefined, 2)}`,
 					const testStorage = new services.DocumentStorage(
 						testDocumentRepository,
 						testTenantManager,
-						false,
+						true, // enableWholeSummaryUpload
 						await databaseManager.getDeltaCollection(undefined, undefined),
 						undefined,
 					);
@@ -801,7 +801,7 @@ Submitted Messages: ${JSON.stringify(messages, undefined, 2)}`,
 			testStorage = new services.DocumentStorage(
 				testDocumentRepository,
 				testTenantManager,
-				false,
+				true, // enableWholeSummaryUpload
 				await databaseManager.getDeltaCollection(undefined, undefined),
 				undefined,
 			);

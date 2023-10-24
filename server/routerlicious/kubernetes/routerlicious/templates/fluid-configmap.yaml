@@ -71,7 +71,6 @@ data:
             "endpoint": "{{ .Values.zookeeper.url }}"
         },
         "storage": {
-            "enableWholeSummaryUpload": {{ .Values.storage.enableWholeSummaryUpload }},
             "storageUrl": "{{ .Values.storage.storageUrl }}"
         },
         "checkpoints": {

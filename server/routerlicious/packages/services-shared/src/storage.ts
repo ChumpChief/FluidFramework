@@ -44,7 +44,7 @@ export class DocumentStorage implements IDocumentStorage {
 	constructor(
 		private readonly documentRepository: IDocumentRepository,
 		private readonly tenantManager: ITenantManager,
-		private readonly enableWholeSummaryUpload: boolean,
+		private readonly enableWholeSummaryUpload: true,
 		private readonly opsCollection: ICollection<ISequencedOperationMessage>,
 		private readonly storageNameAssigner: IStorageNameAllocator,
 	) {}
