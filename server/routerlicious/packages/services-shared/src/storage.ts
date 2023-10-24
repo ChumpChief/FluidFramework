@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { ICommit, ICommitDetails, ICreateCommitParams } from "@fluidframework/gitresources";
+import { ICommit, ICommitDetails } from "@fluidframework/gitresources";
 import {
 	IDocumentAttributes,
 	ICommittedProposal,
@@ -13,7 +13,6 @@ import {
 } from "@fluidframework/protocol-definitions";
 import {
 	IGitCache,
-	SummaryTreeUploadManager,
 	WholeSummaryUploadManager,
 	ISession,
 	getGlobalTimeoutContext,
@@ -44,7 +43,6 @@ export class DocumentStorage implements IDocumentStorage {
 	constructor(
 		private readonly documentRepository: IDocumentRepository,
 		private readonly tenantManager: ITenantManager,
-		private readonly enableWholeSummaryUpload: true,
 		private readonly opsCollection: ICollection<ISequencedOperationMessage>,
 		private readonly storageNameAssigner: IStorageNameAllocator,
 	) {}
@@ -100,21 +98,13 @@ export class DocumentStorage implements IDocumentStorage {
 	}
 
 	private createFullTree(appTree: ISummaryTree, protocolTree: ISummaryTree): ISummaryTree {
-		return this.enableWholeSummaryUpload
-			? {
-					type: SummaryType.Tree,
-					tree: {
-						".protocol": protocolTree,
-						".app": appTree,
-					},
-			  }
-			: {
-					type: SummaryType.Tree,
-					tree: {
-						".protocol": protocolTree,
-						...appTree.tree,
-					},
-			  };
+		return {
+			type: SummaryType.Tree,
+			tree: {
+				".protocol": protocolTree,
+				".app": appTree,
+			},
+		};
 	}
 
 	public async createDocument(
@@ -145,7 +135,6 @@ export class DocumentStorage implements IDocumentStorage {
 			[BaseTelemetryProperties.tenantId]: tenantId,
 			[BaseTelemetryProperties.documentId]: documentId,
 			storageName,
-			enableWholeSummaryUpload: this.enableWholeSummaryUpload,
 			storageNameAssignerExists: storageNameAssignerEnabled,
 			isEphemeralContainer,
 		};
@@ -160,10 +149,7 @@ export class DocumentStorage implements IDocumentStorage {
 		const protocolTree = this.createInitialProtocolTree(sequenceNumber, values);
 		const fullTree = this.createFullTree(appTree, protocolTree);
 
-		const blobsShaCache = new Map<string, string>();
-		const uploadManager = this.enableWholeSummaryUpload
-			? new WholeSummaryUploadManager(gitManager)
-			: new SummaryTreeUploadManager(gitManager, blobsShaCache, async () => undefined);
+		const uploadManager = new WholeSummaryUploadManager(gitManager);
 
 		const initialSummaryUploadMetric = Lumberjack.newLumberMetric(
 			LumberEventName.CreateDocInitialSummaryWrite,
@@ -179,31 +165,9 @@ export class DocumentStorage implements IDocumentStorage {
 				true /* initial */,
 			);
 
-			let initialSummaryUploadSuccessMessage = `Tree reference: ${JSON.stringify(handle)}`;
-
-			if (!this.enableWholeSummaryUpload) {
-				const commitParams: ICreateCommitParams = {
-					author: {
-						date: new Date().toISOString(),
-						email: "dummy@microsoft.com",
-						name: "Routerlicious Service",
-					},
-					message: "New document",
-					parents: [],
-					tree: handle,
-				};
-
-				const commit = await gitManager.createCommit(commitParams);
-				await gitManager.createRef(documentId, commit.sha);
-				initialSummaryUploadSuccessMessage += ` - Commit sha: ${JSON.stringify(
-					commit.sha,
-				)}`;
-				// In the case of ShreddedSummary Upload, summary version is always the commit sha.
-				initialSummaryVersionId = commit.sha;
-			} else {
-				// In the case of WholeSummary Upload, summary tree handle is actually commit sha or version id.
-				initialSummaryVersionId = handle;
-			}
+			const initialSummaryUploadSuccessMessage = `Tree reference: ${JSON.stringify(handle)}`;
+			// In the case of WholeSummary Upload, summary tree handle is actually commit sha or version id.
+			initialSummaryVersionId = handle;
 			initialSummaryUploadMetric.success(initialSummaryUploadSuccessMessage);
 		} catch (error: any) {
 			initialSummaryUploadMetric.error("Error during initial summary upload", error);

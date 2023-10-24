@@ -135,7 +135,6 @@ describe("Routerlicious", () => {
 					testDeltaManager,
 					testTenantManager,
 					DefaultServiceConfiguration,
-					true, // enableWholeSummaryUpload
 					false,
 					false,
 					[],

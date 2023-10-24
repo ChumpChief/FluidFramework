@@ -4,7 +4,6 @@
  */
 
 import { fromBase64ToUtf8 } from "@fluidframework/common-utils";
-import { ICreateCommitParams, ICreateTreeEntry } from "@fluidframework/gitresources";
 import {
 	ISequencedDocumentMessage,
 	ISummaryContent,
@@ -23,7 +22,6 @@ import {
 	WholeSummaryUploadManager,
 	getQuorumTreeEntries,
 	generateServiceProtocolEntries,
-	mergeAppAndProtocolTree,
 } from "@fluidframework/server-services-client";
 import {
 	ICollection,
@@ -54,7 +52,6 @@ export class SummaryWriter implements ISummaryWriter {
 		private readonly summaryStorage: IGitManager,
 		private readonly deltaService: IDeltaService,
 		private readonly opStorage: ICollection<ISequencedOperationMessage>,
-		private readonly enableWholeSummaryUpload: true,
 		private readonly lastSummaryMessages: ISequencedDocumentMessage[],
 		private readonly getDeltasViaAlfred: boolean,
 		private readonly maxRetriesOnError: number = 6,
@@ -156,35 +153,6 @@ export class SummaryWriter implements ISummaryWriter {
 				};
 			}
 
-			// When using git, we also validate whether the parent summary is valid
-			if (!this.enableWholeSummaryUpload) {
-				try {
-					await requestWithRetry(
-						async () =>
-							Promise.all(
-								content.parents.map(async (parentSummary) =>
-									this.summaryStorage.getCommit(parentSummary),
-								),
-							),
-						"writeClientSummary_validateParentSummary",
-						this.lumberProperties,
-						shouldRetryNetworkError,
-						this.maxRetriesOnError,
-					);
-				} catch (e) {
-					clientSummaryMetric.error(`One or more parent summaries are invalid`, e);
-					return {
-						message: {
-							message: "One or more parent summaries are invalid",
-							summaryProposal: {
-								summarySequenceNumber: op.sequenceNumber,
-							},
-						},
-						status: false,
-					};
-				}
-			}
-
 			// We should not accept this summary if it is less than current protocol sequence number
 			if (op.referenceSequenceNumber < checkpoint.protocolState.sequenceNumber) {
 				clientSummaryMetric.error(
@@ -229,124 +197,22 @@ export class SummaryWriter implements ISummaryWriter {
 				JSON.stringify(checkpoint),
 			);
 
-			let uploadHandle: string = "";
-
-			if (this.enableWholeSummaryUpload) {
-				uploadHandle = await requestWithRetry(
-					async () =>
-						this.updateWholeSummary(
-							content.head,
-							content.handle,
-							protocolEntries,
-							logTailEntries,
-							serviceProtocolEntries,
-							checkpoint.protocolState.sequenceNumber,
-							content.details?.includesProtocolTree,
-						),
-					"writeClientSummary_updateWholeSummary",
-					this.lumberProperties,
-					shouldRetryNetworkError,
-					this.maxRetriesOnError,
-				);
-			} else {
-				const [logTailTree, protocolTree, serviceProtocolTree, appSummaryTree] =
-					await Promise.all([
-						requestWithRetry(
-							async () => this.summaryStorage.createTree({ entries: logTailEntries }),
-							"writeClientSummary_createLogTailTree",
-							this.lumberProperties,
-							shouldRetryNetworkError,
-							this.maxRetriesOnError,
-						),
-						requestWithRetry(
-							async () =>
-								this.summaryStorage.createTree({ entries: protocolEntries }),
-							"writeClientSummary_createProtocolTree",
-							this.lumberProperties,
-							shouldRetryNetworkError,
-							this.maxRetriesOnError,
-						),
-						requestWithRetry(
-							async () =>
-								this.summaryStorage.createTree({ entries: serviceProtocolEntries }),
-							"writeClientSummary_createServiceProtocolTree",
-							this.lumberProperties,
-							shouldRetryNetworkError,
-							this.maxRetriesOnError,
-						),
-						requestWithRetry(
-							async () => this.summaryStorage.getTree(content.handle, false),
-							"writeClientSummary_getAppSummaryTree",
-							this.lumberProperties,
-							shouldRetryNetworkError,
-							this.maxRetriesOnError,
-						),
-					]);
-
-				// Combine the app summary with .protocol
-				const newTreeEntries = mergeAppAndProtocolTree(appSummaryTree, protocolTree);
-
-				// Now combine with .logtail and .serviceProtocol
-				newTreeEntries.push({
-					mode: FileMode.Directory,
-					path: ".logTail",
-					sha: logTailTree.sha,
-					type: "tree",
-				});
-				newTreeEntries.push({
-					mode: FileMode.Directory,
-					path: ".serviceProtocol",
-					sha: serviceProtocolTree.sha,
-					type: "tree",
-				});
-
-				// Finally perform the write to git
-				const gitTree = await requestWithRetry(
-					async () => this.summaryStorage.createGitTree({ tree: newTreeEntries }),
-					"writeClientSummary_createGitTree",
-					this.lumberProperties,
-					shouldRetryNetworkError,
-					this.maxRetriesOnError,
-				);
-
-				const commitParams: ICreateCommitParams = {
-					author: {
-						date: new Date().toISOString(),
-						email: "praguertdev@microsoft.com",
-						name: "Routerlicious Service",
-					},
-					message: content.message,
-					parents: content.parents,
-					tree: gitTree.sha,
-				};
-
-				const commit = await requestWithRetry(
-					async () => this.summaryStorage.createCommit(commitParams),
-					"writeClientSummary_createCommit",
-					this.lumberProperties,
-					shouldRetryNetworkError,
-					this.maxRetriesOnError,
-				);
-				uploadHandle = commit.sha;
-
-				await (existingRef
-					? requestWithRetry(
-							async () =>
-								this.summaryStorage.upsertRef(this.documentId, uploadHandle),
-							"writeClientSummary_upsertRef",
-							this.lumberProperties,
-							shouldRetryNetworkError,
-							this.maxRetriesOnError,
-					  )
-					: requestWithRetry(
-							async () =>
-								this.summaryStorage.createRef(this.documentId, uploadHandle),
-							"writeClientSummary_createRef",
-							this.lumberProperties,
-							shouldRetryNetworkError,
-							this.maxRetriesOnError,
-					  ));
-			}
+			const uploadHandle = await requestWithRetry(
+				async () =>
+					this.updateWholeSummary(
+						content.head,
+						content.handle,
+						protocolEntries,
+						logTailEntries,
+						serviceProtocolEntries,
+						checkpoint.protocolState.sequenceNumber,
+						content.details?.includesProtocolTree,
+					),
+				"writeClientSummary_updateWholeSummary",
+				this.lumberProperties,
+				shouldRetryNetworkError,
+				this.maxRetriesOnError,
+			);
 			clientSummaryMetric.success(`Client summary success`);
 			return {
 				message: {
@@ -445,114 +311,19 @@ export class SummaryWriter implements ISummaryWriter {
 				JSON.stringify(checkpoint),
 			);
 
-			let uploadedSummaryHandle: string;
-			if (this.enableWholeSummaryUpload) {
-				uploadedSummaryHandle = await requestWithRetry(
-					async () =>
-						this.createWholeServiceSummary(
-							existingRef.object.sha,
-							logTailEntries,
-							serviceProtocolEntries,
-							op.sequenceNumber,
-						),
-					"writeServiceSummary_createWholeServiceSummary",
-					this.lumberProperties,
-					shouldRetryNetworkError,
-					this.maxRetriesOnError,
-				);
-			} else {
-				// Fetch the last commit and summary tree. Create new trees with logTail and serviceProtocol.
-				const lastCommit = await requestWithRetry(
-					async () => this.summaryStorage.getCommit(existingRef.object.sha),
-					"writeServiceSummary_getCommit",
-					this.lumberProperties,
-					shouldRetryNetworkError,
-					this.maxRetriesOnError,
-				);
-				const [logTailTree, serviceProtocolTree, lastSummaryTree] = await Promise.all([
-					requestWithRetry(
-						async () => this.summaryStorage.createTree({ entries: logTailEntries }),
-						"writeServiceSummary_createLogTailTree",
-						this.lumberProperties,
-						shouldRetryNetworkError,
-						this.maxRetriesOnError,
+			const uploadedSummaryHandle = await requestWithRetry(
+				async () =>
+					this.createWholeServiceSummary(
+						existingRef.object.sha,
+						logTailEntries,
+						serviceProtocolEntries,
+						op.sequenceNumber,
 					),
-					requestWithRetry(
-						async () =>
-							this.summaryStorage.createTree({ entries: serviceProtocolEntries }),
-						"writeServiceSummary_createServiceProtocolTree",
-						this.lumberProperties,
-						shouldRetryNetworkError,
-						this.maxRetriesOnError,
-					),
-					requestWithRetry(
-						async () => this.summaryStorage.getTree(lastCommit.tree.sha, false),
-						"writeServiceSummary_getLastSummaryTree",
-						this.lumberProperties,
-						shouldRetryNetworkError,
-						this.maxRetriesOnError,
-					),
-				]);
-
-				// Combine the last summary tree with .logTail and .serviceProtocol
-				const newTreeEntries = lastSummaryTree.tree.map((value) => {
-					const createTreeEntry: ICreateTreeEntry = {
-						mode: value.mode,
-						path: value.path,
-						sha: value.sha,
-						type: value.type,
-					};
-					return createTreeEntry;
-				});
-				newTreeEntries.push({
-					mode: FileMode.Directory,
-					path: ".logTail",
-					sha: logTailTree.sha,
-					type: "tree",
-				});
-				newTreeEntries.push({
-					mode: FileMode.Directory,
-					path: ".serviceProtocol",
-					sha: serviceProtocolTree.sha,
-					type: "tree",
-				});
-
-				// Finally perform the write to git
-				const gitTree = await requestWithRetry(
-					async () => this.summaryStorage.createGitTree({ tree: newTreeEntries }),
-					"writeServiceSummary_createGitTree",
-					this.lumberProperties,
-					shouldRetryNetworkError,
-					this.maxRetriesOnError,
-				);
-				const commitParams: ICreateCommitParams = {
-					author: {
-						date: new Date().toISOString(),
-						email: "praguertdev@microsoft.com",
-						name: "Routerlicious Service",
-					},
-					message: `Service Summary @${op.sequenceNumber}`,
-					parents: [lastCommit.sha],
-					tree: gitTree.sha,
-				};
-
-				// Finally commit the service summary and update the ref.
-				const commit = await requestWithRetry(
-					async () => this.summaryStorage.createCommit(commitParams),
-					"writeServiceSummary_createCommit",
-					this.lumberProperties,
-					shouldRetryNetworkError,
-					this.maxRetriesOnError,
-				);
-				await requestWithRetry(
-					async () => this.summaryStorage.upsertRef(this.documentId, commit.sha),
-					"writeServiceSummary_upsertRef",
-					this.lumberProperties,
-					shouldRetryNetworkError,
-					this.maxRetriesOnError,
-				);
-				uploadedSummaryHandle = commit.sha;
-			}
+				"writeServiceSummary_createWholeServiceSummary",
+				this.lumberProperties,
+				shouldRetryNetworkError,
+				this.maxRetriesOnError,
+			);
 			serviceSummaryMetric.success(`Service summary success`);
 			// Return the summary handle (commit sha) for the new service summary so that
 			// it can be added to validParentSummaries.

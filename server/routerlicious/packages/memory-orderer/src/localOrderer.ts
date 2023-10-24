@@ -342,12 +342,7 @@ export class LocalOrderer implements IOrderer {
 			() => -1,
 		);
 
-		const summaryReader = new SummaryReader(
-			this.tenantId,
-			this.documentId,
-			this.gitManager,
-			true, // enableWholeSummaryUpload
-		);
+		const summaryReader = new SummaryReader(this.tenantId, this.documentId, this.gitManager);
 		const latestSummary = await summaryReader.readLastSummary();
 		const summaryWriter = new SummaryWriter(
 			this.tenantId,
@@ -355,7 +350,6 @@ export class LocalOrderer implements IOrderer {
 			this.gitManager,
 			null /* deltaService */,
 			scribeMessagesCollection,
-			true /* enableWholeSummaryUpload */,
 			latestSummary.messages,
 			false /* getDeltasViaAlfred */,
 		);

@@ -77,7 +77,6 @@ export class ScribeLambdaFactory
 		private readonly deltaManager: IDeltaService,
 		private readonly tenantManager: ITenantManager,
 		private readonly serviceConfiguration: IServiceConfiguration,
-		private readonly enableWholeSummaryUpload: true,
 		private readonly getDeltasViaAlfred: boolean,
 		private readonly verifyLastOpPersistence: boolean,
 		private readonly transientTenants: string[],
@@ -164,12 +163,7 @@ export class ScribeLambdaFactory
 			);
 
 			gitManager = await this.tenantManager.getTenantGitManager(tenantId, documentId);
-			summaryReader = new SummaryReader(
-				tenantId,
-				documentId,
-				gitManager,
-				this.enableWholeSummaryUpload,
-			);
+			summaryReader = new SummaryReader(tenantId, documentId, gitManager);
 			latestSummary = await summaryReader.readLastSummary();
 		} catch (error) {
 			const errorMessage = "Scribe lambda creation failed.";
@@ -271,7 +265,6 @@ export class ScribeLambdaFactory
 			gitManager,
 			this.deltaManager,
 			this.messageCollection,
-			this.enableWholeSummaryUpload,
 			lastSummaryMessages,
 			this.getDeltasViaAlfred,
 			this.maxLogtailLength,

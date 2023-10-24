@@ -55,7 +55,6 @@
 		"endpoint": "zookeeper:2181"
 	},
 	"storage": {
-		"enableWholeSummaryUpload": true,
 		"storageUrl": "http://gitrest:3000"
 	},
 	"checkpoints": {

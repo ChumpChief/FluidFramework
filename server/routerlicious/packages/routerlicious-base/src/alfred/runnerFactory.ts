@@ -467,7 +467,6 @@ export class AlfredResourcesFactory implements core.IResourcesFactory<AlfredReso
 		const storage = new services.DocumentStorage(
 			documentRepository,
 			tenantManager,
-			true, // enableWholeSummaryUpload
 			opsCollection,
 			storageNameAllocator,
 		);

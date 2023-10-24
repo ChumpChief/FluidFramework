@@ -159,7 +159,6 @@ export async function scribeCreate(
 		deltaManager,
 		tenantManager,
 		serviceConfiguration,
-		true, // enableWholeSummaryUpload
 		getDeltasViaAlfred,
 		verifyLastOpPersistence,
 		transientTenants,
