@@ -12,7 +12,6 @@ import { ICreateTreeEntry } from '@fluidframework/gitresources';
 import { IQuorumSnapshot } from '@fluidframework/protocol-base';
 import { ISequencedDocumentMessage } from '@fluidframework/protocol-definitions';
 import { ISnapshotTree } from '@fluidframework/protocol-definitions';
-import { ISnapshotTreeEx } from '@fluidframework/protocol-definitions';
 import { ISummaryHandle } from '@fluidframework/protocol-definitions';
 import { ISummaryTree as ISummaryTree_2 } from '@fluidframework/protocol-definitions';
 import { ITokenClaims } from '@fluidframework/protocol-definitions';
@@ -591,13 +590,6 @@ export abstract class RestWrapper {
 
 // @public (undocumented)
 export const setGlobalTimeoutContext: (timeoutContext: ITimeoutContext) => void;
-
-// @public
-export class SummaryTreeUploadManager implements ISummaryUploadManager {
-    constructor(manager: IGitManager, blobsShaCache: Map<string, string>, getPreviousFullSnapshot: (parentHandle: string) => Promise<ISnapshotTreeEx | null | undefined>);
-    // (undocumented)
-    writeSummaryTree(summaryTree: ISummaryTree_2, parentHandle: string, summaryType: IWholeSummaryPayloadType, sequenceNumber?: number, initial?: boolean): Promise<string>;
-}
 
 // @public
 export function throwFluidServiceNetworkError(statusCode: number, errorData?: INetworkErrorDetails | string): never;

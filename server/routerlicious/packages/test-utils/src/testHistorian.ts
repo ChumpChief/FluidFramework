@@ -193,7 +193,8 @@ export class TestHistorian implements IHistorian {
 
 	public async createSummary(summary: IWholeSummaryPayload): Promise<IWriteSummaryResponse> {
 		// throw new Error("Not Supported");
-		return { id: "foobar" };
+		// Currently the tests expect a successful call but  don't validate the id returned in any way.
+		return { id: "Fake Id" };
 	}
 
 	public async deleteSummary(softDelete: boolean): Promise<void> {

@@ -78,7 +78,6 @@ export {
 	convertWholeFlatSummaryToSnapshotTreeAndBlobs,
 	convertFirstSummaryWholeSummaryTreeToSummaryTree,
 } from "./storageUtils";
-export { SummaryTreeUploadManager } from "./summaryTreeUploadManager";
 export {
 	ITimeoutContext,
 	getGlobalTimeoutContext,
