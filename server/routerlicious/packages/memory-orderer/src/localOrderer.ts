@@ -355,7 +355,7 @@ export class LocalOrderer implements IOrderer {
 			this.gitManager,
 			null /* deltaService */,
 			scribeMessagesCollection,
-			false /* enableWholeSummaryUpload */,
+			true /* enableWholeSummaryUpload */,
 			latestSummary.messages,
 			false /* getDeltasViaAlfred */,
 		);
