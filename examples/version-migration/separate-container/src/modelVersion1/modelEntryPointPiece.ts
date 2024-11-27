@@ -15,8 +15,6 @@ import type { IInventoryList } from "../modelInterfaces.js";
 import { InventoryListAppModel } from "./appModel.js";
 import { InventoryListInstantiationFactory } from "./inventoryList.js";
 
-const modelEntryPointPieceName = "getModel";
-
 const inventoryListAlias = "default-inventory-list";
 
 async function getDataStoreEntryPoint(
@@ -43,7 +41,6 @@ const createPiece = async (
 };
 
 export const modelEntryPointPiece: IEntryPointPiece = {
-	name: modelEntryPointPieceName,
 	registryEntries: [InventoryListInstantiationFactory.registryEntry],
 	onCreate: async (runtime: IContainerRuntime): Promise<void> => {
 		const inventoryList = await runtime.createDataStore(

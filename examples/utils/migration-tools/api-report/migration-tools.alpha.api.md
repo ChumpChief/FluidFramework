@@ -7,7 +7,7 @@
 // @alpha (undocumented)
 export class CompositeEntryPoint {
     // (undocumented)
-    readonly addEntryPointPiece: (entryPointPiece: IEntryPointPiece) => void;
+    readonly addEntryPointPiece: (name: string, entryPointPiece: IEntryPointPiece) => void;
     // (undocumented)
     readonly onCreate: (runtime: IContainerRuntime) => Promise<void>;
     // (undocumented)
@@ -31,8 +31,6 @@ export interface IAcceptedMigrationDetails {
 export interface IEntryPointPiece {
     // (undocumented)
     readonly createPiece: (runtime: IContainerRuntime) => Promise<FluidObject>;
-    // (undocumented)
-    readonly name: string;
     // (undocumented)
     readonly onCreate: (runtime: IContainerRuntime) => Promise<void>;
     // (undocumented)

@@ -10,8 +10,6 @@ import type { IEntryPointPiece } from "../compositeRuntime/index.js";
 
 import { MigrationToolFactory } from "./migrationTool.js";
 
-const migrationToolEntryPointPieceName = "migrationTool";
-
 const migrationToolRegistryKey = "migration-tool";
 const migrationToolFactory = new MigrationToolFactory();
 
@@ -34,7 +32,6 @@ async function getDataStoreEntryPoint(
  * @alpha
  */
 export const migrationToolEntryPointPiece: IEntryPointPiece = {
-	name: migrationToolEntryPointPieceName,
 	registryEntries: [[migrationToolRegistryKey, Promise.resolve(migrationToolFactory)]],
 	onCreate: async (runtime: IContainerRuntime): Promise<void> => {
 		const migrationTool = await runtime.createDataStore(migrationToolRegistryKey);

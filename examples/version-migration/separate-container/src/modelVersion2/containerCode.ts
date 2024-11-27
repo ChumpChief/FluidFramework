@@ -45,8 +45,10 @@ export class InventoryListContainerRuntimeFactory implements IRuntimeFactory {
 		existing: boolean,
 	): Promise<IRuntime> {
 		const compositeEntryPoint = new CompositeEntryPoint();
-		compositeEntryPoint.addEntryPointPiece(modelEntryPointPiece);
-		compositeEntryPoint.addEntryPointPiece(migrationToolEntryPointPiece);
+		// TODO: Export the magic name
+		compositeEntryPoint.addEntryPointPiece("getModel", modelEntryPointPiece);
+		// TODO: Export the magic name
+		compositeEntryPoint.addEntryPointPiece("migrationTool", migrationToolEntryPointPiece);
 		return loadCompositeRuntime(context, existing, compositeEntryPoint, this.runtimeOptions);
 	}
 }

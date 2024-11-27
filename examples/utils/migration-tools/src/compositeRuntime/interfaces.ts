@@ -11,7 +11,6 @@ import type { NamedFluidDataStoreRegistryEntries } from "@fluidframework/runtime
  * @alpha
  */
 export interface IEntryPointPiece {
-	readonly name: string;
 	readonly registryEntries: NamedFluidDataStoreRegistryEntries;
 	readonly onCreate: (runtime: IContainerRuntime) => Promise<void>;
 	readonly onLoad: (runtime: IContainerRuntime) => Promise<void>;

@@ -23,30 +23,32 @@ import type { IEntryPointPiece } from "./interfaces.js";
  * @alpha
  */
 export class CompositeEntryPoint {
-	private readonly _entryPointPieces: IEntryPointPiece[] = [];
-	// TODO: Consider taking a "name" argument here, and don't include "name" on the IEntryPointPiece
-	// Or maybe allow a default name from the piece but allow override here?
-	public readonly addEntryPointPiece = (entryPointPiece: IEntryPointPiece): void => {
+	private readonly _entryPointPieces: Map<string, IEntryPointPiece> = new Map();
+
+	public readonly addEntryPointPiece = (
+		name: string,
+		entryPointPiece: IEntryPointPiece,
+	): void => {
 		// TODO: Consider validating no conflicts (e.g. name already exists, registry entry collision)
-		this._entryPointPieces.push(entryPointPiece);
+		this._entryPointPieces.set(name, entryPointPiece);
 	};
 
 	public get registryEntries(): NamedFluidDataStoreRegistryEntries {
 		const registryEntries: NamedFluidDataStoreRegistryEntry2[] = [];
-		for (const entryPointPiece of this._entryPointPieces) {
+		for (const entryPointPiece of this._entryPointPieces.values()) {
 			registryEntries.push(...entryPointPiece.registryEntries);
 		}
 		return registryEntries;
 	}
 
 	public readonly onCreate = async (runtime: IContainerRuntime): Promise<void> => {
-		for (const entryPointPiece of this._entryPointPieces) {
+		for (const entryPointPiece of this._entryPointPieces.values()) {
 			await entryPointPiece.onCreate(runtime);
 		}
 	};
 
 	public readonly onLoad = async (runtime: IContainerRuntime): Promise<void> => {
-		for (const entryPointPiece of this._entryPointPieces) {
+		for (const entryPointPiece of this._entryPointPieces.values()) {
 			await entryPointPiece.onLoad(runtime);
 		}
 	};
@@ -55,8 +57,8 @@ export class CompositeEntryPoint {
 		runtime: IContainerRuntime,
 	): Promise<Record<string, FluidObject>> => {
 		const entryPoint: Record<string, FluidObject> = {};
-		for (const entryPointPiece of this._entryPointPieces) {
-			entryPoint[entryPointPiece.name] = await entryPointPiece.createPiece(runtime);
+		for (const [name, entryPointPiece] of this._entryPointPieces) {
+			entryPoint[name] = await entryPointPiece.createPiece(runtime);
 		}
 		return entryPoint;
 	};
