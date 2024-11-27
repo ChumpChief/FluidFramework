@@ -25,11 +25,13 @@ export {
 export {
 	DataTransformationCallback,
 	getModelAndMigrationToolFromContainer,
+	getModelEntryPointPieceName,
 	IImportExportModel,
 	IMigratableModel,
 	IMigrator,
 	IMigratorEvents,
 	IVersionedModel,
+	migrationToolEntryPointPieceName,
 	Migrator,
 } from "./migrator/index.js";
 export {

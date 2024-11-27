@@ -21,6 +21,9 @@ export class CompositeEntryPoint {
 // @alpha
 export type DataTransformationCallback = (exportedData: unknown, modelVersion: string) => Promise<unknown>;
 
+// @alpha (undocumented)
+export const getModelEntryPointPieceName = "getModel";
+
 // @alpha
 export interface IAcceptedMigrationDetails {
     migrationSequenceNumber: number;
@@ -118,6 +121,9 @@ export type MigrationState = "collaborating" | "stopping" | "migrating" | "migra
 
 // @alpha (undocumented)
 export const migrationToolEntryPointPiece: IEntryPointPiece;
+
+// @alpha (undocumented)
+export const migrationToolEntryPointPieceName = "migrationTool";
 
 // @alpha (undocumented)
 export class MigrationToolFactory implements IFluidDataStoreFactory {

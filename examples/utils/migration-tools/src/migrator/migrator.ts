@@ -18,6 +18,15 @@ import type {
 	IMigratorEvents,
 } from "./interfaces.js";
 
+/**
+ * @alpha
+ */
+export const getModelEntryPointPieceName = "getModel";
+/**
+ * @alpha
+ */
+export const migrationToolEntryPointPieceName = "migrationTool";
+
 // TODO: This probably shouldn't be exported, consider having the migrator get its own model/tool out.
 /**
  * The purpose of the model pattern and the model loader is to wrap the IContainer in a more useful object and

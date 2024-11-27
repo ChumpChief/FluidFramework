@@ -13,5 +13,7 @@ export {
 } from "./interfaces.js";
 export {
 	getModelAndMigrationToolFromContainer,
+	getModelEntryPointPieceName,
+	migrationToolEntryPointPieceName,
 	Migrator,
 } from "./migrator.js";
