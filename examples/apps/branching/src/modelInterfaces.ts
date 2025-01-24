@@ -33,4 +33,5 @@ export interface IGroceryList {
 	readonly getItems: () => IGroceryItem[];
 
 	readonly branch: () => Promise<IGroceryList>;
+	readonly merge?: (() => void) | undefined;
 }

@@ -28,7 +28,7 @@ export const AppView: FC<IAppViewProps> = ({ groceryList }: IAppViewProps) => {
 			<div style={{ backgroundColor: "#ddd" }}>
 				<h2>Suggested changes:</h2>
 				<GroceryListView groceryList={branchedList} />
-				<button>Accept these changes</button>
+				<button onClick={branchedList.merge}>Accept these changes</button>
 			</div>
 		);
 	} else {

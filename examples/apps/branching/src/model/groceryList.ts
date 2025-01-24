@@ -11,7 +11,10 @@ import type {
 } from "@fluidframework/core-interfaces";
 import { assert } from "@fluidframework/core-utils/legacy";
 import { FluidDataStoreRuntime } from "@fluidframework/datastore/legacy";
-import type { IChannelFactory } from "@fluidframework/datastore-definitions/legacy";
+import type {
+	IChannelFactory,
+	IFluidDataStoreRuntime,
+} from "@fluidframework/datastore-definitions/legacy";
 import { type ISharedMap, type IValueChanged, MapFactory } from "@fluidframework/map/legacy";
 import type {
 	IFluidDataStoreChannel,
@@ -59,6 +62,7 @@ class GroceryList implements IGroceryList {
 		public readonly handle: IFluidHandle<FluidObject>,
 		private readonly map: ISharedMap,
 		public readonly branch: () => Promise<IGroceryList>,
+		public readonly merge?: (() => void) | undefined,
 	) {
 		if (this.disposableParent.disposed) {
 			this.dispose();
@@ -149,22 +153,23 @@ export class GroceryListFactory implements IFluidDataStoreFactory {
 		assert(runtime.entryPoint !== undefined, "EntryPoint was undefined");
 		const handle = runtime.entryPoint;
 
-		// TODO: Use actual branching.  This is currently just creating a detached map and copying the data over.
-		const branchMap = (originalMap: ISharedMap) => {
-			const branchedMap = runtime.createChannel(uuid(), mapFactory.type) as ISharedMap;
-			for (const [key, value] of originalMap) {
-				branchedMap.set(key, value);
-			}
-			return branchedMap;
-		};
-
 		const branch = async () => {
-			const branchedMap = branchMap(map);
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+			const { channel: branchedMap, context: mergeContext } = await (
+				runtime as IFluidDataStoreRuntime
+			).branchChannel!(map);
 			// TODO: Should there be a working handle here?  What would that mean?
-			// eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-			return new GroceryList(runtime, {} as IFluidHandle<FluidObject>, branchedMap, () => {
-				throw new Error("Double-branching not supported right now");
-			});
+			return new GroceryList(
+				runtime,
+				// eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+				{} as IFluidHandle<FluidObject>,
+				branchedMap,
+				() => {
+					throw new Error("Double-branching not supported right now");
+				},
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+				mergeContext!.merge,
+			);
 		};
 
 		const instance = new GroceryList(runtime, handle, map, branch);
