@@ -19,7 +19,7 @@ import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 
 import { GroceryListContainerRuntimeFactory } from "./model/index.js";
-import type { IGroceryList } from "./modelInterfaces.js";
+import type { BranchFunc, IContainerEntryPoint, IGroceryList } from "./modelInterfaces.js";
 import { AppView, DebugView } from "./view/index.js";
 
 const updateTabForId = (id: string) => {
@@ -30,10 +30,10 @@ const updateTabForId = (id: string) => {
 	document.title = id;
 };
 
-const render = (groceryList: IGroceryList) => {
+const render = (groceryList: IGroceryList, branch: BranchFunc) => {
 	const appDiv = document.getElementById("app") as HTMLDivElement;
 	const appRoot = createRoot(appDiv);
-	appRoot.render(createElement(AppView, { groceryList }));
+	appRoot.render(createElement(AppView, { groceryList, branch }));
 
 	// The DebugView is just for demo purposes, in case we want to access internal state or have debug controls.
 	const debugDiv = document.getElementById("debug") as HTMLDivElement;
@@ -48,6 +48,7 @@ const codeLoader = new StaticCodeLoader(new GroceryListContainerRuntimeFactory()
 async function start(): Promise<void> {
 	let id: string;
 	let groceryList: IGroceryList;
+	let branch: BranchFunc;
 
 	if (location.hash.length === 0) {
 		const container = await createDetachedContainer({
@@ -56,7 +57,10 @@ async function start(): Promise<void> {
 			documentServiceFactory: createRouterliciousDocumentServiceFactory(tokenProvider),
 			codeLoader,
 		});
-		groceryList = (await container.getEntryPoint()) as IGroceryList;
+		const entryPoint = (await container.getEntryPoint()) as IContainerEntryPoint;
+		groceryList = entryPoint.groceryList;
+		branch = entryPoint.branch;
+
 		await container.attach(createTinyliciousTestCreateNewRequest());
 		if (container.resolvedUrl === undefined) {
 			throw new Error("Resolved Url not available on attached container");
@@ -70,10 +74,12 @@ async function start(): Promise<void> {
 			documentServiceFactory: createRouterliciousDocumentServiceFactory(tokenProvider),
 			codeLoader,
 		});
-		groceryList = (await container.getEntryPoint()) as IGroceryList;
+		const entryPoint = (await container.getEntryPoint()) as IContainerEntryPoint;
+		groceryList = entryPoint.groceryList;
+		branch = entryPoint.branch;
 	}
 
-	render(groceryList);
+	render(groceryList, branch);
 	updateTabForId(id);
 }
 

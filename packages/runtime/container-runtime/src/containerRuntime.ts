@@ -3469,7 +3469,7 @@ export class ContainerRuntime
 		return result;
 	}
 
-	detachHead(): { merge(): void; pause(): Promise<void>; dispose(): void } {
+	detachHead(): { merge: () => void; pause: () => Promise<void>; dispose: () => void } {
 		const checkpoint = this.outbox.getBatchCheckpoints(true);
 		let paused = false;
 		const branchInfo = {

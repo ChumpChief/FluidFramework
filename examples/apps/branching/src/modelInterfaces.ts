@@ -31,6 +31,15 @@ export interface IGroceryList {
 
 	readonly addItem: (name: string) => void;
 	readonly getItems: () => IGroceryItem[];
+}
 
-	readonly branch: () => Promise<IGroceryList>;
+export type BranchFunc = () => {
+	merge: () => void;
+	pause: () => Promise<void>;
+	dispose: () => void;
+};
+
+export interface IContainerEntryPoint {
+	readonly groceryList: IGroceryList;
+	readonly branch: BranchFunc;
 }

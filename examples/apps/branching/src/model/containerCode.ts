@@ -30,7 +30,14 @@ export class GroceryListContainerRuntimeFactory implements IRuntimeFactory {
 	): Promise<IRuntime> {
 		const provideEntryPoint = async (
 			containerRuntime: IContainerRuntime,
-		): Promise<FluidObject> => getDataStoreEntryPoint(containerRuntime, groceryListId);
+		): Promise<FluidObject> => {
+			return {
+				groceryList: await getDataStoreEntryPoint(containerRuntime, groceryListId),
+				branch: () => {
+					return containerRuntime.detachHead();
+				},
+			};
+		};
 
 		const runtime = await loadContainerRuntime({
 			context,

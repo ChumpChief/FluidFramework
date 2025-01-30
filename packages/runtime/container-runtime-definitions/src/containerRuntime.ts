@@ -197,4 +197,5 @@ export interface IContainerRuntime
 	 * @param relativeUrl - A relative request within the container
 	 */
 	getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
+	detachHead(): { merge: () => void; pause: () => Promise<void>; dispose: () => void };
 }

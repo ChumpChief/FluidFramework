@@ -16,6 +16,12 @@ export interface IContainerRuntime extends IProvideFluidDataStoreRegistry, ICont
     // (undocumented)
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
     // (undocumented)
+    detachHead(): {
+        merge: () => void;
+        pause: () => Promise<void>;
+        dispose: () => void;
+    };
+    // (undocumented)
     readonly flushMode: FlushMode;
     getAbsoluteUrl(relativeUrl: string): Promise<string | undefined>;
     readonly isDirty: boolean;
