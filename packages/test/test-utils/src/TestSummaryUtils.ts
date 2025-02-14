@@ -31,7 +31,10 @@ import {
 
 import { createTestConfigProvider } from "./TestConfigs.js";
 import { waitForContainerConnection } from "./containerUtils.js";
-import { createContainerRuntimeFactoryWithDefaultDataStore } from "./testContainerRuntimeFactoryWithDefaultDataStore.js";
+import {
+	createContainerRuntimeFactoryWithDefaultDataStore,
+	type CRFWDDSConstructor,
+} from "./testContainerRuntimeFactoryWithDefaultDataStore.js";
 import { ITestContainerConfig, ITestObjectProvider } from "./testObjectProvider.js";
 import { timeoutAwait } from "./timeoutUtils.js";
 
@@ -118,13 +121,13 @@ export async function createSummarizerFromFactory(
 	container: IContainer,
 	dataStoreFactory: IFluidDataStoreFactory,
 	summaryVersion?: string,
-	containerRuntimeFactoryType = ContainerRuntimeFactoryWithDefaultDataStore,
+	crfwddsConstructor?: CRFWDDSConstructor,
 	registryEntries?: NamedFluidDataStoreRegistryEntries,
 	logger?: ITelemetryBaseLogger,
 	configProvider: IConfigProviderBase = createTestConfigProvider(),
 ): Promise<{ container: IContainer; summarizer: ISummarizer }> {
 	const runtimeFactory = createContainerRuntimeFactoryWithDefaultDataStore(
-		containerRuntimeFactoryType,
+		crfwddsConstructor ?? ContainerRuntimeFactoryWithDefaultDataStore,
 		{
 			defaultFactory: dataStoreFactory,
 			registryEntries: registryEntries ?? [

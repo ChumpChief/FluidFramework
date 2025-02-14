@@ -60,4 +60,7 @@ export {
 	getContainerEntryPointBackCompat,
 	getDataStoreEntryPointBackCompat,
 } from "./containerUtils.js";
-export { createContainerRuntimeFactoryWithDefaultDataStore } from "./testContainerRuntimeFactoryWithDefaultDataStore.js";
+export {
+	createContainerRuntimeFactoryWithDefaultDataStore,
+	CRFWDDSConstructor,
+} from "./testContainerRuntimeFactoryWithDefaultDataStore.js";

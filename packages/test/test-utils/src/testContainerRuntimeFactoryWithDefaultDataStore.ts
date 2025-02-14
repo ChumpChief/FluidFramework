@@ -3,13 +3,13 @@
  * Licensed under the MIT License.
  */
 
-import { ContainerRuntimeFactoryWithDefaultDataStore } from "@fluidframework/aqueduct/internal";
-import { IContainerRuntimeOptions } from "@fluidframework/container-runtime/internal";
-import { IContainerRuntime } from "@fluidframework/container-runtime-definitions/internal";
-import { FluidObject } from "@fluidframework/core-interfaces";
+import type { IRuntimeFactory } from "@fluidframework/container-definitions/internal";
+import type { IContainerRuntimeOptions } from "@fluidframework/container-runtime/internal";
+import type { IContainerRuntime } from "@fluidframework/container-runtime-definitions/internal";
+import type { FluidObject } from "@fluidframework/core-interfaces";
 // eslint-disable-next-line import/no-deprecated
-import { RuntimeRequestHandler } from "@fluidframework/request-handler/internal";
-import {
+import type { RuntimeRequestHandler } from "@fluidframework/request-handler/internal";
+import type {
 	IFluidDataStoreFactory,
 	NamedFluidDataStoreRegistryEntries,
 } from "@fluidframework/runtime-definitions/internal";
@@ -23,11 +23,25 @@ const getDefaultFluidObject = async (runtime: IContainerRuntime) => {
 };
 
 /**
+ * Happens to match the constructor of ContainerRuntimeFactoryWithDefaultDataStore.
+ * @internal
+ */
+export type CRFWDDSConstructor = new (props: {
+	defaultFactory: IFluidDataStoreFactory;
+	registryEntries: NamedFluidDataStoreRegistryEntries;
+	dependencyContainer?: any;
+	// eslint-disable-next-line import/no-deprecated
+	requestHandlers?: RuntimeRequestHandler[];
+	runtimeOptions?: IContainerRuntimeOptions;
+	provideEntryPoint?: (runtime: IContainerRuntime) => Promise<FluidObject>;
+}) => IRuntimeFactory;
+
+/**
  * ! Note: This function is purely needed for back-compat as the constructor argument structure was changed
  * @internal
  */
 export const createContainerRuntimeFactoryWithDefaultDataStore = (
-	Base: typeof ContainerRuntimeFactoryWithDefaultDataStore = ContainerRuntimeFactoryWithDefaultDataStore,
+	ctor: CRFWDDSConstructor,
 	ctorArgs: {
 		defaultFactory: IFluidDataStoreFactory;
 		registryEntries: NamedFluidDataStoreRegistryEntries;
@@ -37,9 +51,9 @@ export const createContainerRuntimeFactoryWithDefaultDataStore = (
 		runtimeOptions?: IContainerRuntimeOptions;
 		provideEntryPoint?: (runtime: IContainerRuntime) => Promise<FluidObject>;
 	},
-): ContainerRuntimeFactoryWithDefaultDataStore => {
+): IRuntimeFactory => {
 	try {
-		return new Base(ctorArgs);
+		return new ctor(ctorArgs);
 	} catch (err) {
 		// IMPORTANT: The constructor argument structure changed, so this is needed for dynamically using older ContainerRuntimeFactoryWithDefaultDataStore's
 		const {
@@ -51,7 +65,7 @@ export const createContainerRuntimeFactoryWithDefaultDataStore = (
 			provideEntryPoint,
 		} = ctorArgs;
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-		return new (Base as any)(
+		return new (ctor as any)(
 			defaultFactory,
 			registryEntries,
 			dependencyContainer,
