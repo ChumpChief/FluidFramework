@@ -63,4 +63,5 @@ export {
 export {
 	createContainerRuntimeFactoryWithDefaultDataStore,
 	CRFWDDSConstructor,
+	CRFWDDSConstructorArgs,
 } from "./testContainerRuntimeFactoryWithDefaultDataStore.js";

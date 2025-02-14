@@ -23,10 +23,10 @@ const getDefaultFluidObject = async (runtime: IContainerRuntime) => {
 };
 
 /**
- * Happens to match the constructor of ContainerRuntimeFactoryWithDefaultDataStore.
+ * Happens to match the constructor args of ContainerRuntimeFactoryWithDefaultDataStore.
  * @internal
  */
-export type CRFWDDSConstructor = new (props: {
+export interface CRFWDDSConstructorArgs {
 	defaultFactory: IFluidDataStoreFactory;
 	registryEntries: NamedFluidDataStoreRegistryEntries;
 	dependencyContainer?: any;
@@ -34,7 +34,13 @@ export type CRFWDDSConstructor = new (props: {
 	requestHandlers?: RuntimeRequestHandler[];
 	runtimeOptions?: IContainerRuntimeOptions;
 	provideEntryPoint?: (runtime: IContainerRuntime) => Promise<FluidObject>;
-}) => IRuntimeFactory;
+}
+
+/**
+ * Happens to match the constructor of ContainerRuntimeFactoryWithDefaultDataStore.
+ * @internal
+ */
+export type CRFWDDSConstructor = new (props: CRFWDDSConstructorArgs) => IRuntimeFactory;
 
 /**
  * ! Note: This function is purely needed for back-compat as the constructor argument structure was changed
@@ -42,15 +48,7 @@ export type CRFWDDSConstructor = new (props: {
  */
 export const createContainerRuntimeFactoryWithDefaultDataStore = (
 	ctor: CRFWDDSConstructor,
-	ctorArgs: {
-		defaultFactory: IFluidDataStoreFactory;
-		registryEntries: NamedFluidDataStoreRegistryEntries;
-		dependencyContainer?: any;
-		// eslint-disable-next-line import/no-deprecated
-		requestHandlers?: RuntimeRequestHandler[];
-		runtimeOptions?: IContainerRuntimeOptions;
-		provideEntryPoint?: (runtime: IContainerRuntime) => Promise<FluidObject>;
-	},
+	ctorArgs: CRFWDDSConstructorArgs,
 ): IRuntimeFactory => {
 	try {
 		return new ctor(ctorArgs);
