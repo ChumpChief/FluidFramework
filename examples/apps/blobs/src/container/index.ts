@@ -8,4 +8,7 @@ export {
 	IBlobCollectionEvents,
 	IBlobRecord,
 } from "./blobCollection/index.js";
-export { BlobCollectionContainerRuntimeFactory } from "./runtimeFactory.js";
+export {
+	BlobCollectionContainerRuntimeFactory,
+	IBlobCollectionEntryPoint,
+} from "./runtimeFactory.js";

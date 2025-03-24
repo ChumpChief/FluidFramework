@@ -97,22 +97,76 @@ export const BlobCollectionView: FC<IBlobCollectionViewProps> = ({
 
 export interface IDebugViewProps {
 	attach?: () => void;
+	createDetachedBlobCollection: () => Promise<{
+		detachedBlobCollection: IBlobCollection;
+		attachRuntime: () => Promise<void>;
+	}>;
 }
 
-export const DebugView: FC<IDebugViewProps> = ({ attach }) => {
+export const DebugView: FC<IDebugViewProps> = ({ attach, createDetachedBlobCollection }) => {
 	const [showAttach, setShowAttach] = useState<boolean>(attach !== undefined);
+	const [detachedBlobCollectionIns, setDetachedBlobCollectionIns] = useState<
+		IBlobCollection | undefined
+	>(undefined);
+	// Hiding the function in an object, otherwise React will think it's a state updater function
+	const [detachedControls, setDetachedControls] = useState<
+		| {
+				attachRuntime: () => Promise<void>;
+		  }
+		| undefined
+	>(undefined);
 
+	let attachControls;
 	if (attach !== undefined && showAttach) {
 		const onAttachClick = () => {
 			attach();
 			setShowAttach(false);
 		};
-		return (
+		attachControls = (
 			<div>
 				<button onClick={onAttachClick}>Attach container</button>
 			</div>
 		);
 	} else {
-		return <></>;
+		attachControls = <></>;
 	}
+
+	let detachedCollectionControls;
+	if (detachedControls === undefined) {
+		const onCreateButtonClick = () => {
+			createDetachedBlobCollection()
+				.then(({ detachedBlobCollection, attachRuntime }) => {
+					setDetachedBlobCollectionIns(detachedBlobCollection);
+					setDetachedControls({ attachRuntime });
+				})
+				.catch(console.error);
+		};
+		detachedCollectionControls = (
+			<button onClick={onCreateButtonClick}>Create new detached instance</button>
+		);
+	} else {
+		const onAttachButtonClick = () => {
+			detachedControls
+				.attachRuntime()
+				.then(() => {
+					setDetachedControls(undefined);
+				})
+				.catch(console.error);
+		};
+		detachedCollectionControls = (
+			<button onClick={onAttachButtonClick}>Attach the instance</button>
+		);
+	}
+
+	return (
+		<div>
+			{attachControls}
+			{detachedCollectionControls}
+			{detachedBlobCollectionIns ? (
+				<BlobCollectionView blobCollection={detachedBlobCollectionIns} />
+			) : (
+				<></>
+			)}
+		</div>
+	);
 };

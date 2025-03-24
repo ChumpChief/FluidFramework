@@ -29,6 +29,7 @@ import { v4 as uuid } from "uuid";
 import {
 	BlobCollectionContainerRuntimeFactory,
 	type IBlobCollection,
+	type IBlobCollectionEntryPoint,
 } from "../src/container/index.js";
 import { BlobCollectionView, DebugView } from "../src/view.js";
 
@@ -91,14 +92,15 @@ async function createContainerAndRenderInElement(element: HTMLDivElement): Promi
 		document.title = id;
 	}
 
-	const blobCollection = (await container.getEntryPoint()) as IBlobCollection;
+	const { blobCollection, createDetachedBlobCollection } =
+		(await container.getEntryPoint()) as IBlobCollectionEntryPoint;
 	const render = (blobCollection: IBlobCollection) => {
 		const appElement = document.createElement("div");
 		const debugElement = document.createElement("div");
 		element.append(debugElement, appElement);
 
 		const debugRoot = createRoot(debugElement);
-		debugRoot.render(createElement(DebugView, { attach }));
+		debugRoot.render(createElement(DebugView, { attach, createDetachedBlobCollection }));
 
 		const appRoot = createRoot(appElement);
 		appRoot.render(createElement(BlobCollectionView, { blobCollection }));

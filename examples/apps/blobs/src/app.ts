@@ -25,7 +25,7 @@ import { createRoot } from "react-dom/client";
 
 import {
 	BlobCollectionContainerRuntimeFactory,
-	type IBlobCollection,
+	type IBlobCollectionEntryPoint,
 } from "./container/index.js";
 import { BlobCollectionView, DebugView } from "./view.js";
 
@@ -83,12 +83,13 @@ if (location.hash.length === 0) {
 	document.title = id;
 }
 
-const blobCollection = (await container.getEntryPoint()) as IBlobCollection;
+const { blobCollection, createDetachedBlobCollection } =
+	(await container.getEntryPoint()) as IBlobCollectionEntryPoint;
 
 // Render view
 const debugDiv = document.getElementById("debug") as HTMLDivElement;
 const debugRoot = createRoot(debugDiv);
-debugRoot.render(createElement(DebugView, { attach }));
+debugRoot.render(createElement(DebugView, { attach, createDetachedBlobCollection }));
 
 const appDiv = document.getElementById("app") as HTMLDivElement;
 const appRoot = createRoot(appDiv);
