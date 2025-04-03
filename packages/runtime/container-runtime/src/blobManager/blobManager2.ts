@@ -158,34 +158,64 @@ interface PendingBlob {
 	stashedUpload?: boolean;
 }
 
-interface IUploadingBlob {
+interface IUploadingBlobRecord {
 	readonly state: "uploading";
 	readonly localId: string;
 	readonly blob: ArrayBufferLike;
 }
 
-interface IUnackedBlob {
+interface IUnackedBlobRecord {
 	readonly state: "unacked";
 	readonly localId: string;
 	readonly blob: ArrayBufferLike;
 	readonly storageId: string;
 }
 
-interface IAttachedBlob {
+interface IAttachedBlobRecord {
 	readonly state: "attached";
 	readonly localId: string;
 	readonly blob: ArrayBufferLike;
 	readonly storageId: string;
 }
 
-type LocalBlob = IUploadingBlob | IUnackedBlob | IAttachedBlob;
+type LocalBlobRecord = IUploadingBlobRecord | IUnackedBlobRecord | IAttachedBlobRecord;
+
+interface IBlobManager2InternalEvents extends IEvent {
+	(event: "processedBlobAttach", listener: (localId: string, storageId: string) => void);
+}
 
 export class BlobManager2 {
-	private readonly localBlobCache = new Map<string, LocalBlob>();
-	public readonly getBlob = (localId: string): Promise<ArrayBufferLike> => {
-		throw new Error("Not implemented");
+	private readonly localBlobCache = new Map<string, LocalBlobRecord>();
+	private readonly redirectTable: Map<string, string>;
+	private readonly internalEvents = new TypedEventEmitter<IBlobManager2InternalEvents>();
+
+	public constructor(
+		private readonly documentStorageService: IDocumentStorageService,
+		redirectEntries: [string, string][],
+	) {
+		this.redirectTable = new Map(redirectEntries);
+	}
+
+	public readonly getBlob = async (localId: string): Promise<ArrayBufferLike> => {
+		const localBlob = this.localBlobCache.get(localId);
+		if (localBlob !== undefined) {
+			return localBlob.blob;
+		}
+		// If we don't find it in the redirectTable, assume the attach op is coming eventually and wait.
+		const storageId = this.redirectTable.get(localId) ?? await new Promise<string>((resolve) => {
+			const onProcessBlobAttach = (_localId: string, _storageId: string): void => {
+				if (_localId === localId) {
+					this.internalEvents.off("processedBlobAttach", onProcessBlobAttach);
+					resolve(_storageId);
+				}
+			};
+			this.internalEvents.on("processedBlobAttach", onProcessBlobAttach);
+		});
+
+		return this.documentStorageService.readBlob(storageId)
 	};
-	public readonly uploadBlob = (contents: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>> => {
+
+	public readonly uploadBlob = (contents: ArrayBufferLike): IFluidHandle<ArrayBufferLike> => {
 		throw new Error("Not implemented");
 	};
 }
