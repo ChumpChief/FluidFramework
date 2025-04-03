@@ -4191,7 +4191,7 @@ export class ContainerRuntime
 		return new BlobHandle(
 			getGCNodePathFromBlobId(localId),
 			this.handleContext,
-			async () => blob,
+			async () => this.blobManager2.getBlob(localId),
 			false, // attached
 			() => {
 				attach().catch(console.error);

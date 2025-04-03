@@ -215,13 +215,13 @@ export class BlobManager2 {
 		const storageId =
 			this.redirectTable.get(localId) ??
 			(await new Promise<string>((resolve) => {
-				const onProcessBlobAttach = (_localId: string, _storageId: string): void => {
+				const onBlobAttached = (_localId: string, _storageId: string): void => {
 					if (_localId === localId) {
-						this.internalEvents.off("blobAttached", onProcessBlobAttach);
+						this.internalEvents.off("blobAttached", onBlobAttached);
 						resolve(_storageId);
 					}
 				};
-				this.internalEvents.on("blobAttached", onProcessBlobAttach);
+				this.internalEvents.on("blobAttached", onBlobAttached);
 			}));
 
 		return this.documentStorageService.readBlob(storageId);
@@ -272,13 +272,13 @@ export class BlobManager2 {
 		// Send a blob attach op and also await its ack, so that this function resolves once the blob
 		// is fully attached.
 		await new Promise<string>((resolve) => {
-			const onProcessBlobAttach = (_localId: string, _storageId: string): void => {
+			const onBlobAttached = (_localId: string, _storageId: string): void => {
 				if (_localId === localId) {
-					this.internalEvents.off("blobAttached", onProcessBlobAttach);
+					this.internalEvents.off("blobAttached", onBlobAttached);
 					resolve(_storageId);
 				}
 			};
-			this.internalEvents.on("blobAttached", onProcessBlobAttach);
+			this.internalEvents.on("blobAttached", onBlobAttached);
 			this.sendBlobAttachOp(localId, storageId);
 		});
 	};
