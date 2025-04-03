@@ -158,14 +158,20 @@ interface PendingBlob {
 	stashedUpload?: boolean;
 }
 
+interface IDetachedBlobRecord {
+	readonly state: "detached";
+	readonly localId: string;
+	readonly blob: ArrayBufferLike;
+}
+
 interface IUploadingBlobRecord {
 	readonly state: "uploading";
 	readonly localId: string;
 	readonly blob: ArrayBufferLike;
 }
 
-interface IUnackedBlobRecord {
-	readonly state: "unacked";
+interface IAttachingBlobRecord {
+	readonly state: "attaching";
 	readonly localId: string;
 	readonly blob: ArrayBufferLike;
 	readonly storageId: string;
@@ -178,10 +184,10 @@ interface IAttachedBlobRecord {
 	readonly storageId: string;
 }
 
-type LocalBlobRecord = IUploadingBlobRecord | IUnackedBlobRecord | IAttachedBlobRecord;
+type LocalBlobRecord = IDetachedBlobRecord | IUploadingBlobRecord | IAttachingBlobRecord | IAttachedBlobRecord;
 
 interface IBlobManager2InternalEvents extends IEvent {
-	(event: "processedBlobAttach", listener: (localId: string, storageId: string) => void);
+	(event: "blobAttached", listener: (localId: string, storageId: string) => void);
 }
 
 export class BlobManager2 {
@@ -192,6 +198,7 @@ export class BlobManager2 {
 	public constructor(
 		private readonly documentStorageService: IDocumentStorageService,
 		redirectEntries: [string, string][],
+		private readonly sendBlobAttachOp: (localId: string, storageId: string) => void,
 	) {
 		this.redirectTable = new Map(redirectEntries);
 	}
@@ -205,18 +212,62 @@ export class BlobManager2 {
 		const storageId = this.redirectTable.get(localId) ?? await new Promise<string>((resolve) => {
 			const onProcessBlobAttach = (_localId: string, _storageId: string): void => {
 				if (_localId === localId) {
-					this.internalEvents.off("processedBlobAttach", onProcessBlobAttach);
+					this.internalEvents.off("blobAttached", onProcessBlobAttach);
 					resolve(_storageId);
 				}
 			};
-			this.internalEvents.on("processedBlobAttach", onProcessBlobAttach);
+			this.internalEvents.on("blobAttached", onProcessBlobAttach);
 		});
 
 		return this.documentStorageService.readBlob(storageId)
 	};
 
-	public readonly uploadBlob = (contents: ArrayBufferLike): IFluidHandle<ArrayBufferLike> => {
-		throw new Error("Not implemented");
+	public readonly createDetachedBlob = (blob: ArrayBufferLike): () => void => {
+		const localId = uuid();
+		const detachedBlobRecord: IDetachedBlobRecord = {
+			state: "detached",
+			localId,
+			blob,
+		};
+		this.localBlobCache.set(localId, detachedBlobRecord);
+		return () => this.uploadAndAttachBlob(localId);
+	};
+
+	private readonly uploadAndAttachBlob = async (localId: string): Promise<void> => {
+		const detachedBlobRecord = this.localBlobCache.get(localId);
+		// TODO handle deduping?  Assert if not detached state?
+		if (detachedBlobRecord?.state !== "detached") {
+			throw new Error("Trying to attach when not allowed");
+		}
+
+		const uploadingBlobRecord: IUploadingBlobRecord = {
+			...detachedBlobRecord,
+			state: "uploading",
+		}
+		this.localBlobCache.set(localId, uploadingBlobRecord);
+		const { id: storageId } = await this.documentStorageService.createBlob(detachedBlobRecord.blob);
+
+		const attachingBlobRecord: IAttachingBlobRecord = {
+			...uploadingBlobRecord,
+			state: "attaching",
+			storageId,
+		}
+		this.localBlobCache.set(localId, attachingBlobRecord);
+		this.sendBlobAttachOp(localId, storageId);
+	};
+
+	public readonly notifyBlobAttached = (localId: string, storageId: string): void => {
+		this.redirectTable.set(localId, storageId);
+		const attachingBlobRecord = this.localBlobCache.get(localId);
+		// TODO assert if present but not in attaching state?
+		if (attachingBlobRecord?.state === "attaching") {
+			const attachedBlobRecord: IAttachedBlobRecord = {
+				...attachingBlobRecord,
+				state: "attached",
+			};
+			this.localBlobCache.set(localId, attachedBlobRecord);
+		}
+		this.internalEvents.emit("blobAttached", localId, storageId);
 	};
 }
 
