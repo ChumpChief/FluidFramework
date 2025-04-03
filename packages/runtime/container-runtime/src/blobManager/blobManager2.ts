@@ -16,7 +16,6 @@ import {
 import type {
 	IEvent,
 	IEventProvider,
-	IFluidHandle,
 	IFluidHandleContext,
 	IFluidHandleInternal,
 	IFluidHandleInternalWithMetadata,
@@ -184,7 +183,11 @@ interface IAttachedBlobRecord {
 	readonly storageId: string;
 }
 
-type LocalBlobRecord = IDetachedBlobRecord | IUploadingBlobRecord | IAttachingBlobRecord | IAttachedBlobRecord;
+type LocalBlobRecord =
+	| IDetachedBlobRecord
+	| IUploadingBlobRecord
+	| IAttachingBlobRecord
+	| IAttachedBlobRecord;
 
 interface IBlobManager2InternalEvents extends IEvent {
 	(event: "blobAttached", listener: (localId: string, storageId: string) => void);
@@ -209,20 +212,22 @@ export class BlobManager2 {
 			return localBlob.blob;
 		}
 		// If we don't find it in the redirectTable, assume the attach op is coming eventually and wait.
-		const storageId = this.redirectTable.get(localId) ?? await new Promise<string>((resolve) => {
-			const onProcessBlobAttach = (_localId: string, _storageId: string): void => {
-				if (_localId === localId) {
-					this.internalEvents.off("blobAttached", onProcessBlobAttach);
-					resolve(_storageId);
-				}
-			};
-			this.internalEvents.on("blobAttached", onProcessBlobAttach);
-		});
+		const storageId =
+			this.redirectTable.get(localId) ??
+			(await new Promise<string>((resolve) => {
+				const onProcessBlobAttach = (_localId: string, _storageId: string): void => {
+					if (_localId === localId) {
+						this.internalEvents.off("blobAttached", onProcessBlobAttach);
+						resolve(_storageId);
+					}
+				};
+				this.internalEvents.on("blobAttached", onProcessBlobAttach);
+			}));
 
-		return this.documentStorageService.readBlob(storageId)
+		return this.documentStorageService.readBlob(storageId);
 	};
 
-	public readonly createDetachedBlob = (blob: ArrayBufferLike): () => void => {
+	public readonly createDetachedBlob = (blob: ArrayBufferLike): (() => Promise<void>) => {
 		const localId = uuid();
 		const detachedBlobRecord: IDetachedBlobRecord = {
 			state: "detached",
@@ -230,7 +235,7 @@ export class BlobManager2 {
 			blob,
 		};
 		this.localBlobCache.set(localId, detachedBlobRecord);
-		return () => this.uploadAndAttachBlob(localId);
+		return async () => this.uploadAndAttachBlob(localId);
 	};
 
 	private readonly uploadAndAttachBlob = async (localId: string): Promise<void> => {
@@ -243,17 +248,31 @@ export class BlobManager2 {
 		const uploadingBlobRecord: IUploadingBlobRecord = {
 			...detachedBlobRecord,
 			state: "uploading",
-		}
+		};
 		this.localBlobCache.set(localId, uploadingBlobRecord);
-		const { id: storageId } = await this.documentStorageService.createBlob(detachedBlobRecord.blob);
+		const { id: storageId } = await this.documentStorageService.createBlob(
+			detachedBlobRecord.blob,
+		);
 
 		const attachingBlobRecord: IAttachingBlobRecord = {
 			...uploadingBlobRecord,
 			state: "attaching",
 			storageId,
-		}
+		};
 		this.localBlobCache.set(localId, attachingBlobRecord);
-		this.sendBlobAttachOp(localId, storageId);
+
+		// Send a blob attach op and also await its ack, so that this function resolves once the blob
+		// is fully attached.
+		await new Promise<string>((resolve) => {
+			const onProcessBlobAttach = (_localId: string, _storageId: string): void => {
+				if (_localId === localId) {
+					this.internalEvents.off("blobAttached", onProcessBlobAttach);
+					resolve(_storageId);
+				}
+			};
+			this.internalEvents.on("blobAttached", onProcessBlobAttach);
+			this.sendBlobAttachOp(localId, storageId);
+		});
 	};
 
 	public readonly notifyBlobAttached = (localId: string, storageId: string): void => {
