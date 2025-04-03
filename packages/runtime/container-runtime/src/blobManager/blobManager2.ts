@@ -199,7 +199,8 @@ export class BlobManager2 {
 	private readonly internalEvents = new TypedEventEmitter<IBlobManager2InternalEvents>();
 
 	public constructor(
-		private readonly documentStorageService: IDocumentStorageService,
+		private readonly createBlob: (file: ArrayBufferLike) => Promise<string>,
+		private readonly readBlob: (id: string) => Promise<ArrayBufferLike>,
 		redirectEntries: [string, string][],
 		private readonly sendBlobAttachOp: (localId: string, storageId: string) => void,
 	) {
@@ -224,7 +225,7 @@ export class BlobManager2 {
 				this.internalEvents.on("blobAttached", onBlobAttached);
 			}));
 
-		return this.documentStorageService.readBlob(storageId);
+		return this.readBlob(storageId);
 	};
 
 	public readonly createDetachedBlob = (
@@ -258,9 +259,7 @@ export class BlobManager2 {
 			state: "uploading",
 		};
 		this.localBlobCache.set(localId, uploadingBlobRecord);
-		const { id: storageId } = await this.documentStorageService.createBlob(
-			detachedBlobRecord.blob,
-		);
+		const storageId = await this.createBlob(detachedBlobRecord.blob);
 
 		const attachingBlobRecord: IAttachingBlobRecord = {
 			...uploadingBlobRecord,

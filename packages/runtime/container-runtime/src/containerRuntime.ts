@@ -1733,8 +1733,24 @@ export class ContainerRuntime
 		// 	stashedBlobs: pendingRuntimeState?.pendingAttachmentBlobs,
 		// });
 
+		const pseudoDocumentStorageService = {
+			createBlob: async (file: ArrayBufferLike): Promise<string> => {
+				// We can't upload blobs until the container attaches or else we'll be writing into
+				// the MemoryBlobStorage, which will lie to us about the storageId.
+				if (this.attachState !== AttachState.Attached) {
+					await new Promise<void>((resolve) => {
+						this.once("attached", resolve);
+					});
+				}
+				const { id } = await this.storage.createBlob(file);
+				return id;
+			},
+			readBlob: async (id: string): Promise<ArrayBufferLike> => this.storage.readBlob(id),
+		};
+
 		this.blobManager2 = new BlobManager2(
-			this.storage,
+			pseudoDocumentStorageService.createBlob,
+			pseudoDocumentStorageService.readBlob,
 			blobManagerLoadInfo.redirectTable ?? [],
 			(localId: string, blobId: string) => {
 				if (!this.disposed) {
