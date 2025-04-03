@@ -11,7 +11,7 @@ export {
 	blobManagerBasePath,
 	isBlobPath,
 } from "./blobManager.js";
-export { BlobManager2 } from "./blobManager2.js";
+export { BlobHandle, BlobManager2, getGCNodePathFromBlobId } from "./blobManager2.js";
 export {
 	loadBlobManagerLoadInfo,
 	IBlobManagerLoadInfo,

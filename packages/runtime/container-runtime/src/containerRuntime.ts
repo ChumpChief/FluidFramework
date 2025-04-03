@@ -35,7 +35,6 @@ import type {
 	ITelemetryBaseLogger,
 } from "@fluidframework/core-interfaces";
 import type {
-	IErrorBase,
 	IFluidHandleContext,
 	IFluidHandleInternal,
 	IProvideFluidHandleContext,
@@ -136,10 +135,12 @@ import { v4 as uuid } from "uuid";
 
 import { BindBatchTracker } from "./batchTracker.js";
 import {
-	BlobManager,
+	BlobHandle,
+	BlobManager2,
 	IPendingBlobs,
 	blobManagerBasePath,
 	blobsTreeName,
+	getGCNodePathFromBlobId,
 	isBlobPath,
 	loadBlobManagerLoadInfo,
 	type IBlobManagerLoadInfo,
@@ -147,7 +148,6 @@ import {
 import {
 	ChannelCollection,
 	getSummaryForDatastores,
-	RuntimeHeaders,
 	wrapContext,
 } from "./channelCollection.js";
 import { ReportOpPerfTelemetry } from "./connectionTelemetry.js";
@@ -1015,16 +1015,16 @@ export class ContainerRuntime
 			recentBatchInfo,
 		);
 
-		runtime.blobManager.stashedBlobsUploadP.then(
-			() => {
-				// make sure we didn't reconnect before the promise resolved
-				if (runtime.delayConnectClientId !== undefined && !runtime.disposed) {
-					runtime.delayConnectClientId = undefined;
-					runtime.setConnectionStateCore(true, runtime.delayConnectClientId);
-				}
-			},
-			(error: IErrorBase) => runtime.closeFn(error),
-		);
+		// runtime.blobManager.stashedBlobsUploadP.then(
+		// 	() => {
+		// 		// make sure we didn't reconnect before the promise resolved
+		// 		if (runtime.delayConnectClientId !== undefined && !runtime.disposed) {
+		// 			runtime.delayConnectClientId = undefined;
+		// 			runtime.setConnectionStateCore(true, runtime.delayConnectClientId);
+		// 		}
+		// 	},
+		// 	(error: IErrorBase) => runtime.closeFn(error),
+		// );
 
 		// Apply stashed ops with a reference sequence number equal to the sequence number of the snapshot,
 		// or zero. This must be done before Container replays saved ops.
@@ -1236,7 +1236,8 @@ export class ContainerRuntime
 	private readonly _summarizer?: Summarizer;
 	private readonly deltaScheduler: DeltaScheduler;
 	private readonly inboundBatchAggregator: InboundBatchAggregator;
-	private readonly blobManager: BlobManager;
+	// private readonly blobManager: BlobManager;
+	private readonly blobManager2: BlobManager2;
 	private readonly pendingStateManager: PendingStateManager;
 	private readonly duplicateBatchDetector: DuplicateBatchDetector | undefined;
 	private readonly outbox: Outbox;
@@ -1705,11 +1706,37 @@ export class ContainerRuntime
 			async (runtime: ChannelCollection) => provideEntryPoint,
 		);
 
-		this.blobManager = new BlobManager({
-			routeContext: this.handleContext,
-			blobManagerLoadInfo,
-			storage: this.storage,
-			sendBlobAttachOp: (localId: string, blobId?: string) => {
+		// this.blobManager = new BlobManager({
+		// 	routeContext: this.handleContext,
+		// 	blobManagerLoadInfo,
+		// 	storage: this.storage,
+		// 	sendBlobAttachOp: (localId: string, blobId?: string) => {
+		// 		if (!this.disposed) {
+		// 			this.submit(
+		// 				{ type: ContainerMessageType.BlobAttach, contents: undefined },
+		// 				undefined,
+		// 				{
+		// 					localId,
+		// 					blobId,
+		// 				},
+		// 			);
+		// 		}
+		// 	},
+		// 	blobRequested: (blobPath: string) =>
+		// 		this.garbageCollector.nodeUpdated({
+		// 			node: { type: "Blob", path: blobPath },
+		// 			reason: "Loaded",
+		// 			timestampMs: this.getCurrentReferenceTimestampMs(),
+		// 		}),
+		// 	isBlobDeleted: (blobPath: string) => this.garbageCollector.isNodeDeleted(blobPath),
+		// 	runtime: this,
+		// 	stashedBlobs: pendingRuntimeState?.pendingAttachmentBlobs,
+		// });
+
+		this.blobManager2 = new BlobManager2(
+			this.storage,
+			blobManagerLoadInfo.redirectTable ?? [],
+			(localId: string, blobId: string) => {
 				if (!this.disposed) {
 					this.submit(
 						{ type: ContainerMessageType.BlobAttach, contents: undefined },
@@ -1721,16 +1748,7 @@ export class ContainerRuntime
 					);
 				}
 			},
-			blobRequested: (blobPath: string) =>
-				this.garbageCollector.nodeUpdated({
-					node: { type: "Blob", path: blobPath },
-					reason: "Loaded",
-					timestampMs: this.getCurrentReferenceTimestampMs(),
-				}),
-			isBlobDeleted: (blobPath: string) => this.garbageCollector.isNodeDeleted(blobPath),
-			runtime: this,
-			stashedBlobs: pendingRuntimeState?.pendingAttachmentBlobs,
-		});
+		);
 
 		this.deltaScheduler = new DeltaScheduler(
 			this.innerDeltaManager,
@@ -2239,19 +2257,21 @@ export class ContainerRuntime
 			}
 
 			if (id === blobManagerBasePath && requestParser.isLeaf(2)) {
-				if (
-					!this.blobManager.hasBlob(requestParser.pathParts[1]) &&
-					requestParser.headers?.[RuntimeHeaders.wait] === false
-				) {
-					return create404Response(request);
-				}
+				// if (
+				// 	!this.blobManager.hasBlob(requestParser.pathParts[1]) &&
+				// 	requestParser.headers?.[RuntimeHeaders.wait] === false
+				// ) {
+				// 	return create404Response(request);
+				// }
 
-				const blob = await this.blobManager.getBlob(
-					requestParser.pathParts[1],
-					requestParser.headers?.[RuntimeHeaders.metadata] as
-						| Readonly<Record<string, string | number | boolean>>
-						| undefined,
-				);
+				// const blob = await this.blobManager.getBlob(
+				// 	requestParser.pathParts[1],
+				// 	requestParser.headers?.[RuntimeHeaders.metadata] as
+				// 		| Readonly<Record<string, string | number | boolean>>
+				// 		| undefined,
+				// );
+
+				const blob = await this.blobManager2.getBlob(requestParser.pathParts[1]);
 
 				return {
 					status: 200,
@@ -2355,7 +2375,7 @@ export class ContainerRuntime
 			addBlobToSummary(summaryTree, electedSummarizerBlobName, electedSummarizerContent);
 		}
 
-		const blobManagerSummary = this.blobManager.summarize();
+		const blobManagerSummary = this.blobManager2.summarize();
 		// Some storage (like git) doesn't allow empty tree, so we can omit it.
 		// and the blob manager can handle the tree not existing when loading
 		if (Object.keys(blobManagerSummary.summary.tree).length > 0) {
@@ -2552,16 +2572,16 @@ export class ContainerRuntime
 		// If there are stashed blobs in the pending state, we need to delay
 		// propagation of the "connected" event until we have uploaded them to
 		// ensure we don't submit ops referencing a blob that has not been uploaded
-		const connecting = connected && !this._connected;
-		if (connecting && this.blobManager.hasPendingStashedUploads()) {
-			assert(
-				!this.delayConnectClientId,
-				0x791 /* Connect event delay must be canceled before subsequent connect event */,
-			);
-			assert(!!clientId, 0x792 /* Must have clientId when connecting */);
-			this.delayConnectClientId = clientId;
-			return;
-		}
+		// const connecting = connected && !this._connected;
+		// if (connecting && this.blobManager.hasPendingStashedUploads()) {
+		// 	assert(
+		// 		!this.delayConnectClientId,
+		// 		0x791 /* Connect event delay must be canceled before subsequent connect event */,
+		// 	);
+		// 	assert(!!clientId, 0x792 /* Must have clientId when connecting */);
+		// 	this.delayConnectClientId = clientId;
+		// 	return;
+		// }
 
 		this.setConnectionStateCore(connected, clientId);
 	}
@@ -2984,7 +3004,9 @@ export class ContainerRuntime
 				break;
 			}
 			case ContainerMessageType.BlobAttach: {
-				this.blobManager.processBlobAttachMessage(message, local);
+				// this.blobManager.processBlobAttachMessage(message, local);
+				const { localId, blobId } = message.metadata as { localId: string; blobId: string };
+				this.blobManager2.notifyBlobAttached(localId, blobId);
 				break;
 			}
 			case ContainerMessageType.IdAllocation: {
@@ -3354,9 +3376,9 @@ export class ContainerRuntime
 		blobRedirectTable?: Map<string, string>,
 		telemetryContext?: ITelemetryContext,
 	): ISummaryTree {
-		if (blobRedirectTable) {
-			this.blobManager.setRedirectTable(blobRedirectTable);
-		}
+		// if (blobRedirectTable) {
+		// 	this.blobManager.setRedirectTable(blobRedirectTable);
+		// }
 
 		// We can finalize any allocated IDs since we're the only client
 		const idRange = this._idCompressor?.takeNextCreationRange();
@@ -3507,8 +3529,8 @@ export class ContainerRuntime
 		const dsGCData = await this.summarizerNode.getGCData(fullGC);
 		builder.addNodes(dsGCData.gcNodes);
 
-		const blobsGCData = this.blobManager.getGCData(fullGC);
-		builder.addNodes(blobsGCData.gcNodes);
+		// const blobsGCData = this.blobManager.getGCData(fullGC);
+		// builder.addNodes(blobsGCData.gcNodes);
 		return builder.getGCData();
 	}
 
@@ -3533,12 +3555,11 @@ export class ContainerRuntime
 	 * @returns The routes of nodes that were deleted.
 	 */
 	public deleteSweepReadyNodes(sweepReadyRoutes: readonly string[]): readonly string[] {
-		const { dataStoreRoutes, blobManagerRoutes } =
-			this.getDataStoreAndBlobManagerRoutes(sweepReadyRoutes);
+		const { dataStoreRoutes } = this.getDataStoreAndBlobManagerRoutes(sweepReadyRoutes);
 
 		return [
 			...this.channelCollection.deleteSweepReadyNodes(dataStoreRoutes),
-			...this.blobManager.deleteSweepReadyNodes(blobManagerRoutes),
+			// ...this.blobManager.deleteSweepReadyNodes(blobManagerRoutes),
 		];
 	}
 
@@ -4165,7 +4186,18 @@ export class ContainerRuntime
 		signal?: AbortSignal,
 	): Promise<IFluidHandleInternal<ArrayBufferLike>> {
 		this.verifyNotClosed();
-		return this.blobManager.createBlob(blob, signal);
+
+		const { localId, attach } = this.blobManager2.createDetachedBlob(blob);
+		return new BlobHandle(
+			getGCNodePathFromBlobId(localId),
+			this.handleContext,
+			async () => blob,
+			false, // attached
+			() => {
+				attach().catch(console.error);
+			},
+		);
+		// return this.blobManager.createBlob(blob, signal);
 	}
 
 	private submitIdAllocationOpIfNeeded(resubmitOutstandingRanges: boolean): void {
@@ -4410,7 +4442,17 @@ export class ContainerRuntime
 				break;
 			}
 			case ContainerMessageType.BlobAttach: {
-				this.blobManager.reSubmit(opMetadata);
+				const { localId, blobId } = opMetadata as { localId: string; blobId: string };
+				if (!this.disposed) {
+					this.submit(
+						{ type: ContainerMessageType.BlobAttach, contents: undefined },
+						undefined,
+						{
+							localId,
+							blobId,
+						},
+					);
+				}
 				break;
 			}
 			case ContainerMessageType.Rejoin: {
@@ -4646,18 +4688,22 @@ export class ContainerRuntime
 		// to close current batch.
 		this.flush();
 
-		return props?.notifyImminentClosure === true
-			? PerformanceEvent.timedExecAsync(this.mc.logger, perfEvent, async (event) =>
-					logAndReturnPendingState(
-						event,
-						getSyncState(
-							await this.blobManager.attachAndGetPendingBlobs(props?.stopBlobAttachingSignal),
-						),
-					),
-				)
-			: PerformanceEvent.timedExec(this.mc.logger, perfEvent, (event) =>
-					logAndReturnPendingState(event, getSyncState()),
-				);
+		// return props?.notifyImminentClosure === true
+		// 	? PerformanceEvent.timedExecAsync(this.mc.logger, perfEvent, async (event) =>
+		// 			logAndReturnPendingState(
+		// 				event,
+		// 				getSyncState(
+		// 					await this.blobManager.attachAndGetPendingBlobs(props?.stopBlobAttachingSignal),
+		// 				),
+		// 			),
+		// 		)
+		// 	: PerformanceEvent.timedExec(this.mc.logger, perfEvent, (event) =>
+		// 			logAndReturnPendingState(event, getSyncState()),
+		// 		);
+
+		return PerformanceEvent.timedExec(this.mc.logger, perfEvent, (event) =>
+			logAndReturnPendingState(event, getSyncState()),
+		);
 	}
 
 	public summarizeOnDemand(options: IOnDemandSummarizeOptions): ISummarizeResults {

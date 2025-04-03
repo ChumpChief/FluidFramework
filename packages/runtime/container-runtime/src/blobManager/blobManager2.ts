@@ -227,7 +227,12 @@ export class BlobManager2 {
 		return this.documentStorageService.readBlob(storageId);
 	};
 
-	public readonly createDetachedBlob = (blob: ArrayBufferLike): (() => Promise<void>) => {
+	public readonly createDetachedBlob = (
+		blob: ArrayBufferLike,
+	): {
+		localId: string;
+		attach: () => Promise<void>;
+	} => {
 		const localId = uuid();
 		const detachedBlobRecord: IDetachedBlobRecord = {
 			state: "detached",
@@ -235,7 +240,10 @@ export class BlobManager2 {
 			blob,
 		};
 		this.localBlobCache.set(localId, detachedBlobRecord);
-		return async () => this.uploadAndAttachBlob(localId);
+		return {
+			localId,
+			attach: async () => this.uploadAndAttachBlob(localId),
+		};
 	};
 
 	private readonly uploadAndAttachBlob = async (localId: string): Promise<void> => {
@@ -287,6 +295,10 @@ export class BlobManager2 {
 			this.localBlobCache.set(localId, attachedBlobRecord);
 		}
 		this.internalEvents.emit("blobAttached", localId, storageId);
+	};
+
+	public readonly summarize = (): ISummaryTreeWithStats => {
+		return summarizeBlobManagerState(this.redirectTable, AttachState.Attached);
 	};
 }
 
@@ -1159,7 +1171,7 @@ export class BlobManager {
  * This path must match the path of the blob handle returned by the createBlob API because blobs are marked
  * referenced by storing these handles in a referenced DDS.
  */
-const getGCNodePathFromBlobId = (blobId: string): string =>
+export const getGCNodePathFromBlobId = (blobId: string): string =>
 	`/${blobManagerBasePath}/${blobId}`;
 
 /**
