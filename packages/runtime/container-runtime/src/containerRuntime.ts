@@ -140,6 +140,7 @@ import {
 	IPendingBlobs,
 	blobManagerBasePath,
 	blobsTreeName,
+	getBlobIdFromGCNodePath,
 	getGCNodePathFromBlobId,
 	isBlobPath,
 	loadBlobManagerLoadInfo,
@@ -2273,21 +2274,13 @@ export class ContainerRuntime
 			}
 
 			if (id === blobManagerBasePath && requestParser.isLeaf(2)) {
-				// if (
-				// 	!this.blobManager.hasBlob(requestParser.pathParts[1]) &&
-				// 	requestParser.headers?.[RuntimeHeaders.wait] === false
-				// ) {
-				// 	return create404Response(request);
-				// }
-
-				// const blob = await this.blobManager.getBlob(
-				// 	requestParser.pathParts[1],
-				// 	requestParser.headers?.[RuntimeHeaders.metadata] as
-				// 		| Readonly<Record<string, string | number | boolean>>
-				// 		| undefined,
-				// );
-
-				const blob = await this.blobManager2.getBlob(requestParser.pathParts[1]);
+				const localId = requestParser.pathParts[1];
+				this.garbageCollector.nodeUpdated({
+					node: { type: "Blob", path: getGCNodePathFromBlobId(localId) },
+					reason: "Loaded",
+					timestampMs: this.getCurrentReferenceTimestampMs(),
+				});
+				const blob = await this.blobManager2.getBlob(localId);
 
 				return {
 					status: 200,
@@ -3571,11 +3564,17 @@ export class ContainerRuntime
 	 * @returns The routes of nodes that were deleted.
 	 */
 	public deleteSweepReadyNodes(sweepReadyRoutes: readonly string[]): readonly string[] {
-		const { dataStoreRoutes } = this.getDataStoreAndBlobManagerRoutes(sweepReadyRoutes);
+		const { blobManagerRoutes, dataStoreRoutes } =
+			this.getDataStoreAndBlobManagerRoutes(sweepReadyRoutes);
+
+		for (const route of blobManagerRoutes) {
+			const blobId = getBlobIdFromGCNodePath(route);
+			this.blobManager2.deleteBlob(blobId);
+		}
 
 		return [
 			...this.channelCollection.deleteSweepReadyNodes(dataStoreRoutes),
-			// ...this.blobManager.deleteSweepReadyNodes(blobManagerRoutes),
+			...blobManagerRoutes,
 		];
 	}
 
@@ -4210,6 +4209,8 @@ export class ContainerRuntime
 			async () => this.blobManager2.getBlob(localId),
 			false, // attached
 			() => {
+				// TODO: console.error isn't an appropriate error path here, but it's currently unhandled.
+				// Need to establish a real error handling path.
 				attach().catch(console.error);
 			},
 		);

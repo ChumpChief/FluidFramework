@@ -194,8 +194,8 @@ interface IBlobManager2InternalEvents extends IEvent {
 }
 
 export class BlobManager2 {
-	private readonly localBlobCache = new Map<string, LocalBlobRecord>();
 	private readonly redirectTable: Map<string, string>;
+	private readonly localBlobCache: Map<string, LocalBlobRecord>;
 	private readonly internalEvents = new TypedEventEmitter<IBlobManager2InternalEvents>();
 
 	public constructor(
@@ -203,8 +203,12 @@ export class BlobManager2 {
 		private readonly readBlob: (id: string) => Promise<ArrayBufferLike>,
 		redirectEntries: [string, string][],
 		private readonly sendBlobAttachOp: (localId: string, storageId: string) => void,
+		pendingState?: [string, LocalBlobRecord][] | undefined,
 	) {
 		this.redirectTable = new Map(redirectEntries);
+		this.localBlobCache = new Map(pendingState);
+		// TODO: here kick off resume of pending uploads/attaches.  Consider if we need to avoid resending
+		// an attach op if it might have already made it (i.e. wait for connected state)?
 	}
 
 	public readonly getBlob = async (localId: string): Promise<ArrayBufferLike> => {
@@ -296,9 +300,17 @@ export class BlobManager2 {
 		this.internalEvents.emit("blobAttached", localId, storageId);
 	};
 
+	public readonly deleteBlob = (localId: string): void => {
+		this.redirectTable.delete(localId);
+	};
+
 	public readonly summarize = (): ISummaryTreeWithStats => {
+		// TODO: will always act as if attached, don't want to think about attach state at this layer
 		return summarizeBlobManagerState(this.redirectTable, AttachState.Attached);
 	};
+
+	public readonly getPendingState = (): [string, LocalBlobRecord][] =>
+		[...this.localBlobCache].filter(([_, record]) => record.state !== "attached");
 }
 
 export interface IPendingBlobs {
@@ -1176,7 +1188,7 @@ export const getGCNodePathFromBlobId = (blobId: string): string =>
 /**
  * For a given GC node path, return the blobId. The node path is of the format `/<basePath>/<blobId>`.
  */
-const getBlobIdFromGCNodePath = (nodePath: string): string => {
+export const getBlobIdFromGCNodePath = (nodePath: string): string => {
 	const pathParts = nodePath.split("/");
 	assert(areBlobPathParts(pathParts), 0x5bd /* Invalid blob node path */);
 	return pathParts[2];
