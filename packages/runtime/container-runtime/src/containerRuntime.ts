@@ -1791,6 +1791,7 @@ export class ContainerRuntime
 			async (runtime: ChannelCollection) => provideEntryPoint,
 		);
 
+		// TODO: tidier wrapper
 		const pseudoDocumentStorageService = {
 			createBlob: async (file: ArrayBufferLike): Promise<string> => {
 				// We can't upload blobs until the container attaches or else we'll be writing into
@@ -2637,20 +2638,6 @@ export class ContainerRuntime
 			this.documentsSchemaController.onDisconnect();
 		}
 
-		// If there are stashed blobs in the pending state, we need to delay
-		// propagation of the "connected" event until we have uploaded them to
-		// ensure we don't submit ops referencing a blob that has not been uploaded
-		// const connecting = connected && !this._connected;
-		// if (connecting && this.blobManager.hasPendingStashedUploads()) {
-		// 	assert(
-		// 		!this.delayConnectClientId,
-		// 		0x791 /* Connect event delay must be canceled before subsequent connect event */,
-		// 	);
-		// 	assert(!!clientId, 0x792 /* Must have clientId when connecting */);
-		// 	this.delayConnectClientId = clientId;
-		// 	return;
-		// }
-
 		this.setConnectionStateCore(connected, clientId);
 	}
 
@@ -3072,7 +3059,6 @@ export class ContainerRuntime
 				break;
 			}
 			case ContainerMessageType.BlobAttach: {
-				// this.blobManager.processBlobAttachMessage(message, local);
 				const { localId, blobId } = message.metadata as { localId: string; blobId: string };
 				this.blobManager2.notifyBlobAttached(localId, blobId);
 				break;
@@ -3441,13 +3427,9 @@ export class ContainerRuntime
 	 * @param telemetryContext - summary data passed through the layers for telemetry purposes
 	 */
 	public createSummary(
-		blobRedirectTable?: Map<string, string>,
+		blobRedirectTable?: Map<string, string>, // TODO: unused now
 		telemetryContext?: ITelemetryContext,
 	): ISummaryTree {
-		// if (blobRedirectTable) {
-		// 	this.blobManager.setRedirectTable(blobRedirectTable);
-		// }
-
 		// We can finalize any allocated IDs since we're the only client
 		const idRange = this._idCompressor?.takeNextCreationRange();
 		if (idRange !== undefined) {
@@ -3628,7 +3610,7 @@ export class ContainerRuntime
 	 * @returns The routes of nodes that were deleted.
 	 */
 	public deleteSweepReadyNodes(sweepReadyRoutes: readonly string[]): readonly string[] {
-		const { blobManagerRoutes, dataStoreRoutes } =
+		const { dataStoreRoutes, blobManagerRoutes } =
 			this.getDataStoreAndBlobManagerRoutes(sweepReadyRoutes);
 
 		for (const route of blobManagerRoutes) {
@@ -4260,6 +4242,7 @@ export class ContainerRuntime
 		this.submit({ type, contents }, localOpMetadata);
 	}
 
+	// TODO: Support some abort flow
 	public async uploadBlob(
 		blob: ArrayBufferLike,
 		signal?: AbortSignal,
@@ -4278,7 +4261,6 @@ export class ContainerRuntime
 				attach().catch(console.error);
 			},
 		);
-		// return this.blobManager.createBlob(blob, signal);
 	}
 
 	private submitIdAllocationOpIfNeeded(resubmitOutstandingRanges: boolean): void {
@@ -4741,6 +4723,8 @@ export class ContainerRuntime
 				props?.sessionExpiryTimerStarted ?? this.garbageCollector.sessionExpiryTimerStarted;
 
 			const pendingIdCompressorState = this._idCompressor?.serialize(true);
+			// TODO: Can now get the pending blobs synchronously
+			// const pendingBlobs = this.blobManager2.getPendingState();
 
 			return {
 				pending,
@@ -4768,19 +4752,6 @@ export class ContainerRuntime
 		// getPendingLocalState() is only exposed through Container.closeAndGetPendingLocalState(), so it's safe
 		// to close current batch.
 		this.flush();
-
-		// return props?.notifyImminentClosure === true
-		// 	? PerformanceEvent.timedExecAsync(this.mc.logger, perfEvent, async (event) =>
-		// 			logAndReturnPendingState(
-		// 				event,
-		// 				getSyncState(
-		// 					await this.blobManager.attachAndGetPendingBlobs(props?.stopBlobAttachingSignal),
-		// 				),
-		// 			),
-		// 		)
-		// 	: PerformanceEvent.timedExec(this.mc.logger, perfEvent, (event) =>
-		// 			logAndReturnPendingState(event, getSyncState()),
-		// 		);
 
 		return PerformanceEvent.timedExec(this.mc.logger, perfEvent, (event) =>
 			logAndReturnPendingState(event, getSyncState()),
