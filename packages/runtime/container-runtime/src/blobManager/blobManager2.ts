@@ -183,6 +183,7 @@ interface IAttachedBlobRecord {
 	readonly storageId: string;
 }
 
+// TODO: Maybe overkill for tracking, also maybe don't need localId as a member of each entry
 type LocalBlobRecord =
 	| IDetachedBlobRecord
 	| IUploadingBlobRecord
@@ -193,6 +194,7 @@ interface IBlobManager2InternalEvents extends IEvent {
 	(event: "blobAttached", listener: (localId: string, storageId: string) => void);
 }
 
+// TODO: telemetry, fix tests
 export class BlobManager2 {
 	private readonly redirectTable: Map<string, string>;
 	private readonly localBlobCache: Map<string, LocalBlobRecord>;
@@ -251,9 +253,10 @@ export class BlobManager2 {
 		};
 	};
 
+	// TODO: retry logic, respect ttl, prevent multiple calling
 	private readonly uploadAndAttachBlob = async (localId: string): Promise<void> => {
 		const detachedBlobRecord = this.localBlobCache.get(localId);
-		// TODO handle deduping?  Assert if not detached state?
+		// TODO: assert if not detached state?
 		if (detachedBlobRecord?.state !== "detached") {
 			throw new Error("Trying to attach when not allowed");
 		}
@@ -303,6 +306,8 @@ export class BlobManager2 {
 	public readonly deleteBlob = (localId: string): void => {
 		this.redirectTable.delete(localId);
 	};
+
+	public readonly knownBlobIds = (): string[] => [...this.redirectTable.keys()];
 
 	public readonly summarize = (): ISummaryTreeWithStats => {
 		// TODO: will always act as if attached, don't want to think about attach state at this layer

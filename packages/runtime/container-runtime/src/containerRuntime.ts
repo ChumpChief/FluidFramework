@@ -3538,8 +3538,13 @@ export class ContainerRuntime
 		const dsGCData = await this.summarizerNode.getGCData(fullGC);
 		builder.addNodes(dsGCData.gcNodes);
 
-		// const blobsGCData = this.blobManager.getGCData(fullGC);
-		// builder.addNodes(blobsGCData.gcNodes);
+		const blobsGCData: IGarbageCollectionData = { gcNodes: {} };
+		const knownBlobIds = this.blobManager2.knownBlobIds();
+		for (const localId of knownBlobIds) {
+			blobsGCData.gcNodes[getGCNodePathFromBlobId(localId)] = [];
+		}
+
+		builder.addNodes(blobsGCData.gcNodes);
 		return builder.getGCData();
 	}
 
