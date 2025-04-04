@@ -37,6 +37,7 @@ import type {
 import type {
 	IFluidHandleContext,
 	IFluidHandleInternal,
+	IFluidHandleInternalWithMetadata,
 	IProvideFluidHandleContext,
 	ISignalEnvelope,
 } from "@fluidframework/core-interfaces/internal";
@@ -96,6 +97,7 @@ import {
 	gcTreeKey,
 } from "@fluidframework/runtime-definitions/internal";
 import {
+	FluidHandleBase,
 	GCDataBuilder,
 	RequestParser,
 	TelemetryContext,
@@ -104,6 +106,7 @@ import {
 	calculateStats,
 	create404Response,
 	exceptionToResponse,
+	generateHandleContextPath,
 	seqFromTree,
 } from "@fluidframework/runtime-utils/internal";
 import type {
@@ -135,14 +138,10 @@ import { v4 as uuid } from "uuid";
 
 import { BindBatchTracker } from "./batchTracker.js";
 import {
-	BlobHandle,
 	BlobManager2,
 	IPendingBlobs,
 	blobManagerBasePath,
 	blobsTreeName,
-	getBlobIdFromGCNodePath,
-	getGCNodePathFromBlobId,
-	isBlobPath,
 	loadBlobManagerLoadInfo,
 	type IBlobManagerLoadInfo,
 } from "./blobManager/index.js";
@@ -650,6 +649,102 @@ export let getSingleUseLegacyLogCallback = (logger: ITelemetryLoggerExt, type: s
 		getSingleUseLegacyLogCallback = () => () => {};
 	};
 };
+
+/**
+ * For a blobId, returns its path in GC's graph. The node path is of the format `/<blobManagerBasePath>/<blobId>`.
+ * This path must match the path of the blob handle returned by the createBlob API because blobs are marked
+ * referenced by storing these handles in a referenced DDS.
+ */
+const getGCNodePathFromBlobId = (blobId: string): string =>
+	`/${blobManagerBasePath}/${blobId}`;
+
+/**
+ * For a given GC node path, return the blobId. The node path is of the format `/<basePath>/<blobId>`.
+ */
+const getBlobIdFromGCNodePath = (nodePath: string): string => {
+	const pathParts = nodePath.split("/");
+	assert(areBlobPathParts(pathParts), 0x5bd /* Invalid blob node path */);
+	return pathParts[2];
+};
+
+/**
+ * Returns whether a given path is for attachment blobs that are in the format - "/blobManagerBasePath/...".
+ */
+const isBlobPath = (path: string): path is `/${typeof blobManagerBasePath}/${string}` =>
+	areBlobPathParts(path.split("/"));
+
+const areBlobPathParts = (
+	pathParts: string[],
+): pathParts is ["", typeof blobManagerBasePath, string] =>
+	pathParts.length === 3 && pathParts[1] === blobManagerBasePath;
+
+/**
+ * The BlobManager produces BlobHandles during operation. In older versions of Fluid, these
+ * handles were assumed to only exist if their respective blob was attached and available to
+ * remote clients - these handles are NOT annotated with metadata. Now, the handle may exist
+ * prior to remote availability while the source client completes the upload/attach of the
+ * blob - these handles ARE annotated with metadata.
+ */
+interface IBlobManagerHandleMetadata {
+	/**
+	 * Notes that this is a blob handle, and also signifies that it was created after the change
+	 * to permit the handle's existence before the blob attach completes.
+	 */
+	readonly type: "blob";
+	/**
+	 * If present, we expect this handle's blob to already be blob-attached (the BlobAttach op
+	 * has been ack'd and we should be able to find it in the redirect table). Used in the
+	 * createBlobLegacy() flow.
+	 */
+	readonly attached?: true;
+}
+
+/**
+ * This class represents blob (long string)
+ * This object is used only when creating (writing) new blob and serialization purposes.
+ * De-serialization process goes through FluidObjectHandle and request flow:
+ * DataObject.request() recognizes requests in the form of `/blobs/<id>`
+ * and loads blob.
+ */
+class BlobHandle
+	extends FluidHandleBase<ArrayBufferLike>
+	implements IFluidHandleInternalWithMetadata<ArrayBufferLike>
+{
+	private attached: boolean = false;
+
+	public get isAttached(): boolean {
+		return this.routeContext.isAttached && this.attached;
+	}
+
+	public readonly absolutePath: string;
+
+	public readonly metadata: Readonly<Record<string, string | number | boolean>>;
+
+	constructor(
+		public readonly path: string,
+		public readonly routeContext: IFluidHandleContext,
+		public get: () => Promise<ArrayBufferLike>,
+		attached: boolean,
+		private readonly onAttachGraph?: () => void,
+	) {
+		super();
+		this.metadata = (
+			attached ? { type: "blob", attached } : { type: "blob" }
+		) satisfies IBlobManagerHandleMetadata;
+		this.absolutePath = generateHandleContextPath(path, this.routeContext);
+	}
+
+	public attachGraph(): void {
+		if (!this.attached) {
+			this.attached = true;
+			this.onAttachGraph?.();
+		}
+	}
+
+	public bind(handle: IFluidHandleInternal): void {
+		throw new Error("Cannot bind to blob handle");
+	}
+}
 
 /**
  * This object holds the parameters necessary for the {@link loadContainerRuntime} function.
