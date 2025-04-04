@@ -1111,17 +1111,6 @@ export class ContainerRuntime
 			recentBatchInfo,
 		);
 
-		// runtime.blobManager.stashedBlobsUploadP.then(
-		// 	() => {
-		// 		// make sure we didn't reconnect before the promise resolved
-		// 		if (runtime.delayConnectClientId !== undefined && !runtime.disposed) {
-		// 			runtime.delayConnectClientId = undefined;
-		// 			runtime.setConnectionStateCore(true, runtime.delayConnectClientId);
-		// 		}
-		// 	},
-		// 	(error: IErrorBase) => runtime.closeFn(error),
-		// );
-
 		// Apply stashed ops with a reference sequence number equal to the sequence number of the snapshot,
 		// or zero. This must be done before Container replays saved ops.
 		await runtime.pendingStateManager.applyStashedOpsAt(runtimeSequenceNumber ?? 0);
@@ -1802,33 +1791,6 @@ export class ContainerRuntime
 			async (runtime: ChannelCollection) => provideEntryPoint,
 		);
 
-		// this.blobManager = new BlobManager({
-		// 	routeContext: this.handleContext,
-		// 	blobManagerLoadInfo,
-		// 	storage: this.storage,
-		// 	sendBlobAttachOp: (localId: string, blobId?: string) => {
-		// 		if (!this.disposed) {
-		// 			this.submit(
-		// 				{ type: ContainerMessageType.BlobAttach, contents: undefined },
-		// 				undefined,
-		// 				{
-		// 					localId,
-		// 					blobId,
-		// 				},
-		// 			);
-		// 		}
-		// 	},
-		// 	blobRequested: (blobPath: string) =>
-		// 		this.garbageCollector.nodeUpdated({
-		// 			node: { type: "Blob", path: blobPath },
-		// 			reason: "Loaded",
-		// 			timestampMs: this.getCurrentReferenceTimestampMs(),
-		// 		}),
-		// 	isBlobDeleted: (blobPath: string) => this.garbageCollector.isNodeDeleted(blobPath),
-		// 	runtime: this,
-		// 	stashedBlobs: pendingRuntimeState?.pendingAttachmentBlobs,
-		// });
-
 		const pseudoDocumentStorageService = {
 			createBlob: async (file: ArrayBufferLike): Promise<string> => {
 				// We can't upload blobs until the container attaches or else we'll be writing into
@@ -1860,6 +1822,8 @@ export class ContainerRuntime
 					);
 				}
 			},
+			// TODO: The type of pending blobs changes
+			// pendingRuntimeState?.pendingAttachmentBlobs
 		);
 
 		this.deltaScheduler = new DeltaScheduler(
