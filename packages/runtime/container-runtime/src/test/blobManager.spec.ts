@@ -391,8 +391,7 @@ for (const createBlobPayloadPending of [false, true]) {
 		});
 
 		afterEach(async () => {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- Accessing private property
-			assert.strictEqual((runtime.blobManager as any).pendingBlobs.size, 0);
+			assert(!runtime.blobManager.hasPendingBlobs);
 			injectedSettings = {};
 			mockLogger.clear();
 		});
@@ -430,29 +429,15 @@ for (const createBlobPayloadPending of [false, true]) {
 			assert.strictEqual(summaryData.redirectTable?.length, 2);
 		});
 
-		it("NoPendingBlobs count", async () => {
-			await runtime.attach();
-			await runtime.connect();
-			let count = 0;
-			runtime.blobManager.events.on("noPendingBlobs", () => count++);
-
-			await createBlob(IsoBuffer.from("blob", "utf8"));
-			await runtime.processAll();
-			assert.strictEqual(count, 1);
-			await createBlob(IsoBuffer.from("blob2", "utf8"));
-			await createBlob(IsoBuffer.from("blob3", "utf8"));
-			await runtime.processAll();
-			assert.strictEqual(count, 2);
-			const summaryData = validateSummary(runtime);
-			assert.strictEqual(summaryData.ids.length, 3);
-			assert.strictEqual(summaryData.redirectTable?.length, 3);
-		});
-
 		it("detached snapshot", async () => {
 			assert.strictEqual(runtime.blobManager.hasPendingBlobs, false);
 			await createBlob(IsoBuffer.from("blob", "utf8"));
 			await runtime.processAll();
-			assert.strictEqual(runtime.blobManager.hasPendingBlobs, true);
+			// From the BlobManager's perspective, blobs "uploaded" while detached are not
+			// pending - they are "fully uploaded" to the detached storage.  The reupload
+			// process is external to the BlobManager's bookkeeping, and is later reconciled
+			// via setRedirectTable.
+			assert.strictEqual(runtime.blobManager.hasPendingBlobs, false);
 
 			const summaryData = validateSummary(runtime);
 			assert.strictEqual(summaryData.ids.length, 1);
@@ -462,7 +447,7 @@ for (const createBlobPayloadPending of [false, true]) {
 		it("detached->attached snapshot", async () => {
 			await createBlob(IsoBuffer.from("blob", "utf8"));
 			await runtime.processAll();
-			assert.strictEqual(runtime.blobManager.hasPendingBlobs, true);
+			assert.strictEqual(runtime.blobManager.hasPendingBlobs, false);
 			await runtime.attach();
 			assert.strictEqual(runtime.blobManager.hasPendingBlobs, false);
 			const summaryData = validateSummary(runtime);

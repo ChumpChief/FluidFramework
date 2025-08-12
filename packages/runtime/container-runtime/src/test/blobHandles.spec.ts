@@ -106,8 +106,8 @@ describe("BlobHandles", () => {
 		// getting blob handle before attaching from the pending blob list
 		assert.strictEqual(bufferToString(await blobHandle.get(), "utf8"), "content");
 		blobHandle.attachGraph();
-		// getting blob handle after attaching from storage
-		assert.strictEqual(bufferToString(await blobHandle.get(), "utf8"), "contentFromStorage");
+		// Even after attaching, we read the locally cached copy (not getting contentFromStorage)
+		assert.strictEqual(bufferToString(await blobHandle.get(), "utf8"), "content");
 	});
 
 	it("Reupload expired blob", async () => {
