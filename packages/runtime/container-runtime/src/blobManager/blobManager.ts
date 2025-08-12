@@ -128,7 +128,7 @@ export class BlobHandle
 // the contract explicit and reduces the amount of mocking required for tests.
 export type IBlobManagerRuntime = Pick<
 	IContainerRuntime,
-	"attachState" | "connected" | "baseLogger" | "clientDetails" | "disposed"
+	"attachState" | "baseLogger" | "disposed"
 > &
 	IEventProvider<IContainerRuntimeEvents>;
 
