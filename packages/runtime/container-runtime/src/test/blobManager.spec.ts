@@ -101,7 +101,7 @@ export class MockRuntime
 			routeContext: undefined as unknown as IFluidHandleContext,
 			blobManagerLoadInfo,
 			storage: this.getStorage(),
-			sendBlobAttachOp: (localId: string, blobId?: string) =>
+			sendBlobAttachOp: (localId: string, blobId: string) =>
 				this.sendBlobAttachOp(localId, blobId),
 			blobRequested: () => undefined,
 			isBlobDeleted: (blobPath: string) => this.isBlobDeleted(blobPath),
@@ -338,7 +338,7 @@ export const validateSummary = (
 const textBlob = (text: string): ArrayBufferLike => {
 	const encoder = new TextEncoder();
 	// Casting because TS is mad about the toString tag being different for SharedArrayBuffer
-	return encoder.encode(text) as unknown as ArrayBufferLike;
+	return encoder.encode(text).buffer;
 };
 
 for (const createBlobPayloadPending of [false, true]) {
