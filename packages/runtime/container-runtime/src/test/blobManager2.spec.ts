@@ -29,13 +29,13 @@ import {
 	toFluidHandleInternal,
 } from "@fluidframework/runtime-utils/internal";
 import { MockLogger } from "@fluidframework/telemetry-utils/internal";
+import { v4 as uuid } from "uuid";
 
 import {
 	BlobManager,
 	type IBlobManagerRuntime,
 	redirectTableBlobName,
 } from "../blobManager/index.js";
-import type { IBlobMetadata } from "../metadata.js";
 
 const MIN_TTL = 24 * 60 * 60; // same as ODSP
 
@@ -155,20 +155,46 @@ class MockStorageAdapter implements Pick<IContainerStorageService, "createBlob" 
 }
 
 interface MockOrderingServiceEvents {
-	opSent: () => void;
+	op: (op: ISequencedMessageEnvelope) => void;
 }
 
 class MockOrderingService {
-	public readonly unprocessedOps: IBlobMetadata[] = [];
+	public readonly unprocessedOps: ISequencedMessageEnvelope[] = [];
 	public readonly events = createEmitter<MockOrderingServiceEvents>();
-	public readonly takeNextUnprocessedOp = () => {
-		const next = this.unprocessedOps.shift();
-		assert(next !== undefined, "Tried processing, but none to process");
-		return { metadata: next };
+	public messagesReceived = 0;
+
+	private _paused: boolean = false;
+	public pause = () => {
+		this._paused = true;
 	};
-	public readonly sendBlobAttachOp = (localId: string, remoteId: string) => {
-		this.unprocessedOps.push({ localId, blobId: remoteId });
-		this.events.emit("opSent");
+
+	public unpause = () => {
+		this._paused = false;
+		this.processAll();
+	};
+
+	public readonly processOne = () => {
+		const op = this.unprocessedOps.shift();
+		assert(op !== undefined, "Tried processing, but none to process");
+		this.events.emit("op", op);
+	};
+
+	public readonly processAll = () => {
+		while (this.unprocessedOps.length > 0) {
+			this.processOne();
+		}
+	};
+
+	public readonly sendBlobAttachOp = (clientId, localId: string, remoteId: string) => {
+		// BlobManager only checks the metadata, so this cast is good enough.
+		this.unprocessedOps.push({
+			clientId,
+			metadata: { localId, blobId: remoteId },
+		} as ISequencedMessageEnvelope);
+		this.messagesReceived++;
+		if (!this._paused) {
+			this.processAll();
+		}
 	};
 }
 
@@ -291,16 +317,22 @@ for (const createBlobPayloadPending of [false, true]) {
 			mockLogger = new MockLogger();
 			mockRuntime = new MockRuntime(mockLogger);
 
+			const clientId = uuid();
 			blobManager = new BlobManager({
 				routeContext: undefined as unknown as IFluidHandleContext,
 				blobManagerLoadInfo: {},
 				storage: mockBlobStorage,
-				sendBlobAttachOp: mockOrderingService.sendBlobAttachOp,
+				sendBlobAttachOp: (localId: string, storageId: string) =>
+					mockOrderingService.sendBlobAttachOp(clientId, localId, storageId),
 				blobRequested: () => undefined,
 				isBlobDeleted: mockGarbageCollector.isBlobDeleted,
 				runtime: mockRuntime,
 				stashedBlobs: undefined,
 				createBlobPayloadPending,
+			});
+
+			mockOrderingService.events.on("op", (op: ISequencedMessageEnvelope) => {
+				blobManager.processBlobAttachMessage(op, op.clientId === clientId);
 			});
 		});
 
@@ -323,6 +355,11 @@ for (const createBlobPayloadPending of [false, true]) {
 				assert.strictEqual(blobToText(blobFromManager), "hello", "Blob content mismatch");
 				const blobFromHandle = await handle.get();
 				assert.strictEqual(blobToText(blobFromHandle), "hello", "Blob content mismatch");
+				assert.strictEqual(
+					mockOrderingService.messagesReceived,
+					0,
+					"Should not try to send messages in detached state",
+				);
 			});
 		});
 
@@ -370,15 +407,6 @@ for (const createBlobPayloadPending of [false, true]) {
 				});
 
 				it("Can create a blob and retrieve it", async () => {
-					if (!createBlobPayloadPending) {
-						// In the non-payloadPending case, createBlob won't return a handle until it processes
-						// the blob attach op ack. Set up processing here to unstick it.
-						mockOrderingService.events.on("opSent", () => {
-							const op =
-								mockOrderingService.takeNextUnprocessedOp() as ISequencedMessageEnvelope;
-							blobManager.processBlobAttachMessage(op, true);
-						});
-					}
 					const handle = await blobManager.createBlob(textToBlob("hello"));
 					const { localId } = unpackHandle(handle);
 					assert(blobManager.hasBlob(localId));
