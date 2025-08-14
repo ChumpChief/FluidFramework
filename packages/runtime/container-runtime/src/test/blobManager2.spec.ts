@@ -567,6 +567,53 @@ for (const createBlobPayloadPending of [false, true]) {
 					}
 					assert(isFluidHandlePayloadPending(handle));
 					assert.strictEqual(handle.payloadState, "shared", "Payload should be shared");
+
+					const { attachments, redirectTable } =
+						getSummaryContentsWithFormatValidation(blobManager);
+					assert.strictEqual(attachments?.length, 1);
+					assert.strictEqual(redirectTable?.length, 1);
+				});
+
+				it("Can complete blob attach with multiple resubmits", async () => {
+					mockOrderingService.pause();
+					// Generate the original message
+					const handle1P = blobManager.createBlob(textToBlob("hello"));
+					if (createBlobPayloadPending) {
+						const _handle = await handle1P;
+						_handle.attachGraph();
+					}
+					// Drop the original message for handle1
+					await mockOrderingService.waitDropOne();
+
+					const handle2P = blobManager.createBlob(textToBlob("world"));
+					if (createBlobPayloadPending) {
+						const _handle = await handle2P;
+						_handle.attachGraph();
+					}
+
+					// Drop the resubmitted message for handle1
+					await mockOrderingService.waitDropOne();
+					// Drop the original message for handle2
+					await mockOrderingService.waitDropOne();
+					// Sequence the doubly-resubmitted message for handle1
+					await mockOrderingService.waitSequenceOne();
+					// Sequence the resubmitted message for handle2
+					await mockOrderingService.waitSequenceOne();
+
+					const handle1 = await handle1P;
+					const handle2 = await handle2P;
+					if (createBlobPayloadPending) {
+						await ensureBlobsAttached([handle1, handle2]);
+					}
+					assert(isFluidHandlePayloadPending(handle1));
+					assert(isFluidHandlePayloadPending(handle2));
+					assert.strictEqual(handle1.payloadState, "shared", "Payload should be shared");
+					assert.strictEqual(handle2.payloadState, "shared", "Payload should be shared");
+
+					const { attachments, redirectTable } =
+						getSummaryContentsWithFormatValidation(blobManager);
+					assert.strictEqual(attachments?.length, 2);
+					assert.strictEqual(redirectTable?.length, 2);
 				});
 			});
 			describe("Failure", () => {});
