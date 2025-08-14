@@ -37,6 +37,7 @@ import {
 	type IBlobManagerRuntime,
 	redirectTableBlobName,
 } from "../blobManager/index.js";
+import type { IBlobMetadata } from "../metadata.js";
 
 const MIN_TTL = 24 * 60 * 60; // same as ODSP
 
@@ -155,12 +156,19 @@ class MockStorageAdapter implements Pick<IContainerStorageService, "createBlob" 
 	public readonly readBlob = async (id: string) => this.getCurrentStorage().readBlob(id);
 }
 
+interface UnprocessedOp {
+	clientId: string;
+	metadata: IBlobMetadata;
+}
+
 interface MockOrderingServiceEvents {
-	op: (op: ISequencedMessageEnvelope) => void;
+	opDropped: (op: UnprocessedOp) => void;
+	opReceived: (op: UnprocessedOp) => void;
+	opSequenced: (op: ISequencedMessageEnvelope) => void;
 }
 
 class MockOrderingService {
-	public readonly unprocessedOps: ISequencedMessageEnvelope[] = [];
+	public readonly unprocessedOps: UnprocessedOp[] = [];
 	public readonly events = createEmitter<MockOrderingServiceEvents>();
 	public messagesReceived = 0;
 
@@ -171,31 +179,79 @@ class MockOrderingService {
 
 	public unpause = () => {
 		this._paused = false;
-		this.processAll();
+		this.sequenceAll();
 	};
 
-	public readonly processOne = () => {
+	private readonly waitOpAvailable = async (): Promise<void> => {
+		if (this.unprocessedOps.length === 0) {
+			return new Promise<void>((resolve) => {
+				const onOpReceived = (op: UnprocessedOp) => {
+					resolve();
+					this.events.off("opReceived", onOpReceived);
+				};
+				this.events.on("opReceived", onOpReceived);
+			});
+		}
+	};
+
+	public readonly sequenceOne = () => {
 		const op = this.unprocessedOps.shift();
-		assert(op !== undefined, "Tried processing, but none to process");
-		this.events.emit("op", op);
+		assert(op !== undefined, "Tried sequencing, but none to sequence");
+		// BlobManager only checks the metadata, so this cast is good enough.
+		this.events.emit("opSequenced", op as ISequencedMessageEnvelope);
 	};
 
-	public readonly processAll = () => {
+	public readonly waitSequenceOne = async () => {
+		assert(
+			this._paused,
+			"waitSequenceOne is only available in paused mode to avoid conflicting with normal sequencing",
+		);
+		await this.waitOpAvailable();
+		this.sequenceOne();
+	};
+
+	// Sequence all unprocessed ops. The events emitted can be used to drive normal processing scenarios.
+	public readonly sequenceAll = () => {
 		while (this.unprocessedOps.length > 0) {
-			this.processOne();
+			this.sequenceOne();
+		}
+	};
+
+	public readonly dropOne = () => {
+		const op = this.unprocessedOps.shift();
+		assert(op !== undefined, "Tried dropping, but none to drop");
+		this.events.emit("opDropped", op);
+	};
+
+	public readonly waitDropOne = async () => {
+		assert(
+			this._paused,
+			"waitDropOne is only available in paused mode to avoid conflicting with normal sequencing",
+		);
+		await this.waitOpAvailable();
+		this.dropOne();
+	};
+
+	// Drop all unprocessed ops. The events emitted can be used to drive resubmit scenarios.
+	public readonly dropAll = () => {
+		// Only drop the current unprocessed ops, since this will trigger resubmit and we don't
+		// necessarily want to drop those too.
+		const numberToDrop = this.unprocessedOps.length;
+		for (let i = 0; i < numberToDrop; i++) {
+			this.dropOne();
 		}
 	};
 
 	public readonly sendBlobAttachOp = (clientId: string, localId: string, remoteId: string) => {
-		// BlobManager only checks the metadata, so this cast is good enough.
-		// eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-		this.unprocessedOps.push({
+		const op: UnprocessedOp = {
 			clientId,
 			metadata: { localId, blobId: remoteId },
-		} as ISequencedMessageEnvelope);
+		};
+		this.unprocessedOps.push(op);
 		this.messagesReceived++;
+		this.events.emit("opReceived", op);
 		if (!this._paused) {
-			this.processAll();
+			this.sequenceAll();
 		}
 	};
 }
@@ -223,6 +279,9 @@ class MockRuntime
 		if (this._attachState === AttachState.Attached) {
 			this.emit("attached");
 		}
+	}
+	public get isAttached() {
+		return this._attachState === AttachState.Attached;
 	}
 	public disposed: boolean = false;
 	public constructor(public readonly baseLogger: ITelemetryBaseLogger) {
@@ -268,7 +327,10 @@ const waitHandlePayloadShared = async (handle: IFluidHandle): Promise<void> => {
 const ensureBlobsAttached = async (handles: IFluidHandle[]) => {
 	return Promise.all(
 		handles.map(async (handle) => {
-			toFluidHandleInternal(handle).attachGraph();
+			const internalHandle = toFluidHandleInternal(handle);
+			if (!internalHandle.isAttached) {
+				internalHandle.attachGraph();
+			}
 			return waitHandlePayloadShared(handle);
 		}),
 	);
@@ -342,7 +404,9 @@ for (const createBlobPayloadPending of [false, true]) {
 
 			const clientId = uuid();
 			blobManager = new BlobManager({
-				routeContext: undefined as unknown as IFluidHandleContext,
+				// The routeContext is only needed by the BlobHandles to determine isAttached, so this
+				// cast is good enough
+				routeContext: mockRuntime as unknown as IFluidHandleContext,
 				blobManagerLoadInfo: {},
 				storage: mockBlobStorage,
 				sendBlobAttachOp: (localId: string, storageId: string) =>
@@ -354,8 +418,14 @@ for (const createBlobPayloadPending of [false, true]) {
 				createBlobPayloadPending,
 			});
 
-			mockOrderingService.events.on("op", (op: ISequencedMessageEnvelope) => {
+			mockOrderingService.events.on("opSequenced", (op: ISequencedMessageEnvelope) => {
 				blobManager.processBlobAttachMessage(op, op.clientId === clientId);
+			});
+
+			mockOrderingService.events.on("opDropped", (op: UnprocessedOp) => {
+				if (op.clientId === clientId) {
+					blobManager.reSubmit(op.metadata as unknown as Record<string, unknown>);
+				}
 			});
 		});
 
@@ -457,7 +527,28 @@ for (const createBlobPayloadPending of [false, true]) {
 			});
 			// TODO: beforeEach to create a whole second BlobManager?
 			describe("Blobs from remote clients", () => {});
-			describe("Disconnect/reconnect", () => {});
+			describe("Disconnect/reconnect", () => {
+				it("Can complete blob attach with resubmit", async () => {
+					mockOrderingService.pause();
+					// Generate the original message
+					const handleP = blobManager.createBlob(textToBlob("hello"));
+					if (createBlobPayloadPending) {
+						const _handle = await handleP;
+						_handle.attachGraph();
+					}
+					// Drop the original message
+					await mockOrderingService.waitDropOne();
+					// Sequence the resubmitted message
+					await mockOrderingService.waitSequenceOne();
+
+					const handle = await handleP;
+					if (createBlobPayloadPending) {
+						await ensureBlobsAttached([handle]);
+					}
+					assert(isFluidHandlePayloadPending(handle));
+					assert.strictEqual(handle.payloadState, "shared", "Payload should be shared");
+				});
+			});
 			describe("Failure", () => {});
 			describe("Abort", () => {});
 			describe("getPendingBlobs", () => {});
@@ -489,7 +580,7 @@ for (const createBlobPayloadPending of [false, true]) {
 					assert.strictEqual(redirectTable?.length, 3);
 				});
 
-				it("Deduping after attach", async () => {
+				it("Detached, deduping after attach", async () => {
 					await blobManager.createBlob(textToBlob("hello"));
 					await blobManager.createBlob(textToBlob("world"));
 					await blobManager.createBlob(textToBlob("world"));
@@ -518,7 +609,7 @@ for (const createBlobPayloadPending of [false, true]) {
 					assert.strictEqual(redirectTable?.length, 3);
 				});
 
-				it("Spanning attach", async () => {
+				it("Detached -> attached, deduping after attach", async () => {
 					await blobManager.createBlob(textToBlob("hello"));
 					await blobManager.createBlob(textToBlob("world"));
 					await blobManager.createBlob(textToBlob("world"));

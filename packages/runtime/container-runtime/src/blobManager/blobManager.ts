@@ -78,9 +78,9 @@ export class BlobHandle
 		return (this._events ??= createEmitter<ILocalFluidHandleEvents>());
 	}
 
-	private _state: PayloadState = "pending";
+	private _payloadState: PayloadState;
 	public get payloadState(): PayloadState {
-		return this._state;
+		return this._payloadState;
 	}
 
 	/**
@@ -103,11 +103,12 @@ export class BlobHandle
 		private readonly onAttachGraph?: () => void,
 	) {
 		super();
+		this._payloadState = payloadPending ? "pending" : "shared";
 		this.absolutePath = generateHandleContextPath(path, this.routeContext);
 	}
 
 	public readonly notifyShared = (): void => {
-		this._state = "shared";
+		this._payloadState = "shared";
 		this._events?.emit("payloadShared");
 	};
 
