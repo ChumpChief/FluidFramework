@@ -131,7 +131,7 @@ export class BlobHandle
 // the contract explicit and reduces the amount of mocking required for tests.
 export type IBlobManagerRuntime = Pick<
 	IContainerRuntime,
-	"attachState" | "connected" | "baseLogger" | "clientDetails" | "disposed"
+	"attachState" | "baseLogger" | "disposed"
 > &
 	IEventProvider<IContainerRuntimeEvents>;
 
@@ -808,7 +808,7 @@ export class BlobManager {
 	 * The provided table must have exactly the same set of pseudo storage IDs as are found in the redirect table.
 	 * @param detachedStorageTable - A map of pseudo storage IDs to real storage IDs.
 	 */
-	public setRedirectTable(detachedStorageTable: Map<string, string>): void {
+	public readonly setRedirectTable = (detachedStorageTable: Map<string, string>): void => {
 		assert(
 			this.runtime.attachState === AttachState.Detached,
 			0x252 /* "redirect table can only be set in detached container" */,
@@ -825,7 +825,7 @@ export class BlobManager {
 			assert(newStorageId !== undefined, "Couldn't find a matching storage ID");
 			this.redirectTable.set(localId, newStorageId);
 		}
-	}
+	};
 
 	/**
 	 * To be used in getPendingLocalState flow. Get a serializable record of the blobs that are
