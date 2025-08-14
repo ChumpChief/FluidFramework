@@ -499,6 +499,7 @@ for (const createBlobPayloadPending of [false, true]) {
 					);
 				});
 
+				// TODO: Separate test for the network-visible effects of blob creation?
 				it("Can create a blob and retrieve it", async () => {
 					const handle = await blobManager.createBlob(textToBlob("hello"));
 					const { localId } = unpackHandle(handle);
@@ -512,12 +513,31 @@ for (const createBlobPayloadPending of [false, true]) {
 					assert.strictEqual(blobToText(blobFromManager), "hello", "Blob content mismatch");
 					const blobFromHandle = await handle.get();
 					assert.strictEqual(blobToText(blobFromHandle), "hello", "Blob content mismatch");
-					// TODO: Move this to separate test about network-visible effects of the blob creation?
+
+					assert(isFluidHandlePayloadPending(handle));
 					// With payloadPending handles, we won't actually upload and send the attach op until the
 					// handle is attached.
 					if (createBlobPayloadPending) {
+						assert.strictEqual(
+							handle.payloadState,
+							"pending",
+							"Payload should be pending before handle attach",
+						);
+						let eventRaised = false;
+						const onPayloadShared = () => {
+							eventRaised = true;
+							handle.events.off("payloadShared", onPayloadShared);
+						};
+						handle.events.on("payloadShared", onPayloadShared);
 						await ensureBlobsAttached([handle]);
+						assert(eventRaised, "payloadShared event was not raised when expected");
 					}
+					assert.strictEqual(
+						handle.payloadState,
+						"shared",
+						"Payload should be in shared state",
+					);
+
 					assert.strictEqual(
 						mockOrderingService.messagesReceived,
 						1,
