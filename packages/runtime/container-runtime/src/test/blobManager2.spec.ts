@@ -18,12 +18,23 @@ import {
 } from "@fluidframework/container-definitions/internal";
 import { IContainerRuntimeEvents } from "@fluidframework/container-runtime-definitions/internal";
 import {
+	type IFluidHandle,
 	type IFluidHandleContext,
 	type ITelemetryBaseLogger,
 } from "@fluidframework/core-interfaces/internal";
+import { SummaryType } from "@fluidframework/driver-definitions";
+import type { ISequencedMessageEnvelope } from "@fluidframework/runtime-definitions/internal";
+import {
+	isFluidHandleInternalPayloadPending,
+	toFluidHandleInternal,
+} from "@fluidframework/runtime-utils/internal";
 import { MockLogger } from "@fluidframework/telemetry-utils/internal";
 
-import { BlobManager, IBlobManagerRuntime } from "../blobManager/index.js";
+import {
+	BlobManager,
+	type IBlobManagerRuntime,
+	redirectTableBlobName,
+} from "../blobManager/index.js";
 import type { IBlobMetadata } from "../metadata.js";
 
 const MIN_TTL = 24 * 60 * 60; // same as ODSP
@@ -105,8 +116,8 @@ class MockBlobStorage implements Pick<IContainerStorageService, "createBlob" | "
 }
 
 class MockStorageAdapter implements Pick<IContainerStorageService, "createBlob" | "readBlob"> {
-	private readonly detachedStorage = new MockBlobStorage(false);
-	private readonly attachedStorage = new MockBlobStorage(true);
+	public readonly detachedStorage = new MockBlobStorage(false);
+	public readonly attachedStorage = new MockBlobStorage(true);
 	public readonly pause = () => {
 		this.getCurrentStorage().pause();
 	};
@@ -143,15 +154,21 @@ class MockStorageAdapter implements Pick<IContainerStorageService, "createBlob" 
 	public readonly readBlob = async (id: string) => this.getCurrentStorage().readBlob(id);
 }
 
+interface MockOrderingServiceEvents {
+	opSent: () => void;
+}
+
 class MockOrderingService {
 	public readonly unprocessedOps: IBlobMetadata[] = [];
+	public readonly events = createEmitter<MockOrderingServiceEvents>();
 	public readonly takeNextUnprocessedOp = () => {
 		const next = this.unprocessedOps.shift();
 		assert(next !== undefined, "Tried processing, but none to process");
-		return next;
+		return { metadata: next };
 	};
-	public readonly sendBlobAttachOp = (localId: string, blobId: string) => {
-		this.unprocessedOps.push({ localId, blobId });
+	public readonly sendBlobAttachOp = (localId: string, remoteId: string) => {
+		this.unprocessedOps.push({ localId, blobId: remoteId });
+		this.events.emit("opSent");
 	};
 }
 
@@ -198,11 +215,65 @@ const simulateAttach = async (
 	runtime.attachState = AttachState.Attached;
 };
 
-// const textBlob = (text: string): ArrayBufferLike => {
-// 	const encoder = new TextEncoder();
-// 	// Casting because TS is mad about the toString tag being different for SharedArrayBuffer
-// 	return encoder.encode(text) as unknown as ArrayBufferLike;
-// };
+const unpackHandle = (handle: IFluidHandle) => {
+	const internalHandle = toFluidHandleInternal(handle);
+	const pathParts = internalHandle.absolutePath.split("/");
+	return {
+		absolutePath: internalHandle.absolutePath,
+		localId: pathParts[2],
+		payloadPending: isFluidHandleInternalPayloadPending(internalHandle),
+	};
+};
+
+const getSummaryContentsWithFormatValidation = (
+	blobManager: BlobManager,
+): {
+	attachments: string[] | undefined;
+	redirectTable: [string, string][] | undefined;
+} => {
+	const { summary } = blobManager.summarize();
+	const treeEntries = Object.entries(summary.tree);
+	const summaryMembers = new Map(treeEntries);
+	assert.strictEqual(treeEntries.length, summaryMembers.size, "Unexpected size mismatch");
+
+	let attachments: string[] | undefined;
+	let redirectTable: [string, string][] | undefined;
+
+	const redirectTableMember = summaryMembers.get(redirectTableBlobName);
+	if (redirectTableMember !== undefined) {
+		assert(redirectTableMember.type === SummaryType.Blob);
+		assert(typeof redirectTableMember.content === "string");
+		redirectTable = [
+			...new Map<string, string>(
+				JSON.parse(redirectTableMember.content) as [string, string][],
+			).entries(),
+		];
+	}
+	summaryMembers.delete(redirectTableBlobName);
+
+	if (summaryMembers.size > 0) {
+		attachments = [];
+		for (const [, summaryMember] of summaryMembers) {
+			assert.strictEqual(
+				summaryMember.type,
+				SummaryType.Attachment,
+				"Remaining summary members must be attachments",
+			);
+			attachments.push(summaryMember.id);
+		}
+	}
+	return { attachments, redirectTable };
+};
+
+const textToBlob = (text: string): ArrayBufferLike => {
+	const encoder = new TextEncoder();
+	return encoder.encode(text).buffer;
+};
+
+const blobToText = (blob: ArrayBufferLike): string => {
+	const decoder = new TextDecoder();
+	return decoder.decode(blob);
+};
 
 for (const createBlobPayloadPending of [false, true]) {
 	describe.only(`BlobManager (pending payloads): ${createBlobPayloadPending}`, () => {
@@ -229,13 +300,135 @@ for (const createBlobPayloadPending of [false, true]) {
 				isBlobDeleted: mockGarbageCollector.isBlobDeleted,
 				runtime: mockRuntime,
 				stashedBlobs: undefined,
-				createBlobPayloadPending: false,
+				createBlobPayloadPending,
 			});
 		});
 
-		it("Smoke test", async () => {
-			assert(!blobManager.hasBlob("blobId"));
-			await simulateAttach(mockBlobStorage, mockRuntime, blobManager);
+		describe("Detached usage", () => {
+			it("Responds as expected for unknown blob IDs", async () => {
+				assert(!blobManager.hasBlob("blobId"));
+				await assert.rejects(async () => {
+					// Handles for detached blobs are never payload pending, even if the flag is set.
+					await blobManager.getBlob("blobId", false);
+				});
+			});
+
+			it("Can create a blob and retrieve it", async () => {
+				const handle = await blobManager.createBlob(textToBlob("hello"));
+				const { localId } = unpackHandle(handle);
+				assert(blobManager.hasBlob(localId));
+				// Handles for detached blobs are never payload pending, even if the flag is set.
+				assert(!handle.payloadPending);
+				const blobFromManager = await blobManager.getBlob(localId, false);
+				assert.strictEqual(blobToText(blobFromManager), "hello", "Blob content mismatch");
+				const blobFromHandle = await handle.get();
+				assert.strictEqual(blobToText(blobFromHandle), "hello", "Blob content mismatch");
+			});
 		});
+
+		describe("Attaching", () => {
+			it("Can attach when empty", async () => {
+				await simulateAttach(mockBlobStorage, mockRuntime, blobManager);
+			});
+
+			it("Can get a detached blob after attaching", async () => {
+				const handle = await blobManager.createBlob(textToBlob("hello"));
+				const { localId } = unpackHandle(handle);
+
+				await simulateAttach(mockBlobStorage, mockRuntime, blobManager);
+
+				assert(blobManager.hasBlob(localId));
+				// Handles for detached blobs are never payload pending, even if the flag is set.
+				const blobFromManager = await blobManager.getBlob(localId, false);
+				assert.strictEqual(blobToText(blobFromManager), "hello", "Blob content mismatch");
+				const blobFromHandle = await handle.get();
+				assert.strictEqual(blobToText(blobFromHandle), "hello", "Blob content mismatch");
+			});
+		});
+		describe("Attached usage", () => {
+			beforeEach(async () => {
+				await simulateAttach(mockBlobStorage, mockRuntime, blobManager);
+			});
+			describe("Normal usage", () => {
+				it("Responds as expected for unknown blob IDs", async () => {
+					assert(!blobManager.hasBlob("blobId"));
+					// When payloadPending is false, we throw for unknown blobs
+					await assert.rejects(async () => {
+						await blobManager.getBlob("blobId", false);
+					});
+					// When payloadPending is true, we allow the promise to remain pending (waiting
+					// for the blob to later arrive)
+					const result = await Promise.race([
+						blobManager.getBlob("blobId", true),
+						new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 50)),
+					]);
+					assert.strictEqual(
+						result,
+						"timeout",
+						"Did not expect promise to settle within timeout window",
+					);
+				});
+
+				it("Can create a blob and retrieve it", async () => {
+					if (!createBlobPayloadPending) {
+						// In the non-payloadPending case, createBlob won't return a handle until it processes
+						// the blob attach op ack. Set up processing here to unstick it.
+						mockOrderingService.events.on("opSent", () => {
+							const op =
+								mockOrderingService.takeNextUnprocessedOp() as ISequencedMessageEnvelope;
+							blobManager.processBlobAttachMessage(op, true);
+						});
+					}
+					const handle = await blobManager.createBlob(textToBlob("hello"));
+					const { localId } = unpackHandle(handle);
+					assert(blobManager.hasBlob(localId));
+					assert.strictEqual(
+						handle.payloadPending,
+						createBlobPayloadPending,
+						"Wrong handle type created",
+					);
+					const blobFromManager = await blobManager.getBlob(localId, createBlobPayloadPending);
+					assert.strictEqual(blobToText(blobFromManager), "hello", "Blob content mismatch");
+					const blobFromHandle = await handle.get();
+					assert.strictEqual(blobToText(blobFromHandle), "hello", "Blob content mismatch");
+				});
+			});
+			// TODO: beforeEach to create a whole second BlobManager?
+			describe("Blobs from remote clients", () => {});
+			describe("Disconnect/reconnect", () => {});
+			describe("Failure", () => {});
+			describe("Abort", () => {});
+			describe("getPendingBlobs", () => {});
+		});
+		describe("Summaries", () => {
+			describe("Generating summaries", () => {
+				it("Empty summary", () => {
+					const { attachments, redirectTable } =
+						getSummaryContentsWithFormatValidation(blobManager);
+					assert.strictEqual(
+						attachments,
+						undefined,
+						"Shouldn't have attachments for empty summary",
+					);
+					assert.strictEqual(
+						redirectTable,
+						undefined,
+						"Shouldn't have redirectTable for empty summary",
+					);
+				});
+
+				// TODO: Dedupe testing too
+				it("Summary with blobs", async () => {
+					await blobManager.createBlob(textToBlob("hello"));
+					await blobManager.createBlob(textToBlob("world"));
+					const { attachments, redirectTable } =
+						getSummaryContentsWithFormatValidation(blobManager);
+					assert.strictEqual(attachments?.length, 2);
+					assert.strictEqual(redirectTable?.length, 2);
+				});
+			});
+			describe("Loading from summaries", () => {});
+		});
+		describe("Garbage collection", () => {});
 	});
 }
