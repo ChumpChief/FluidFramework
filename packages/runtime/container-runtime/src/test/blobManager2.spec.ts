@@ -26,6 +26,7 @@ import { SummaryType } from "@fluidframework/driver-definitions";
 import type { ISequencedMessageEnvelope } from "@fluidframework/runtime-definitions/internal";
 import {
 	isFluidHandleInternalPayloadPending,
+	isFluidHandlePayloadPending,
 	toFluidHandleInternal,
 } from "@fluidframework/runtime-utils/internal";
 import { MockLogger } from "@fluidframework/telemetry-utils/internal";
@@ -185,8 +186,9 @@ class MockOrderingService {
 		}
 	};
 
-	public readonly sendBlobAttachOp = (clientId, localId: string, remoteId: string) => {
+	public readonly sendBlobAttachOp = (clientId: string, localId: string, remoteId: string) => {
 		// BlobManager only checks the metadata, so this cast is good enough.
+		// eslint-disable-next-line @typescript-eslint/consistent-type-assertions
 		this.unprocessedOps.push({
 			clientId,
 			metadata: { localId, blobId: remoteId },
@@ -249,6 +251,27 @@ const unpackHandle = (handle: IFluidHandle) => {
 		localId: pathParts[2],
 		payloadPending: isFluidHandleInternalPayloadPending(internalHandle),
 	};
+};
+
+const waitHandlePayloadShared = async (handle: IFluidHandle): Promise<void> => {
+	if (isFluidHandlePayloadPending(handle) && handle.payloadState !== "shared") {
+		return new Promise<void>((resolve) => {
+			const onPayloadShared = () => {
+				resolve();
+				handle.events.off("payloadShared", onPayloadShared);
+			};
+			handle.events.on("payloadShared", onPayloadShared);
+		});
+	}
+};
+
+const ensureBlobsAttached = async (handles: IFluidHandle[]) => {
+	return Promise.all(
+		handles.map(async (handle) => {
+			toFluidHandleInternal(handle).attachGraph();
+			return waitHandlePayloadShared(handle);
+		}),
+	);
 };
 
 const getSummaryContentsWithFormatValidation = (
@@ -419,6 +442,17 @@ for (const createBlobPayloadPending of [false, true]) {
 					assert.strictEqual(blobToText(blobFromManager), "hello", "Blob content mismatch");
 					const blobFromHandle = await handle.get();
 					assert.strictEqual(blobToText(blobFromHandle), "hello", "Blob content mismatch");
+					// TODO: Move this to separate test about network-visible effects of the blob creation?
+					// With payloadPending handles, we won't actually upload and send the attach op until the
+					// handle is attached.
+					if (createBlobPayloadPending) {
+						await ensureBlobsAttached([handle]);
+					}
+					assert.strictEqual(
+						mockOrderingService.messagesReceived,
+						1,
+						"Should have sent one message for blob attach",
+					);
 				});
 			});
 			// TODO: beforeEach to create a whole second BlobManager?
@@ -445,14 +479,62 @@ for (const createBlobPayloadPending of [false, true]) {
 					);
 				});
 
-				// TODO: Dedupe testing too
-				it("Summary with blobs", async () => {
+				it("Detached, non-dedupe storage", async () => {
 					await blobManager.createBlob(textToBlob("hello"));
+					await blobManager.createBlob(textToBlob("world"));
 					await blobManager.createBlob(textToBlob("world"));
 					const { attachments, redirectTable } =
 						getSummaryContentsWithFormatValidation(blobManager);
+					assert.strictEqual(attachments?.length, 3);
+					assert.strictEqual(redirectTable?.length, 3);
+				});
+
+				it("Deduping after attach", async () => {
+					await blobManager.createBlob(textToBlob("hello"));
+					await blobManager.createBlob(textToBlob("world"));
+					await blobManager.createBlob(textToBlob("world"));
+					await simulateAttach(mockBlobStorage, mockRuntime, blobManager);
+					const { attachments, redirectTable } =
+						getSummaryContentsWithFormatValidation(blobManager);
+					// As attach uploads the non-deduped blobs to the deduping storage, the duplicate
+					// "world" will remain in the redirectTable (since it has a unique localId), but
+					// its attachment will be deduplicated.
 					assert.strictEqual(attachments?.length, 2);
-					assert.strictEqual(redirectTable?.length, 2);
+					assert.strictEqual(redirectTable?.length, 3);
+				});
+
+				it("Attached, dedupe storage", async () => {
+					await simulateAttach(mockBlobStorage, mockRuntime, blobManager);
+					const handle1 = await blobManager.createBlob(textToBlob("hello"));
+					const handle2 = await blobManager.createBlob(textToBlob("world"));
+					const handle3 = await blobManager.createBlob(textToBlob("world"));
+					// Ensure the blobs are attached so they are included in the summary.
+					if (createBlobPayloadPending) {
+						await ensureBlobsAttached([handle1, handle2, handle3]);
+					}
+					const { attachments, redirectTable } =
+						getSummaryContentsWithFormatValidation(blobManager);
+					assert.strictEqual(attachments?.length, 2);
+					assert.strictEqual(redirectTable?.length, 3);
+				});
+
+				it("Spanning attach", async () => {
+					await blobManager.createBlob(textToBlob("hello"));
+					await blobManager.createBlob(textToBlob("world"));
+					await blobManager.createBlob(textToBlob("world"));
+					await simulateAttach(mockBlobStorage, mockRuntime, blobManager);
+					const handle1 = await blobManager.createBlob(textToBlob("hello"));
+					const handle2 = await blobManager.createBlob(textToBlob("world"));
+					const handle3 = await blobManager.createBlob(textToBlob("another"));
+					const handle4 = await blobManager.createBlob(textToBlob("another"));
+					// Ensure the blobs are attached so they are included in the summary.
+					if (createBlobPayloadPending) {
+						await ensureBlobsAttached([handle1, handle2, handle3, handle4]);
+					}
+					const { attachments, redirectTable } =
+						getSummaryContentsWithFormatValidation(blobManager);
+					assert.strictEqual(attachments?.length, 3);
+					assert.strictEqual(redirectTable?.length, 7);
 				});
 			});
 			describe("Loading from summaries", () => {});
