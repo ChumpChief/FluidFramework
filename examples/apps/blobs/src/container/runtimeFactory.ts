@@ -45,6 +45,10 @@ export class BlobCollectionContainerRuntimeFactory implements IRuntimeFactory {
 			]),
 			provideEntryPoint,
 			existing,
+			runtimeOptions: {
+				explicitSchemaControl: true,
+				createBlobPayloadPending: true,
+			},
 		});
 
 		if (!existing) {
