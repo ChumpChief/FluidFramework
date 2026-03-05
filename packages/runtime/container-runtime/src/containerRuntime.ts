@@ -302,14 +302,12 @@ import {
 	type ISummaryConfiguration,
 	type ISummaryMetadataMessage,
 	metadataBlobName,
-	OrderedClientCollection,
-	OrderedClientElection,
 	recentBatchInfoBlobName,
 	RetriableSummaryError,
 	rootHasIsolatedChannels,
 	type SubmitSummaryResult,
 	type Summarizer,
-	SummarizerClientElection,
+	SummarizerElection,
 	summarizerClientType,
 	summarizerRequestUrl,
 	SummaryCollection,
@@ -1378,11 +1376,11 @@ export class ContainerRuntime
 	// internal logger for ContainerRuntime. Use this.logger for stores, summaries, etc.
 	private readonly mc: MonitoringContext;
 
-	private summarizerClientElection?: SummarizerClientElection;
+	private summarizerClientElection?: SummarizerElection;
 	/**
 	 * summaryManager will only be created if this client is permitted to spawn a summarizing client
 	 * It is created only by interactive client, i.e. summarizer client, as well as non-interactive bots
-	 * do not create it (see SummarizerClientElection.clientDetailsPermitElection() for details)
+	 * do not create it (see SummarizerElection.clientDetailsPermitElection() for details)
 	 */
 	private summaryManager?: SummaryManager;
 
@@ -2252,34 +2250,20 @@ export class ContainerRuntime
 			);
 		} else if (
 			!onRequestMode &&
-			SummarizerClientElection.clientDetailsPermitElection(this.clientDetails)
+			SummarizerElection.clientDetailsPermitElection(this.clientDetails)
 		) {
-			// Only create a SummaryManager and SummarizerClientElection
+			// Only create a SummaryManager and SummarizerElection
 			// if summaries are enabled and we are not the summarizer client.
-			const orderedClientLogger = createChildLogger({
-				logger: this.baseLogger,
-				namespace: "OrderedClientElection",
-			});
-			const orderedClientCollection = new OrderedClientCollection(
-				orderedClientLogger,
+			this.summarizerClientElection = new SummarizerElection(
+				createChildLogger({
+					logger: this.baseLogger,
+					namespace: "SummarizerElection",
+				}),
 				this.innerDeltaManager,
 				this._quorum,
-			);
-			const orderedClientElectionForSummarizer = new OrderedClientElection(
-				orderedClientLogger,
-				orderedClientCollection,
-				this.electedSummarizerData ?? this.innerDeltaManager.lastSequenceNumber,
-				SummarizerClientElection.isClientEligible,
-				this.mc.config.getBoolean(
-					"Fluid.ContainerRuntime.OrderedClientElection.EnablePerformanceEvents",
-				),
-			);
-
-			this.summarizerClientElection = new SummarizerClientElection(
-				orderedClientLogger,
 				summaryCollection,
-				orderedClientElectionForSummarizer,
 				maxOpsSinceLastSummary,
+				this.electedSummarizerData ?? this.innerDeltaManager.lastSequenceNumber,
 			);
 
 			const defaultAction = (): void => {
