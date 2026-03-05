@@ -44,13 +44,11 @@ export {
 	type ISummaryBaseConfiguration,
 } from "./summarizerTypes.js";
 export {
-	type IOrderedClientCollection,
-	type IOrderedClientElection,
 	type ISerializedElection,
-	type ITrackedClient,
-	OrderedClientCollection,
-	OrderedClientElection,
-} from "./orderedClientElection.js";
+	type ISummarizerClientElection,
+	type ISummarizerClientElectionEvents,
+	SummarizerElection,
+} from "./summarizerElection.js";
 export {
 	type IAckedSummary,
 	type ISummaryCollectionOpEvents,
@@ -63,11 +61,6 @@ export {
 	type OpActionEventListener,
 	type OpActionEventName,
 } from "./summaryCollection.js";
-export {
-	type ISummarizerClientElection,
-	type ISummarizerClientElectionEvents,
-	SummarizerClientElection,
-} from "./summarizerClientElection.js";
 export {
 	aliasBlobName,
 	chunksBlobName,
