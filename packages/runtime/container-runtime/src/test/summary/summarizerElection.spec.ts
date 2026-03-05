@@ -414,6 +414,196 @@ describe("Summarizer Election", () => {
 			removeClient("a-summarizer", 5);
 			assertState(undefined, undefined, 30, "everything gone");
 		});
+
+		it("Should pick up summarizer already in quorum at construction time", () => {
+			// Add clients including a summarizer before creating the election
+			addClient("a", 2, true);
+			addClient("a-summarizer", 10, false, summarizerClientType);
+			election = new SummarizerElection(
+				mockLogger.toTelemetryLogger(),
+				testDeltaManager,
+				testQuorum,
+				summaryCollectionEmitter,
+				maxOps,
+				currentSequenceNumber,
+			);
+			assertState("a-summarizer", "a", 10, "summarizer detected at construction");
+		});
+	});
+
+	describe("Initialization from serialized state", () => {
+		it("Should fall back to oldest when serialized parent is in quorum but ineligible", () => {
+			// "s1" is non-interactive and non-summarizer, so ineligible
+			createElection(
+				[
+					["s1", 1, false],
+					["a", 5, true],
+				],
+				{ electedClientId: "s1", electedParentId: "s1", electionSequenceNumber: 100 },
+			);
+			assertState("a", "a", 100, "fell back to oldest eligible");
+		});
+
+		it("Should use electedClientId as parent when electedParentId is undefined (backward compat)", () => {
+			createElection(
+				[
+					["a", 2, true],
+					["b", 7, true],
+				],
+				{ electedClientId: "b", electedParentId: undefined, electionSequenceNumber: 100 },
+			);
+			assertState("b", "b", 100, "electedClientId used as parent");
+		});
+
+		it("Should not use electedClientId as parent when it is a summarizer type", () => {
+			addClient("a", 2, true);
+			addClient("a-summarizer", 10, false, summarizerClientType);
+			election = new SummarizerElection(
+				mockLogger.toTelemetryLogger(),
+				testDeltaManager,
+				testQuorum,
+				summaryCollectionEmitter,
+				maxOps,
+				{
+					electedClientId: "a-summarizer",
+					electedParentId: undefined,
+					electionSequenceNumber: 100,
+				},
+			);
+			// Should fall through to findOldestEligibleParent, not use the summarizer as parent
+			assertState("a-summarizer", "a", 100, "summarizer not used as parent");
+		});
+
+		it("Should fall back to oldest when electedClientId is in quorum but ineligible", () => {
+			// "s1" is in quorum, matches electedClientId, but is ineligible
+			createElection(
+				[
+					["s1", 1, false],
+					["a", 5, true],
+				],
+				{ electedClientId: "s1", electedParentId: "s1", electionSequenceNumber: 100 },
+			);
+			// electedParentId "s1" is in quorum but ineligible → falls through
+			// electedClientId "s1" is defined and IS in quorum → no error logged
+			// falls back to findOldestEligibleParent
+			assertState("a", "a", 100, "fell back to oldest eligible");
+			mockLogger.assertMatchNone([
+				{ eventName: "SummarizerElection:InitialElectedClientNotFound" },
+			]);
+		});
+
+		it("Should log error when electedClientId is not found in quorum", () => {
+			createElection(
+				[
+					["a", 2, true],
+					["b", 7, true],
+				],
+				{ electedClientId: "x", electedParentId: "x", electionSequenceNumber: 100 },
+			);
+			assertState("a", "a", 100, "fell back to oldest");
+			mockLogger.matchEvents([
+				{
+					eventName: "SummarizerElection:InitialElectedClientNotFound",
+					expectedClientId: "x",
+				},
+			]);
+		});
+	});
+
+	describe("clientDetailsPermitElection", () => {
+		function makeDetails(
+			interactive: boolean,
+			type?: string,
+		): ISequencedClient["client"]["details"] {
+			const details: ISequencedClient["client"]["details"] = {
+				capabilities: { interactive },
+			};
+			if (type !== undefined) {
+				details.type = type;
+			}
+			return details;
+		}
+
+		it("Should permit interactive clients", () => {
+			assert.strictEqual(
+				SummarizerElection.clientDetailsPermitElection(makeDetails(true)),
+				true,
+			);
+		});
+
+		it("Should permit summarizer-type clients", () => {
+			assert.strictEqual(
+				SummarizerElection.clientDetailsPermitElection(
+					makeDetails(false, summarizerClientType),
+				),
+				true,
+			);
+		});
+
+		it("Should reject non-interactive non-summarizer clients", () => {
+			assert.strictEqual(
+				SummarizerElection.clientDetailsPermitElection(makeDetails(false)),
+				false,
+			);
+		});
+	});
+
+	describe("Client eligibility edge cases", () => {
+		it("Should elect interactive client with no type set (standard case)", () => {
+			// Client with interactive capability but no type field — the common case
+			const details: ISequencedClient["client"]["details"] = {
+				capabilities: { interactive: true },
+			};
+			const c: Partial<ISequencedClient["client"]> = { details };
+			const client: ISequencedClient = {
+				client: c as ISequencedClient["client"],
+				sequenceNumber: 5,
+			};
+			testQuorum.addClient("a", client);
+			currentSequenceNumber = 5;
+			election = new SummarizerElection(
+				mockLogger.toTelemetryLogger(),
+				testDeltaManager,
+				testQuorum,
+				summaryCollectionEmitter,
+				maxOps,
+				currentSequenceNumber,
+			);
+			assertState("a", "a", 5, "interactive client with no type is eligible");
+		});
+
+		it("Should not elect ineligible client when no parent is elected", () => {
+			createElection();
+			// Add a non-interactive, non-summarizer client — it is ineligible
+			addClient("bot", 10, false);
+			assertState(undefined, undefined, 0, "ineligible client not elected");
+		});
+	});
+
+	describe("Op telemetry deduplication", () => {
+		it("Should not log duplicate telemetry within the same window", () => {
+			createElection([["a", 2, true]]);
+			// Exceed threshold to trigger first log
+			defaultOp(maxOps + 1);
+			const firstCount = mockLogger.events.filter(
+				(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+			).length;
+			assert.strictEqual(firstCount, 1, "should log once after exceeding threshold");
+
+			// Send more ops within the same maxOps window — should NOT log again
+			defaultOp(maxOps - 1);
+			const secondCount = mockLogger.events.filter(
+				(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+			).length;
+			assert.strictEqual(secondCount, 1, "should not log again within same window");
+
+			// Exceed the next window — should log again
+			defaultOp(2);
+			const thirdCount = mockLogger.events.filter(
+				(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+			).length;
+			assert.strictEqual(thirdCount, 2, "should log again after next window");
+		});
 	});
 
 	describe("Integration with SummaryManager", () => {
