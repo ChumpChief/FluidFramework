@@ -429,6 +429,23 @@ describe("Summarizer Election", () => {
 			);
 			assertState("a-summarizer", "a", 10, "summarizer detected at construction");
 		});
+
+		it("Should replace tracked summarizer when a second summarizer joins", () => {
+			createElection([["a", 2, true]]);
+			addClient("summarizer-1", 10, false, summarizerClientType);
+			assertState("summarizer-1", "a", 2, "first summarizer is elected client");
+
+			addClient("summarizer-2", 20, false, summarizerClientType);
+			assertState("summarizer-2", "a", 2, "second summarizer replaces first");
+
+			// Removing the first summarizer should not affect election since it's no longer tracked
+			removeClient("summarizer-1", 5);
+			assertState("summarizer-2", "a", 2, "removing old summarizer has no effect");
+
+			// Removing the tracked summarizer reverts to parent
+			removeClient("summarizer-2", 5);
+			assertState("a", "a", 2, "parent is elected again after tracked summarizer leaves");
+		});
 	});
 
 	describe("Initialization from serialized state", () => {
