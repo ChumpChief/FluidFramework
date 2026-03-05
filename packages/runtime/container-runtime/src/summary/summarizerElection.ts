@@ -46,12 +46,9 @@ export interface ISummarizerClientElection
 }
 
 /**
- * Simplified summarizer election that replaces OrderedClientCollection +
- * OrderedClientElection + SummarizerClientElection.
- *
  * Determines the elected parent (oldest eligible interactive client) by
- * iterating quorum members. Tracks summarizer clients in the quorum to
- * implement the graceful handoff protocol.
+ * reading quorum members. Observes quorum membership events to detect when
+ * summarizer clients join or leave, enabling the graceful handoff protocol.
  */
 export class SummarizerElection
 	extends TypedEventEmitter<ISummarizerClientElectionEvents>
