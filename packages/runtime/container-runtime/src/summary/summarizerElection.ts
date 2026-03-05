@@ -22,8 +22,8 @@ import {
 	createChildLogger,
 } from "@fluidframework/telemetry-utils/internal";
 
-import type { ISummaryCollectionOpEvents } from "./summaryCollection.js";
 import { summarizerClientType } from "./summarizerTypes.js";
+import type { ISummaryCollectionOpEvents } from "./summaryCollection.js";
 
 /**
  * Serialized state of the summarizer election.
@@ -176,22 +176,19 @@ export class SummarizerElection
 		const members = this.quorum.getMembers();
 
 		// Try to restore the elected parent
-		if (state.electedParentId !== undefined && members.has(state.electedParentId)) {
-			const member = members.get(state.electedParentId)!;
-			if (SummarizerElection.isClientEligible(member)) {
+		if (state.electedParentId !== undefined) {
+			const member = members.get(state.electedParentId);
+			if (member !== undefined && SummarizerElection.isClientEligible(member)) {
 				this._electedParentId = state.electedParentId;
 				return;
 			}
 		}
 
 		// If electedParentId is missing but electedClientId is an interactive client, use it
-		if (
-			state.electedClientId !== undefined &&
-			state.electedParentId === undefined &&
-			members.has(state.electedClientId)
-		) {
-			const member = members.get(state.electedClientId)!;
+		if (state.electedClientId !== undefined && state.electedParentId === undefined) {
+			const member = members.get(state.electedClientId);
 			if (
+				member !== undefined &&
 				SummarizerElection.isClientEligible(member) &&
 				member.client.details.type !== summarizerClientType
 			) {

@@ -436,6 +436,7 @@ describe("Summarizer Election", () => {
 			public connect() {
 				this.connected = true;
 				this.clientId = election.electedParentId;
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				this.emit("connected", this.clientId!);
 			}
 
@@ -470,6 +471,7 @@ describe("Summarizer Election", () => {
 				this.state = "running";
 				await Promise.all([this.stopDeferred.promise, this.runDeferred.promise]);
 				this.state = "stopped";
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				removeClient(this.clientId!, 0);
 				return "summarizerClientDisconnected";
 			}
