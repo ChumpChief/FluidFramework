@@ -24,7 +24,7 @@ import {
 
 import type { IThrottler } from "../throttler.js";
 
-import type { ISummarizerClientElection } from "./summarizerElection.js";
+import type { ISummarizerClientElection } from "./summarizerClientElection.js";
 import type {
 	IEnqueueSummarizeOptions,
 	IOnDemandSummarizeOptions,

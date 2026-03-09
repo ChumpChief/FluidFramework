@@ -21,7 +21,7 @@ import {
 	type ISerializedElection,
 	type ISummarizer,
 	type ISummaryCollectionOpEvents,
-	SummarizerElection,
+	SummarizerClientElection,
 	SummaryManager,
 	summarizerClientType,
 } from "../../summary/index.js";
@@ -39,7 +39,7 @@ describe("Summarizer Election", () => {
 	};
 	const mockLogger = new MockLogger();
 	const summaryCollectionEmitter = new TypedEventEmitter<ISummaryCollectionOpEvents>();
-	let election: SummarizerElection;
+	let election: SummarizerClientElection;
 
 	function addClient(
 		clientId: string,
@@ -73,7 +73,7 @@ describe("Summarizer Election", () => {
 		for (const [id, seq, int] of initialClients) {
 			addClient(id, seq, int);
 		}
-		election = new SummarizerElection(
+		election = new SummarizerClientElection(
 			mockLogger.toTelemetryLogger(),
 			testDeltaManager,
 			testQuorum,
@@ -274,7 +274,7 @@ describe("Summarizer Election", () => {
 			defaultOp(maxOps);
 			assert.strictEqual(
 				mockLogger.events.filter(
-					(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+					(e) => e.eventName === "SummarizerClientElection:ElectedClientNotSummarizing",
 				).length,
 				0,
 				"should not log at max ops",
@@ -282,7 +282,7 @@ describe("Summarizer Election", () => {
 			defaultOp();
 			assert.strictEqual(
 				mockLogger.events.filter(
-					(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+					(e) => e.eventName === "SummarizerClientElection:ElectedClientNotSummarizing",
 				).length,
 				1,
 				"should log after exceeding max ops",
@@ -296,7 +296,7 @@ describe("Summarizer Election", () => {
 			defaultOp(maxOps);
 			assert.strictEqual(
 				mockLogger.events.filter(
-					(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+					(e) => e.eventName === "SummarizerClientElection:ElectedClientNotSummarizing",
 				).length,
 				0,
 				"should not log when ack resets counter",
@@ -304,7 +304,7 @@ describe("Summarizer Election", () => {
 			defaultOp();
 			assert.strictEqual(
 				mockLogger.events.filter(
-					(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+					(e) => e.eventName === "SummarizerClientElection:ElectedClientNotSummarizing",
 				).length,
 				1,
 				"should log after exceeding max ops since ack",
@@ -419,7 +419,7 @@ describe("Summarizer Election", () => {
 			// Add clients including a summarizer before creating the election
 			addClient("a", 2, true);
 			addClient("a-summarizer", 10, false, summarizerClientType);
-			election = new SummarizerElection(
+			election = new SummarizerClientElection(
 				mockLogger.toTelemetryLogger(),
 				testDeltaManager,
 				testQuorum,
@@ -475,7 +475,7 @@ describe("Summarizer Election", () => {
 		it("Should not use electedClientId as parent when it is a summarizer type", () => {
 			addClient("a", 2, true);
 			addClient("a-summarizer", 10, false, summarizerClientType);
-			election = new SummarizerElection(
+			election = new SummarizerClientElection(
 				mockLogger.toTelemetryLogger(),
 				testDeltaManager,
 				testQuorum,
@@ -505,7 +505,7 @@ describe("Summarizer Election", () => {
 			// falls back to findOldestEligibleParent
 			assertState("a", "a", 100, "fell back to oldest eligible");
 			mockLogger.assertMatchNone([
-				{ eventName: "SummarizerElection:InitialElectedClientNotFound" },
+				{ eventName: "SummarizerClientElection:InitialElectedClientNotFound" },
 			]);
 		});
 
@@ -520,7 +520,7 @@ describe("Summarizer Election", () => {
 			assertState("a", "a", 100, "fell back to oldest");
 			mockLogger.matchEvents([
 				{
-					eventName: "SummarizerElection:InitialElectedClientNotFound",
+					eventName: "SummarizerClientElection:InitialElectedClientNotFound",
 					expectedClientId: "x",
 				},
 			]);
@@ -543,14 +543,14 @@ describe("Summarizer Election", () => {
 
 		it("Should permit interactive clients", () => {
 			assert.strictEqual(
-				SummarizerElection.clientDetailsPermitElection(makeDetails(true)),
+				SummarizerClientElection.clientDetailsPermitElection(makeDetails(true)),
 				true,
 			);
 		});
 
 		it("Should permit summarizer-type clients", () => {
 			assert.strictEqual(
-				SummarizerElection.clientDetailsPermitElection(
+				SummarizerClientElection.clientDetailsPermitElection(
 					makeDetails(false, summarizerClientType),
 				),
 				true,
@@ -559,7 +559,7 @@ describe("Summarizer Election", () => {
 
 		it("Should reject non-interactive non-summarizer clients", () => {
 			assert.strictEqual(
-				SummarizerElection.clientDetailsPermitElection(makeDetails(false)),
+				SummarizerClientElection.clientDetailsPermitElection(makeDetails(false)),
 				false,
 			);
 		});
@@ -578,7 +578,7 @@ describe("Summarizer Election", () => {
 			};
 			testQuorum.addClient("a", client);
 			currentSequenceNumber = 5;
-			election = new SummarizerElection(
+			election = new SummarizerClientElection(
 				mockLogger.toTelemetryLogger(),
 				testDeltaManager,
 				testQuorum,
@@ -603,21 +603,21 @@ describe("Summarizer Election", () => {
 			// Exceed threshold to trigger first log
 			defaultOp(maxOps + 1);
 			const firstCount = mockLogger.events.filter(
-				(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+				(e) => e.eventName === "SummarizerClientElection:ElectedClientNotSummarizing",
 			).length;
 			assert.strictEqual(firstCount, 1, "should log once after exceeding threshold");
 
 			// Send more ops within the same maxOps window — should NOT log again
 			defaultOp(maxOps - 1);
 			const secondCount = mockLogger.events.filter(
-				(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+				(e) => e.eventName === "SummarizerClientElection:ElectedClientNotSummarizing",
 			).length;
 			assert.strictEqual(secondCount, 1, "should not log again within same window");
 
 			// Exceed the next window — should log again
 			defaultOp(2);
 			const thirdCount = mockLogger.events.filter(
-				(e) => e.eventName === "SummarizerElection:ElectedClientNotSummarizing",
+				(e) => e.eventName === "SummarizerClientElection:ElectedClientNotSummarizing",
 			).length;
 			assert.strictEqual(thirdCount, 2, "should log again after next window");
 		});

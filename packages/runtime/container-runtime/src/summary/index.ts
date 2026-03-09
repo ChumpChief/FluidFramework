@@ -47,8 +47,8 @@ export {
 	type ISerializedElection,
 	type ISummarizerClientElection,
 	type ISummarizerClientElectionEvents,
-	SummarizerElection,
-} from "./summarizerElection.js";
+	SummarizerClientElection,
+} from "./summarizerClientElection.js";
 export {
 	type IAckedSummary,
 	type ISummaryCollectionOpEvents,

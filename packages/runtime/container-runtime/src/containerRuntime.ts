@@ -307,7 +307,7 @@ import {
 	rootHasIsolatedChannels,
 	type SubmitSummaryResult,
 	type Summarizer,
-	SummarizerElection,
+	SummarizerClientElection,
 	summarizerClientType,
 	summarizerRequestUrl,
 	SummaryCollection,
@@ -1376,11 +1376,11 @@ export class ContainerRuntime
 	// internal logger for ContainerRuntime. Use this.logger for stores, summaries, etc.
 	private readonly mc: MonitoringContext;
 
-	private summarizerClientElection?: SummarizerElection;
+	private summarizerClientElection?: SummarizerClientElection;
 	/**
 	 * summaryManager will only be created if this client is permitted to spawn a summarizing client
 	 * It is created only by interactive client, i.e. summarizer client, as well as non-interactive bots
-	 * do not create it (see SummarizerElection.clientDetailsPermitElection() for details)
+	 * do not create it (see SummarizerClientElection.clientDetailsPermitElection() for details)
 	 */
 	private summaryManager?: SummaryManager;
 
@@ -2250,14 +2250,14 @@ export class ContainerRuntime
 			);
 		} else if (
 			!onRequestMode &&
-			SummarizerElection.clientDetailsPermitElection(this.clientDetails)
+			SummarizerClientElection.clientDetailsPermitElection(this.clientDetails)
 		) {
-			// Only create a SummaryManager and SummarizerElection
+			// Only create a SummaryManager and SummarizerClientElection
 			// if summaries are enabled and we are not the summarizer client.
-			this.summarizerClientElection = new SummarizerElection(
+			this.summarizerClientElection = new SummarizerClientElection(
 				createChildLogger({
 					logger: this.baseLogger,
-					namespace: "SummarizerElection",
+					namespace: "SummarizerClientElection",
 				}),
 				this.innerDeltaManager,
 				this._quorum,

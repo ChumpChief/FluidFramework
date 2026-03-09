@@ -88,25 +88,20 @@ export interface ISummarizerClientElection
  *
  * i. Begin by electing A. electedParent === A, electedClient === A.
  *
- * ii. SummaryManager running on A spawns a summarizer client, A'. electedParent === A,
- *     electedClient === A'.
+ * ii. SummaryManager running on A spawns a summarizer client, A'. electedParent === A, electedClient === A'
  *
- * iii. A' stops producing summaries. A new parent client, B, is elected.
- *      electedParent === B, electedClient === A'.
+ * iii. A' stops producing summaries. A new parent client, B, is elected. electedParent === B, electedClient === A'
  *
- * iv. SummaryManager running on A detects the change to electedParent and tells the summarizer
- *     to stop, but A' is in mid-summarization. No new summarizer is spawned, as
- *     electedParent !== electedClient.
+ * iv. SummaryManager running on A detects the change to electedParent and tells the summarizer to stop, but A'
+ * is in mid-summarization. No new summarizer is spawned, as electedParent !== electedClient.
  *
  * v. A' completes its summary, and the summarizer and backing client are torn down.
  *
- * vi. A' leaves the quorum, and B takes its place as electedClient.
- *     electedParent === B, electedClient === B.
+ * vi. A' leaves the quorum, and B takes its place as electedClient. electedParent === B, electedClient === B
  *
- * vii. SummaryManager running on B spawns a summarizer client, B'. electedParent === B,
- *      electedClient === B'.
+ * vii. SummaryManager running on B spawns a summarizer client, B'. electedParent === B, electedClient === B'
  */
-export class SummarizerElection
+export class SummarizerClientElection
 	extends TypedEventEmitter<ISummarizerClientElectionEvents>
 	implements ISummarizerClientElection
 {
@@ -146,7 +141,7 @@ export class SummarizerElection
 		initialState: ISerializedElection | number,
 	) {
 		super();
-		this.logger = createChildLogger({ logger, namespace: "SummarizerElection" });
+		this.logger = createChildLogger({ logger, namespace: "SummarizerClientElection" });
 
 		if (typeof initialState === "number") {
 			this._electionSequenceNumber = initialState;
@@ -169,7 +164,10 @@ export class SummarizerElection
 			}
 
 			// Interactive client joined
-			if (this._electedParentId === undefined && SummarizerElection.isClientEligible(client)) {
+			if (
+				this._electedParentId === undefined &&
+				SummarizerClientElection.isClientEligible(client)
+			) {
 				this._electedParentId = clientId;
 				this._electionSequenceNumber = sequenceNumber;
 				this.lastSummaryAckSeqForClient = undefined;
@@ -242,7 +240,7 @@ export class SummarizerElection
 		// Try to restore the elected parent
 		if (state.electedParentId !== undefined) {
 			const member = members.get(state.electedParentId);
-			if (member !== undefined && SummarizerElection.isClientEligible(member)) {
+			if (member !== undefined && SummarizerClientElection.isClientEligible(member)) {
 				this._electedParentId = state.electedParentId;
 				return;
 			}
@@ -253,7 +251,7 @@ export class SummarizerElection
 			const member = members.get(state.electedClientId);
 			if (
 				member !== undefined &&
-				SummarizerElection.isClientEligible(member) &&
+				SummarizerClientElection.isClientEligible(member) &&
 				member.client.details.type !== summarizerClientType
 			) {
 				this._electedParentId = state.electedClientId;
@@ -291,7 +289,7 @@ export class SummarizerElection
 
 		for (const [clientId, client] of this.quorum.getMembers()) {
 			if (
-				SummarizerElection.isClientEligible(client) &&
+				SummarizerClientElection.isClientEligible(client) &&
 				client.client.details.type !== summarizerClientType &&
 				client.sequenceNumber < oldestSeq
 			) {
@@ -320,7 +318,7 @@ export class SummarizerElection
 	private hasEligibleClients(): boolean {
 		for (const [, client] of this.quorum.getMembers()) {
 			if (
-				SummarizerElection.isClientEligible(client) &&
+				SummarizerClientElection.isClientEligible(client) &&
 				client.client.details.type !== summarizerClientType
 			) {
 				return true;
@@ -342,7 +340,7 @@ export class SummarizerElection
 		if (details === undefined) {
 			return true;
 		}
-		return SummarizerElection.clientDetailsPermitElection(details);
+		return SummarizerClientElection.clientDetailsPermitElection(details);
 	}
 
 	public static readonly clientDetailsPermitElection = (details: IClientDetails): boolean =>
