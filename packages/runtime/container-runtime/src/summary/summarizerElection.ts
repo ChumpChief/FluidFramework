@@ -30,8 +30,24 @@ import type { ISummaryCollectionOpEvents } from "./summaryCollection.js";
  * @internal
  */
 export interface ISerializedElection {
+	/**
+	 * Sequence number at the time of the latest election.
+	 */
 	readonly electionSequenceNumber: number;
+
+	/**
+	 * Most recently elected client id. This is either:
+	 *
+	 * 1. the interactive elected parent client, in which case electedClientId === electedParentId,
+	 * and the SummaryManager on the elected client will spawn a summarizer client, or
+	 *
+	 * 2. the non-interactive summarizer client itself.
+	 */
 	readonly electedClientId: string | undefined;
+
+	/**
+	 * Most recently elected parent client id. This is always an interactive client.
+	 */
 	readonly electedParentId: string | undefined;
 }
 
@@ -46,9 +62,49 @@ export interface ISummarizerClientElection
 }
 
 /**
- * Determines the elected parent (oldest eligible interactive client) by
- * reading quorum members. Observes quorum membership events to detect when
- * summarizer clients join or leave, enabling the graceful handoff protocol.
+ * Determines the elected parent (oldest eligible interactive client) by reading quorum members.
+ * Observes quorum membership events to detect when summarizer clients join or leave, enabling the
+ * graceful handoff protocol. Monitors ops and logs telemetry when the elected client has not
+ * produced a summary ack within a configured number of ops.
+ *
+ * This class tracks electedParent and electedClient (via summarizerClientId) separately. This
+ * allows us to handle the case where a new interactive parent client has been elected, but the
+ * summarizer is still doing work, so a new summarizer should not yet be spawned. In this case,
+ * changing electedParent will cause SummaryManager to stop the current summarizer, but a new
+ * summarizer will not be spawned until the old summarizer client has left the quorum.
+ *
+ * Details:
+ *
+ * electedParent is the interactive client that has been elected to spawn a summarizer. It is
+ * typically the oldest eligible interactive client in the quorum. Only the electedParent is
+ * permitted to spawn a summarizer.
+ *
+ * electedClient is the non-interactive summarizer client if one exists. If not, then
+ * electedClient is equal to electedParent. If electedParent === electedClient, this is the
+ * signal for electedParent to spawn a new electedClient. Once a summarizer client becomes
+ * electedClient, a new summarizer will not be spawned until electedClient leaves the quorum.
+ *
+ * A typical sequence looks like this:
+ *
+ * i. Begin by electing A. electedParent === A, electedClient === A.
+ *
+ * ii. SummaryManager running on A spawns a summarizer client, A'. electedParent === A,
+ *     electedClient === A'.
+ *
+ * iii. A' stops producing summaries. A new parent client, B, is elected.
+ *      electedParent === B, electedClient === A'.
+ *
+ * iv. SummaryManager running on A detects the change to electedParent and tells the summarizer
+ *     to stop, but A' is in mid-summarization. No new summarizer is spawned, as
+ *     electedParent !== electedClient.
+ *
+ * v. A' completes its summary, and the summarizer and backing client are torn down.
+ *
+ * vi. A' leaves the quorum, and B takes its place as electedClient.
+ *     electedParent === B, electedClient === B.
+ *
+ * vii. SummaryManager running on B spawns a summarizer client, B'. electedParent === B,
+ *      electedClient === B'.
  */
 export class SummarizerElection
 	extends TypedEventEmitter<ISummarizerClientElectionEvents>
@@ -57,7 +113,18 @@ export class SummarizerElection
 	private _electedParentId: string | undefined;
 	private _summarizerClientId: string | undefined;
 	private _electionSequenceNumber: number;
+	/**
+	 * Used to calculate number of ops since last summary ack for the current elected client.
+	 * This will be undefined if there is no elected summarizer, or no summary ack has been
+	 * observed since this client was elected.
+	 * When a summary ack comes in, this will be set to the sequence number of the summary ack.
+	 */
 	private lastSummaryAckSeqForClient: number | undefined;
+	/**
+	 * Used to prevent excess logging by recording the sequence number that we last reported at,
+	 * and making sure we don't report another event to telemetry. If things work as intended,
+	 * this is not needed, otherwise it could report an event on every op in worst case scenario.
+	 */
 	private lastReportedSeq = 0;
 
 	private readonly logger: ITelemetryLoggerExt;
