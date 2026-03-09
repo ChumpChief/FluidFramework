@@ -302,7 +302,6 @@ import {
 	type ISummaryConfiguration,
 	type ISummaryMetadataMessage,
 	metadataBlobName,
-	OrderedClientElection,
 	recentBatchInfoBlobName,
 	RetriableSummaryError,
 	rootHasIsolatedChannels,
@@ -2255,26 +2254,16 @@ export class ContainerRuntime
 		) {
 			// Only create a SummaryManager and SummarizerClientElection
 			// if summaries are enabled and we are not the summarizer client.
-			const orderedClientLogger = createChildLogger({
-				logger: this.baseLogger,
-				namespace: "OrderedClientElection",
-			});
-			const orderedClientElectionForSummarizer = new OrderedClientElection(
-				orderedClientLogger,
+			this.summarizerClientElection = new SummarizerClientElection(
+				createChildLogger({
+					logger: this.baseLogger,
+					namespace: "SummarizerClientElection",
+				}),
 				this.innerDeltaManager,
 				this._quorum,
-				this.electedSummarizerData ?? this.innerDeltaManager.lastSequenceNumber,
-				SummarizerClientElection.isClientEligible,
-				this.mc.config.getBoolean(
-					"Fluid.ContainerRuntime.OrderedClientElection.EnablePerformanceEvents",
-				),
-			);
-
-			this.summarizerClientElection = new SummarizerClientElection(
-				orderedClientLogger,
 				summaryCollection,
-				orderedClientElectionForSummarizer,
 				maxOpsSinceLastSummary,
+				this.electedSummarizerData ?? this.innerDeltaManager.lastSequenceNumber,
 			);
 
 			const defaultAction = (): void => {
