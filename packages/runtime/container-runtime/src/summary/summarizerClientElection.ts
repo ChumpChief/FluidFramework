@@ -25,6 +25,14 @@ import {
 import { summarizerClientType } from "./summarizerTypes.js";
 import type { ISummaryCollectionOpEvents } from "./summaryCollection.js";
 
+function isClientEligible(client: ISequencedClient): boolean {
+	const details: IClient["details"] | undefined = client.client.details;
+	if (details === undefined) {
+		return true;
+	}
+	return SummarizerClientElection.clientDetailsPermitElection(details);
+}
+
 /**
  * Serialized state of the summarizer election.
  * @internal
@@ -166,10 +174,7 @@ export class SummarizerClientElection
 			}
 
 			// Interactive client joined
-			if (
-				this._electedParentId === undefined &&
-				SummarizerClientElection.isClientEligible(client)
-			) {
+			if (this._electedParentId === undefined && isClientEligible(client)) {
 				this.setElectedParent(clientId);
 				this._electionSequenceNumber = sequenceNumber;
 				this.lastSummaryAckSeqForClient = undefined;
@@ -242,10 +247,7 @@ export class SummarizerClientElection
 		// Try to restore the elected parent directly
 		if (state.electedParentId !== undefined) {
 			const parentMember = members.get(state.electedParentId);
-			if (
-				parentMember !== undefined &&
-				SummarizerClientElection.isClientEligible(parentMember)
-			) {
+			if (parentMember !== undefined && isClientEligible(parentMember)) {
 				this.setElectedParent(state.electedParentId);
 				return;
 			}
@@ -269,7 +271,7 @@ export class SummarizerClientElection
 				clientCount: members.size,
 			});
 			this.setElectedParent(this.findOldestEligibleParent());
-		} else if (SummarizerClientElection.isClientEligible(member)) {
+		} else if (isClientEligible(member)) {
 			if (member.client.details.type === summarizerClientType) {
 				// The elected client is a summarizer — find the parent from quorum.
 				// _summarizerClientId will be set by findSummarizerInQuorum after init.
@@ -337,7 +339,7 @@ export class SummarizerClientElection
 
 		for (const [clientId, client] of this.quorum.getMembers()) {
 			if (
-				SummarizerClientElection.isClientEligible(client) &&
+				isClientEligible(client) &&
 				client.client.details.type !== summarizerClientType &&
 				client.sequenceNumber > sequenceNumber &&
 				client.sequenceNumber < nextSeq
@@ -367,14 +369,6 @@ export class SummarizerClientElection
 			electedClientId: this.electedClientId,
 			electedParentId: this._electedParentId,
 		};
-	}
-
-	private static isClientEligible(client: ISequencedClient): boolean {
-		const details: IClient["details"] | undefined = client.client.details;
-		if (details === undefined) {
-			return true;
-		}
-		return SummarizerClientElection.clientDetailsPermitElection(details);
 	}
 
 	public static readonly clientDetailsPermitElection = (details: IClientDetails): boolean =>
