@@ -7,11 +7,8 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
 	ADOSizeComparator,
-	type BundleComparison,
-	type BundleMetric,
-	bundlesContainNoChanges,
 	getAzureDevopsApi,
-	totalSizeMetricName,
+	type PackageComparison,
 } from "@fluidframework/bundle-size-tools";
 import { Flags } from "@oclif/core";
 
@@ -34,10 +31,6 @@ const defaultLocalReportPath = "./artifacts/bundleAnalysis";
 // artifact.
 const defaultOutputDir = "./artifacts/bundleSizeDiff";
 
-// Any single non-total metric that grows by more than this threshold is considered a
-// regression.
-const sizeRegressionThresholdBytes = 5120;
-
 // Output file names. Only one of these is present per run: `result.json` when the
 // comparison produced a meaningful result, or `error.json` when it did not. Consumers
 // use file existence as the success/failure discriminator without needing to parse JSON.
@@ -45,50 +38,37 @@ const resultFileName = "result.json";
 const errorFileName = "error.json";
 
 /**
- * Shape of the `result.json` file produced on a successful comparison, discriminated by
- * `kind`. On `"no-changes"`, the comparison ran and found no size deltas. On `"changes"`,
- * the comparison found size deltas; `comparison` holds the diff and `sizeRegressionDetected`
- * flags any non-total metric that grew past the threshold.
+ * Provenance fields written to both `result.json` and `error.json` so consumers can
+ * tell where the data came from and reason about freshness.
  */
-type BundleSizeDiffResult = {
+interface BundleSizeDiffProvenance {
 	prNumber: number;
-	baseCommit: string;
 	targetBranch: string;
-} & (
-	| { kind: "no-changes" }
-	| { kind: "changes"; sizeRegressionDetected: boolean; comparison: BundleComparison[] }
-);
+	compareCommit: string;
+	adoBuildId: number;
+	timestamp: string;
+}
+
+/**
+ * Shape of the `result.json` file produced on a successful comparison. `comparison`
+ * holds the per-package diff data; each bundle entry encodes pre-existing / added /
+ * removed via field presence (see {@link PackageComparison}). The producer is
+ * unopinionated about what constitutes a "change" — consumers apply their own
+ * thresholds.
+ */
+interface BundleSizeDiffResult extends BundleSizeDiffProvenance {
+	baseCommit: string;
+	comparison: PackageComparison[];
+}
 
 /**
  * Shape of the `error.json` file produced when the command could not produce a comparison
  * (e.g. no usable baseline build, an unexpected ADO API failure). `baseCommit` may be
  * `undefined` if the baseline search never reached a candidate.
  */
-interface BundleSizeDiffError {
-	prNumber: number;
+interface BundleSizeDiffError extends BundleSizeDiffProvenance {
 	baseCommit: string | undefined;
-	targetBranch: string;
 	error: string;
-}
-
-/**
- * Compute whether any bundle shows a non-total metric growing by more than the regression
- * threshold.
- */
-function detectSizeRegression(comparison: BundleComparison[]): boolean {
-	return comparison.some((bundle: BundleComparison) =>
-		Object.entries(bundle.commonBundleMetrics).some(
-			([metricName, { baseline, compare }]: [
-				string,
-				{ baseline: BundleMetric; compare: BundleMetric },
-			]) => {
-				if (metricName === totalSizeMetricName) {
-					return false;
-				}
-				return compare.parsedSize - baseline.parsedSize > sizeRegressionThresholdBytes;
-			},
-		),
-	);
 }
 
 export default class GenerateBundleSizeDiff extends BaseCommand<
@@ -124,6 +104,18 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 			required: true,
 			hidden: true,
 		}),
+		compareCommit: Flags.string({
+			description: "SHA of the PR branch's head commit being analyzed.",
+			env: "COMPARE_COMMIT",
+			required: true,
+			hidden: true,
+		}),
+		adoBuildId: Flags.integer({
+			description: "ID of the ADO pipeline build that produced this artifact.",
+			env: "ADO_BUILD_ID",
+			required: true,
+			hidden: true,
+		}),
 		adoApiToken: Flags.string({
 			description:
 				"ADO PAT for accessing the baseline build. When absent, anonymous reads are used (suitable for fork PR builds where $(System.AccessToken) isn't populated).",
@@ -135,7 +127,23 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 	} as const;
 
 	public async run(): Promise<BundleSizeDiffResult | BundleSizeDiffError> {
-		const { adoApiToken, localReportPath, outputDir, prNumber, targetBranch } = this.flags;
+		const {
+			adoApiToken,
+			adoBuildId,
+			compareCommit,
+			localReportPath,
+			outputDir,
+			prNumber,
+			targetBranch,
+		} = this.flags;
+
+		const provenance: BundleSizeDiffProvenance = {
+			prNumber,
+			targetBranch,
+			compareCommit,
+			adoBuildId,
+			timestamp: new Date().toISOString(),
+		};
 
 		const adoConnection = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
 		const sizeComparator = new ADOSizeComparator(
@@ -143,10 +151,8 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 			adoConnection,
 			localReportPath,
 			targetBranch,
-			undefined,
-			ADOSizeComparator.naiveFallbackCommitGenerator,
 		);
-		const comparisonResult = await sizeComparator.getSizeComparison(false);
+		const comparisonResult = await sizeComparator.getSizeComparison();
 
 		const resolvedOutputDir = path.resolve(process.cwd(), outputDir);
 		await mkdir(resolvedOutputDir, { recursive: true });
@@ -159,13 +165,12 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 
 		if (comparisonResult.kind === "error") {
 			const errorResult: BundleSizeDiffError = {
-				prNumber,
-				baseCommit: comparisonResult.baselineCommit,
-				targetBranch,
+				...provenance,
+				baseCommit: comparisonResult.baseCommit,
 				error: comparisonResult.error,
 			};
 			await writeFile(errorPath, JSON.stringify(errorResult, undefined, 2));
-			this.info(`Wrote ${errorPath}`);
+			this.info(`Wrote ${errorPath} — ${errorResult.error}`);
 			return errorResult;
 		}
 
@@ -173,34 +178,25 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 		// surface that as an error rather than a misleading "no-changes" result.
 		if (comparisonResult.comparison.length === 0) {
 			const errorResult: BundleSizeDiffError = {
-				prNumber,
-				baseCommit: comparisonResult.baselineCommit,
-				targetBranch,
+				...provenance,
+				baseCommit: comparisonResult.baseCommit,
 				error:
 					"No bundles to compare — baseline artifact or PR local bundle reports are empty.",
 			};
 			await writeFile(errorPath, JSON.stringify(errorResult, undefined, 2));
-			this.info(`Wrote ${errorPath}`);
+			this.info(`Wrote ${errorPath} — ${errorResult.error}`);
 			return errorResult;
 		}
 
-		const { baselineCommit, comparison } = comparisonResult;
-		const common = {
-			prNumber,
-			baseCommit: baselineCommit,
-			targetBranch,
+		const { baseCommit, comparison } = comparisonResult;
+		const result: BundleSizeDiffResult = {
+			...provenance,
+			baseCommit,
+			comparison,
 		};
-		const result: BundleSizeDiffResult = bundlesContainNoChanges(comparison)
-			? { ...common, kind: "no-changes" }
-			: {
-					...common,
-					kind: "changes",
-					sizeRegressionDetected: detectSizeRegression(comparison),
-					comparison,
-				};
 
 		await writeFile(resultPath, JSON.stringify(result, undefined, 2));
-		this.info(`Wrote ${resultPath}`);
+		this.info(`Wrote ${resultPath} (base ${baseCommit})`);
 		return result;
 	}
 }
