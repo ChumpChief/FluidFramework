@@ -5,7 +5,6 @@
 
 export { downloadArtifact } from "./downloadArtifact";
 export { getAzureDevopsApi } from "./getAzureDevopsApi";
-export { getBaseCommit } from "./getBaseCommit";
 export {
 	BaselineBundlesResult,
 	GetBundlesForCommitOptions,

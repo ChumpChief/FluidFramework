@@ -56,9 +56,6 @@ export function downloadArtifact(adoConnection: WebApi, project: string, buildId
 export function getAzureDevopsApi(accessToken: string | undefined, orgUrl: string): WebApi;
 
 // @public
-export function getBaseCommit(targetBranch: string): string;
-
-// @public
 export function getBundlesForCommit(adoConnection: WebApi, options: GetBundlesForCommitOptions): Promise<BaselineBundlesResult>;
 
 // @public (undocumented)

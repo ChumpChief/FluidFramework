@@ -8,7 +8,6 @@ export {
 	downloadArtifact,
 	GetBundlesForCommitOptions,
 	getAzureDevopsApi,
-	getBaseCommit,
 	getBundlesForCommit,
 	getBundlesFromFileSystem,
 } from "./ADO";

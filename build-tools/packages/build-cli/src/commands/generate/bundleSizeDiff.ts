@@ -3,12 +3,12 @@
  * Licensed under the MIT License.
  */
 
+import { execSync } from "node:child_process";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
 	compareBundles,
 	getAzureDevopsApi,
-	getBaseCommit,
 	getBundlesForCommit,
 	getBundlesFromFileSystem,
 	type PackageComparison,
@@ -169,7 +169,9 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 
 		let baseCommit: string | undefined;
 		try {
-			baseCommit = getBaseCommit(targetBranch);
+			baseCommit = execSync(`git merge-base origin/${targetBranch} HEAD`)
+				.toString()
+				.trim();
 			console.log(`The base commit for this PR is ${baseCommit}`);
 
 			const adoConnection = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
