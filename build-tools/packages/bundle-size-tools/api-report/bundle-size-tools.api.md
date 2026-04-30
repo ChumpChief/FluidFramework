@@ -5,7 +5,7 @@
 ```ts
 
 import type JSZip from 'jszip';
-import { WebApi } from 'azure-devops-node-api';
+import type { WebApi } from 'azure-devops-node-api';
 import type Webpack from 'webpack';
 
 // @public (undocumented)
@@ -51,9 +51,6 @@ export function compareBundles(base: PackageSummaries, compare: PackageSummaries
 
 // @public
 export function downloadArtifact(adoConnection: WebApi, project: string, buildId: number, artifactName: string): Promise<JSZip>;
-
-// @public
-export function getAzureDevopsApi(accessToken: string | undefined, orgUrl: string): WebApi;
 
 // @public
 export function getBundlesForCommit(adoConnection: WebApi, options: GetBundlesForCommitOptions): Promise<BaselineBundlesResult>;

@@ -7,7 +7,6 @@ export {
 	BaselineBundlesResult,
 	downloadArtifact,
 	GetBundlesForCommitOptions,
-	getAzureDevopsApi,
 	getBundlesForCommit,
 	getBundlesFromFileSystem,
 } from "./ADO";

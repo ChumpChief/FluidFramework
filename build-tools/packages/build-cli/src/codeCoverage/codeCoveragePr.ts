@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { getAzureDevopsApi } from "@fluidframework/bundle-size-tools";
 import type { IAzureDevopsBuildCoverageConstants } from "../library/azureDevops/constants.js";
+import { getAzureDevopsApi } from "../library/azureDevops/getAzureDevopsApi.js";
 import {
 	getBaselineBuildMetrics,
 	getBuildArtifactForSpecificBuild,
