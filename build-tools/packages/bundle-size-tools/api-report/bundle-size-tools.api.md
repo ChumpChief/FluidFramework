@@ -66,7 +66,6 @@ export interface GetBundlesForCommitOptions {
     artifactName: string;
     baseCommit: string;
     ciBuildDefinitionId: number;
-    maxBuildsPerDefinition?: number;
     project: string;
 }
 

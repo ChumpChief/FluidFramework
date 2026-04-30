@@ -4,10 +4,8 @@
  */
 
 export { downloadArtifact } from "./downloadArtifact";
-export { FindUsableBuildResult, findUsableBuild } from "./findUsableBuild";
 export { getAzureDevopsApi } from "./getAzureDevopsApi";
 export { getBaseCommit } from "./getBaseCommit";
-export { GetBuildOptions, getBuilds } from "./getBuilds";
 export {
 	BaselineBundlesResult,
 	GetBundlesForCommitOptions,
