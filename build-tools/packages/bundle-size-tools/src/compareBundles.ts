@@ -3,62 +3,43 @@
  * Licensed under the MIT License.
  */
 
-import type { BundleComparison, BundleSummaries } from "./BundleBuddyTypes";
+import type { PackageComparison, PackageSummaries } from "./types";
 
 /**
- * Compares all the bundle summaries for a "baseline" and a "compare" bundle.
+ * Compares all the bundle summaries for a "base" and a "compare" set, grouped by
+ * source package. Iterates the union of source packages and bundles so added and
+ * removed entries are explicitly represented (see {@link PackageComparison}).
  */
 export function compareBundles(
-	baseline: BundleSummaries,
-	compare: BundleSummaries,
-): BundleComparison[] {
-	const results: BundleComparison[] = [];
+	base: PackageSummaries,
+	compare: PackageSummaries,
+): PackageComparison[] {
+	const results: PackageComparison[] = [];
 
-	baseline.forEach((baselineBundle, bundleName) => {
-		const compareBundle = compare.get(bundleName);
+	const allPackages = new Set<string>([...base.keys(), ...compare.keys()]);
 
-		if (!compareBundle) {
-			console.log(
-				`Baseline has bundle '${bundleName}' that does not appear in the comparison bundle `,
-			);
-		} else {
-			const bundleComparison: BundleComparison = { bundleName, commonBundleMetrics: {} };
+	for (const sourcePackage of allPackages) {
+		const baseBundles = base.get(sourcePackage);
+		const compareBundles = compare.get(sourcePackage);
 
-			baselineBundle.forEach((baselineMetric, metricName) => {
-				const compareMetric = compareBundle.get(metricName);
+		const allBundleNames = new Set<string>([
+			...(baseBundles?.keys() ?? []),
+			...(compareBundles?.keys() ?? []),
+		]);
 
-				if (!compareMetric) {
-					console.log(
-						`Baseline has metric '${metricName}' in bundle '${bundleName}' that does not exist in the comparison bundle'`,
-					);
-				} else {
-					bundleComparison.commonBundleMetrics[metricName] = {
-						baseline: baselineMetric,
-						compare: compareMetric,
-					};
-				}
-			});
+		const bundles: PackageComparison["bundles"] = {};
+		for (const bundleName of allBundleNames) {
+			const baseBundle = baseBundles?.get(bundleName);
+			const compareBundle = compareBundles?.get(bundleName);
 
-			results.push(bundleComparison);
+			bundles[bundleName] = {
+				...(baseBundle && { base: baseBundle }),
+				...(compareBundle && { compare: compareBundle }),
+			};
 		}
-	});
 
-	return results;
-}
-
-/**
- * Checks if a bundle comparison contains no size changes
- * @param comparisons - bundle comparison
- */
-export function bundlesContainNoChanges(comparisons: BundleComparison[]): boolean {
-	for (const { commonBundleMetrics } of comparisons) {
-		const metrics = Object.values(commonBundleMetrics);
-		for (const { baseline, compare } of metrics) {
-			if (baseline.parsedSize !== compare.parsedSize) {
-				return false;
-			}
-		}
+		results.push({ sourcePackage, bundles });
 	}
 
-	return true;
+	return results;
 }

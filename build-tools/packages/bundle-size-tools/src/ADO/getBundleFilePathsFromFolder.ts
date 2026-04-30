@@ -4,21 +4,19 @@
  */
 
 export interface BundleFileData {
-	bundleName: string;
+	sourcePackage: string;
 
-	relativePathToStatsFile: string;
-
-	relativePathToConfigFile: string | undefined;
+	relativePathToAnalyzerJson: string;
 }
 
-function getBundleNameFromPath(relativePath: string): string {
+function getSourcePackageFromPath(relativePath: string): string {
 	// Our artifacts are stored in the the format /<npm scope>/<package name>[/<bundle name>]/<file name>.
-	// We want to use the npm scope + package name as the bundle name.
+	// We want to use the npm scope + package name as the source package identifier.
 	// The regex here normalized the slashes in the path names.
 	const pathParts = relativePath.replace(/\\/g, "/").split("/");
 
 	if (pathParts.length < 3) {
-		throw Error(`Could not derive a bundle name from this path: ${relativePath}`);
+		throw Error(`Could not derive a source package from this path: ${relativePath}`);
 	}
 	pathParts.pop(); // Remove the filename
 
@@ -28,25 +26,16 @@ function getBundleNameFromPath(relativePath: string): string {
 export function getBundleFilePathsFromFolder(
 	relativePathsInFolder: string[],
 ): BundleFileData[] {
-	const statsFilePaths: Omit<BundleFileData, "relativePathToConfigFile">[] = [];
-
-	// A map from bundle name to a bundle buddy config
-	const configFilePathMap = new Map<string, string>();
+	const analyzerJsonPaths: BundleFileData[] = [];
 
 	relativePathsInFolder.forEach((relativePath) => {
-		if (relativePath.endsWith(".msp.gz")) {
-			statsFilePaths.push({
-				bundleName: getBundleNameFromPath(relativePath),
-				relativePathToStatsFile: relativePath,
+		if (relativePath.endsWith("analyzer.json")) {
+			analyzerJsonPaths.push({
+				sourcePackage: getSourcePackageFromPath(relativePath),
+				relativePathToAnalyzerJson: relativePath,
 			});
-		} else if (relativePath.endsWith("bundleBuddyConfig.json")) {
-			configFilePathMap.set(getBundleNameFromPath(relativePath), relativePath);
 		}
 	});
 
-	return statsFilePaths.map(({ bundleName, relativePathToStatsFile }) => ({
-		bundleName,
-		relativePathToStatsFile,
-		relativePathToConfigFile: configFilePathMap.get(bundleName),
-	}));
+	return analyzerJsonPaths;
 }

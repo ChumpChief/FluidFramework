@@ -4,14 +4,39 @@
  */
 
 import { promises as fsPromises } from "fs";
-import type { StatsCompilation } from "webpack";
+import { join } from "path";
 
-import type { BundleBuddyConfig } from "../BundleBuddyTypes";
-import { decompressStatsFile, getAllFilesInDirectory } from "../utilities";
+import type { AnalyzerAssetEntry } from "../types";
 import {
 	type BundleFileData,
 	getBundleFilePathsFromFolder,
 } from "./getBundleFilePathsFromFolder";
+
+/**
+ * Gets the relative path of all files in this directory
+ * @param sourceFolder - The path of the directory to scan
+ * @param partialPathPrefix - The partial path built up as we recurse through directories. External callers probably don't want to set this.
+ */
+async function getAllFilesInDirectory(
+	sourceFolder: string,
+	partialPathPrefix: string = "",
+): Promise<string[]> {
+	const result: string[] = [];
+	for (const file of await fsPromises.readdir(sourceFolder)) {
+		const fullPath = join(sourceFolder, file);
+		if ((await fsPromises.stat(fullPath)).isFile()) {
+			result.push(join(partialPathPrefix, file));
+		} else {
+			result.push(
+				...(await getAllFilesInDirectory(
+					join(sourceFolder, file),
+					join(partialPathPrefix, file),
+				)),
+			);
+		}
+	}
+	return result;
+}
 
 /**
  * Returns a list of all the files relevant to bundle buddy from the given folder
@@ -26,23 +51,13 @@ export async function getBundlePathsFromFileSystem(
 }
 
 /**
- * Gets and parses a BundleBuddyConfig  file from the filesystem
+ * Gets and parses an analyzer.json from the filesystem.
  * @param path - the full path to the file in the filesystem
  */
-export async function getBundleBuddyConfigFromFileSystem(
+export async function getAnalyzerJsonFromFileSystem(
 	path: string,
-): Promise<BundleBuddyConfig> {
-	const file = await fsPromises.readFile(path);
+): Promise<AnalyzerAssetEntry[]> {
+	const file = await fsPromises.readFile(path, "utf8");
 
-	return JSON.parse(file.toString());
-}
-
-/**
- * Gets a decompressed webpack stats file from the filesystem
- * @param path - the full path to the file in the filesystem
- */
-export async function getStatsFileFromFileSystem(path: string): Promise<StatsCompilation> {
-	const file = await fsPromises.readFile(path);
-
-	return decompressStatsFile(file);
+	return JSON.parse(file);
 }

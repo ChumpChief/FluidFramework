@@ -3,47 +3,36 @@
  * Licensed under the MIT License.
  */
 
-import type { StatsCompilation } from "webpack";
-
-import type {
-	BundleBuddyConfig,
-	BundleSummaries,
-	WebpackStatsProcessor,
-} from "../BundleBuddyTypes";
-import { runProcessorsOnStatsFile } from "../utilities/runProcessorOnStatsFile";
+import type { AnalyzerAssetEntry, BundleSizeSet, PackageSummaries } from "../types";
 import type { BundleFileData } from "./getBundleFilePathsFromFolder";
 
 export interface GetBundleSummariesArgs {
 	bundlePaths: BundleFileData[];
 
-	statsProcessors: WebpackStatsProcessor[];
+	getAnalyzerJson: (relativePath: string) => Promise<AnalyzerAssetEntry[]>;
+}
 
-	getStatsFile: (relativePath: string) => Promise<StatsCompilation>;
-
-	getBundleBuddyConfigFile: (
-		bundleName: string,
-	) => Promise<BundleBuddyConfig | undefined> | (BundleBuddyConfig | undefined);
+function entriesToBundleSizeSet(entries: AnalyzerAssetEntry[]): BundleSizeSet {
+	const result: BundleSizeSet = new Map();
+	for (const entry of entries) {
+		if (!entry.isAsset) continue;
+		result.set(entry.label, {
+			statSize: entry.statSize,
+			parsedSize: entry.parsedSize,
+			gzipSize: entry.gzipSize,
+		});
+	}
+	return result;
 }
 
 export async function getBundleSummaries(
 	args: GetBundleSummariesArgs,
-): Promise<BundleSummaries> {
-	const result: BundleSummaries = new Map();
+): Promise<PackageSummaries> {
+	const result: PackageSummaries = new Map();
 
 	const pendingAsyncWork = args.bundlePaths.map(async (bundle) => {
-		const [statsFile, bundleBuddyConfig] = await Promise.all([
-			args.getStatsFile(bundle.relativePathToStatsFile),
-			args.getBundleBuddyConfigFile(bundle.bundleName),
-		]);
-
-		const bundleSummary = runProcessorsOnStatsFile(
-			bundle.bundleName,
-			statsFile!, // non-null assertion here needed to due TS bug. Stats file is never undefined here
-			bundleBuddyConfig,
-			args.statsProcessors,
-		);
-
-		result.set(bundle.bundleName, bundleSummary);
+		const entries = await args.getAnalyzerJson(bundle.relativePathToAnalyzerJson);
+		result.set(bundle.sourcePackage, entriesToBundleSizeSet(entries));
 	});
 
 	await Promise.all(pendingAsyncWork);

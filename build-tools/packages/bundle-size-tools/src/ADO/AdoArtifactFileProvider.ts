@@ -6,14 +6,33 @@
 import { strict as assert } from "assert";
 import type { WebApi } from "azure-devops-node-api";
 import type JSZip from "jszip";
-import type { StatsCompilation } from "webpack";
+import { loadAsync } from "jszip";
 
-import type { BundleBuddyConfig } from "../BundleBuddyTypes";
-import { decompressStatsFile, unzipStream } from "../utilities";
+import type { AnalyzerAssetEntry } from "../types";
 import {
 	type BundleFileData,
 	getBundleFilePathsFromFolder,
 } from "./getBundleFilePathsFromFolder";
+
+function readStreamAsBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+	return new Promise((resolve, reject) => {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const data: any[] = [];
+		stream.on("data", (chunk) => {
+			data.push(chunk);
+		});
+		stream.on("close", () => {
+			resolve(Buffer.concat(data));
+		});
+		stream.on("error", (error) => {
+			reject(error);
+		});
+	});
+}
+
+async function unzipStream(stream: NodeJS.ReadableStream): Promise<JSZip> {
+	return loadAsync(await readStreamAsBuffer(stream));
+}
 
 /**
  * Gets a list of all paths relevant to bundle buddy from the zip archive
@@ -68,33 +87,17 @@ export async function getZipObjectFromArtifact(
 }
 
 /**
- * Retrieves a decompressed stats file from a jszip object
+ * Retrieves and parses an analyzer.json from a jszip object.
  * @param jsZip - A zip file that has been processed with the jszip library
  * @param relativePath - The relative path to the file that will be retrieved
  */
-export async function getStatsFileFromZip(
+export async function getAnalyzerJsonFromZip(
 	jsZip: JSZip,
 	relativePath: string,
-): Promise<StatsCompilation> {
+): Promise<AnalyzerAssetEntry[]> {
 	const jsZipObject = jsZip.file(relativePath);
-	assert(jsZipObject, `getStatsFileFromZip could not find file ${relativePath}`);
+	assert(jsZipObject, `getAnalyzerJsonFromZip could not find file ${relativePath}`);
 
-	const buffer = await jsZipObject.async("nodebuffer");
-	return decompressStatsFile(buffer);
-}
-
-/**
- * Retrieves and parses a bundle buddy config file from a jszip object
- * @param jsZip - A zip file that has been processed with the jszip library
- * @param relativePath - The relative path to the file that will be retrieved
- */
-export async function getBundleBuddyConfigFileFromZip(
-	jsZip: JSZip,
-	relativePath: string,
-): Promise<BundleBuddyConfig> {
-	const jsZipObject = jsZip.file(relativePath);
-	assert(jsZipObject, `getBundleBuddyConfigFileFromZip could not find file ${relativePath}`);
-
-	const buffer = await jsZipObject.async("nodebuffer");
-	return JSON.parse(buffer.toString());
+	const text = await jsZipObject.async("string");
+	return JSON.parse(text);
 }
