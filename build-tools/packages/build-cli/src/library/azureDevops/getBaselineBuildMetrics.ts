@@ -4,7 +4,7 @@
  */
 
 import { strict as assert } from "node:assert";
-import { getZipObjectFromArtifact } from "@fluidframework/bundle-size-tools";
+import { downloadArtifact } from "@fluidframework/bundle-size-tools";
 import type { WebApi } from "azure-devops-node-api";
 import type { Build } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { BuildResult } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
@@ -64,7 +64,7 @@ export async function getBaselineBuildMetrics(
 		);
 
 		// eslint-disable-next-line no-await-in-loop
-		baselineArtifactZip = await getZipObjectFromArtifact(
+		baselineArtifactZip = await downloadArtifact(
 			adoConnection,
 			azureDevopsBuildCoverageConstants.projectName,
 			build.id,
@@ -159,7 +159,7 @@ export async function getBuildArtifactForSpecificBuild(
 		`codeCoverageAnalysisArtifactName: ${azureDevopsBuildCoverageConstants.artifactName}`,
 	);
 
-	const artifactZip: JSZip | undefined = await getZipObjectFromArtifact(
+	const artifactZip: JSZip | undefined = await downloadArtifact(
 		adoConnection,
 		azureDevopsBuildCoverageConstants.projectName,
 		build.id,

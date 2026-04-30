@@ -3,16 +3,15 @@
  * Licensed under the MIT License.
  */
 
-export {
-	getAnalyzerJsonFromZip,
-	getBundlePathsFromZipObject,
-	getZipObjectFromArtifact,
-} from "./AdoArtifactFileProvider";
-export { ADOSizeComparator, IADOConstants, SizeComparison } from "./AdoSizeComparator";
-export {
-	getAnalyzerJsonFromFileSystem,
-	getBundlePathsFromFileSystem,
-} from "./FileSystemBundleFileProvider";
+export { downloadArtifact } from "./downloadArtifact";
+export { FindUsableBuildResult, findUsableBuild } from "./findUsableBuild";
 export { getAzureDevopsApi } from "./getAzureDevopsApi";
-export { BundleFileData, getBundleFilePathsFromFolder } from "./getBundleFilePathsFromFolder";
-export { GetBundleSummariesArgs, getBundleSummaries } from "./getBundleSummaries";
+export { getBaseCommit } from "./getBaseCommit";
+export { GetBuildOptions, getBuilds } from "./getBuilds";
+export {
+	BaselineBundlesResult,
+	GetBundlesForCommitOptions,
+	getBundlesForCommit,
+} from "./getBundlesForCommit";
+export { getBundlesFromArtifact } from "./getBundlesFromArtifact";
+export { getBundlesFromFileSystem } from "./getBundlesFromFileSystem";

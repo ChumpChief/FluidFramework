@@ -4,15 +4,18 @@
  */
 
 export {
-	ADOSizeComparator,
+	BaselineBundlesResult,
+	downloadArtifact,
+	GetBundlesForCommitOptions,
 	getAzureDevopsApi,
-	getZipObjectFromArtifact,
-	IADOConstants,
-	SizeComparison,
+	getBaseCommit,
+	getBundlesForCommit,
+	getBundlesFromFileSystem,
 } from "./ADO";
 export {
 	BannedModule,
 	BannedModulesPlugin,
 	BannedModulesPluginOptions,
 } from "./bannedModulesPlugin";
-export { BundleSize, PackageComparison } from "./types";
+export { compareBundles } from "./compareBundles";
+export { BundleSize, BundleSizeSet, PackageComparison, PackageSummaries } from "./types";

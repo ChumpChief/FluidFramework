@@ -6,8 +6,11 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
-	ADOSizeComparator,
+	compareBundles,
 	getAzureDevopsApi,
+	getBaseCommit,
+	getBundlesForCommit,
+	getBundlesFromFileSystem,
 	type PackageComparison,
 } from "@fluidframework/bundle-size-tools";
 import { Flags } from "@oclif/core";
@@ -145,15 +148,6 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 			timestamp: new Date().toISOString(),
 		};
 
-		const adoConnection = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
-		const sizeComparator = new ADOSizeComparator(
-			adoConstants,
-			adoConnection,
-			localReportPath,
-			targetBranch,
-		);
-		const comparisonResult = await sizeComparator.getSizeComparison();
-
 		const resolvedOutputDir = path.resolve(process.cwd(), outputDir);
 		await mkdir(resolvedOutputDir, { recursive: true });
 		const resultPath = path.join(resolvedOutputDir, resultFileName);
@@ -163,40 +157,56 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 		// success/failure discriminator without worrying about stale artifacts from earlier runs.
 		await Promise.all([rm(resultPath, { force: true }), rm(errorPath, { force: true })]);
 
-		if (comparisonResult.kind === "error") {
-			const errorResult: BundleSizeDiffError = {
-				...provenance,
-				baseCommit: comparisonResult.baseCommit,
-				error: comparisonResult.error,
-			};
+		const writeError = async (
+			error: string,
+			baseCommit: string | undefined,
+		): Promise<BundleSizeDiffError> => {
+			const errorResult: BundleSizeDiffError = { ...provenance, baseCommit, error };
 			await writeFile(errorPath, JSON.stringify(errorResult, undefined, 2));
-			this.info(`Wrote ${errorPath} — ${errorResult.error}`);
+			this.info(`Wrote ${errorPath} — ${error}`);
 			return errorResult;
-		}
-
-		// An empty comparison means the baseline or PR collection produced no bundles;
-		// surface that as an error rather than a misleading "no-changes" result.
-		if (comparisonResult.comparison.length === 0) {
-			const errorResult: BundleSizeDiffError = {
-				...provenance,
-				baseCommit: comparisonResult.baseCommit,
-				error:
-					"No bundles to compare — baseline artifact or PR local bundle reports are empty.",
-			};
-			await writeFile(errorPath, JSON.stringify(errorResult, undefined, 2));
-			this.info(`Wrote ${errorPath} — ${errorResult.error}`);
-			return errorResult;
-		}
-
-		const { baseCommit, comparison } = comparisonResult;
-		const result: BundleSizeDiffResult = {
-			...provenance,
-			baseCommit,
-			comparison,
 		};
 
-		await writeFile(resultPath, JSON.stringify(result, undefined, 2));
-		this.info(`Wrote ${resultPath} (base ${baseCommit})`);
-		return result;
+		let baseCommit: string | undefined;
+		try {
+			baseCommit = getBaseCommit(targetBranch);
+			console.log(`The base commit for this PR is ${baseCommit}`);
+
+			const adoConnection = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
+
+			const [baselineLookup, compareSummaries] = await Promise.all([
+				getBundlesForCommit(adoConnection, {
+					project: adoConstants.projectName,
+					ciBuildDefinitionId: adoConstants.ciBuildDefinitionId,
+					artifactName: adoConstants.bundleAnalysisArtifactName,
+					baseCommit,
+				}),
+				getBundlesFromFileSystem(localReportPath),
+			]);
+
+			if (baselineLookup.kind === "error") {
+				return await writeError(baselineLookup.error, baseCommit);
+			}
+
+			const { baseBundles } = baselineLookup;
+			if (baseBundles.size === 0 || compareSummaries.size === 0) {
+				return await writeError(
+					"No bundles to compare — baseline artifact or PR local bundle reports are empty.",
+					baseCommit,
+				);
+			}
+
+			const comparison = compareBundles(baseBundles, compareSummaries);
+			const result: BundleSizeDiffResult = { ...provenance, baseCommit, comparison };
+
+			await writeFile(resultPath, JSON.stringify(result, undefined, 2));
+			this.info(`Wrote ${resultPath} (base ${baseCommit})`);
+			return result;
+		} catch (e) {
+			return writeError(
+				`Unexpected failure during size comparison: ${e instanceof Error ? e.message : String(e)}`,
+				baseCommit,
+			);
+		}
 	}
 }

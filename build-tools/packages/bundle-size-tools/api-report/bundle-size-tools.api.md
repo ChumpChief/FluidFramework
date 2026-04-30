@@ -9,16 +9,6 @@ import { WebApi } from 'azure-devops-node-api';
 import type Webpack from 'webpack';
 
 // @public (undocumented)
-export class ADOSizeComparator {
-    constructor(
-    adoConstants: IADOConstants,
-    adoConnection: WebApi,
-    localReportPath: string,
-    targetBranch: string);
-    getSizeComparison(): Promise<SizeComparison>;
-}
-
-// @public (undocumented)
 export interface BannedModule {
     moduleName: string;
     reason: string;
@@ -38,6 +28,15 @@ export interface BannedModulesPluginOptions {
 }
 
 // @public
+export type BaselineBundlesResult = {
+    kind: "found";
+    baseBundles: PackageSummaries;
+} | {
+    kind: "error";
+    error: string;
+};
+
+// @public
 export interface BundleSize {
     gzipSize: number;
     parsedSize: number;
@@ -45,24 +44,34 @@ export interface BundleSize {
 }
 
 // @public
+export type BundleSizeSet = Map<string, BundleSize>;
+
+// @public
+export function compareBundles(base: PackageSummaries, compare: PackageSummaries): PackageComparison[];
+
+// @public
+export function downloadArtifact(adoConnection: WebApi, project: string, buildId: number, artifactName: string): Promise<JSZip>;
+
+// @public
 export function getAzureDevopsApi(accessToken: string | undefined, orgUrl: string): WebApi;
 
 // @public
-export function getZipObjectFromArtifact(adoConnection: WebApi, projectName: string, buildNumber: number, bundleAnalysisArtifactName: string): Promise<JSZip>;
+export function getBaseCommit(targetBranch: string): string;
+
+// @public
+export function getBundlesForCommit(adoConnection: WebApi, options: GetBundlesForCommitOptions): Promise<BaselineBundlesResult>;
 
 // @public (undocumented)
-export interface IADOConstants {
-    // (undocumented)
-    buildsToSearch?: number;
-    // (undocumented)
-    bundleAnalysisArtifactName: string;
-    // (undocumented)
+export interface GetBundlesForCommitOptions {
+    artifactName: string;
+    baseCommit: string;
     ciBuildDefinitionId: number;
-    // (undocumented)
-    orgUrl: string;
-    // (undocumented)
-    projectName: string;
+    maxBuildsPerDefinition?: number;
+    project: string;
 }
+
+// @public
+export function getBundlesFromFileSystem(rootPath: string): Promise<PackageSummaries>;
 
 // @public
 export interface PackageComparison {
@@ -78,15 +87,7 @@ export interface PackageComparison {
 }
 
 // @public
-export type SizeComparison = {
-    kind: "success";
-    baseCommit: string;
-    comparison: PackageComparison[];
-} | {
-    kind: "error";
-    baseCommit: string | undefined;
-    error: string;
-};
+export type PackageSummaries = Map<string, BundleSizeSet>;
 
 // (No @packageDocumentation comment for this package)
 
