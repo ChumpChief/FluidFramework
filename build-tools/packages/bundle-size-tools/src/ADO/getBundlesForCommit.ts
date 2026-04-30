@@ -66,17 +66,18 @@ async function getRecentBuilds(
 }
 
 /**
- * Searches `builds` for one whose `sourceVersion` matches `targetCommit` and
- * validates it: must have an id, be completed, and have succeeded.
+ * Looks up the baseline build for `baseCommit` in `builds` and validates that
+ * it has an id, is completed, and succeeded. Returns the build id on success,
+ * or a human-readable error explaining why no usable build was found.
  */
-function findUsableBuild(
+function findBaseBuildId(
 	builds: Build[],
-	targetCommit: string,
-): { kind: "found"; build: Build & { id: number } } | { kind: "error"; error: string } {
-	const build = builds.find((b) => b.sourceVersion === targetCommit);
+	baseCommit: string,
+): { kind: "found"; buildId: number } | { kind: "error"; error: string } {
+	const build = builds.find((b) => b.sourceVersion === baseCommit);
 
 	if (build === undefined) {
-		return { kind: "error", error: `No CI build found for base commit ${targetCommit}` };
+		return { kind: "error", error: `No CI build found for base commit ${baseCommit}` };
 	}
 
 	if (build.id === undefined) {
@@ -94,7 +95,7 @@ function findUsableBuild(
 		};
 	}
 
-	return { kind: "found", build: build as Build & { id: number } };
+	return { kind: "found", buildId: build.id };
 }
 
 /**
@@ -113,7 +114,7 @@ export async function getBundlesForCommit(
 		options.ciBuildDefinitionId,
 	);
 
-	const buildLookup = findUsableBuild(builds, options.baseCommit);
+	const buildLookup = findBaseBuildId(builds, options.baseCommit);
 	if (buildLookup.kind === "error") {
 		return buildLookup;
 	}
@@ -122,7 +123,7 @@ export async function getBundlesForCommit(
 		const baseBundles = await getBundlesFromArtifact(
 			adoConnection,
 			options.project,
-			buildLookup.build.id,
+			buildLookup.buildId,
 			options.artifactName,
 		);
 		return { kind: "found", baseBundles };
