@@ -169,9 +169,7 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 
 		let baseCommit: string | undefined;
 		try {
-			baseCommit = execSync(`git merge-base origin/${targetBranch} HEAD`)
-				.toString()
-				.trim();
+			baseCommit = execSync(`git merge-base origin/${targetBranch} HEAD`).toString().trim();
 			console.log(`The base commit for this PR is ${baseCommit}`);
 
 			const adoConnection = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
