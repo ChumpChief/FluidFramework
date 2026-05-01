@@ -35,7 +35,7 @@ export function sourcePackageFromAnalyzerPath(relativePath: string): string | un
  * {@link PackageSummaries} keyed by source package, where each value maps
  * bundle name (webpack entrypoint) to its size data.
  */
-export function summarize(jsons: AnalyzerJsonByPackage): PackageSummaries {
+export function extractPackageSummaries(jsons: AnalyzerJsonByPackage): PackageSummaries {
 	const result: PackageSummaries = new Map();
 	for (const [sourcePackage, entries] of jsons) {
 		const sizes: BundleSizeSet = new Map();

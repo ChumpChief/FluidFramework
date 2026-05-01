@@ -10,9 +10,9 @@ import type { AnalyzerAssetEntry, PackageSummaries } from "../types";
 import { downloadArtifact } from "./downloadArtifact";
 import {
 	type AnalyzerJsonByPackage,
+	extractPackageSummaries,
 	sourcePackageFromAnalyzerPath,
-	summarize,
-} from "./summarize";
+} from "./extractPackageSummaries";
 
 /**
  * Walks `zip`, finds every `analyzer.json` entry, parses it, and keys the
@@ -51,5 +51,5 @@ export async function getBundlesFromArtifact(
 ): Promise<PackageSummaries> {
 	const zip = await downloadArtifact(adoConnection, project, buildId, artifactName);
 	const jsons = await extractAnalyzerJsonsFromZip(zip);
-	return summarize(jsons);
+	return extractPackageSummaries(jsons);
 }
