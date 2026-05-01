@@ -4,7 +4,7 @@
  */
 
 export {
-	BaselineBundlesResult,
+	BaselinePackagesResult,
 	downloadArtifact,
 	GetBundlesForCommitOptions,
 	getBundlesForCommit,

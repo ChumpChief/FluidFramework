@@ -5,7 +5,7 @@
 
 export { downloadArtifact } from "./downloadArtifact";
 export {
-	BaselineBundlesResult,
+	BaselinePackagesResult,
 	GetBundlesForCommitOptions,
 	getBundlesForCommit,
 } from "./getBundlesForCommit";

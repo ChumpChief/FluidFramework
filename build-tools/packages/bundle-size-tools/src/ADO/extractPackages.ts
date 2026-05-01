@@ -35,19 +35,19 @@ export function sourcePackageFromAnalyzerPath(relativePath: string): string | un
  * {@link Packages} keyed by source package, where each value maps
  * entrypoint name to its bundle data.
  */
-export function extractPackageSummaries(jsons: AnalyzerJsonByPackage): Packages {
+export function extractPackages(jsons: AnalyzerJsonByPackage): Packages {
 	const result: Packages = new Map();
 	for (const [sourcePackage, entries] of jsons) {
-		const sizes: Entrypoints = new Map();
+		const entrypoints: Entrypoints = new Map();
 		for (const entry of entries) {
 			if (!entry.isAsset) continue;
-			sizes.set(entry.label, {
+			entrypoints.set(entry.label, {
 				statSize: entry.statSize,
 				parsedSize: entry.parsedSize,
 				gzipSize: entry.gzipSize,
 			});
 		}
-		result.set(sourcePackage, sizes);
+		result.set(sourcePackage, entrypoints);
 	}
 	return result;
 }

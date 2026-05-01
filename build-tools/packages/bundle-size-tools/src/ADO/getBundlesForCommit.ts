@@ -22,8 +22,8 @@ const recentBuildsToFetch = 100;
 /**
  * Result of looking up bundle data for a target commit on an ADO baseline pipeline.
  */
-export type BaselineBundlesResult =
-	| { kind: "found"; baseBundles: Packages }
+export type BaselinePackagesResult =
+	| { kind: "found"; basePackages: Packages }
 	| { kind: "error"; error: string };
 
 export interface GetBundlesForCommitOptions {
@@ -107,7 +107,7 @@ function findBaseBuildId(
 export async function getBundlesForCommit(
 	adoConnection: WebApi,
 	options: GetBundlesForCommitOptions,
-): Promise<BaselineBundlesResult> {
+): Promise<BaselinePackagesResult> {
 	const builds = await getRecentBuilds(
 		adoConnection,
 		options.project,
@@ -120,13 +120,13 @@ export async function getBundlesForCommit(
 	}
 
 	try {
-		const baseBundles = await getBundlesFromArtifact(
+		const basePackages = await getBundlesFromArtifact(
 			adoConnection,
 			options.project,
 			buildLookup.buildId,
 			options.artifactName,
 		);
-		return { kind: "found", baseBundles };
+		return { kind: "found", basePackages };
 	} catch (e) {
 		return {
 			kind: "error",

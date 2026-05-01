@@ -174,7 +174,7 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 
 			const adoConnection = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
 
-			const [baselineLookup, compareSummaries] = await Promise.all([
+			const [baselineLookup, comparePackages] = await Promise.all([
 				getBundlesForCommit(adoConnection, {
 					project: adoConstants.projectName,
 					ciBuildDefinitionId: adoConstants.ciBuildDefinitionId,
@@ -188,15 +188,15 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 				return await writeError(baselineLookup.error, baseCommit);
 			}
 
-			const { baseBundles } = baselineLookup;
-			if (baseBundles.size === 0 || compareSummaries.size === 0) {
+			const { basePackages } = baselineLookup;
+			if (basePackages.size === 0 || comparePackages.size === 0) {
 				return await writeError(
 					"No bundles to compare — baseline artifact or PR local bundle reports are empty.",
 					baseCommit,
 				);
 			}
 
-			const comparison = compareBundles(baseBundles, compareSummaries);
+			const comparison = compareBundles(basePackages, comparePackages);
 			const result: BundleSizeDiffResult = { ...provenance, baseCommit, comparison };
 
 			await writeFile(resultPath, JSON.stringify(result, undefined, 2));

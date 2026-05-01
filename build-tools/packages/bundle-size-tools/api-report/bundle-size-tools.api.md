@@ -28,9 +28,9 @@ export interface BannedModulesPluginOptions {
 }
 
 // @public
-export type BaselineBundlesResult = {
+export type BaselinePackagesResult = {
     kind: "found";
-    baseBundles: Packages;
+    basePackages: Packages;
 } | {
     kind: "error";
     error: string;
@@ -53,7 +53,7 @@ export function downloadArtifact(adoConnection: WebApi, project: string, buildId
 export type Entrypoints = Map<string, BundleData>;
 
 // @public
-export function getBundlesForCommit(adoConnection: WebApi, options: GetBundlesForCommitOptions): Promise<BaselineBundlesResult>;
+export function getBundlesForCommit(adoConnection: WebApi, options: GetBundlesForCommitOptions): Promise<BaselinePackagesResult>;
 
 // @public (undocumented)
 export interface GetBundlesForCommitOptions {

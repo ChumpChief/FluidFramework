@@ -16,18 +16,18 @@ export function compareBundles(base: Packages, compare: Packages): PackageCompar
 	const allPackages = new Set<string>([...base.keys(), ...compare.keys()]);
 
 	for (const sourcePackage of allPackages) {
-		const baseBundles = base.get(sourcePackage);
-		const compareBundles = compare.get(sourcePackage);
+		const baseEntrypoints = base.get(sourcePackage);
+		const compareEntrypoints = compare.get(sourcePackage);
 
 		const allBundleNames = new Set<string>([
-			...(baseBundles?.keys() ?? []),
-			...(compareBundles?.keys() ?? []),
+			...(baseEntrypoints?.keys() ?? []),
+			...(compareEntrypoints?.keys() ?? []),
 		]);
 
 		const bundles: PackageComparison["bundles"] = {};
 		for (const bundleName of allBundleNames) {
-			const baseBundle = baseBundles?.get(bundleName);
-			const compareBundle = compareBundles?.get(bundleName);
+			const baseBundle = baseEntrypoints?.get(bundleName);
+			const compareBundle = compareEntrypoints?.get(bundleName);
 
 			bundles[bundleName] = {
 				...(baseBundle && { base: baseBundle }),

@@ -9,9 +9,9 @@ import { join } from "path";
 import type { AnalyzerAssetEntry, Packages } from "../types";
 import {
 	type AnalyzerJsonByPackage,
-	extractPackageSummaries,
+	extractPackages,
 	sourcePackageFromAnalyzerPath,
-} from "./extractPackageSummaries";
+} from "./extractPackages";
 
 /**
  * Gets the relative path of all files in this directory
@@ -68,5 +68,5 @@ async function extractAnalyzerJsonsFromFileSystem(
  */
 export async function getBundlesFromFileSystem(rootPath: string): Promise<Packages> {
 	const jsons = await extractAnalyzerJsonsFromFileSystem(rootPath);
-	return extractPackageSummaries(jsons);
+	return extractPackages(jsons);
 }
