@@ -8,10 +8,11 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Flags } from "@oclif/core";
 
+import { getArtifactForCommit } from "../../library/azureDevops/getArtifactForCommit.js";
 import { getAzureDevopsApi } from "../../library/azureDevops/getAzureDevopsApi.js";
 import {
 	compareJsonReportsByPackage,
-	getBundlesForCommit,
+	getBundlesFromArtifact,
 	getBundlesFromFileSystem,
 	type PackageComparison,
 } from "../../library/bundleSizeDiff/index.js";
@@ -174,21 +175,21 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 
 			const adoConnection = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
 
-			const [baselineLookup, comparePackages] = await Promise.all([
-				getBundlesForCommit(adoConnection, {
+			const [baselineArtifact, comparePackages] = await Promise.all([
+				getArtifactForCommit(adoConnection, {
 					project: adoConstants.projectName,
-					ciBuildDefinitionId: adoConstants.ciBuildDefinitionId,
+					definitionId: adoConstants.ciBuildDefinitionId,
 					artifactName: adoConstants.bundleAnalysisArtifactName,
-					baseCommit,
+					commit: baseCommit,
 				}),
 				getBundlesFromFileSystem(localReportPath),
 			]);
 
-			if (baselineLookup.kind === "error") {
-				return await writeError(baselineLookup.error, baseCommit);
+			if (baselineArtifact.kind === "error") {
+				return await writeError(baselineArtifact.error, baseCommit);
 			}
 
-			const { basePackages } = baselineLookup;
+			const basePackages = getBundlesFromArtifact(baselineArtifact.contents);
 			if (basePackages.size === 0 || comparePackages.size === 0) {
 				return await writeError(
 					"No bundles to compare — baseline artifact or PR local bundle reports are empty.",

@@ -4,6 +4,6 @@
  */
 
 export { compareJsonReportsByPackage } from "./compareJsonReportsByPackage.js";
-export { getBundlesForCommit } from "./getBundlesForCommit.js";
+export { getBundlesFromArtifact } from "./getBundlesFromArtifact.js";
 export { getBundlesFromFileSystem } from "./getBundlesFromFileSystem.js";
 export type { PackageComparison } from "./types.js";
