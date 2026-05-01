@@ -6,7 +6,7 @@
 import { promises as fsPromises } from "fs";
 import { join } from "path";
 
-import type { AnalyzerAssetEntry, PackageSummaries } from "../types";
+import type { AnalyzerAssetEntry, Packages } from "../types";
 import {
 	type AnalyzerJsonByPackage,
 	extractPackageSummaries,
@@ -64,9 +64,9 @@ async function extractAnalyzerJsonsFromFileSystem(
 
 /**
  * Reads analyzer.json files from a local bundle-report directory and returns
- * them as a {@link PackageSummaries}.
+ * them as a {@link Packages}.
  */
-export async function getBundlesFromFileSystem(rootPath: string): Promise<PackageSummaries> {
+export async function getBundlesFromFileSystem(rootPath: string): Promise<Packages> {
 	const jsons = await extractAnalyzerJsonsFromFileSystem(rootPath);
 	return extractPackageSummaries(jsons);
 }

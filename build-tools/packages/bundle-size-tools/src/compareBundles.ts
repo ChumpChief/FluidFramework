@@ -3,17 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import type { PackageComparison, PackageSummaries } from "./types";
+import type { PackageComparison, Packages } from "./types";
 
 /**
- * Compares all the bundle summaries for a "base" and a "compare" set, grouped by
+ * Compares all the bundle data for a "base" and a "compare" set, grouped by
  * source package. Iterates the union of source packages and bundles so added and
  * removed entries are explicitly represented (see {@link PackageComparison}).
  */
-export function compareBundles(
-	base: PackageSummaries,
-	compare: PackageSummaries,
-): PackageComparison[] {
+export function compareBundles(base: Packages, compare: Packages): PackageComparison[] {
 	const results: PackageComparison[] = [];
 
 	const allPackages = new Set<string>([...base.keys(), ...compare.keys()]);

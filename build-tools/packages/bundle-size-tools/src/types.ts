@@ -4,20 +4,20 @@
  */
 
 /**
- * Map from source package name to its per-bundle size data.
+ * Map from source package name to its entrypoint bundle data.
  */
-export type PackageSummaries = Map<string, BundleSizeSet>;
+export type Packages = Map<string, Entrypoints>;
 
 /**
- * Map from bundle name (webpack entrypoint) to its size data, for one source package.
+ * Map from entrypoint name to its bundle data, for one source package.
  */
-export type BundleSizeSet = Map<string, BundleSize>;
+export type Entrypoints = Map<string, BundleData>;
 
 /**
- * Size data for a single bundle (webpack entrypoint), sourced from
+ * Data for a single bundle (webpack entrypoint), sourced from
  * webpack-bundle-analyzer's chart data.
  */
-export interface BundleSize {
+export interface BundleData {
 	/**
 	 * Sum of source-module sizes before tree-shaking and minification.
 	 */
@@ -49,8 +49,8 @@ export interface PackageComparison {
 
 	bundles: {
 		[key: string]: {
-			base?: BundleSize;
-			compare?: BundleSize;
+			base?: BundleData;
+			compare?: BundleData;
 		};
 	};
 }

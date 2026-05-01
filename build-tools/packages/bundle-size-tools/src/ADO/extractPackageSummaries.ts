@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import type { AnalyzerAssetEntry, BundleSizeSet, PackageSummaries } from "../types";
+import type { AnalyzerAssetEntry, Entrypoints, Packages } from "../types";
 
 /**
  * Map from source package name to the analyzer.json contents (as parsed
@@ -32,13 +32,13 @@ export function sourcePackageFromAnalyzerPath(relativePath: string): string | un
 
 /**
  * Convert parsed analyzer.json contents (one per source package) into a
- * {@link PackageSummaries} keyed by source package, where each value maps
- * bundle name (webpack entrypoint) to its size data.
+ * {@link Packages} keyed by source package, where each value maps
+ * entrypoint name to its bundle data.
  */
-export function extractPackageSummaries(jsons: AnalyzerJsonByPackage): PackageSummaries {
-	const result: PackageSummaries = new Map();
+export function extractPackageSummaries(jsons: AnalyzerJsonByPackage): Packages {
+	const result: Packages = new Map();
 	for (const [sourcePackage, entries] of jsons) {
-		const sizes: BundleSizeSet = new Map();
+		const sizes: Entrypoints = new Map();
 		for (const entry of entries) {
 			if (!entry.isAsset) continue;
 			sizes.set(entry.label, {

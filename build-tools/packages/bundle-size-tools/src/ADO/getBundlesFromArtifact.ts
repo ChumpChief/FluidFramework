@@ -6,7 +6,7 @@
 import type { WebApi } from "azure-devops-node-api";
 import type JSZip from "jszip";
 
-import type { AnalyzerAssetEntry, PackageSummaries } from "../types";
+import type { AnalyzerAssetEntry, Packages } from "../types";
 import { downloadArtifact } from "./downloadArtifact";
 import {
 	type AnalyzerJsonByPackage,
@@ -36,7 +36,7 @@ async function extractAnalyzerJsonsFromZip(zip: JSZip): Promise<AnalyzerJsonByPa
 
 /**
  * Downloads an ADO build artifact and returns its analyzer.json files as a
- * {@link PackageSummaries}.
+ * {@link Packages}.
  *
  * @param adoConnection - A connection to the ADO API.
  * @param project - The ADO project containing the build.
@@ -48,7 +48,7 @@ export async function getBundlesFromArtifact(
 	project: string,
 	buildId: number,
 	artifactName: string,
-): Promise<PackageSummaries> {
+): Promise<Packages> {
 	const zip = await downloadArtifact(adoConnection, project, buildId, artifactName);
 	const jsons = await extractAnalyzerJsonsFromZip(zip);
 	return extractPackageSummaries(jsons);

@@ -30,27 +30,27 @@ export interface BannedModulesPluginOptions {
 // @public
 export type BaselineBundlesResult = {
     kind: "found";
-    baseBundles: PackageSummaries;
+    baseBundles: Packages;
 } | {
     kind: "error";
     error: string;
 };
 
 // @public
-export interface BundleSize {
+export interface BundleData {
     gzipSize: number;
     parsedSize: number;
     statSize: number;
 }
 
 // @public
-export type BundleSizeSet = Map<string, BundleSize>;
-
-// @public
-export function compareBundles(base: PackageSummaries, compare: PackageSummaries): PackageComparison[];
+export function compareBundles(base: Packages, compare: Packages): PackageComparison[];
 
 // @public
 export function downloadArtifact(adoConnection: WebApi, project: string, buildId: number, artifactName: string): Promise<JSZip>;
+
+// @public
+export type Entrypoints = Map<string, BundleData>;
 
 // @public
 export function getBundlesForCommit(adoConnection: WebApi, options: GetBundlesForCommitOptions): Promise<BaselineBundlesResult>;
@@ -64,15 +64,15 @@ export interface GetBundlesForCommitOptions {
 }
 
 // @public
-export function getBundlesFromFileSystem(rootPath: string): Promise<PackageSummaries>;
+export function getBundlesFromFileSystem(rootPath: string): Promise<Packages>;
 
 // @public
 export interface PackageComparison {
     // (undocumented)
     bundles: {
         [key: string]: {
-            base?: BundleSize;
-            compare?: BundleSize;
+            base?: BundleData;
+            compare?: BundleData;
         };
     };
     // (undocumented)
@@ -80,7 +80,7 @@ export interface PackageComparison {
 }
 
 // @public
-export type PackageSummaries = Map<string, BundleSizeSet>;
+export type Packages = Map<string, Entrypoints>;
 
 // (No @packageDocumentation comment for this package)
 

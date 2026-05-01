@@ -10,7 +10,7 @@ import {
 	BuildStatus,
 } from "azure-devops-node-api/interfaces/BuildInterfaces";
 
-import type { PackageSummaries } from "../types";
+import type { Packages } from "../types";
 import { getBundlesFromArtifact } from "./getBundlesFromArtifact";
 
 // Upper bound on builds fetched when searching for one matching the base commit.
@@ -23,7 +23,7 @@ const recentBuildsToFetch = 100;
  * Result of looking up bundle data for a target commit on an ADO baseline pipeline.
  */
 export type BaselineBundlesResult =
-	| { kind: "found"; baseBundles: PackageSummaries }
+	| { kind: "found"; baseBundles: Packages }
 	| { kind: "error"; error: string };
 
 export interface GetBundlesForCommitOptions {
@@ -101,7 +101,7 @@ function findBaseBuildId(
 /**
  * Look up the baseline build for `baseCommit` on the given ADO pipeline and
  * return its bundle data. Returns a discriminated union: on success, the
- * `PackageSummaries` for the baseline build; on failure, a human-readable
+ * `Packages` for the baseline build; on failure, a human-readable
  * error string covering missing/incomplete/failed builds and missing artifacts.
  */
 export async function getBundlesForCommit(

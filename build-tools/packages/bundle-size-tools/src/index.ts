@@ -16,4 +16,4 @@ export {
 	BannedModulesPluginOptions,
 } from "./bannedModulesPlugin";
 export { compareBundles } from "./compareBundles";
-export { BundleSize, BundleSizeSet, PackageComparison, PackageSummaries } from "./types";
+export { BundleData, Entrypoints, PackageComparison, Packages } from "./types";
