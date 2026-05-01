@@ -5,29 +5,23 @@
 
 import type { AnalyzerJsonByPackage } from "@fluidframework/bundle-size-tools";
 import type { WebApi } from "azure-devops-node-api";
-import type JSZip from "jszip";
 import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
 
-import { downloadArtifact } from "../azureDevops/downloadArtifact.js";
+import { type ArtifactContents, downloadArtifact } from "../azureDevops/downloadArtifact.js";
 import { sourcePackageFromAnalyzerPath } from "./sourcePackageFromAnalyzerPath.js";
 
 /**
- * Walks `zip`, finds every `analyzer.json` entry, parses it, and keys the
+ * Walks `entries`, finds every `analyzer.json`, parses it, and keys the
  * results by source package.
  */
-async function extractAnalyzerJsonsFromZip(zip: JSZip): Promise<AnalyzerJsonByPackage> {
+function extractAnalyzerJsons(entries: ArtifactContents): AnalyzerJsonByPackage {
 	const result: AnalyzerJsonByPackage = new Map();
-	const reads: Promise<void>[] = [];
-	zip.forEach((relativePath, zipObject) => {
+	for (const [relativePath, bytes] of Object.entries(entries)) {
 		const sourcePackage = sourcePackageFromAnalyzerPath(relativePath);
-		if (sourcePackage === undefined) return;
-		reads.push(
-			zipObject.async("string").then((text) => {
-				result.set(sourcePackage, JSON.parse(text) as BundleAnalyzerPlugin.JsonReport);
-			}),
-		);
-	});
-	await Promise.all(reads);
+		if (sourcePackage === undefined) continue;
+		const text = Buffer.from(bytes).toString("utf8");
+		result.set(sourcePackage, JSON.parse(text) as BundleAnalyzerPlugin.JsonReport);
+	}
 	return result;
 }
 
@@ -46,6 +40,6 @@ export async function getBundlesFromArtifact(
 	buildId: number,
 	artifactName: string,
 ): Promise<AnalyzerJsonByPackage> {
-	const zip = await downloadArtifact(adoConnection, project, buildId, artifactName);
-	return extractAnalyzerJsonsFromZip(zip);
+	const entries = await downloadArtifact(adoConnection, project, buildId, artifactName);
+	return extractAnalyzerJsons(entries);
 }

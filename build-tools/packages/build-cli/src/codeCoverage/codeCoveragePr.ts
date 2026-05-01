@@ -68,8 +68,8 @@ export async function getCodeCoverageReport(
 
 	// Extract the coverage metrics for the baseline and PR builds.
 	const [coverageMetricsForBaseline, coverageMetricsForPr] = await Promise.all([
-		getCoverageMetricsFromArtifact(baselineBuildInfo.artifactZip),
-		getCoverageMetricsFromArtifact(prBuildInfo.artifactZip),
+		getCoverageMetricsFromArtifact(baselineBuildInfo.artifactContents),
+		getCoverageMetricsFromArtifact(prBuildInfo.artifactContents),
 	]);
 
 	// Compare the code coverage metrics for the baseline and PR builds.

@@ -40,8 +40,6 @@
 		"tsc": "tsc"
 	},
 	"dependencies": {
-		"azure-devops-node-api": "^11.2.0",
-		"jszip": "^3.10.1",
 		"typescript": "~5.4.5",
 		"webpack": "^5.103.0"
 	},

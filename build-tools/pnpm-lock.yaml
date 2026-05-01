@@ -211,9 +211,6 @@ importers:
       jssm:
         specifier: ^5.104.2
         version: 5.104.2
-      jszip:
-        specifier: ^3.10.1
-        version: 3.10.1
       latest-version:
         specifier: ^9.0.0
         version: 9.0.0
@@ -661,12 +658,6 @@ importers:
 
   packages/bundle-size-tools:
     dependencies:
-      azure-devops-node-api:
-        specifier: ^11.2.0
-        version: 11.2.0
-      jszip:
-        specifier: ^3.10.1
-        version: 3.10.1
       typescript:
         specifier: ~5.4.5
         version: 5.4.5

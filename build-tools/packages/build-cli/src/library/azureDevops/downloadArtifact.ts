@@ -5,20 +5,26 @@
 
 import { strict as assert } from "node:assert";
 import type { WebApi } from "azure-devops-node-api";
-import jszip, { type default as JSZip } from "jszip";
+import { unzipSync } from "fflate";
 
-async function unzipStream(stream: NodeJS.ReadableStream): Promise<JSZip> {
-	const buffer = await new Promise<Buffer>((resolve, reject) => {
+/**
+ * Files extracted from an ADO pipeline artifact zip, keyed by path relative
+ * to the artifact's top-level folder.
+ */
+export type ArtifactContents = { [path: string]: Uint8Array };
+
+async function readStreamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+	return new Promise<Buffer>((resolve, reject) => {
 		const chunks: Buffer[] = [];
 		stream.on("data", (chunk: Buffer) => chunks.push(chunk));
 		stream.on("close", () => resolve(Buffer.concat(chunks)));
 		stream.on("error", reject);
 	});
-	return jszip.loadAsync(buffer);
 }
 
 /**
- * Downloads an Azure DevOps pipeline artifact and returns its contents as a JSZip.
+ * Downloads an Azure DevOps pipeline artifact and returns its files as
+ * an {@link ArtifactContents}.
  *
  * @param adoConnection - A connection to the ADO API.
  * @param project - The ADO project containing the build.
@@ -30,7 +36,7 @@ export async function downloadArtifact(
 	project: string,
 	buildId: number,
 	artifactName: string,
-): Promise<JSZip> {
+): Promise<ArtifactContents> {
 	const buildApi = await adoConnection.getBuildApi();
 
 	// IMPORTANT
@@ -45,9 +51,23 @@ export async function downloadArtifact(
 	// Undo hack from above
 	buildApi.createAcceptHeader = originalCreateAcceptHeader;
 
-	// We want our relative paths to be clean, so navigating JsZip into the top level folder
-	const result = (await unzipStream(artifactStream)).folder(artifactName);
-	assert(result, `downloadArtifact could not find the folder ${artifactName}`);
+	const buffer = await readStreamToBuffer(artifactStream);
+	const entries = unzipSync(buffer);
+
+	// Scope to entries inside the artifact's top-level folder, with the prefix
+	// stripped from each key so callers see clean relative paths.
+	const prefix = `${artifactName}/`;
+	const result: ArtifactContents = {};
+	for (const [path, bytes] of Object.entries(entries)) {
+		if (path.startsWith(prefix)) {
+			result[path.slice(prefix.length)] = bytes;
+		}
+	}
+
+	assert(
+		Object.keys(result).length > 0,
+		`downloadArtifact could not find the folder ${artifactName}`,
+	);
 
 	return result;
 }
