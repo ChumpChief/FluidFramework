@@ -13,7 +13,9 @@ import type { AnalyzerJsonByPackage } from "./types.js";
  * Walks a downloaded artifact's contents, finds every `analyzer.json`, parses
  * it, and keys the results by source package.
  */
-export function getBundlesFromArtifact(contents: ArtifactContents): AnalyzerJsonByPackage {
+export function extractAnalyzerJsonsFromArtifact(
+	contents: ArtifactContents,
+): AnalyzerJsonByPackage {
 	const result: AnalyzerJsonByPackage = new Map();
 	for (const [relativePath, bytes] of Object.entries(contents)) {
 		const sourcePackage = sourcePackageFromAnalyzerPath(relativePath);

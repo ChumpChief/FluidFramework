@@ -12,9 +12,9 @@ import { getArtifactForCommit } from "../../library/azureDevops/getArtifactForCo
 import { getAzureDevopsApi } from "../../library/azureDevops/getAzureDevopsApi.js";
 import {
 	compareJsonReportsByPackage,
-	getBundlesFromArtifact,
-	getBundlesFromFileSystem,
+	extractAnalyzerJsonsFromArtifact,
 	type PackageComparison,
+	readAnalyzerJsonsFromFileSystem,
 } from "../../library/bundleSizeDiff/index.js";
 import { BaseCommand } from "../../library/commands/base.js";
 
@@ -183,14 +183,14 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 					definitionId: adoConstants.ciBuildDefinitionId,
 					project: adoConstants.projectName,
 				}),
-				getBundlesFromFileSystem(localReportPath),
+				readAnalyzerJsonsFromFileSystem(localReportPath),
 			]);
 
 			if (baselineArtifact.kind === "error") {
 				return await writeError(baselineArtifact.error, baseCommit);
 			}
 
-			const basePackages = getBundlesFromArtifact(baselineArtifact.contents);
+			const basePackages = extractAnalyzerJsonsFromArtifact(baselineArtifact.contents);
 			if (basePackages.size === 0 || comparePackages.size === 0) {
 				return await writeError(
 					"No bundles to compare — baseline artifact or PR local bundle reports are empty.",

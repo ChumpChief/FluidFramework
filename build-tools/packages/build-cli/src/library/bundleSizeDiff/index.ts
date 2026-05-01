@@ -4,8 +4,8 @@
  */
 
 export { compareJsonReportsByPackage } from "./compareJsonReportsByPackage.js";
-export { getBundlesFromArtifact } from "./getBundlesFromArtifact.js";
-export { getBundlesFromFileSystem } from "./getBundlesFromFileSystem.js";
+export { extractAnalyzerJsonsFromArtifact } from "./extractAnalyzerJsonsFromArtifact.js";
+export { readAnalyzerJsonsFromFileSystem } from "./readAnalyzerJsonsFromFileSystem.js";
 export type {
 	AnalyzerJsonByPackage,
 	BundleData,

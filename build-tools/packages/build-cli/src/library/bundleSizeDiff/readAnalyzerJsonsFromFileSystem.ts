@@ -40,7 +40,7 @@ async function getAllFilesInDirectory(
  * Walks `rootPath`, finds every `analyzer.json` file, parses it, and keys the
  * results by source package.
  */
-async function extractAnalyzerJsonsFromFileSystem(
+export async function readAnalyzerJsonsFromFileSystem(
 	rootPath: string,
 ): Promise<AnalyzerJsonByPackage> {
 	const allPaths = await getAllFilesInDirectory(rootPath);
@@ -57,14 +57,4 @@ async function extractAnalyzerJsonsFromFileSystem(
 	}
 	await Promise.all(reads);
 	return result;
-}
-
-/**
- * Reads analyzer.json files from a local bundle-report directory and returns
- * them as an {@link AnalyzerJsonByPackage}.
- */
-export async function getBundlesFromFileSystem(
-	rootPath: string,
-): Promise<AnalyzerJsonByPackage> {
-	return extractAnalyzerJsonsFromFileSystem(rootPath);
 }
