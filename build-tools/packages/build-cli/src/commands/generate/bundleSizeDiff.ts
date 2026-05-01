@@ -9,10 +9,12 @@ import path from "node:path";
 import { Flags } from "@oclif/core";
 
 import { getAzureDevopsApi } from "../../library/azureDevops/getAzureDevopsApi.js";
-import { compareJsonReportsByPackage } from "../../library/bundleSizeDiff/compareJsonReportsByPackage.js";
-import { getBundlesForCommit } from "../../library/bundleSizeDiff/getBundlesForCommit.js";
-import { getBundlesFromFileSystem } from "../../library/bundleSizeDiff/getBundlesFromFileSystem.js";
-import type { PackageComparison } from "../../library/bundleSizeDiff/types.js";
+import {
+	compareJsonReportsByPackage,
+	getBundlesForCommit,
+	getBundlesFromFileSystem,
+	type PackageComparison,
+} from "../../library/bundleSizeDiff/index.js";
 import { BaseCommand } from "../../library/commands/base.js";
 
 // ADO constants for the baseline build source.
@@ -168,7 +170,7 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 		let baseCommit: string | undefined;
 		try {
 			baseCommit = execSync(`git merge-base origin/${targetBranch} HEAD`).toString().trim();
-			console.log(`The base commit for this PR is ${baseCommit}`);
+			this.info(`The base commit for this PR is ${baseCommit}`);
 
 			const adoConnection = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
 
