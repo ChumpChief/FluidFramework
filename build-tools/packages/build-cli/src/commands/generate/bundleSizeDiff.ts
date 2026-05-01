@@ -173,14 +173,15 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 			baseCommit = execSync(`git merge-base origin/${targetBranch} HEAD`).toString().trim();
 			this.info(`The base commit for this PR is ${baseCommit}`);
 
-			const adoConnection = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
+			const adoApi = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
 
 			const [baselineArtifact, comparePackages] = await Promise.all([
-				getArtifactForCommit(adoConnection, {
-					project: adoConstants.projectName,
-					definitionId: adoConstants.ciBuildDefinitionId,
+				getArtifactForCommit({
+					adoApi,
 					artifactName: adoConstants.bundleAnalysisArtifactName,
 					commit: baseCommit,
+					definitionId: adoConstants.ciBuildDefinitionId,
+					project: adoConstants.projectName,
 				}),
 				getBundlesFromFileSystem(localReportPath),
 			]);

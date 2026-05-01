@@ -26,18 +26,18 @@ async function readStreamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer
  * Downloads an Azure DevOps pipeline artifact and returns its files as
  * an {@link ArtifactContents}.
  *
- * @param adoConnection - A connection to the ADO API.
+ * @param adoApi - A connection to the ADO API.
  * @param project - The ADO project containing the build.
  * @param buildId - The numeric build id whose artifact to fetch.
  * @param artifactName - The pipeline artifact's published name.
  */
 export async function downloadArtifact(
-	adoConnection: WebApi,
+	adoApi: WebApi,
 	project: string,
 	buildId: number,
 	artifactName: string,
 ): Promise<ArtifactContents> {
-	const buildApi = await adoConnection.getBuildApi();
+	const buildApi = await adoApi.getBuildApi();
 
 	// IMPORTANT
 	// getArtifactContentZip() in the azure-devops-node-api package tries to download pipeline artifacts using an

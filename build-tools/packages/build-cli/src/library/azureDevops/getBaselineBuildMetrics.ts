@@ -23,15 +23,15 @@ export interface IBuildMetrics {
 /**
  * Method that returns the build artifact for a baseline build.
  * @param azureDevopsBuildCoverageConstants - Code coverage constants for the project.
- * @param adoConnection - The connection to the Azure DevOps API
+ * @param adoApi - The connection to the Azure DevOps API
  * @param logger - The logger to log messages.
  */
 export async function getBaselineBuildMetrics(
 	azureDevopsBuildCoverageConstants: IAzureDevopsBuildCoverageConstants,
-	adoConnection: WebApi,
+	adoApi: WebApi,
 	logger?: CommandLogger,
 ): Promise<IBuildMetrics> {
-	const recentBuilds = await getBuilds(adoConnection, {
+	const recentBuilds = await getBuilds(adoApi, {
 		project: azureDevopsBuildCoverageConstants.projectName,
 		definitions: [azureDevopsBuildCoverageConstants.ciBuildDefinitionId],
 		branch:
@@ -64,7 +64,7 @@ export async function getBaselineBuildMetrics(
 
 		// eslint-disable-next-line no-await-in-loop
 		baselineArtifactContents = await downloadArtifact(
-			adoConnection,
+			adoApi,
 			azureDevopsBuildCoverageConstants.projectName,
 			build.id,
 			`${azureDevopsBuildCoverageConstants.artifactName}_${build.id}`,
@@ -126,19 +126,19 @@ export async function getBaselineBuildMetrics(
 /**
  * Method that returns the build artifact for a specific build.
  * @param azureDevopsBuildCoverageConstants - Code coverage constants for the project.
- * @param adoConnection - The connection to the Azure DevOps API
+ * @param adoApi - The connection to the Azure DevOps API
  * @param logger - The logger to log messages.
  */
 export async function getBuildArtifactForSpecificBuild(
 	azureDevopsBuildCoverageConstants: IAzureDevopsBuildCoverageConstants,
-	adoConnection: WebApi,
+	adoApi: WebApi,
 	logger?: CommandLogger,
 ): Promise<IBuildMetrics> {
 	assert(azureDevopsBuildCoverageConstants.buildId !== undefined, "buildId is required");
 	logger?.verbose(`The buildId id ${azureDevopsBuildCoverageConstants.buildId}`);
 
 	const build: Build = await getBuild(
-		adoConnection,
+		adoApi,
 		{
 			project: azureDevopsBuildCoverageConstants.projectName,
 			definitions: [azureDevopsBuildCoverageConstants.ciBuildDefinitionId],
@@ -161,7 +161,7 @@ export async function getBuildArtifactForSpecificBuild(
 	);
 
 	const artifactContents: ArtifactContents | undefined = await downloadArtifact(
-		adoConnection,
+		adoApi,
 		azureDevopsBuildCoverageConstants.projectName,
 		build.id,
 		`${azureDevopsBuildCoverageConstants.artifactName}_${build.id}`,

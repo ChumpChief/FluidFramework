@@ -19,32 +19,14 @@ import { type ArtifactContents, downloadArtifact } from "./downloadArtifact.js";
 const recentBuildsToFetch = 100;
 
 /**
- * Result of looking up an artifact for a target commit on an ADO pipeline.
- */
-export type ArtifactForCommitResult =
-	| { kind: "found"; contents: ArtifactContents }
-	| { kind: "error"; error: string };
-
-export interface GetArtifactForCommitOptions {
-	/** The ADO project name. */
-	project: string;
-	/** ID of the ADO pipeline whose builds to search. */
-	definitionId: number;
-	/** Name of the pipeline artifact to fetch. */
-	artifactName: string;
-	/** Commit whose build to look up. */
-	commit: string;
-}
-
-/**
  * Wrapper around the unwieldy positional signature of ADO's `getBuilds`.
  */
 async function getRecentBuilds(
-	adoConnection: WebApi,
+	adoApi: WebApi,
 	project: string,
 	definitionId: number,
 ): Promise<Build[]> {
-	const buildApi = await adoConnection.getBuildApi();
+	const buildApi = await adoApi.getBuildApi();
 	return buildApi.getBuilds(
 		project,
 		[definitionId],
@@ -98,34 +80,55 @@ function findBuildIdForCommit(
 }
 
 /**
+ * Result of looking up an artifact for a target commit on an ADO pipeline.
+ */
+export type ArtifactForCommitResult =
+	| { kind: "found"; contents: ArtifactContents }
+	| { kind: "error"; error: string };
+
+export interface GetArtifactForCommitArgs {
+	/** A connection to the ADO API. */
+	adoApi: WebApi;
+	/** Name of the pipeline artifact to fetch. */
+	artifactName: string;
+	/** Commit whose build to look up. */
+	commit: string;
+	/** ID of the ADO pipeline whose builds to search. */
+	definitionId: number;
+	/** The ADO project name. */
+	project: string;
+}
+
+/**
  * Look up the build for `commit` on the given ADO pipeline and return the
  * contents of one of its artifacts. Returns a discriminated union: on success,
  * the artifact's {@link ArtifactContents}; on failure, a human-readable error
  * string covering missing/incomplete/failed builds and missing artifacts.
  */
 export async function getArtifactForCommit(
-	adoConnection: WebApi,
-	options: GetArtifactForCommitOptions,
+	args: GetArtifactForCommitArgs,
 ): Promise<ArtifactForCommitResult> {
-	const builds = await getRecentBuilds(adoConnection, options.project, options.definitionId);
+	const { adoApi, artifactName, commit, definitionId, project } = args;
 
-	const buildLookup = findBuildIdForCommit(builds, options.commit);
+	const builds = await getRecentBuilds(adoApi, project, definitionId);
+
+	const buildLookup = findBuildIdForCommit(builds, commit);
 	if (buildLookup.kind === "error") {
 		return buildLookup;
 	}
 
 	try {
 		const contents = await downloadArtifact(
-			adoConnection,
-			options.project,
+			adoApi,
+			project,
 			buildLookup.buildId,
-			options.artifactName,
+			artifactName,
 		);
 		return { kind: "found", contents };
 	} catch (e) {
 		return {
 			kind: "error",
-			error: `Build for commit ${options.commit} did not publish artifact "${options.artifactName}": ${e instanceof Error ? e.message : String(e)}`,
+			error: `Build for commit ${commit} did not publish artifact "${artifactName}": ${e instanceof Error ? e.message : String(e)}`,
 		};
 	}
 }

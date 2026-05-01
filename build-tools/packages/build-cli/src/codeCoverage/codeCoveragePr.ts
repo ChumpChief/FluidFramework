@@ -44,22 +44,22 @@ export async function getCodeCoverageReport(
 	changedFiles: string[],
 	logger?: CommandLogger,
 ): Promise<CodeCoverageReport> {
-	const adoConnection = getAzureDevopsApi(adoToken, codeCoverageConstantsBaseline.orgUrl);
+	const adoApi = getAzureDevopsApi(adoToken, codeCoverageConstantsBaseline.orgUrl);
 
 	const baselineBuildInfo = await getBaselineBuildMetrics(
 		codeCoverageConstantsBaseline,
-		adoConnection,
+		adoApi,
 		logger,
 	).catch((error) => {
 		logger?.errorLog(`Error getting baseline build metrics: ${error}`);
 		throw error;
 	});
 
-	const adoConnectionForPR = getAzureDevopsApi(adoToken, codeCoverageConstantsPR.orgUrl);
+	const adoApiForPR = getAzureDevopsApi(adoToken, codeCoverageConstantsPR.orgUrl);
 
 	const prBuildInfo = await getBuildArtifactForSpecificBuild(
 		codeCoverageConstantsPR,
-		adoConnectionForPR,
+		adoApiForPR,
 		logger,
 	).catch((error) => {
 		logger?.errorLog(`Error getting PR build metrics: ${error}`);
