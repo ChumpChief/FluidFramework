@@ -5,8 +5,6 @@
 ```ts
 
 import type { BundleAnalyzerPlugin } from 'webpack-bundle-analyzer';
-import type JSZip from 'jszip';
-import type { WebApi } from 'azure-devops-node-api';
 import type Webpack from 'webpack';
 
 // @public
@@ -32,15 +30,6 @@ export interface BannedModulesPluginOptions {
 }
 
 // @public
-export type BaselinePackagesResult = {
-    kind: "found";
-    basePackages: AnalyzerJsonByPackage;
-} | {
-    kind: "error";
-    error: string;
-};
-
-// @public
 export interface BundleData {
     gzipSize: number;
     parsedSize: number;
@@ -57,23 +46,6 @@ export type BundlesComparison = {
 
 // @public
 export function compareJsonReportsByPackage(base: AnalyzerJsonByPackage, compare: AnalyzerJsonByPackage): PackageComparison;
-
-// @public
-export function downloadArtifact(adoConnection: WebApi, project: string, buildId: number, artifactName: string): Promise<JSZip>;
-
-// @public
-export function getBundlesForCommit(adoConnection: WebApi, options: GetBundlesForCommitOptions): Promise<BaselinePackagesResult>;
-
-// @public (undocumented)
-export interface GetBundlesForCommitOptions {
-    artifactName: string;
-    baseCommit: string;
-    ciBuildDefinitionId: number;
-    project: string;
-}
-
-// @public
-export function getBundlesFromFileSystem(rootPath: string): Promise<AnalyzerJsonByPackage>;
 
 // @public
 export type PackageComparison = {

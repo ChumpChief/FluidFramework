@@ -4,13 +4,6 @@
  */
 
 export {
-	BaselinePackagesResult,
-	downloadArtifact,
-	GetBundlesForCommitOptions,
-	getBundlesForCommit,
-	getBundlesFromFileSystem,
-} from "./ADO";
-export {
 	BannedModule,
 	BannedModulesPlugin,
 	BannedModulesPluginOptions,

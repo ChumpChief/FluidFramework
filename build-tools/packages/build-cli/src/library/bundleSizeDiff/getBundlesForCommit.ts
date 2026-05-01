@@ -3,15 +3,15 @@
  * Licensed under the MIT License.
  */
 
+import type { AnalyzerJsonByPackage } from "@fluidframework/bundle-size-tools";
 import type { WebApi } from "azure-devops-node-api";
 import {
 	type Build,
 	BuildResult,
 	BuildStatus,
-} from "azure-devops-node-api/interfaces/BuildInterfaces";
+} from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 
-import type { AnalyzerJsonByPackage } from "../types";
-import { getBundlesFromArtifact } from "./getBundlesFromArtifact";
+import { getBundlesFromArtifact } from "./getBundlesFromArtifact.js";
 
 // Upper bound on builds fetched when searching for one matching the base commit.
 // ADO has no API to query builds by commit SHA, so this window size determines

@@ -168,6 +168,7 @@
 		"@types/semver": "^7.7.1",
 		"@types/sort-json": "^2.0.3",
 		"@types/unist": "^3.0.3",
+		"@types/webpack-bundle-analyzer": "^4.7.0",
 		"@types/xml2js": "^0.4.14",
 		"c8": "^10.1.3",
 		"chai": "^6.2.1",

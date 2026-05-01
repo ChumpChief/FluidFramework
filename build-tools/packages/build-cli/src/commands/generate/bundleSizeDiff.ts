@@ -8,13 +8,13 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
 	compareJsonReportsByPackage,
-	getBundlesForCommit,
-	getBundlesFromFileSystem,
 	type PackageComparison,
 } from "@fluidframework/bundle-size-tools";
 import { Flags } from "@oclif/core";
 
 import { getAzureDevopsApi } from "../../library/azureDevops/getAzureDevopsApi.js";
+import { getBundlesForCommit } from "../../library/bundleSizeDiff/getBundlesForCommit.js";
+import { getBundlesFromFileSystem } from "../../library/bundleSizeDiff/getBundlesFromFileSystem.js";
 import { BaseCommand } from "../../library/commands/base.js";
 
 // ADO constants for the baseline build source.

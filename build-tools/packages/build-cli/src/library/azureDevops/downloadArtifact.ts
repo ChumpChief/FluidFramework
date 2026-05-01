@@ -3,10 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { strict as assert } from "assert";
+import { strict as assert } from "node:assert";
 import type { WebApi } from "azure-devops-node-api";
-import type JSZip from "jszip";
-import { loadAsync } from "jszip";
+import jszip, { type default as JSZip } from "jszip";
 
 async function unzipStream(stream: NodeJS.ReadableStream): Promise<JSZip> {
 	const buffer = await new Promise<Buffer>((resolve, reject) => {
@@ -15,7 +14,7 @@ async function unzipStream(stream: NodeJS.ReadableStream): Promise<JSZip> {
 		stream.on("close", () => resolve(Buffer.concat(chunks)));
 		stream.on("error", reject);
 	});
-	return loadAsync(buffer);
+	return jszip.loadAsync(buffer);
 }
 
 /**

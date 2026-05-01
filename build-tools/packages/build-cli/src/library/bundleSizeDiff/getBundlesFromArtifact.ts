@@ -3,14 +3,13 @@
  * Licensed under the MIT License.
  */
 
+import type { AnalyzerJsonByPackage } from "@fluidframework/bundle-size-tools";
 import type { WebApi } from "azure-devops-node-api";
 import type JSZip from "jszip";
-
 import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
 
-import type { AnalyzerJsonByPackage } from "../types";
-import { downloadArtifact } from "./downloadArtifact";
-import { sourcePackageFromAnalyzerPath } from "./sourcePackageFromAnalyzerPath";
+import { downloadArtifact } from "../azureDevops/downloadArtifact.js";
+import { sourcePackageFromAnalyzerPath } from "./sourcePackageFromAnalyzerPath.js";
 
 /**
  * Walks `zip`, finds every `analyzer.json` entry, parses it, and keys the
