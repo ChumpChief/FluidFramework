@@ -6,7 +6,9 @@
 import { promises as fsPromises } from "fs";
 import { join } from "path";
 
-import type { AnalyzerAssetEntry, Packages } from "../types";
+import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
+
+import type { Packages } from "../types";
 import {
 	type AnalyzerJsonByPackage,
 	extractPackages,
@@ -54,7 +56,7 @@ async function extractAnalyzerJsonsFromFileSystem(
 		if (sourcePackage === undefined) continue;
 		reads.push(
 			fsPromises.readFile(join(rootPath, relativePath), "utf8").then((text) => {
-				result.set(sourcePackage, JSON.parse(text) as AnalyzerAssetEntry[]);
+				result.set(sourcePackage, JSON.parse(text) as BundleAnalyzerPlugin.JsonReport);
 			}),
 		);
 	}

@@ -3,13 +3,15 @@
  * Licensed under the MIT License.
  */
 
-import type { AnalyzerAssetEntry, Entrypoints, Packages } from "../types";
+import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
+
+import type { Entrypoints, Packages } from "../types";
 
 /**
  * Map from source package name to the analyzer.json contents (as parsed
  * webpack-bundle-analyzer chart entries) that source package produced.
  */
-export type AnalyzerJsonByPackage = Map<string, AnalyzerAssetEntry[]>;
+export type AnalyzerJsonByPackage = Map<string, BundleAnalyzerPlugin.JsonReport>;
 
 const analyzerJsonFileName = "analyzer.json";
 

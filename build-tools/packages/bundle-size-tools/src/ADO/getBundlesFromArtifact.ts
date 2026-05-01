@@ -6,7 +6,9 @@
 import type { WebApi } from "azure-devops-node-api";
 import type JSZip from "jszip";
 
-import type { AnalyzerAssetEntry, Packages } from "../types";
+import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
+
+import type { Packages } from "../types";
 import { downloadArtifact } from "./downloadArtifact";
 import {
 	type AnalyzerJsonByPackage,
@@ -26,7 +28,7 @@ async function extractAnalyzerJsonsFromZip(zip: JSZip): Promise<AnalyzerJsonByPa
 		if (sourcePackage === undefined) return;
 		reads.push(
 			zipObject.async("string").then((text) => {
-				result.set(sourcePackage, JSON.parse(text) as AnalyzerAssetEntry[]);
+				result.set(sourcePackage, JSON.parse(text) as BundleAnalyzerPlugin.JsonReport);
 			}),
 		);
 	});

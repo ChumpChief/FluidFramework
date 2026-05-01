@@ -54,18 +54,3 @@ export interface PackageComparison {
 		};
 	};
 }
-
-/**
- * One top-level entry from webpack-bundle-analyzer's `analyzerMode: "json"` output.
- * Each entry corresponds to one emitted webpack asset (a JS bundle).
- *
- * `groups` (the recursive module-byte-attribution tree that powers the treemap)
- * is intentionally not modeled here — we only consume the per-asset sizes.
- */
-export interface AnalyzerAssetEntry {
-	label: string;
-	isAsset: boolean;
-	statSize: number;
-	parsedSize: number;
-	gzipSize: number;
-}
