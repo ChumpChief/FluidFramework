@@ -6,4 +6,9 @@
 export { compareJsonReportsByPackage } from "./compareJsonReportsByPackage.js";
 export { getBundlesFromArtifact } from "./getBundlesFromArtifact.js";
 export { getBundlesFromFileSystem } from "./getBundlesFromFileSystem.js";
-export type { PackageComparison } from "./types.js";
+export type {
+	AnalyzerJsonByPackage,
+	BundleData,
+	BundlesComparison,
+	PackageComparison,
+} from "./types.js";
