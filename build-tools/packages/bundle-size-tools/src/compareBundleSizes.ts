@@ -10,7 +10,7 @@ import type { PackageComparison, Packages } from "./types";
  * source package. Iterates the union of source packages and bundles so added and
  * removed entries are explicitly represented (see {@link PackageComparison}).
  */
-export function compareBundles(base: Packages, compare: Packages): PackageComparison[] {
+export function compareBundleSizes(base: Packages, compare: Packages): PackageComparison[] {
 	const results: PackageComparison[] = [];
 
 	const allPackages = new Set<string>([...base.keys(), ...compare.keys()]);

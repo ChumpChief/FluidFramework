@@ -44,7 +44,7 @@ export interface BundleData {
 }
 
 // @public
-export function compareBundles(base: Packages, compare: Packages): PackageComparison[];
+export function compareBundleSizes(base: Packages, compare: Packages): PackageComparison[];
 
 // @public
 export function downloadArtifact(adoConnection: WebApi, project: string, buildId: number, artifactName: string): Promise<JSZip>;
