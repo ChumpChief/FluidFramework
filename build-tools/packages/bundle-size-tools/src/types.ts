@@ -33,24 +33,26 @@ export interface BundleData {
 }
 
 /**
- * Comparison of all bundles produced by one source package against a baseline.
- *
- * Each entry in `bundles` represents a single webpack entrypoint. The shape encodes
- * three states via field presence:
+ * Per-bundle comparison for one source package, keyed by bundle name (webpack
+ * entrypoint). Field presence on each entry encodes three states:
  * - **pre-existing** (existed in both): both `base` and `compare` present
  * - **added** (only in PR): only `compare` present
  * - **removed** (only in baseline): only `base` present
+ */
+export type BundlesComparison = {
+	[bundleName: string]: {
+		base?: BundleData;
+		compare?: BundleData;
+	};
+};
+
+/**
+ * Full comparison keyed by source package name. Packages present only on one
+ * side appear with that side's bundles only.
  *
  * The producer is deliberately unopinionated: it emits raw sizes only. Consumers
  * compute deltas, percentages, and apply their own thresholds / regression rules.
  */
-export interface PackageComparison {
-	sourcePackage: string;
-
-	bundles: {
-		[key: string]: {
-			base?: BundleData;
-			compare?: BundleData;
-		};
-	};
-}
+export type PackageComparison = {
+	[sourcePackage: string]: BundlesComparison;
+};

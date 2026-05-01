@@ -61,7 +61,7 @@ interface BundleSizeDiffProvenance {
  */
 interface BundleSizeDiffResult extends BundleSizeDiffProvenance {
 	baseCommit: string;
-	comparison: PackageComparison[];
+	comparison: PackageComparison;
 }
 
 /**

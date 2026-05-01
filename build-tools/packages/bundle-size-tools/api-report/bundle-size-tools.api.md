@@ -44,7 +44,15 @@ export interface BundleData {
 }
 
 // @public
-export function compareBundleSizes(base: Packages, compare: Packages): PackageComparison[];
+export type BundlesComparison = {
+    [bundleName: string]: {
+        base?: BundleData;
+        compare?: BundleData;
+    };
+};
+
+// @public
+export function compareBundleSizes(base: Packages, compare: Packages): PackageComparison;
 
 // @public
 export function downloadArtifact(adoConnection: WebApi, project: string, buildId: number, artifactName: string): Promise<JSZip>;
@@ -67,17 +75,9 @@ export interface GetBundlesForCommitOptions {
 export function getBundlesFromFileSystem(rootPath: string): Promise<Packages>;
 
 // @public
-export interface PackageComparison {
-    // (undocumented)
-    bundles: {
-        [key: string]: {
-            base?: BundleData;
-            compare?: BundleData;
-        };
-    };
-    // (undocumented)
-    sourcePackage: string;
-}
+export type PackageComparison = {
+    [sourcePackage: string]: BundlesComparison;
+};
 
 // @public
 export type Packages = Map<string, Entrypoints>;
