@@ -8,12 +8,7 @@ import { join } from "path";
 
 import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
 
-import type { Packages } from "../types";
-import {
-	type AnalyzerJsonByPackage,
-	extractPackages,
-	sourcePackageFromAnalyzerPath,
-} from "./extractPackages";
+import { type AnalyzerJsonByPackage, sourcePackageFromAnalyzerPath } from "./extractPackages";
 
 /**
  * Gets the relative path of all files in this directory
@@ -66,9 +61,10 @@ async function extractAnalyzerJsonsFromFileSystem(
 
 /**
  * Reads analyzer.json files from a local bundle-report directory and returns
- * them as a {@link Packages}.
+ * them as an {@link AnalyzerJsonByPackage}.
  */
-export async function getBundlesFromFileSystem(rootPath: string): Promise<Packages> {
-	const jsons = await extractAnalyzerJsonsFromFileSystem(rootPath);
-	return extractPackages(jsons);
+export async function getBundlesFromFileSystem(
+	rootPath: string,
+): Promise<AnalyzerJsonByPackage> {
+	return extractAnalyzerJsonsFromFileSystem(rootPath);
 }

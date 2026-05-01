@@ -4,9 +4,13 @@
 
 ```ts
 
+import type { BundleAnalyzerPlugin } from 'webpack-bundle-analyzer';
 import type JSZip from 'jszip';
 import type { WebApi } from 'azure-devops-node-api';
 import type Webpack from 'webpack';
+
+// @public
+export type AnalyzerJsonByPackage = Map<string, BundleAnalyzerPlugin.JsonReport>;
 
 // @public (undocumented)
 export interface BannedModule {
@@ -30,7 +34,7 @@ export interface BannedModulesPluginOptions {
 // @public
 export type BaselinePackagesResult = {
     kind: "found";
-    basePackages: Packages;
+    basePackages: AnalyzerJsonByPackage;
 } | {
     kind: "error";
     error: string;
@@ -55,6 +59,9 @@ export type BundlesComparison = {
 export function compareBundleSizes(base: Packages, compare: Packages): PackageComparison;
 
 // @public
+export function compareJsonReportsByPackage(base: AnalyzerJsonByPackage, compare: AnalyzerJsonByPackage): PackageComparison;
+
+// @public
 export function downloadArtifact(adoConnection: WebApi, project: string, buildId: number, artifactName: string): Promise<JSZip>;
 
 // @public
@@ -72,7 +79,7 @@ export interface GetBundlesForCommitOptions {
 }
 
 // @public
-export function getBundlesFromFileSystem(rootPath: string): Promise<Packages>;
+export function getBundlesFromFileSystem(rootPath: string): Promise<AnalyzerJsonByPackage>;
 
 // @public
 export type PackageComparison = {

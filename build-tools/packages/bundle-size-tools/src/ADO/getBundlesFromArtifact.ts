@@ -8,13 +8,8 @@ import type JSZip from "jszip";
 
 import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
 
-import type { Packages } from "../types";
 import { downloadArtifact } from "./downloadArtifact";
-import {
-	type AnalyzerJsonByPackage,
-	extractPackages,
-	sourcePackageFromAnalyzerPath,
-} from "./extractPackages";
+import { type AnalyzerJsonByPackage, sourcePackageFromAnalyzerPath } from "./extractPackages";
 
 /**
  * Walks `zip`, finds every `analyzer.json` entry, parses it, and keys the
@@ -37,8 +32,8 @@ async function extractAnalyzerJsonsFromZip(zip: JSZip): Promise<AnalyzerJsonByPa
 }
 
 /**
- * Downloads an ADO build artifact and returns its analyzer.json files as a
- * {@link Packages}.
+ * Downloads an ADO build artifact and returns its analyzer.json files as an
+ * {@link AnalyzerJsonByPackage}.
  *
  * @param adoConnection - A connection to the ADO API.
  * @param project - The ADO project containing the build.
@@ -50,8 +45,7 @@ export async function getBundlesFromArtifact(
 	project: string,
 	buildId: number,
 	artifactName: string,
-): Promise<Packages> {
+): Promise<AnalyzerJsonByPackage> {
 	const zip = await downloadArtifact(adoConnection, project, buildId, artifactName);
-	const jsons = await extractAnalyzerJsonsFromZip(zip);
-	return extractPackages(jsons);
+	return extractAnalyzerJsonsFromZip(zip);
 }

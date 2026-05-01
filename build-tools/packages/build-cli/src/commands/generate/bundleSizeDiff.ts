@@ -7,7 +7,7 @@ import { execSync } from "node:child_process";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
-	compareBundleSizes,
+	compareJsonReportsByPackage,
 	getBundlesForCommit,
 	getBundlesFromFileSystem,
 	type PackageComparison,
@@ -196,7 +196,7 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 				);
 			}
 
-			const comparison = compareBundleSizes(basePackages, comparePackages);
+			const comparison = compareJsonReportsByPackage(basePackages, comparePackages);
 			const result: BundleSizeDiffResult = { ...provenance, baseCommit, comparison };
 
 			await writeFile(resultPath, JSON.stringify(result, undefined, 2));
