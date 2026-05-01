@@ -5,29 +5,9 @@
 ```ts
 
 import type { BundleAnalyzerPlugin } from 'webpack-bundle-analyzer';
-import type Webpack from 'webpack';
 
 // @public
 export type AnalyzerJsonByPackage = Map<string, BundleAnalyzerPlugin.JsonReport>;
-
-// @public (undocumented)
-export interface BannedModule {
-    moduleName: string;
-    reason: string;
-}
-
-// @public
-export class BannedModulesPlugin {
-    constructor(options: BannedModulesPluginOptions);
-    // (undocumented)
-    apply(compiler: Webpack.Compiler): void;
-}
-
-// @public (undocumented)
-export interface BannedModulesPluginOptions {
-    // (undocumented)
-    bannedModules: BannedModule[];
-}
 
 // @public
 export interface BundleData {

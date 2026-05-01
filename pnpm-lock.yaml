@@ -15,9 +15,6 @@ catalogs:
     '@fluidframework/build-tools':
       specifier: ^0.65.0
       version: 0.65.0
-    '@fluidframework/bundle-size-tools':
-      specifier: ^0.65.0
-      version: 0.65.0
   eslint:
     '@fluidframework/eslint-config-fluid':
       specifier: ^9.0.0
@@ -4850,9 +4847,6 @@ importers:
       '@fluidframework/build-tools':
         specifier: catalog:buildTools
         version: 0.65.0(@types/node@22.19.17)
-      '@fluidframework/bundle-size-tools':
-        specifier: catalog:buildTools
-        version: 0.65.0(webpack-cli@5.1.4)
       '@fluidframework/eslint-config-fluid':
         specifier: catalog:eslint
         version: 9.0.0(@typescript-eslint/utils@8.56.1(eslint@9.39.1(jiti@2.6.1))(typescript@5.4.5))(eslint@9.39.1(jiti@2.6.1))(typescript@5.4.5)
@@ -33960,12 +33954,12 @@ snapshots:
   '@webpack-cli/configtest@2.1.1(webpack-cli@5.1.4)(webpack@5.103.0)':
     dependencies:
       webpack: 5.103.0(webpack-cli@5.1.4)
-      webpack-cli: 5.1.4(webpack-dev-server@4.15.2)(webpack@5.103.0)
+      webpack-cli: 5.1.4(webpack-bundle-analyzer@4.10.2)(webpack@5.103.0)
 
   '@webpack-cli/info@2.0.2(webpack-cli@5.1.4)(webpack@5.103.0)':
     dependencies:
       webpack: 5.103.0(webpack-cli@5.1.4)
-      webpack-cli: 5.1.4(webpack-dev-server@4.15.2)(webpack@5.103.0)
+      webpack-cli: 5.1.4(webpack-bundle-analyzer@4.10.2)(webpack@5.103.0)
 
   '@webpack-cli/serve@2.0.5(webpack-cli@5.1.4)(webpack-dev-server@4.15.2)(webpack@5.103.0)':
     dependencies:
@@ -42473,7 +42467,7 @@ snapshots:
       watchpack: 2.4.4
       webpack-sources: 3.3.3
     optionalDependencies:
-      webpack-cli: 5.1.4(webpack-dev-server@4.15.2)(webpack@5.103.0)
+      webpack-cli: 5.1.4(webpack-bundle-analyzer@4.10.2)(webpack@5.103.0)
     transitivePeerDependencies:
       - '@swc/core'
       - esbuild

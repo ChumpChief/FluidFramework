@@ -3,11 +3,6 @@
  * Licensed under the MIT License.
  */
 
-export {
-	BannedModule,
-	BannedModulesPlugin,
-	BannedModulesPluginOptions,
-} from "./bannedModulesPlugin";
 export { compareJsonReportsByPackage } from "./compareJsonReportsByPackage";
 export {
 	AnalyzerJsonByPackage,
