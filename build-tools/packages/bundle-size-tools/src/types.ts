@@ -3,15 +3,13 @@
  * Licensed under the MIT License.
  */
 
-/**
- * Map from source package name to its entrypoint bundle data.
- */
-export type Packages = Map<string, Entrypoints>;
+import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
 
 /**
- * Map from entrypoint name to its bundle data, for one source package.
+ * Map from source package name to that package's parsed analyzer.json
+ * (webpack-bundle-analyzer's `analyzerMode: "json"` output).
  */
-export type Entrypoints = Map<string, BundleData>;
+export type AnalyzerJsonByPackage = Map<string, BundleAnalyzerPlugin.JsonReport>;
 
 /**
  * Data for a single bundle (webpack entrypoint), sourced from

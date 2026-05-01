@@ -8,7 +8,8 @@ import { join } from "path";
 
 import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
 
-import { type AnalyzerJsonByPackage, sourcePackageFromAnalyzerPath } from "./extractPackages";
+import type { AnalyzerJsonByPackage } from "../types";
+import { sourcePackageFromAnalyzerPath } from "./sourcePackageFromAnalyzerPath";
 
 /**
  * Gets the relative path of all files in this directory

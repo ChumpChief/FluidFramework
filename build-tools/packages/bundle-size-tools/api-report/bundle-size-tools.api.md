@@ -56,16 +56,10 @@ export type BundlesComparison = {
 };
 
 // @public
-export function compareBundleSizes(base: Packages, compare: Packages): PackageComparison;
-
-// @public
 export function compareJsonReportsByPackage(base: AnalyzerJsonByPackage, compare: AnalyzerJsonByPackage): PackageComparison;
 
 // @public
 export function downloadArtifact(adoConnection: WebApi, project: string, buildId: number, artifactName: string): Promise<JSZip>;
-
-// @public
-export type Entrypoints = Map<string, BundleData>;
 
 // @public
 export function getBundlesForCommit(adoConnection: WebApi, options: GetBundlesForCommitOptions): Promise<BaselinePackagesResult>;
@@ -85,9 +79,6 @@ export function getBundlesFromFileSystem(rootPath: string): Promise<AnalyzerJson
 export type PackageComparison = {
     [sourcePackage: string]: BundlesComparison;
 };
-
-// @public
-export type Packages = Map<string, Entrypoints>;
 
 // (No @packageDocumentation comment for this package)
 

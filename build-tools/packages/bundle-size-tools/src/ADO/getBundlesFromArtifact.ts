@@ -8,8 +8,9 @@ import type JSZip from "jszip";
 
 import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
 
+import type { AnalyzerJsonByPackage } from "../types";
 import { downloadArtifact } from "./downloadArtifact";
-import { type AnalyzerJsonByPackage, sourcePackageFromAnalyzerPath } from "./extractPackages";
+import { sourcePackageFromAnalyzerPath } from "./sourcePackageFromAnalyzerPath";
 
 /**
  * Walks `zip`, finds every `analyzer.json` entry, parses it, and keys the

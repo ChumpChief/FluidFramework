@@ -3,9 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import type { AnalyzerJsonByPackage } from "./ADO/extractPackages";
 import { compareJsonReports } from "./compareJsonReports";
-import type { PackageComparison } from "./types";
+import type { AnalyzerJsonByPackage, PackageComparison } from "./types";
 
 /**
  * Compare per-package `JsonReport`s for two snapshots and produce a

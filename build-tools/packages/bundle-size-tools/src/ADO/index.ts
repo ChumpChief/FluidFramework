@@ -4,7 +4,6 @@
  */
 
 export { downloadArtifact } from "./downloadArtifact";
-export { AnalyzerJsonByPackage } from "./extractPackages";
 export {
 	BaselinePackagesResult,
 	GetBundlesForCommitOptions,

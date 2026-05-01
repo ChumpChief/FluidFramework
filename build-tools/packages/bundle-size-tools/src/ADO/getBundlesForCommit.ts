@@ -10,7 +10,7 @@ import {
 	BuildStatus,
 } from "azure-devops-node-api/interfaces/BuildInterfaces";
 
-import type { AnalyzerJsonByPackage } from "./extractPackages";
+import type { AnalyzerJsonByPackage } from "../types";
 import { getBundlesFromArtifact } from "./getBundlesFromArtifact";
 
 // Upper bound on builds fetched when searching for one matching the base commit.

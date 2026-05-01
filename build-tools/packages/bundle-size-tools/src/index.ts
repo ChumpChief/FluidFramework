@@ -4,7 +4,6 @@
  */
 
 export {
-	AnalyzerJsonByPackage,
 	BaselinePackagesResult,
 	downloadArtifact,
 	GetBundlesForCommitOptions,
@@ -16,12 +15,10 @@ export {
 	BannedModulesPlugin,
 	BannedModulesPluginOptions,
 } from "./bannedModulesPlugin";
-export { compareBundleSizes } from "./compareBundleSizes";
 export { compareJsonReportsByPackage } from "./compareJsonReportsByPackage";
 export {
+	AnalyzerJsonByPackage,
 	BundleData,
 	BundlesComparison,
-	Entrypoints,
 	PackageComparison,
-	Packages,
 } from "./types";
