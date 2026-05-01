@@ -5,7 +5,7 @@
 
 import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
 
-import type { BundleData, BundlesComparison } from "./types";
+import type { BundleData, BundlesComparison } from "./types.js";
 
 /**
  * Filter `report` to its asset entries and key their size data by asset name.

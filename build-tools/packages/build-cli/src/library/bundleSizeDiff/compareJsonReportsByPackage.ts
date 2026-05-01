@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { compareJsonReports } from "./compareJsonReports";
-import type { AnalyzerJsonByPackage, PackageComparison } from "./types";
+import { compareJsonReports } from "./compareJsonReports.js";
+import type { AnalyzerJsonByPackage, PackageComparison } from "./types.js";
 
 /**
  * Compare per-package `JsonReport`s for two snapshots and produce a

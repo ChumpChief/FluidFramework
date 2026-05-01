@@ -3,12 +3,12 @@
  * Licensed under the MIT License.
  */
 
-import type { AnalyzerJsonByPackage } from "@fluidframework/bundle-size-tools";
 import { promises as fsPromises } from "fs";
 import { join } from "path";
 import type { BundleAnalyzerPlugin } from "webpack-bundle-analyzer";
 
 import { sourcePackageFromAnalyzerPath } from "./sourcePackageFromAnalyzerPath.js";
+import type { AnalyzerJsonByPackage } from "./types.js";
 
 /**
  * Gets the relative path of all files in this directory
