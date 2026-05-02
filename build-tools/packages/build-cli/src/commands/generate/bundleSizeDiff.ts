@@ -8,9 +8,13 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Flags } from "@oclif/core";
 
-import { getArtifactForCommit } from "../../library/azureDevops/getArtifactForCommit.js";
+import {
+	type GetArtifactForCommitArgs,
+	getArtifactForCommit,
+} from "../../library/azureDevops/getArtifactForCommit.js";
 import { getAzureDevopsApi } from "../../library/azureDevops/getAzureDevopsApi.js";
 import {
+	type AnalyzerJsonByPackage,
 	compareJsonReportsByPackage,
 	extractAnalyzerJsonsFromArtifact,
 	type PackageComparison,
@@ -175,8 +179,25 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 
 			const adoApi = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
 
-			const [baselineArtifact, comparePackages] = await Promise.all([
-				getArtifactForCommit({
+			// Combine the artifact lookup and extraction into a single promise so
+			// the whole baseline flow can run in parallel with the local read below.
+			const readAnalyzerJsonsForCommit = async (
+				args: GetArtifactForCommitArgs,
+			): Promise<
+				{ kind: "found"; packages: AnalyzerJsonByPackage } | { kind: "error"; error: string }
+			> => {
+				const artifact = await getArtifactForCommit(args);
+				if (artifact.kind === "error") {
+					return artifact;
+				}
+				return {
+					kind: "found",
+					packages: extractAnalyzerJsonsFromArtifact(artifact.contents),
+				};
+			};
+
+			const [baselineLookup, comparePackages] = await Promise.all([
+				readAnalyzerJsonsForCommit({
 					adoApi,
 					artifactName: adoConstants.bundleAnalysisArtifactName,
 					commit: baseCommit,
@@ -186,11 +207,11 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 				readAnalyzerJsonsFromFileSystem(localReportPath),
 			]);
 
-			if (baselineArtifact.kind === "error") {
-				return await writeError(baselineArtifact.error, baseCommit);
+			if (baselineLookup.kind === "error") {
+				return await writeError(baselineLookup.error, baseCommit);
 			}
 
-			const basePackages = extractAnalyzerJsonsFromArtifact(baselineArtifact.contents);
+			const basePackages = baselineLookup.packages;
 			if (basePackages.size === 0 || comparePackages.size === 0) {
 				return await writeError(
 					"No bundles to compare — baseline artifact or PR local bundle reports are empty.",
