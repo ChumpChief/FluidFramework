@@ -446,6 +446,8 @@ extends:
                     env:
                       TARGET_BRANCH: '$(targetBranch)'
                       PR_NUMBER: '$(System.PullRequest.PullRequestNumber)'
+                      COMPARE_COMMIT: '$(System.PullRequest.SourceCommitId)'
+                      ADO_BUILD_ID: '$(Build.BuildId)'
                     inputs:
                       targetType: inline
                       workingDirectory: '$(Pipeline.Workspace)/${{ parameters.buildDirectory }}'
