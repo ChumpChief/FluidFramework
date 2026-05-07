@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { Flags } from "@oclif/core";
 import { copySync, readJson } from "fs-extra/esm";
-
+import { encodePackageNameForPath } from "../../library/bundleSizeDiff/sourcePackageFromAnalyzerPath.js";
 import { BaseCommand } from "../../library/commands/base.js";
 import { type PnpmListEntry, pnpmList } from "../../pnpm.js";
 
@@ -91,7 +91,10 @@ export default class GenerateBundlestats extends BaseCommand<typeof GenerateBund
 			const packageAnalyzerJsonPath = path.join(pkg.path, "bundleAnalyzerJson");
 			if (existsSync(packageAnalyzerJsonPath)) {
 				this.log(`found bundleAnalyzerJson for ${pkg.name}`);
-				copySync(packageAnalyzerJsonPath, path.join(analyzerJsonDestPath, pkg.name));
+				copySync(
+					packageAnalyzerJsonPath,
+					path.join(analyzerJsonDestPath, encodePackageNameForPath(pkg.name)),
+				);
 			}
 		}
 
