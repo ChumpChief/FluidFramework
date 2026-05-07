@@ -15,8 +15,7 @@ import { getBuild, getBuilds } from "./utils.js";
 export interface IBuildMetrics {
 	build: Build & { id: number };
 	/**
-	 * The decompressed contents of the artifact that was published by the build,
-	 * keyed by file path relative to the artifact root.
+	 * Files extracted from the artifact published by the PR build.
 	 */
 	artifactContents: ArtifactContents;
 }
@@ -81,7 +80,7 @@ export async function getBaselineBuildMetrics(
 		// For reasons that I don't understand, the "undefined" string is omitted in the log output, which makes the
 		// output very confusing. The string is capitalized here and elsewhere in this file as a workaround.
 		logger?.verbose(
-			`Baseline artifact contents === UNDEFINED: ${baselineArtifactContents === undefined}`,
+			`Baseline Contents === UNDEFINED: ${baselineArtifactContents === undefined}`,
 		);
 
 		// Successful baseline build does not have the needed build artifacts
@@ -91,7 +90,7 @@ export async function getBaselineBuildMetrics(
 			);
 			continue;
 		}
-		// Found usable baseline contents, so break out of the loop early.
+		// Found usable baseline artifact, so break out of the loop early.
 		baselineBuild = build;
 		break;
 	}
@@ -177,7 +176,7 @@ export async function getBuildArtifactForSpecificBuild(
 
 	// For reasons that I don't understand, the "undefined" string is omitted in the log output, which makes the
 	// output very confusing. The string is capitalized here and elsewhere in this file as a workaround.
-	logger?.verbose(`Artifact contents === UNDEFINED: ${artifactContents === undefined}`);
+	logger?.verbose(`Artifact Contents === UNDEFINED: ${artifactContents === undefined}`);
 	if (artifactContents === undefined) {
 		const message = `Could not find a usable artifact`;
 		logger?.warning(message);

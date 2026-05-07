@@ -3,16 +3,23 @@
  * Licensed under the MIT License.
  */
 
+import { execSync } from "node:child_process";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Flags } from "@oclif/core";
-import {
-	ADOSizeComparator,
-	type BundleComparison,
-	bundlesContainNoChanges,
-	getAzureDevopsApi,
-} from "../../library/bundleSizeDiff/index.js";
 
+import {
+	type GetArtifactForCommitArgs,
+	getArtifactForCommit,
+} from "../../library/azureDevops/getArtifactForCommit.js";
+import { getAzureDevopsApi } from "../../library/azureDevops/getAzureDevopsApi.js";
+import {
+	type AnalyzerJsonByPackage,
+	compareJsonReportsByPackage,
+	extractAnalyzerJsonsFromArtifact,
+	type PackageComparison,
+	readAnalyzerJsonsFromFileSystem,
+} from "../../library/bundleSizeDiff/index.js";
 import { BaseCommand } from "../../library/commands/base.js";
 
 // ADO constants for the baseline build source.
@@ -39,26 +46,36 @@ const resultFileName = "result.json";
 const errorFileName = "error.json";
 
 /**
- * Shape of the `result.json` file produced on a successful comparison, discriminated by
- * `kind`. On `"no-changes"`, the comparison ran and found no size deltas. On `"changes"`,
- * the comparison found size deltas and `comparison` holds the diff. The producer is
- * unopinionated about what constitutes a "regression" — consumers apply their own thresholds.
+ * Provenance fields written to both `result.json` and `error.json` so consumers can
+ * tell where the data came from and reason about freshness.
  */
-type BundleSizeDiffResult = {
+interface BundleSizeDiffProvenance {
 	prNumber: number;
-	baseCommit: string;
 	targetBranch: string;
-} & ({ kind: "no-changes" } | { kind: "changes"; comparison: BundleComparison[] });
+	compareCommit: string;
+	adoBuildId: number;
+	timestamp: string;
+}
+
+/**
+ * Shape of the `result.json` file produced on a successful comparison. `comparison`
+ * holds the per-package diff data; each bundle entry encodes pre-existing / added /
+ * removed via field presence (see {@link PackageComparison}). The producer is
+ * unopinionated about what constitutes a "change" — consumers apply their own
+ * thresholds.
+ */
+interface BundleSizeDiffResult extends BundleSizeDiffProvenance {
+	baseCommit: string;
+	comparison: PackageComparison;
+}
 
 /**
  * Shape of the `error.json` file produced when the command could not produce a comparison
  * (e.g. no usable baseline build, an unexpected ADO API failure). `baseCommit` may be
  * `undefined` if the baseline search never reached a candidate.
  */
-interface BundleSizeDiffError {
-	prNumber: number;
+interface BundleSizeDiffError extends BundleSizeDiffProvenance {
 	baseCommit: string | undefined;
-	targetBranch: string;
 	error: string;
 }
 
@@ -95,6 +112,18 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 			required: true,
 			hidden: true,
 		}),
+		compareCommit: Flags.string({
+			description: "SHA of the PR branch's head commit being analyzed.",
+			env: "COMPARE_COMMIT",
+			required: true,
+			hidden: true,
+		}),
+		adoBuildId: Flags.integer({
+			description: "ID of the ADO pipeline build that produced this artifact.",
+			env: "ADO_BUILD_ID",
+			required: true,
+			hidden: true,
+		}),
 		adoApiToken: Flags.string({
 			description:
 				"ADO PAT for accessing the baseline build. When absent, anonymous reads are used (suitable for fork PR builds where $(System.AccessToken) isn't populated).",
@@ -106,16 +135,23 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 	} as const;
 
 	public async run(): Promise<BundleSizeDiffResult | BundleSizeDiffError> {
-		const { adoApiToken, localReportPath, outputDir, prNumber, targetBranch } = this.flags;
-
-		const adoApi = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
-		const sizeComparator = new ADOSizeComparator(
-			adoConstants,
-			adoApi,
+		const {
+			adoApiToken,
+			adoBuildId,
+			compareCommit,
 			localReportPath,
+			outputDir,
+			prNumber,
 			targetBranch,
-		);
-		const comparisonResult = await sizeComparator.getSizeComparison();
+		} = this.flags;
+
+		const provenance: BundleSizeDiffProvenance = {
+			prNumber,
+			targetBranch,
+			compareCommit,
+			adoBuildId,
+			timestamp: new Date().toISOString(),
+		};
 
 		const resolvedOutputDir = path.resolve(process.cwd(), outputDir);
 		await mkdir(resolvedOutputDir, { recursive: true });
@@ -126,45 +162,76 @@ export default class GenerateBundleSizeDiff extends BaseCommand<
 		// success/failure discriminator without worrying about stale artifacts from earlier runs.
 		await Promise.all([rm(resultPath, { force: true }), rm(errorPath, { force: true })]);
 
-		if (comparisonResult.kind === "error") {
-			const errorResult: BundleSizeDiffError = {
-				prNumber,
-				baseCommit: comparisonResult.baselineCommit,
-				targetBranch,
-				error: comparisonResult.error,
-			};
+		const writeError = async (
+			error: string,
+			baseCommit: string | undefined,
+		): Promise<BundleSizeDiffError> => {
+			const errorResult: BundleSizeDiffError = { ...provenance, baseCommit, error };
 			await writeFile(errorPath, JSON.stringify(errorResult, undefined, 2));
-			this.info(`Wrote ${errorPath}`);
+			this.info(`Wrote ${errorPath} — ${error}`);
 			return errorResult;
-		}
-
-		// An empty comparison means the baseline or PR collection produced no bundles;
-		// surface that as an error rather than a misleading "no-changes" result.
-		if (comparisonResult.comparison.length === 0) {
-			const errorResult: BundleSizeDiffError = {
-				prNumber,
-				baseCommit: comparisonResult.baselineCommit,
-				targetBranch,
-				error:
-					"No bundles to compare — baseline artifact or PR local bundle reports are empty.",
-			};
-			await writeFile(errorPath, JSON.stringify(errorResult, undefined, 2));
-			this.info(`Wrote ${errorPath}`);
-			return errorResult;
-		}
-
-		const { baselineCommit, comparison } = comparisonResult;
-		const common = {
-			prNumber,
-			baseCommit: baselineCommit,
-			targetBranch,
 		};
-		const result: BundleSizeDiffResult = bundlesContainNoChanges(comparison)
-			? { ...common, kind: "no-changes" }
-			: { ...common, kind: "changes", comparison };
 
-		await writeFile(resultPath, JSON.stringify(result, undefined, 2));
-		this.info(`Wrote ${resultPath}`);
-		return result;
+		let baseCommit: string | undefined;
+		try {
+			baseCommit = execSync(`git merge-base origin/${targetBranch} ${compareCommit}`)
+				.toString()
+				.trim();
+			this.info(`The base commit for this PR is ${baseCommit}`);
+
+			const adoApi = getAzureDevopsApi(adoApiToken, adoConstants.orgUrl);
+
+			// Combine the artifact lookup and extraction into a single promise so
+			// the whole baseline flow can run in parallel with the local read below.
+			const readAnalyzerJsonsForCommit = async (
+				args: GetArtifactForCommitArgs,
+			): Promise<
+				{ kind: "found"; packages: AnalyzerJsonByPackage } | { kind: "error"; error: string }
+			> => {
+				const artifact = await getArtifactForCommit(args);
+				if (artifact.kind === "error") {
+					return artifact;
+				}
+				return {
+					kind: "found",
+					packages: extractAnalyzerJsonsFromArtifact(artifact.contents),
+				};
+			};
+
+			const [baselineLookup, comparePackages] = await Promise.all([
+				readAnalyzerJsonsForCommit({
+					adoApi,
+					artifactName: adoConstants.artifactName,
+					commit: baseCommit,
+					definitionId: adoConstants.ciBuildDefinitionId,
+					project: adoConstants.projectName,
+				}),
+				readAnalyzerJsonsFromFileSystem(localReportPath),
+			]);
+
+			if (baselineLookup.kind === "error") {
+				return await writeError(baselineLookup.error, baseCommit);
+			}
+
+			const basePackages = baselineLookup.packages;
+			if (basePackages.size === 0 || comparePackages.size === 0) {
+				return await writeError(
+					"No bundles to compare — baseline artifact or PR local bundle reports are empty.",
+					baseCommit,
+				);
+			}
+
+			const comparison = compareJsonReportsByPackage(basePackages, comparePackages);
+			const result: BundleSizeDiffResult = { ...provenance, baseCommit, comparison };
+
+			await writeFile(resultPath, JSON.stringify(result, undefined, 2));
+			this.info(`Wrote ${resultPath} (base ${baseCommit})`);
+			return result;
+		} catch (e) {
+			return writeError(
+				`Unexpected failure during size comparison: ${e instanceof Error ? e.message : String(e)}`,
+				baseCommit,
+			);
+		}
 	}
 }
