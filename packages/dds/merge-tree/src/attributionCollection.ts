@@ -330,9 +330,10 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			}
 		}
 
-		if (other.channels !== undefined || this.channels !== undefined) {
+		const otherChannels = other.getChannels();
+		if (otherChannels !== undefined || this.channels !== undefined) {
 			this.channels ??= {};
-			for (const [key, collection] of other.channelEntries) {
+			for (const [key, collection] of Object.entries(otherChannels ?? {})) {
 				const thisCollection = (this.channels[key] ??= new AttributionCollection({
 					length: this.length,
 					// eslint-disable-next-line unicorn/no-null
@@ -341,7 +342,7 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 				thisCollection.append(collection);
 			}
 			for (const [key, collection] of this.channelEntries) {
-				if (other.channels?.[key] === undefined) {
+				if (otherChannels?.[key] === undefined) {
 					collection.append(
 						new AttributionCollection({
 							length: other.length,
@@ -368,6 +369,14 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			rootEntries[i] = { offset: this.offsets[i], key: this.keys[i] };
 		}
 		return rootEntries;
+	}
+
+	/**
+	 * Returns a shallow copy of the named-channel map, or undefined if no map has been initialized.
+	 * Channel collections are shared with this instance; they are not cloned.
+	 */
+	public getChannels(): Record<string, AttributionCollection> | undefined {
+		return this.channels === undefined ? undefined : { ...this.channels };
 	}
 
 	public getAll(): IAttributionCollectionSpec<AttributionKey> {

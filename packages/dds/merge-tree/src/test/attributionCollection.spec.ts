@@ -162,6 +162,47 @@ describe("AttributionCollection", () => {
 		});
 	});
 
+	describe(".getChannels", () => {
+		it("returns an independent map containing the original channel collections", () => {
+			const channel = new AttributionCollection({
+				length: 2,
+				rootEntries: [{ offset: 0, key: opKey(10) }],
+			});
+			const collection = new AttributionCollection({
+				length: 2,
+				rootEntries: [],
+				channels: { foo: channel },
+			});
+			const channels = collection.getChannels();
+			assert(channels !== undefined);
+			assert.equal(channels.foo, channel);
+			channels.foo = new AttributionCollection({ length: 2, rootEntries: [] });
+			channels.bar = new AttributionCollection({ length: 2, rootEntries: [] });
+			assert.deepEqual(collection.channelNames, ["foo"]);
+			assert.equal(collection.getChannels()?.foo, channel);
+
+			channel.update(
+				undefined,
+				new AttributionCollection({
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(20) }],
+				}),
+			);
+			assert.deepEqual(collection.getAtOffset(0, "foo"), opKey(20));
+		});
+
+		it("distinguishes absent and initialized-empty channel maps", () => {
+			assert.equal(
+				new AttributionCollection({ length: 2, rootEntries: [] }).getChannels(),
+				undefined,
+			);
+			assert.deepEqual(
+				new AttributionCollection({ length: 2, rootEntries: [], channels: {} }).getChannels(),
+				{},
+			);
+		});
+	});
+
 	describe(".getAtOffset", () => {
 		describe("on a collection with a single entry", () => {
 			const collection = new AttributionCollection({
@@ -501,6 +542,76 @@ describe("AttributionCollection", () => {
 		});
 
 		describe("appends channels", () => {
+			for (const receiverHasMap of [false, true]) {
+				for (const donorHasMap of [false, true]) {
+					it(`preserves empty-map presence (receiver=${receiverHasMap}, donor=${donorHasMap})`, () => {
+						const collection = new AttributionCollection({
+							length: 2,
+							rootEntries: [],
+							channels: receiverHasMap ? {} : undefined,
+						});
+						const other = new AttributionCollection({
+							length: 3,
+							rootEntries: [],
+							channels: donorHasMap ? {} : undefined,
+						});
+						collection.append(other);
+						assert.equal(collection.length, 5);
+						assert.deepEqual(
+							collection.getAll().channels,
+							receiverHasMap || donorHasMap ? {} : undefined,
+						);
+						assert.deepEqual(other.getChannels(), donorHasMap ? {} : undefined);
+					});
+				}
+			}
+
+			it("appends nested channels without flattening them or modifying the donor", () => {
+				const nested = new AttributionCollection({
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(10) }],
+				});
+				const collection = new AttributionCollection({
+					length: 2,
+					rootEntries: [],
+					channels: {
+						foo: new AttributionCollection({
+							length: 2,
+							rootEntries: [],
+							channels: { nested },
+						}),
+					},
+				});
+				const donorNested = new AttributionCollection({
+					length: 3,
+					rootEntries: [{ offset: 0, key: opKey(20) }],
+				});
+				const other = new AttributionCollection({
+					length: 3,
+					rootEntries: [],
+					channels: {
+						foo: new AttributionCollection({
+							length: 3,
+							rootEntries: [],
+							channels: { nested: donorNested },
+						}),
+					},
+				});
+				const expectedDonor = other.getAll();
+
+				collection.append(other);
+
+				assert.equal(collection.length, 5);
+				assert.equal(nested.length, 5);
+				assert.deepEqual(nested.getRootEntries(), [
+					{ offset: 0, key: opKey(10) },
+					{ offset: 2, key: opKey(20) },
+				]);
+				assert.equal(donorNested.length, 3);
+				assert.deepEqual(donorNested.getRootEntries(), [{ offset: 0, key: opKey(20) }]);
+				assert.deepEqual(other.getAll(), expectedDonor);
+			});
+
 			it("when both collections have the channel", () => {
 				const appender = makeCollectionWithChannel({ length: 2, seq: 100 });
 				appender.append(makeCollectionWithChannel({ length: 5, seq: 200 }));
