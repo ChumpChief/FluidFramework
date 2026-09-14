@@ -118,6 +118,50 @@ describe("AttributionCollection", () => {
 		});
 	});
 
+	describe(".getRootEntries", () => {
+		it("returns independent entry records while retaining attribution key identities", () => {
+			const key = opKey(10);
+			const expected = [
+				{ offset: 0, key },
+				{ offset: 1, key: null },
+			];
+			const collection = new AttributionCollection({ length: 2, rootEntries: expected });
+			const rootEntries = collection.getRootEntries();
+			assert.deepEqual(rootEntries, expected);
+			assert.equal(rootEntries[0].key, key);
+
+			rootEntries[0].offset = 1;
+			rootEntries[0].key = null;
+			rootEntries.push({ offset: 2, key: opKey(20) });
+			assert.deepEqual(collection.getRootEntries(), expected);
+		});
+
+		it("reads and copies root entries without traversing named channels", () => {
+			class UnreadableChannel extends AttributionCollection {
+				public override getAll(): never {
+					throw new Error("Root-only access must not traverse named channels");
+				}
+			}
+			const expected = [{ offset: 0, key: opKey(10) }];
+			const source = new AttributionCollection({
+				length: 2,
+				rootEntries: expected,
+				channels: { nested: new UnreadableChannel({ length: 2, rootEntries: [] }) },
+			});
+			assert.deepEqual(source.getRootEntries(), expected);
+
+			const destination = new AttributionCollection({ length: 2, rootEntries: [] });
+			destination.update(undefined, source);
+			assert.deepEqual(destination.getRootEntries(), expected);
+			assert.deepEqual(destination.channelNames, []);
+			source.update(
+				undefined,
+				new AttributionCollection({ length: 2, rootEntries: [{ offset: 0, key: null }] }),
+			);
+			assert.deepEqual(destination.getRootEntries(), expected);
+		});
+	});
+
 	describe(".getAtOffset", () => {
 		describe("on a collection with a single entry", () => {
 			const collection = new AttributionCollection({

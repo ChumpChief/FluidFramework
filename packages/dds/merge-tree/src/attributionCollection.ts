@@ -321,10 +321,12 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 
 	public append(other: AttributionCollection): void {
 		const lastEntry = this.keys[this.keys.length - 1];
-		for (let i = 0; i < other.keys.length; i++) {
-			if (i !== 0 || !areEqualAttributionKeys(lastEntry, other.keys[i])) {
-				this.offsets.push(other.offsets[i] + this.length);
-				this.keys.push(other.keys[i]);
+		const rootEntries = other.getRootEntries();
+		for (let i = 0; i < rootEntries.length; i++) {
+			const { offset, key } = rootEntries[i];
+			if (i !== 0 || !areEqualAttributionKeys(lastEntry, key)) {
+				this.offsets.push(offset + this.length);
+				this.keys.push(key);
 			}
 		}
 
@@ -353,7 +355,12 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 		this._length += other.length;
 	}
 
-	private getRootEntries(): { offset: number; key: AttributionKey | null }[] {
+	/**
+	 * Returns copies of this collection's root entries without traversing named channels.
+	 * Attribution keys are not deep-cloned.
+	 */
+	// eslint-disable-next-line @rushstack/no-new-null -- Explicit null entries are part of the legacy attribution format.
+	public getRootEntries(): { offset: number; key: AttributionKey | null }[] {
 		type ExtractGeneric<T> = T extends Iterable<infer Q> ? Q : unknown;
 		const rootEntries: ExtractGeneric<IAttributionCollectionSpec<AttributionKey>["root"]>[] =
 			Array.from({ length: this.keys.length });
@@ -396,8 +403,9 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			0x5c0 /* AttributionCollection channel update should have consistent segment length */,
 		);
 		if (name === undefined) {
-			this.offsets = [...channel.offsets];
-			this.keys = [...channel.keys];
+			const rootEntries = channel.getRootEntries();
+			this.offsets = rootEntries.map(({ offset }) => offset);
+			this.keys = rootEntries.map(({ key }) => key);
 		} else {
 			this.channels ??= {};
 			if (this.channels[name] === undefined) {
