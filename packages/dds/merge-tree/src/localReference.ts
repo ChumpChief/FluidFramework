@@ -262,14 +262,15 @@ export class LocalReferenceCollection {
 		 * The segment this `LocalReferenceCollection` is associated with.
 		 */
 		private readonly segment: ISegmentInternal,
-		initialRefsByfOffset: (IRefsAtOffset | undefined)[] = Array.from({
-			length: segment.cachedLength,
-		}),
+		initialRefsByOffset?: (IRefsAtOffset | undefined)[],
 	) {
-		// Since javascript arrays are sparse the above won't populate any of the
-		// indices, but it will ensure the length property of the array matches
-		// the length of the segment.
-		this.refsByOffset = initialRefsByfOffset;
+		this.refsByOffset = initialRefsByOffset ?? Array.from({ length: segment.cachedLength });
+		if (initialRefsByOffset !== undefined) {
+			for (const refs of initialRefsByOffset) {
+				this.refCount +=
+					(refs?.before?.length ?? 0) + (refs?.at?.length ?? 0) + (refs?.after?.length ?? 0);
+			}
+		}
 	}
 
 	/**
@@ -476,7 +477,6 @@ export class LocalReferenceCollection {
 				assertLocalReferences(lref);
 				lref.link(splitSeg, lref.getOffset() - offset, lref.getListNode());
 				this.refCount--;
-				localRefs.refCount++;
 			}
 		}
 		validateRefCount?.(this);

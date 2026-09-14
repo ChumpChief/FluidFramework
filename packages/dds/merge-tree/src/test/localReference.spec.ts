@@ -10,6 +10,8 @@ import type { ISegmentInternal } from "../mergeTreeNodes.js";
 import { ReferenceType } from "../ops.js";
 import { TextSegment } from "../textSegment.js";
 
+import { validateRefCount } from "./testUtils.js";
+
 interface TestSetup {
 	collection: LocalReferenceCollection;
 	/**
@@ -77,6 +79,75 @@ function addTombstones(
 }
 
 describe("LocalReferenceCollection", () => {
+	describe("split", () => {
+		it("initializes split reference counts for before, at, and after buckets", () => {
+			const { collection: suffixCollection, refs } = setup("abc", 2);
+			const suffix = refs[0].getSegment();
+			assert(suffix !== undefined);
+			const before = addTombstones(suffixCollection, "before", ["b-0", "b-1"]);
+			const after = addTombstones(suffixCollection, "after", ["a-0", "a-1"]);
+			const segment: ISegmentInternal = TextSegment.make("x");
+			const collection = LocalReferenceCollection.setOrGet(segment);
+			const retainedRef = collection.createLocalRef(0, ReferenceType.Simple, {
+				id: "retained",
+			});
+			segment.append(suffix);
+
+			const splitSegment: ISegmentInternal | undefined = segment.splitAt(1);
+			assert(splitSegment !== undefined);
+			collection.split(1, splitSegment);
+			const splitCollection = splitSegment.localRefs;
+			assert(splitCollection !== undefined);
+			const movedRefs = [...before, ...refs, ...after];
+			assert.deepEqual([...collection], [retainedRef]);
+			assert.deepEqual([...splitCollection], movedRefs);
+			for (const ref of movedRefs) {
+				assert.equal(ref.getSegment(), splitSegment);
+				assert(splitCollection.has(ref));
+				assert(!collection.has(ref));
+			}
+			for (const ref of after) {
+				assert(splitCollection.isAfterTombstone(ref));
+			}
+			assert.deepEqual(walk(splitCollection), [
+				"b-0",
+				"b-1",
+				"0-0",
+				"0-1",
+				"1-0",
+				"1-1",
+				"2-0",
+				"2-1",
+				"a-0",
+				"a-1",
+			]);
+			validateRefCount(collection);
+			validateRefCount(splitCollection);
+
+			for (const ref of movedRefs) {
+				assert.equal(splitCollection.removeLocalRef(ref), ref);
+			}
+			assert(splitCollection.empty);
+			assert(!collection.empty);
+			validateRefCount(collection);
+			validateRefCount(splitCollection);
+		});
+
+		it("initializes an empty split collection when all references remain in the source", () => {
+			const segment: ISegmentInternal = TextSegment.make("abc");
+			const collection = LocalReferenceCollection.setOrGet(segment);
+			const retainedRef = collection.createLocalRef(0, ReferenceType.Simple, undefined);
+			const splitSegment: ISegmentInternal | undefined = segment.splitAt(1);
+			assert(splitSegment !== undefined);
+			collection.split(1, splitSegment);
+			assert(splitSegment.localRefs !== undefined);
+			assert(splitSegment.localRefs.empty);
+			assert.deepEqual([...collection], [retainedRef]);
+			validateRefCount(collection);
+			validateRefCount(splitSegment.localRefs);
+		});
+	});
+
 	describe("walkReferences", () => {
 		it("walks all references when no start is provided", () => {
 			const { collection } = setup("abc", 2);
