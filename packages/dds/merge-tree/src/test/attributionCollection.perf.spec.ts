@@ -8,6 +8,7 @@ import type { AttributionKey } from "@fluidframework/runtime-definitions/interna
 
 import {
 	type IAttributionCollection,
+	type IAttributionCollectionSpec,
 	AttributionCollection as NewAttributionCollection,
 	type SerializedAttributionCollection,
 } from "../attributionCollection.js";
@@ -15,7 +16,10 @@ import type { ISegment } from "../mergeTreeNodes.js";
 import { TextSegmentGranularity } from "../textSegment.js";
 
 interface IAttributionCollectionCtor {
-	new (length: number, key?: AttributionKey): IAttributionCollection<AttributionKey>;
+	new (initial: {
+		length: number;
+		rootEntries: IAttributionCollectionSpec<AttributionKey>["root"];
+	}): IAttributionCollection<AttributionKey>;
 
 	serializeAttributionCollections(
 		segments: Iterable<{
@@ -38,14 +42,27 @@ function getCollectionSizes(
 	collection: IAttributionCollection<AttributionKey>;
 	type: BenchmarkType;
 }[] {
-	const singleKeyCollection = new ctor(5, { type: "op", seq: 42 });
-	const tenKeyCollection = new ctor(2, { type: "op", seq: 0 });
+	const singleKeyCollection = new ctor({
+		length: 5,
+		rootEntries: [{ offset: 0, key: { type: "op", seq: 42 } }],
+	});
+	const tenKeyCollection = new ctor({
+		length: 2,
+		rootEntries: [{ offset: 0, key: { type: "op", seq: 0 } }],
+	});
 	for (let i = 1; i < 10; i++) {
-		tenKeyCollection.append(new ctor(3 * i, { type: "op", seq: i }));
+		tenKeyCollection.append(
+			new ctor({ length: 3 * i, rootEntries: [{ offset: 0, key: { type: "op", seq: i } }] }),
+		);
 	}
-	const maxSizeCollection = new ctor(1, { type: "op", seq: 0 });
+	const maxSizeCollection = new ctor({
+		length: 1,
+		rootEntries: [{ offset: 0, key: { type: "op", seq: 0 } }],
+	});
 	for (let i = 1; i < TextSegmentGranularity; i++) {
-		maxSizeCollection.append(new ctor(1, { type: "op", seq: i }));
+		maxSizeCollection.append(
+			new ctor({ length: 1, rootEntries: [{ offset: 0, key: { type: "op", seq: i } }] }),
+		);
 	}
 	return [
 		{ name: "one key", collection: singleKeyCollection, type: BenchmarkType.Diagnostic },
@@ -129,7 +146,10 @@ function runAttributionCollectionSuite(
 
 	benchmarkIt({
 		title: "construction",
-		...benchmarkDuration({ benchmarkFn: () => new ctor(42, { type: "op", seq: 5 }) }),
+		...benchmarkDuration({
+			benchmarkFn: () =>
+				new ctor({ length: 42, rootEntries: [{ offset: 0, key: { type: "op", seq: 5 } }] }),
+		}),
 		type: suiteBaseType,
 	});
 

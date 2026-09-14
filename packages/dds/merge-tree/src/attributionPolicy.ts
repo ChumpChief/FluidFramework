@@ -75,7 +75,10 @@ const ensureAttributionCollectionCallbacks: AttributionCallbacks = {
 	delta: ({ op }, { deltaSegments }) => {
 		if (op.type === MergeTreeDeltaType.INSERT) {
 			for (const { segment } of deltaSegments) {
-				segment.attribution = new AttributionCollection(segment.cachedLength);
+				segment.attribution = new AttributionCollection({
+					length: segment.cachedLength,
+					rootEntries: [],
+				});
 			}
 		}
 	},
@@ -101,7 +104,10 @@ const attributeInsertionOnSegments = (
 		if (isInserted(segment)) {
 			segment.attribution?.update(
 				undefined,
-				new AttributionCollection(segment.cachedLength, key),
+				new AttributionCollection({
+					length: segment.cachedLength,
+					rootEntries: [{ offset: 0, key }],
+				}),
 			);
 		}
 	}
@@ -154,7 +160,10 @@ function createPropertyTrackingMergeTreeCallbacks(
 				if (shouldAttributeInsert || shouldAttributeAnnotate) {
 					segment.attribution?.update(
 						channelName,
-						new AttributionCollection(segment.cachedLength, key),
+						new AttributionCollection({
+							length: segment.cachedLength,
+							rootEntries: [{ offset: 0, key }],
+						}),
 					);
 				}
 			}

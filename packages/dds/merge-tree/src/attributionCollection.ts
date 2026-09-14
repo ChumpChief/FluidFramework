@@ -174,7 +174,17 @@ export function areEqualAttributionKeys(
 	}
 }
 
+interface AttributionCollectionInit {
+	readonly length: number;
+	readonly rootEntries: IAttributionCollectionSpec<AttributionKey>["root"];
+	/**
+	 * The channel map is copied, but its collections are retained by reference.
+	 */
+	readonly channels?: Readonly<Record<string, AttributionCollection>>;
+}
+
 export class AttributionCollection implements IAttributionCollection<AttributionKey> {
+	private _length: number;
 	private offsets: number[] = [];
 	private keys: (AttributionKey | null)[] = [];
 
@@ -184,14 +194,20 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 		return Object.entries(this.channels ?? {});
 	}
 
-	public constructor(
-		private _length: number,
-		// eslint-disable-next-line @rushstack/no-new-null
-		baseEntry?: AttributionKey | null,
-	) {
-		if (baseEntry !== undefined) {
-			this.offsets.push(0);
-			this.keys.push(baseEntry);
+	public constructor({ length, rootEntries, channels }: AttributionCollectionInit) {
+		this._length = length;
+		for (const { offset, key } of rootEntries) {
+			this.offsets.push(offset);
+			this.keys.push(key);
+		}
+		if (channels !== undefined) {
+			for (const channel of Object.values(channels)) {
+				assert(
+					channel.length === length,
+					"AttributionCollection channels must have the same length as the collection",
+				);
+			}
+			this.channels = { ...channels };
 		}
 	}
 
@@ -281,18 +297,20 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 	 */
 	public splitAt(pos: number): AttributionCollection {
 		const splitIndex = this.findIndex(pos);
-		const splitCollection = new AttributionCollection(this.length - pos);
-		for (let i = splitIndex; i < this.keys.length; i++) {
-			splitCollection.offsets.push(Math.max(this.offsets[i] - pos, 0));
-			splitCollection.keys.push(this.keys[i]);
+		const rootEntries: { offset: number; key: AttributionKey | null }[] = [];
+		for (let i = Math.max(splitIndex, 0); i < this.keys.length; i++) {
+			rootEntries.push({ offset: Math.max(this.offsets[i] - pos, 0), key: this.keys[i] });
 		}
-
-		if (this.channels) {
-			splitCollection.channels = {};
-			for (const [key, collection] of this.channelEntries) {
-				splitCollection.channels[key] = collection.splitAt(pos);
-			}
-		}
+		const splitCollection = new AttributionCollection({
+			length: this.length - pos,
+			rootEntries,
+			channels:
+				this.channels === undefined
+					? undefined
+					: Object.fromEntries(
+							this.channelEntries.map(([name, collection]) => [name, collection.splitAt(pos)]),
+						),
+		});
 
 		const spliceIndex = this.offsets[splitIndex] === pos ? splitIndex : splitIndex + 1;
 		this.keys.splice(spliceIndex);
@@ -313,33 +331,41 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 		if (other.channels !== undefined || this.channels !== undefined) {
 			this.channels ??= {};
 			for (const [key, collection] of other.channelEntries) {
-				const thisCollection = (this.channels[key] ??= new AttributionCollection(
-					this.length,
-					// Null is needed as null and undefined have different meanings in the context of attribution collections.
+				const thisCollection = (this.channels[key] ??= new AttributionCollection({
+					length: this.length,
 					// eslint-disable-next-line unicorn/no-null
-					null,
-				));
+					rootEntries: [{ offset: 0, key: null }],
+				}));
 				thisCollection.append(collection);
 			}
 			for (const [key, collection] of this.channelEntries) {
 				if (other.channels?.[key] === undefined) {
-					// eslint-disable-next-line unicorn/no-null
-					collection.append(new AttributionCollection(other.length, null));
+					collection.append(
+						new AttributionCollection({
+							length: other.length,
+							// eslint-disable-next-line unicorn/no-null
+							rootEntries: [{ offset: 0, key: null }],
+						}),
+					);
 				}
 			}
 		}
 		this._length += other.length;
 	}
 
-	public getAll(): IAttributionCollectionSpec<AttributionKey> {
+	private getRootEntries(): { offset: number; key: AttributionKey | null }[] {
 		type ExtractGeneric<T> = T extends Iterable<infer Q> ? Q : unknown;
-		const root: ExtractGeneric<IAttributionCollectionSpec<AttributionKey>["root"]>[] =
+		const rootEntries: ExtractGeneric<IAttributionCollectionSpec<AttributionKey>["root"]>[] =
 			Array.from({ length: this.keys.length });
 		for (let i = 0; i < this.keys.length; i++) {
-			root[i] = { offset: this.offsets[i], key: this.keys[i] };
+			rootEntries[i] = { offset: this.offsets[i], key: this.keys[i] };
 		}
+		return rootEntries;
+	}
+
+	public getAll(): IAttributionCollectionSpec<AttributionKey> {
 		const result: IAttributionCollectionSpec<AttributionKey> = {
-			root,
+			root: this.getRootEntries(),
 			length: this.length,
 		};
 		if (this.channels !== undefined) {
@@ -352,17 +378,16 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 	}
 
 	public clone(): AttributionCollection {
-		const copy = new AttributionCollection(this.length);
-		copy.keys = [...this.keys];
-		copy.offsets = [...this.offsets];
-		if (this.channels !== undefined) {
-			const channelsCopy: Record<string, AttributionCollection> = {};
-			for (const [key, collection] of this.channelEntries) {
-				channelsCopy[key] = collection.clone();
-			}
-			copy.channels = channelsCopy;
-		}
-		return copy;
+		return new AttributionCollection({
+			length: this.length,
+			rootEntries: this.getRootEntries(),
+			channels:
+				this.channels === undefined
+					? undefined
+					: Object.fromEntries(
+							this.channelEntries.map(([name, collection]) => [name, collection.clone()]),
+						),
+		});
 	}
 
 	public update(name: string | undefined, channel: AttributionCollection): void {
@@ -411,15 +436,15 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			let cumulativeSegPos = 0;
 
 			for (const segment of segments) {
-				const attribution = new AttributionCollection(segment.cachedLength);
+				const rootEntries: { offset: number; key: AttributionKey | null }[] = [];
 				// This function is defined here to allow for the creation of a new collection for each segment.
 				// eslint-disable-next-line unicorn/consistent-function-scoping
 				const pushEntry = (offset: number, seq: AttributionKey | number | null): void => {
-					attribution.offsets.push(offset);
-					attribution.keys.push(
+					rootEntries.push({
+						offset,
 						// eslint-disable-next-line unicorn/no-null
-						seq === null ? null : typeof seq === "object" ? seq : { type: "op", seq },
-					);
+						key: seq === null ? null : typeof seq === "object" ? seq : { type: "op", seq },
+					});
 				};
 				if (posBreakpoints[curIndex] > cumulativeSegPos) {
 					curIndex--;
@@ -431,11 +456,14 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 					curIndex++;
 				}
 
-				if (attribution.offsets.length === 0) {
+				if (rootEntries.length === 0) {
 					pushEntry(0, seqs[curIndex - 1]);
 				}
 
-				assignToSegment(attribution, segment);
+				assignToSegment(
+					new AttributionCollection({ length: segment.cachedLength, rootEntries }),
+					segment,
+				);
 				cumulativeSegPos += segment.cachedLength;
 			}
 		};
@@ -473,8 +501,12 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 		const allChannelNames = new Set<string>();
 		for (const segment of segments) {
 			const collection =
-				// eslint-disable-next-line unicorn/no-null
-				segment.attribution ?? new AttributionCollection(segment.cachedLength, null);
+				segment.attribution ??
+				new AttributionCollection({
+					length: segment.cachedLength,
+					// eslint-disable-next-line unicorn/no-null
+					rootEntries: [{ offset: 0, key: null }],
+				});
 			const spec = collection.getAll();
 			allCollectionSpecs.push(spec);
 			if (spec.channels) {
