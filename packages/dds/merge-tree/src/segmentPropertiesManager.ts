@@ -15,31 +15,7 @@ import type {
 	IMergeTreeAnnotateAdjustMsg,
 	IMergeTreeAnnotateMsg,
 } from "./ops.js";
-import { type MapLike, type PropertySet, clone, createMap } from "./properties.js";
-
-/**
- * Minimally copies properties and the property manager from source to destination.
- * @internal
- */
-export function copyPropertiesAndManager(
-	source: {
-		properties?: PropertySet;
-		propertyManager?: PropertiesManager;
-	},
-	destination: {
-		properties?: PropertySet;
-		propertyManager?: PropertiesManager;
-	},
-): void {
-	if (source.properties) {
-		if (source.propertyManager === undefined) {
-			destination.properties = clone(source.properties);
-		} else {
-			destination.propertyManager ??= new PropertiesManager();
-			source.propertyManager.copyTo(source.properties, destination);
-		}
-	}
-}
+import { type MapLike, type PropertySet, createMap } from "./properties.js";
 
 type PropertyChange = {
 	seq: number;
@@ -120,12 +96,25 @@ function applyChanges(
 /**
  * The PropertiesManager class handles changes to properties, both remote and local.
  * It manages the lifecycle for local property changes, ensures all property changes are eventually consistent,
- * and provides methods to acknowledge changes, update the minimum sequence number (msn), and copy properties to another manager.
+ * and provides methods to acknowledge changes, update the minimum sequence number (msn), and clone its change histories.
  * This class is essential for maintaining the integrity and consistency of property changes in collaborative environments.
  * @internal
  */
 export class PropertiesManager {
 	private readonly changes = new Map<string, PropertyChanges>();
+
+	/**
+	 * Creates a manager with independent copies of the supplied change-history lists.
+	 */
+	public constructor(changes: Iterable<readonly [string, PropertyChanges]> = []) {
+		for (const [key, { local, remote, msnConsensus }] of changes) {
+			this.changes.set(key, {
+				msnConsensus,
+				remote: new DoublyLinkedList(remote.empty ? undefined : remote.map((c) => c.data)),
+				local: new DoublyLinkedList(local.empty ? undefined : local.map((c) => c.data)),
+			});
+		}
+	}
 
 	/**
 	 * Rolls back local property changes.
@@ -291,28 +280,11 @@ export class PropertiesManager {
 	}
 
 	/**
-	 * Copies properties to another manager.
-	 * This method copies the properties and their changes from the current manager to the destination manager.
-	 *
-	 * @param oldProps - The old properties to be copied.
-	 * @param dest - The destination object containing properties and property manager.
+	 * Clones this manager's current state into a new manager with independent change-history lists.
+	 * Change records and property values are not deep-cloned.
 	 */
-	public copyTo(
-		oldProps: PropertySet | undefined,
-		dest: {
-			properties?: PropertySet;
-			propertyManager?: PropertiesManager;
-		},
-	): void {
-		const newManager = (dest.propertyManager ??= new PropertiesManager());
-		dest.properties = clone(oldProps);
-		for (const [key, { local, remote, msnConsensus }] of this.changes.entries()) {
-			newManager.changes.set(key, {
-				msnConsensus,
-				remote: new DoublyLinkedList(remote.empty ? undefined : remote.map((c) => c.data)),
-				local: new DoublyLinkedList(local.empty ? undefined : local.map((c) => c.data)),
-			});
-		}
+	public clone(): PropertiesManager {
+		return new PropertiesManager(this.changes);
 	}
 
 	/**

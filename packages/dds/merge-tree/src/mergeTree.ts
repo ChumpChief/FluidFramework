@@ -88,7 +88,13 @@ import {
 	RemoteObliteratePerspective,
 	allAckedChangesPerspective,
 } from "./perspective.js";
-import { type PropertySet, createMap, extend, extendIfUndefined } from "./properties.js";
+import {
+	type PropertySet,
+	clone as cloneProperties,
+	createMap,
+	extend,
+	extendIfUndefined,
+} from "./properties.js";
 import {
 	DetachedReferencePosition,
 	type ReferencePosition,
@@ -110,11 +116,7 @@ import {
 	type IHasRemovalInfo,
 	type SegmentWithInfo,
 } from "./segmentInfos.js";
-import {
-	copyPropertiesAndManager,
-	PropertiesManager,
-	type PropsOrAdjust,
-} from "./segmentPropertiesManager.js";
+import { PropertiesManager, type PropsOrAdjust } from "./segmentPropertiesManager.js";
 import { Side, type InteriorSequencePlace } from "./sequencePlace.js";
 import { SortedSegmentSet } from "./sortedSegmentSet.js";
 import type {
@@ -1781,7 +1783,8 @@ export class MergeTree {
 			segment.segmentGroups.copyTo(next.segmentGroups);
 		}
 
-		copyPropertiesAndManager(segment, next);
+		next.properties = cloneProperties(segment.properties);
+		next.propertyManager = segment.propertyManager?.clone();
 		segment.localRefs?.split(pos, next);
 
 		this.mergeTreeMaintenanceCallback?.(

@@ -118,11 +118,7 @@ export {
 	reservedRangeLabelsKey,
 	reservedTileLabelsKey,
 } from "./referencePositions.js";
-export {
-	type PropsOrAdjust,
-	copyPropertiesAndManager,
-	PropertiesManager,
-} from "./segmentPropertiesManager.js";
+export { type PropsOrAdjust, PropertiesManager } from "./segmentPropertiesManager.js";
 export {
 	type InteriorSequencePlace,
 	Side,
