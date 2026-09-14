@@ -331,19 +331,24 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 		}
 
 		const otherChannels = other.getChannels();
-		if (otherChannels !== undefined || this.channels !== undefined) {
+		// Append incoming channels, padding the receiver's prefix when needed.
+		if (otherChannels !== undefined) {
 			this.channels ??= {};
-			for (const [key, collection] of Object.entries(otherChannels ?? {})) {
-				const thisCollection = (this.channels[key] ??= new AttributionCollection({
+			for (const [channelName, sourceChannel] of Object.entries(otherChannels)) {
+				const targetChannel = (this.channels[channelName] ??= new AttributionCollection({
 					length: this.length,
 					// eslint-disable-next-line unicorn/no-null
 					rootEntries: [{ offset: 0, key: null }],
 				}));
-				thisCollection.append(collection);
+				targetChannel.append(sourceChannel);
 			}
-			for (const [key, collection] of this.channelEntries) {
-				if (otherChannels?.[key] === undefined) {
-					collection.append(
+		}
+
+		// Prevent receiver-only attribution from extending into the appended text.
+		if (this.channels !== undefined) {
+			for (const [channelName, targetChannel] of this.channelEntries) {
+				if (otherChannels?.[channelName] === undefined) {
+					targetChannel.append(
 						new AttributionCollection({
 							length: other.length,
 							// eslint-disable-next-line unicorn/no-null

@@ -542,6 +542,42 @@ describe("AttributionCollection", () => {
 		});
 
 		describe("appends channels", () => {
+			it("processes incoming channels before receiver-only channels", () => {
+				const appendOrder: string[] = [];
+				class TrackedChannel extends AttributionCollection {
+					public constructor(private readonly name: string) {
+						super({ length: 2, rootEntries: [{ offset: 0, key: opKey(10) }] });
+					}
+
+					public override append(other: AttributionCollection): void {
+						appendOrder.push(this.name);
+						super.append(other);
+					}
+				}
+				const collection = new AttributionCollection({
+					length: 2,
+					rootEntries: [],
+					channels: {
+						receiverOnly: new TrackedChannel("receiver-only"),
+						shared: new TrackedChannel("shared"),
+					},
+				});
+				collection.append(
+					new AttributionCollection({
+						length: 3,
+						rootEntries: [],
+						channels: {
+							shared: new AttributionCollection({
+								length: 3,
+								rootEntries: [{ offset: 0, key: opKey(20) }],
+							}),
+						},
+					}),
+				);
+
+				assert.deepEqual(appendOrder, ["shared", "receiver-only"]);
+			});
+
 			for (const receiverHasMap of [false, true]) {
 				for (const donorHasMap of [false, true]) {
 					it(`preserves empty-map presence (receiver=${receiverHasMap}, donor=${donorHasMap})`, () => {
