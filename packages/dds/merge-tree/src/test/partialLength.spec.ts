@@ -5,6 +5,7 @@
 
 import { MergeTree } from "../mergeTree.js";
 import { MergeTreeDeltaType } from "../ops.js";
+import { PartialSequenceLengths } from "../partialLengths.js";
 import type { OperationStamp } from "../stamps.js";
 import { TextSegment } from "../textSegment.js";
 
@@ -45,6 +46,12 @@ describe("partial lengths", () => {
 	it("passes with no additional ops", () => {
 		validatePartialLengths(localClientId, mergeTree, [{ seq: refSeq, len: 12 }]);
 	});
+
+	for (const computeLocalPartials of [false, true]) {
+		it(`verifies empty partials (computeLocalPartials=${computeLocalPartials})`, () => {
+			new PartialSequenceLengths(0, computeLocalPartials).verify();
+		});
+	}
 
 	describe("a single inserted element", () => {
 		it("includes length of local insert for local view", () => {

@@ -1126,11 +1126,24 @@ export class PartialSequenceLengths {
 		const cliSeqs = this.perClientAdjustments[clientId];
 		return cliSeqs && cliSeqs.size > 0 ? cliSeqs.items[cliSeqs.size - 1] : undefined;
 	}
+
+	/**
+	 * Checks the consistency of this instance's partial lengths and client adjustments.
+	 */
+	public verify(): void {
+		for (const cliSeq of this.perClientAdjustments) {
+			if (cliSeq !== undefined) {
+				verifyPartialLengthsInner(this.minSeq, this.minLength, cliSeq, true);
+			}
+		}
+
+		verifyPartialLengthsInner(this.minSeq, this.minLength, this.partialLengths, false);
+	}
 }
 
-/* eslint-disable @typescript-eslint/dot-notation */
 function verifyPartialLengthsInner(
-	partialSeqLengths: PartialSequenceLengths,
+	minSeq: number,
+	minLength: number,
 	partialLengths: PartialSequenceLengthsSet,
 	clientPartials: boolean,
 ): number {
@@ -1147,10 +1160,7 @@ function verifyPartialLengthsInner(
 		count++;
 
 		// Sequence number should be larger or equal to minseq
-		assert(
-			partialSeqLengths.minSeq <= partialLength.seq,
-			0x054 /* "Sequence number less than minSeq!" */,
-		);
+		assert(minSeq <= partialLength.seq, 0x054 /* "Sequence number less than minSeq!" */);
 
 		// Sequence number should be sorted
 		assert(lastSeqNum < partialLength.seq, 0x055 /* "Sequence number is not sorted!" */);
@@ -1178,7 +1188,7 @@ function verifyPartialLengthsInner(
 			// client 2 after seq 11.
 		} else {
 			// Len adjustment should not make length negative
-			if (partialSeqLengths["minLength"] + partialLength.len < 0) {
+			if (minLength + partialLength.len < 0) {
 				fail(0x057 /* "Negative length after length adjustment!" */);
 			}
 		}
@@ -1242,31 +1252,6 @@ export function verifyExpectedPartialLengths(
 		);
 	}
 }
-
-export function verifyPartialLengths(partialSeqLengths: PartialSequenceLengths): void {
-	if (partialSeqLengths["perClientAdjustments"]) {
-		for (const cliSeq of partialSeqLengths["perClientAdjustments"]) {
-			if (cliSeq) {
-				verifyPartialLengthsInner(partialSeqLengths, cliSeq, true);
-			}
-		}
-
-		// If we have client view, we should have the flat view
-		assert(
-			!!partialSeqLengths["partialLengths"],
-			0x059 /* "Client view exists but flat view does not!" */,
-		);
-
-		verifyPartialLengthsInner(partialSeqLengths, partialSeqLengths["partialLengths"], false);
-	} else {
-		// If we don't have a client view, we shouldn't have the flat view either
-		assert(
-			!partialSeqLengths["partialLengths"],
-			0x05b /* "Flat view exists but client view does not!" */,
-		);
-	}
-}
-/* eslint-enable @typescript-eslint/dot-notation */
 
 /**
  * Given a number of seq-sorted `partialLength` lists, merges them into a combined seq-sorted `partialLength`

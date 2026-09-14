@@ -14,11 +14,7 @@ import type {
 } from "../mergeTreeDeltaCallback.js";
 import { walkAllChildSegments } from "../mergeTreeNodeWalk.js";
 import type { MergeBlock } from "../mergeTreeNodes.js";
-import {
-	PartialSequenceLengths,
-	verifyExpectedPartialLengths,
-	verifyPartialLengths,
-} from "../partialLengths.js";
+import { PartialSequenceLengths, verifyExpectedPartialLengths } from "../partialLengths.js";
 import {
 	LocalReconnectingPerspective,
 	PriorPerspective,
@@ -248,7 +244,7 @@ export function validateRefCount(collection?: LocalReferenceCollection): void {
  */
 export function useStrictPartialLengthChecks(): void {
 	beforeEach("Enable strict partial lengths", () => {
-		PartialSequenceLengths.options.verifier = verifyPartialLengths;
+		PartialSequenceLengths.options.verifier = (partialLengths) => partialLengths.verify();
 		PartialSequenceLengths.options.verifyExpected = verifyExpectedPartialLengths;
 	});
 
