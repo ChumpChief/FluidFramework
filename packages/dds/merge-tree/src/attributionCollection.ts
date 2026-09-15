@@ -183,6 +183,66 @@ interface AttributionCollectionInit {
 	readonly channels?: Readonly<Record<string, AttributionCollection>>;
 }
 
+/**
+ * Reads segment-relative entries from one serialized attribution stream in order.
+ */
+class AttributionEntryReader {
+	private readonly seqs: SequenceOffsets["seqs"];
+	private readonly posBreakpoints: SequenceOffsets["posBreakpoints"];
+	private curIndex = 0;
+	private cumulativeSegPos = 0;
+
+	public constructor({ seqs, posBreakpoints }: SequenceOffsets) {
+		if (seqs.length === 0) {
+			assert(
+				posBreakpoints.length === 0,
+				0x9e1 /* seqs and posBreakpoints length should match */,
+			);
+		}
+		this.seqs = seqs;
+		this.posBreakpoints = posBreakpoints;
+	}
+
+	/**
+	 * Reads entries for the next segment, with offsets relative to that segment's start.
+	 * Advances the reader by `segmentLength`, carrying forward any key already active at the start.
+	 *
+	 * @param segmentLength - Length of the next consecutive segment.
+	 */
+	public readEntries(
+		segmentLength: number,
+	): IAttributionCollectionSpec<AttributionKey>["root"] {
+		const segmentEnd = this.cumulativeSegPos + segmentLength;
+		const rootEntries: { offset: number; key: AttributionKey | null }[] = [];
+		if (this.curIndex > 0 && this.posBreakpoints[this.curIndex] > this.cumulativeSegPos) {
+			this.curIndex--;
+		}
+
+		while (
+			this.curIndex < this.posBreakpoints.length &&
+			this.posBreakpoints[this.curIndex] < segmentEnd
+		) {
+			rootEntries.push({
+				offset: Math.max(this.posBreakpoints[this.curIndex] - this.cumulativeSegPos, 0),
+				key: this.decodeKey(this.curIndex),
+			});
+			this.curIndex++;
+		}
+
+		if (rootEntries.length === 0 && this.curIndex > 0) {
+			rootEntries.push({ offset: 0, key: this.decodeKey(this.curIndex - 1) });
+		}
+
+		this.cumulativeSegPos = segmentEnd;
+		return rootEntries;
+	}
+
+	private decodeKey(index: number): AttributionKey | null {
+		const seq = this.seqs[index];
+		return typeof seq === "object" ? seq : { type: "op", seq };
+	}
+}
+
 export class AttributionCollection implements IAttributionCollection<AttributionKey> {
 	private _length: number;
 	private offsets: number[] = [];
@@ -444,68 +504,26 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			0x445 /* Invalid attribution summary blob provided */,
 		);
 
-		// Each reader advances independently through one root or named-channel stream.
-		const createSegmentEntryReader = ({
-			seqs,
-			posBreakpoints,
-		}: SequenceOffsets): ((
-			segmentLength: number,
-		) => IAttributionCollectionSpec<AttributionKey>["root"]) => {
-			if (seqs.length === 0) {
-				assert(
-					posBreakpoints.length === 0,
-					0x9e1 /* seqs and posBreakpoints length should match */,
-				);
-				return () => [];
-			}
-			let curIndex = 0;
-			let cumulativeSegPos = 0;
+		const rootReader = new AttributionEntryReader(summary);
+		const channelReaders: [string, AttributionEntryReader][] = [];
+		for (const [name, channelSummary] of Object.entries(channels ?? {})) {
+			channelReaders.push([name, new AttributionEntryReader(channelSummary)]);
+		}
 
-			return (segmentLength) => {
-				const rootEntries: { offset: number; key: AttributionKey | null }[] = [];
-				const pushEntry = (offset: number, seq: AttributionKey | number | null): void => {
-					rootEntries.push({
-						offset,
-						// eslint-disable-next-line unicorn/no-null
-						key: seq === null ? null : typeof seq === "object" ? seq : { type: "op", seq },
-					});
-				};
-				if (curIndex > 0 && posBreakpoints[curIndex] > cumulativeSegPos) {
-					curIndex--;
-				}
-
-				while (posBreakpoints[curIndex] < cumulativeSegPos + segmentLength) {
-					const nextOffset = Math.max(posBreakpoints[curIndex] - cumulativeSegPos, 0);
-					pushEntry(nextOffset, seqs[curIndex]);
-					curIndex++;
-				}
-
-				if (rootEntries.length === 0 && curIndex > 0) {
-					pushEntry(0, seqs[curIndex - 1]);
-				}
-
-				cumulativeSegPos += segmentLength;
-				return rootEntries;
-			};
-		};
-
-		const readRootEntries = createSegmentEntryReader(summary);
-		const channelReaders = Object.entries(channels ?? {}).map(([name, channelSummary]) => ({
-			name,
-			readEntries: createSegmentEntryReader(channelSummary),
-		}));
 		for (const segment of segments) {
 			const length = segment.cachedLength;
-			const rootEntries = readRootEntries(length);
-			const namedChannels =
-				channelReaders.length === 0
-					? undefined
-					: Object.fromEntries(
-							channelReaders.map(({ name, readEntries }): [string, AttributionCollection] => [
-								name,
-								new AttributionCollection({ length, rootEntries: readEntries(length) }),
-							]),
-						);
+			const rootEntries = rootReader.readEntries(length);
+			let namedChannels: Record<string, AttributionCollection> | undefined;
+			if (channelReaders.length > 0) {
+				const channelEntries: [string, AttributionCollection][] = [];
+				for (const [name, reader] of channelReaders) {
+					channelEntries.push([
+						name,
+						new AttributionCollection({ length, rootEntries: reader.readEntries(length) }),
+					]);
+				}
+				namedChannels = Object.fromEntries(channelEntries);
+			}
 			segment.attribution = new AttributionCollection({
 				length,
 				rootEntries,
