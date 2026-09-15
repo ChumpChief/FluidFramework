@@ -3,7 +3,10 @@
  * Licensed under the MIT License.
  */
 
+import { strict as assert } from "node:assert";
+
 import { MergeTree } from "../mergeTree.js";
+import { MergeBlock } from "../mergeTreeNodes.js";
 import { MergeTreeDeltaType } from "../ops.js";
 import { PartialSequenceLengths } from "../partialLengths.js";
 import type { OperationStamp } from "../stamps.js";
@@ -49,7 +52,82 @@ describe("partial lengths", () => {
 
 	for (const computeLocalPartials of [false, true]) {
 		it(`verifies empty partials (computeLocalPartials=${computeLocalPartials})`, () => {
-			new PartialSequenceLengths(0, computeLocalPartials).verify();
+			new PartialSequenceLengths(mergeTree.collabWindow, computeLocalPartials).verify();
+		});
+
+		it(`constructs leaf partials (computeLocalPartials=${computeLocalPartials})`, () => {
+			mergeTree.insertSegments(
+				0,
+				[TextSegment.make("more ")],
+				remoteClient1.perspectiveAt({ refSeq }),
+				remoteClient1.stampAt({ seq: 1 }),
+				undefined,
+			);
+			const localInsert = mergeTree.collabWindow.mintNextLocalOperationStamp();
+			mergeTree.insertSegments(
+				0,
+				[TextSegment.make("local ")],
+				mergeTree.localPerspective,
+				localInsert,
+				undefined,
+			);
+
+			const partials = new PartialSequenceLengths(
+				mergeTree.collabWindow,
+				computeLocalPartials,
+				mergeTree.root,
+			);
+
+			assert.equal(partials.getPartialLength(0, remoteClientId + 1), 12);
+			assert.equal(partials.getPartialLength(0, remoteClientId), 17);
+			assert.equal(partials.getPartialLength(1, remoteClientId + 1), 17);
+			if (computeLocalPartials) {
+				assert.notEqual(localInsert.localSeq, undefined);
+				assert.equal(partials.getPartialLength(0, localClientId, 0), 12);
+				assert.equal(partials.getPartialLength(1, localClientId, 0), 17);
+				assert.equal(partials.getPartialLength(1, localClientId, localInsert.localSeq), 23);
+			}
+		});
+
+		it(`constructs only direct leaf partials (computeLocalPartials=${computeLocalPartials})`, () => {
+			const block = new MergeBlock(2);
+			block.children[0] = mergeTree.root;
+			block.children[1] = mergeTree.root.children[0];
+			mergeTree.collabWindow.minSeq = 5;
+			mergeTree.collabWindow.currentSeq = 5;
+
+			const partials = new PartialSequenceLengths(
+				mergeTree.collabWindow,
+				computeLocalPartials,
+				block,
+			);
+
+			assert.equal(partials.minSeq, 5);
+			assert.equal(partials.getPartialLength(5, remoteClientId), 12);
+		});
+
+		it(`verifies leaf initialization before aggregation (computeLocalPartials=${computeLocalPartials})`, () => {
+			const block = new MergeBlock(1);
+			block.children[0] = mergeTree.root;
+			const verifiedLengths: number[] = [];
+			const verifier = PartialSequenceLengths.options.verifier;
+			PartialSequenceLengths.options.verifier = (partials) => {
+				partials.verify();
+				verifiedLengths.push(partials.getPartialLength(0, remoteClientId));
+			};
+
+			try {
+				const combined = PartialSequenceLengths.combine(
+					block,
+					mergeTree.collabWindow,
+					true,
+					computeLocalPartials,
+				);
+				assert.equal(combined.getPartialLength(0, remoteClientId), 12);
+				assert.deepEqual(verifiedLengths, [0, 12, 12, 12]);
+			} finally {
+				PartialSequenceLengths.options.verifier = verifier;
+			}
 		});
 	}
 

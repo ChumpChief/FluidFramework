@@ -223,7 +223,7 @@ export interface PartialSequenceLengthsOptions {
  *
  * 1. The above description and how it relates to the implementation of `getPartialLength` (which implements the above high-level description
  * 2. `PartialSequenceLengthsSet`, which allows binary searching for overall length deltas at a given sequence number and handles updates.
- * 3. The `fromLeaves` method, which is the base case for the [potential] recursion in `combine`
+ * 3. The constructor's leaf accounting, which is the base case for the [potential] recursion in `combine`
  * 4. The logic in `combine` to aggregate smaller block entries into larger ones
  * 5. The incremental code path of `update`
  */
@@ -309,20 +309,45 @@ export class PartialSequenceLengths {
 	 */
 	private unsequencedRecords: UnsequencedPartialLengthInfo | undefined;
 
+	/**
+	 * The minimumSequenceNumber as defined by the collab window used in the last call to `update`,
+	 * or if no such calls have been made, the one used on construction.
+	 */
+	public minSeq: number;
+
+	/**
+	 * Initializes partial lengths for the direct child leaves of `block`, or empty partial lengths
+	 * for aggregation if no block is provided.
+	 */
 	constructor(
-		/**
-		 * The minimumSequenceNumber as defined by the collab window used in the last call to `update`,
-		 * or if no such calls have been made, the one used on construction.
-		 */
-		public minSeq: number,
+		collabWindow: CollaborationWindow,
 		computeLocalPartials: boolean,
+		block?: MergeBlock,
 	) {
+		this.minSeq = collabWindow.minSeq;
 		if (computeLocalPartials) {
 			this.unsequencedRecords = {
 				partialLengths: new PartialSequenceLengthsSet(),
 				perRefSeqAdjustments: new Map(),
 				cachedAdjustmentByRefSeq: new Map(),
 			};
+		}
+
+		if (block !== undefined) {
+			this.segmentCount = block.childCount;
+			for (let i = 0; i < block.childCount; i++) {
+				const child = block.children[i];
+				if (child.isLeaf()) {
+					if (wasRemovedOnInsert(child)) {
+						this.accountForRemoveOnInsert(child, collabWindow);
+					} else {
+						this.accountForInsertion(child, collabWindow);
+						this.accountForRemoval(child, collabWindow);
+					}
+				}
+			}
+
+			PartialSequenceLengths.options.verifier?.(this);
 		}
 	}
 
@@ -344,10 +369,10 @@ export class PartialSequenceLengths {
 		recur = false,
 		computeLocalPartials = false,
 	): PartialSequenceLengths {
-		const leafPartialLengths = PartialSequenceLengths.fromLeaves(
-			block,
+		const leafPartialLengths = new PartialSequenceLengths(
 			collabWindow,
 			computeLocalPartials,
+			block,
 		);
 
 		let hasInternalChild = false;
@@ -369,10 +394,10 @@ export class PartialSequenceLengths {
 			}
 		}
 
-		// If there are no internal children, the PartialSequenceLengths returns from `fromLeaves` is exactly correct.
+		// If there are no internal children, the leaf partial lengths are exactly correct.
 		// Otherwise, we must additively combine all of the children partial lengths to get this block's totals.
 		const combinedPartialLengths = hasInternalChild
-			? new PartialSequenceLengths(collabWindow.minSeq, computeLocalPartials)
+			? new PartialSequenceLengths(collabWindow, computeLocalPartials)
 			: leafPartialLengths;
 		if (hasInternalChild) {
 			if (leafPartialLengths.partialLengths.size > 0) {
@@ -457,59 +482,11 @@ export class PartialSequenceLengths {
 	}
 
 	/**
-	 * Create a `PartialSequenceLengths` which tracks only changes incurred by direct child leaves of `block`.
-	 */
-	private static fromLeaves(
-		block: MergeBlock,
-
-		collabWindow: CollaborationWindow,
-		computeLocalPartials: boolean,
-		retry = true,
-	): PartialSequenceLengths {
-		const combinedPartialLengths = new PartialSequenceLengths(
-			collabWindow.minSeq,
-			computeLocalPartials,
-		);
-		combinedPartialLengths.segmentCount = block.childCount;
-
-		for (let i = 0; i < block.childCount; i++) {
-			const child = block.children[i];
-			if (child.isLeaf()) {
-				// Leaf segment
-				const segment = child;
-				if (wasRemovedOnInsert(segment)) {
-					PartialSequenceLengths.accountForRemoveOnInsert(
-						combinedPartialLengths,
-						segment,
-						collabWindow,
-					);
-				} else {
-					PartialSequenceLengths.accountForInsertion(
-						combinedPartialLengths,
-						segment,
-						collabWindow,
-					);
-
-					PartialSequenceLengths.accountForRemoval(
-						combinedPartialLengths,
-						segment,
-						collabWindow,
-					);
-				}
-			}
-		}
-
-		PartialSequenceLengths.options.verifier?.(combinedPartialLengths);
-		return combinedPartialLengths;
-	}
-
-	/**
 	 * Assuming this segment was removed on insertion, inserts length information about that operation
 	 * into the appropriate per-client adjustments (the overall view needs no such adjustment since
 	 * from an observing client's perspective, the segment never exists).
 	 */
-	private static accountForRemoveOnInsert(
-		combinedPartialLengths: PartialSequenceLengths,
+	private accountForRemoveOnInsert(
 		segment: ISegmentPrivate,
 		collabWindow: CollaborationWindow,
 	): void {
@@ -531,9 +508,7 @@ export class PartialSequenceLengths {
 		const isLocal = opstampUtils.isLocal(insert);
 		const { clientId } = insert;
 
-		const partials = isLocal
-			? combinedPartialLengths.unsequencedRecords?.partialLengths
-			: combinedPartialLengths.partialLengths;
+		const partials = isLocal ? this.unsequencedRecords?.partialLengths : this.partialLengths;
 		if (partials === undefined) {
 			// Local partial but its computation isn't required
 			return;
@@ -552,7 +527,7 @@ export class PartialSequenceLengths {
 				clientId,
 			});
 
-			combinedPartialLengths.addLocalAdjustment({
+			this.addLocalAdjustment({
 				refSeq: firstRemove.seq,
 				localSeq,
 				seglen: -cachedLength,
@@ -571,7 +546,7 @@ export class PartialSequenceLengths {
 					clientId,
 				});
 
-				combinedPartialLengths.addLocalAdjustment({
+				this.addLocalAdjustment({
 					refSeq: firstRemove.seq,
 					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					localSeq: lastRemove.localSeq!,
@@ -592,23 +567,22 @@ export class PartialSequenceLengths {
 					removeSeq !== undefined,
 					0xab8 /* ObliterateOnInsertion implies removeSeq is defined */,
 				);
-				combinedPartialLengths.addClientAdjustment(clientId, removeSeq, cachedLength);
+				this.addClientAdjustment(clientId, removeSeq, cachedLength);
 			}
 		}
 	}
 
 	/**
 	 * Inserts length information about the insertion of `segment` into
-	 * `combinedPartialLengths.partialLengths` and the appropriate per-client adjustments.
+	 * `this.partialLengths` and the appropriate per-client adjustments.
 	 */
-	private static accountForInsertion(
-		combinedPartialLengths: PartialSequenceLengths,
+	private accountForInsertion(
 		segment: ISegmentPrivate,
 		collabWindow: CollaborationWindow,
 	): void {
 		assertInserted(segment);
 		if (opstampUtils.lte(segment.insert, getMinSeqStamp(collabWindow))) {
-			combinedPartialLengths.minLength += segment.cachedLength;
+			this.minLength += segment.cachedLength;
 			return;
 		}
 
@@ -619,9 +593,7 @@ export class PartialSequenceLengths {
 		const seqOrLocalSeq = isLocal ? insert.localSeq! : insert.seq;
 		const clientId = insert.clientId;
 
-		const partials = isLocal
-			? combinedPartialLengths.unsequencedRecords?.partialLengths
-			: combinedPartialLengths.partialLengths;
+		const partials = isLocal ? this.unsequencedRecords?.partialLengths : this.partialLengths;
 		if (!partials) {
 			// Local partial but its computation isn't required
 			return;
@@ -641,16 +613,15 @@ export class PartialSequenceLengths {
 				len: 0,
 				seglen: segmentLen,
 			});
-			combinedPartialLengths.addClientAdjustment(clientId, seqOrLocalSeq, segmentLen);
+			this.addClientAdjustment(clientId, seqOrLocalSeq, segmentLen);
 		}
 	}
 
 	/**
 	 * Inserts length information about the removal or obliteration of `segment` into
-	 * `combinedPartialLengths.partialLengths` and the appropriate per-client adjustments.
+	 * `this.partialLengths` and the appropriate per-client adjustments.
 	 */
-	private static accountForRemoval(
-		combinedPartialLengths: PartialSequenceLengths,
+	private accountForRemoval(
 		segment: ISegmentPrivate,
 		collabWindow: CollaborationWindow,
 	): void {
@@ -664,7 +635,7 @@ export class PartialSequenceLengths {
 		const firstRemove = removalInfo?.removes[0];
 		const minSeqStamp = getMinSeqStamp(collabWindow);
 		if (firstRemove !== undefined && opstampUtils.lte(firstRemove, minSeqStamp)) {
-			combinedPartialLengths.minLength -= segment.cachedLength;
+			this.minLength -= segment.cachedLength;
 			return;
 		}
 
@@ -686,9 +657,7 @@ export class PartialSequenceLengths {
 			removalInfo?.removes.map((stamp) => stamp.clientId),
 		);
 
-		const partials = isLocal
-			? combinedPartialLengths.unsequencedRecords?.partialLengths
-			: combinedPartialLengths.partialLengths;
+		const partials = isLocal ? this.unsequencedRecords?.partialLengths : this.partialLengths;
 		if (partials === undefined) {
 			// Local partial but its computation isn't required
 			return;
@@ -714,7 +683,7 @@ export class PartialSequenceLengths {
 				});
 			} else {
 				// ... otherwise, it's only visible to reconnecting perspectives above the seq of the insert.
-				combinedPartialLengths.addLocalAdjustment({
+				this.addLocalAdjustment({
 					localSeq: seqOrLocalSeq,
 					refSeq: segment.insert.seq,
 					seglen: lenDelta,
@@ -737,7 +706,7 @@ export class PartialSequenceLengths {
 						// No need to account for it in the unsequenced records.
 						continue;
 					}
-					const { unsequencedRecords } = combinedPartialLengths;
+					const { unsequencedRecords } = this;
 					if (!unsequencedRecords) {
 						// Local partial but its computation isn't required.
 						continue;
@@ -770,7 +739,7 @@ export class PartialSequenceLengths {
 					//
 					// Note that in this picture:
 					// - Adding entries to `unsequencedRecords.partialLengths` is like adding adjustments that affect anything above a given Y value
-					// - Adding entries to `combinedPartialLengths.partialLengths` is like adding adjustments that affect anything above a given X value
+					// - Adding entries to `this.partialLengths` is like adding adjustments that affect anything above a given X value
 					// - Adding entries with `addLocalAdjustment` is like adding adjustments that affect anything above a given X *and* Y value
 					// The remainder this block adds the necessary adjustments to make the length appear 0 in region 2 as well, keeping in mind that
 					// region 1 may or may not exist depending on if the insertion is in the collab window.
@@ -778,7 +747,7 @@ export class PartialSequenceLengths {
 						opstampUtils.isAcked(segment.insert) &&
 						opstampUtils.greaterThan(segment.insert, minSeqStamp)
 					) {
-						combinedPartialLengths.addLocalAdjustment({
+						this.addLocalAdjustment({
 							refSeq: segment.insert.seq,
 							localSeq,
 							seglen: lenDelta,
@@ -794,11 +763,11 @@ export class PartialSequenceLengths {
 
 					// Because we've included deltas which take effect when either of localSeq or refSeq are high enough,
 					// we need to offset this with an adjustment that takes effect when both are high enough.
-					combinedPartialLengths.addLocalAdjustment({
+					this.addLocalAdjustment({
 						refSeq: seqOrLocalSeq,
 						localSeq,
-						// combinedPartialLengths.partialLengths has an entry removing this segment from a perspective >= seqOrLocalSeq.
-						// combinedPartialLengths.unsequencedRecords.partialLengths now has an entry removing this segment from a perspective
+						// this.partialLengths has an entry removing this segment from a perspective >= seqOrLocalSeq.
+						// this.unsequencedRecords.partialLengths now has an entry removing this segment from a perspective
 						// with local seq >= `localSeq`.
 						// In order to only remove this segment once, we add back in the length (where this entry only takes effect when
 						// both above are true due to logic in computeOverallRefSeqAdjustment).
@@ -807,7 +776,7 @@ export class PartialSequenceLengths {
 				} else {
 					// Note that all clients that have a remove or obliterate operation on this segment
 					// use the seq of the winning obliterate in their per-client adjustments!
-					combinedPartialLengths.addClientAdjustment(id, seqOrLocalSeq, lenDelta);
+					this.addClientAdjustment(id, seqOrLocalSeq, lenDelta);
 
 					// Also ensure that all these clients have seen the segment as inserted before being removed
 					// This is technically not necessary for setRemoves (we never ask for the length of this block with
@@ -818,11 +787,7 @@ export class PartialSequenceLengths {
 						opstampUtils.greaterThan(segment.insert, minSeqStamp) &&
 						id !== segment.insert.clientId
 					) {
-						combinedPartialLengths.addClientAdjustment(
-							id,
-							segment.insert.seq,
-							segment.cachedLength,
-						);
+						this.addClientAdjustment(id, segment.insert.seq, segment.cachedLength);
 					}
 				}
 			}
