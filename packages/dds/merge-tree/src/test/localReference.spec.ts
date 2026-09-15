@@ -79,6 +79,84 @@ function addTombstones(
 }
 
 describe("LocalReferenceCollection", () => {
+	describe("append", () => {
+		for (const incomingHasCollection of [false, true]) {
+			it(`does not allocate a receiver collection for unreferenced content (incomingHasCollection=${incomingHasCollection})`, () => {
+				const segment: ISegmentInternal = TextSegment.make("ab");
+				const other: ISegmentInternal = TextSegment.make("cd");
+				if (incomingHasCollection) {
+					LocalReferenceCollection.setOrGet(other);
+				}
+
+				segment.append(other);
+
+				assert.equal(segment.cachedLength, 4);
+				assert.equal(segment.localRefs, undefined);
+				assert.equal(other.localRefs?.empty, incomingHasCollection ? true : undefined);
+			});
+
+			it(`keeps offsets aligned across unreferenced appends (incomingHasCollection=${incomingHasCollection})`, () => {
+				const segment: ISegmentInternal = TextSegment.make("ab");
+				const collection = LocalReferenceCollection.setOrGet(segment);
+				const gap: ISegmentInternal = TextSegment.make("cd");
+				if (incomingHasCollection) {
+					LocalReferenceCollection.setOrGet(gap);
+				}
+				segment.append(gap);
+				assert.equal(segment.localRefs, collection);
+				assert(collection.empty);
+
+				const other: ISegmentInternal = TextSegment.make("ef");
+				const otherRefs = LocalReferenceCollection.setOrGet(other);
+				const incomingRef = otherRefs.createLocalRef(1, ReferenceType.Simple, {
+					id: "incoming",
+				});
+				segment.append(other);
+				const gapRef = collection.createLocalRef(3, ReferenceType.Simple, { id: "gap" });
+
+				assert.equal(segment.cachedLength, 6);
+				assert.equal(incomingRef.getSegment(), segment);
+				assert.equal(incomingRef.getOffset(), 5);
+				assert.equal(gapRef.getOffset(), 3);
+				assert(collection.has(incomingRef));
+				assert(otherRefs.empty);
+				assert.deepEqual(walk(collection), ["gap", "incoming"]);
+				validateRefCount(collection);
+				validateRefCount(otherRefs);
+			});
+		}
+
+		it("creates a receiver collection when the incoming segment has references", () => {
+			const segment: ISegmentInternal = TextSegment.make("ab");
+			const other: ISegmentInternal = TextSegment.make("cd");
+			const otherRefs = LocalReferenceCollection.setOrGet(other);
+			const ref = otherRefs.createLocalRef(1, ReferenceType.Simple, undefined);
+
+			segment.append(other);
+
+			assert(segment.localRefs !== undefined);
+			assert(segment.localRefs.has(ref));
+			assert.equal(ref.getSegment(), segment);
+			assert.equal(ref.getOffset(), 3);
+			assert(otherRefs.empty);
+			validateRefCount(segment.localRefs);
+			validateRefCount(otherRefs);
+		});
+
+		it("rejects a transfer after the receiver length has already changed", () => {
+			const segment: ISegmentInternal = TextSegment.make("ab");
+			const collection = LocalReferenceCollection.setOrGet(segment);
+			const other: ISegmentInternal = TextSegment.make("c");
+			const otherRefs = LocalReferenceCollection.setOrGet(other);
+			const ref = otherRefs.createLocalRef(0, ReferenceType.Simple, undefined);
+			segment.cachedLength += other.cachedLength;
+
+			assert.throws(() => collection.append(other), /0x2be/);
+			assert(otherRefs.has(ref));
+			assert.equal(ref.getSegment(), other);
+		});
+	});
+
 	describe("split", () => {
 		it("initializes split reference counts for before, at, and after buckets", () => {
 			const { collection: suffixCollection, refs } = setup("abc", 2);

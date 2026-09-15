@@ -231,21 +231,10 @@ export function setValidateRefCount(
  */
 export class LocalReferenceCollection {
 	public static append(seg1: ISegmentInternal, seg2: ISegmentInternal): void {
-		if (seg2.localRefs && !seg2.localRefs.empty) {
-			// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- using ??= could change behavior if value is falsy
-			if (!seg1.localRefs) {
-				seg1.localRefs = new LocalReferenceCollection(seg1);
-			}
-			assert(
-				seg1.localRefs.refsByOffset.length === seg1.cachedLength,
-				0x2be /* "LocalReferences array contains a gap" */,
-			);
-			seg1.localRefs.append(seg2.localRefs);
-		} else if (seg1.localRefs) {
-			// Since creating the LocalReferenceCollection, we may have appended
-			// segments that had no local references. Account for them now by padding the array.
-			seg1.localRefs.refsByOffset.length += seg2.cachedLength;
+		if (seg1.localRefs === undefined && seg2.localRefs?.empty === false) {
+			LocalReferenceCollection.setOrGet(seg1);
 		}
+		seg1.localRefs?.append(seg2);
 		validateRefCount?.(seg1.localRefs);
 		validateRefCount?.(seg2.localRefs);
 	}
@@ -401,21 +390,29 @@ export class LocalReferenceCollection {
 	 * but before 'this' segment's cachedLength has changed, or the adjustment to the local refs
 	 * will be incorrect.
 	 *
+	 * @param other - Segment whose local references are transferred to this segment.
 	 * @remarks This method should only be called by mergeTree.
 	 */
-	public append(other: LocalReferenceCollection): void {
-		if (!other || other.empty) {
+	public append(other: ISegmentInternal): void {
+		const otherRefs = other.localRefs;
+		if (otherRefs === undefined || otherRefs.empty) {
+			// Keep offsets aligned even when the appended segment has no references.
+			this.refsByOffset.length += other.cachedLength;
 			return;
 		}
-		this.refCount += other.refCount;
-		other.refCount = 0;
-		for (const lref of other) {
+		assert(
+			this.refsByOffset.length === this.segment.cachedLength,
+			0x2be /* "LocalReferences array contains a gap" */,
+		);
+		this.refCount += otherRefs.refCount;
+		otherRefs.refCount = 0;
+		for (const lref of otherRefs) {
 			assertLocalReferences(lref);
 			lref.link(this.segment, lref.getOffset() + this.refsByOffset.length, lref.getListNode());
 		}
 
-		this.refsByOffset.push(...other.refsByOffset);
-		other.refsByOffset.length = 0;
+		this.refsByOffset.push(...otherRefs.refsByOffset);
+		otherRefs.refsByOffset.length = 0;
 	}
 	/**
 	 * Returns true of the local reference is in the collection, otherwise false.
