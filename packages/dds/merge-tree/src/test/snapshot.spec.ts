@@ -13,6 +13,7 @@ import type { IMergeTreeOptionsInternal } from "../mergeTree.js";
 import { SnapshotV1 } from "../snapshotV1.js";
 
 import { TestString, loadSnapshot } from "./snapshot.utils.js";
+import { TestClient } from "./testClient.js";
 
 function makeSnapshotSuite(options?: IMergeTreeOptionsInternal): void {
 	describe("from an empty initial state", () => {
@@ -164,6 +165,49 @@ function makeSnapshotSuite(options?: IMergeTreeOptionsInternal): void {
 }
 
 describe("snapshot", () => {
+	it("restores named-channel attribution from a remote-only producer with an empty root", async () => {
+		const options: IMergeTreeOptionsInternal = {
+			attribution: {
+				track: true,
+				policyFactory: createPropertyTrackingAttributionPolicyFactory("foo"),
+			},
+		};
+		const writer = new TestClient(options);
+		writer.startOrUpdateCollaboration("writer");
+		const producer = new TestClient(options);
+		producer.startOrUpdateCollaboration("summarizer");
+
+		const insertMessage = writer.makeOpMessage(writer.insertTextLocal(0, "abcd"), 1);
+		writer.applyMsg(insertMessage);
+		producer.applyMsg(insertMessage);
+		const annotateMessage = writer.makeOpMessage(
+			writer.annotateRangeLocal(1, 3, { foo: 1 }),
+			2,
+		);
+		writer.applyMsg(annotateMessage);
+		producer.applyMsg(annotateMessage);
+
+		assert(writer.getCollabWindow().localSeq > 0);
+		assert.equal(producer.getCollabWindow().localSeq, 0);
+		assert.deepEqual(producer.getAllAttributionSeqs(), [
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+		]);
+		assert.deepEqual(producer.getAllAttributionSeqs("foo"), [undefined, 2, 2, undefined]);
+		const snapshot = new SnapshotV1(producer.mergeTree, producer.logger, (id) =>
+			producer.getLongClientId(id),
+		);
+		snapshot.extractSync();
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- TestSerializer requires an undefined bind handle.
+		const summary = snapshot.emit(TestClient.serializer, undefined!).summary;
+
+		const loaded = await loadSnapshot(summary, options);
+
+		assert.deepEqual(loaded.getAllAttributionSeqs("foo"), [undefined, 2, 2, undefined]);
+	});
+
 	describe("with attribution", () => {
 		makeSnapshotSuite({
 			attribution: { track: true, policyFactory: createInsertOnlyAttributionPolicy },

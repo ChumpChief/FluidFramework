@@ -431,10 +431,11 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 	}
 
 	/**
-	 * Rehydrates attribution information from its serialized form into the provided iterable of consecutive segments.
+	 * Replaces attribution on each consecutive segment with the complete data from the summary.
+	 * Empty root and named-channel streams are retained as empty collections.
 	 */
 	public static populateAttributionCollections(
-		segments: ISegment[],
+		segments: Iterable<ISegment>,
 		summary: SerializedAttributionCollection,
 	): void {
 		const { channels } = summary;
@@ -443,24 +444,25 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			0x445 /* Invalid attribution summary blob provided */,
 		);
 
-		const extractOntoSegments = (
-			{ seqs, posBreakpoints }: SequenceOffsets,
-			assignToSegment: (collection: AttributionCollection, segment: ISegment) => void,
-		): void => {
+		// Each reader advances independently through one root or named-channel stream.
+		const createSegmentEntryReader = ({
+			seqs,
+			posBreakpoints,
+		}: SequenceOffsets): ((
+			segmentLength: number,
+		) => IAttributionCollectionSpec<AttributionKey>["root"]) => {
 			if (seqs.length === 0) {
 				assert(
 					posBreakpoints.length === 0,
 					0x9e1 /* seqs and posBreakpoints length should match */,
 				);
-				return;
+				return () => [];
 			}
 			let curIndex = 0;
 			let cumulativeSegPos = 0;
 
-			for (const segment of segments) {
+			return (segmentLength) => {
 				const rootEntries: { offset: number; key: AttributionKey | null }[] = [];
-				// This function is defined here to allow for the creation of a new collection for each segment.
-				// eslint-disable-next-line unicorn/consistent-function-scoping
 				const pushEntry = (offset: number, seq: AttributionKey | number | null): void => {
 					rootEntries.push({
 						offset,
@@ -468,41 +470,47 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 						key: seq === null ? null : typeof seq === "object" ? seq : { type: "op", seq },
 					});
 				};
-				if (posBreakpoints[curIndex] > cumulativeSegPos) {
+				if (curIndex > 0 && posBreakpoints[curIndex] > cumulativeSegPos) {
 					curIndex--;
 				}
 
-				while (posBreakpoints[curIndex] < cumulativeSegPos + segment.cachedLength) {
+				while (posBreakpoints[curIndex] < cumulativeSegPos + segmentLength) {
 					const nextOffset = Math.max(posBreakpoints[curIndex] - cumulativeSegPos, 0);
 					pushEntry(nextOffset, seqs[curIndex]);
 					curIndex++;
 				}
 
-				if (rootEntries.length === 0) {
+				if (rootEntries.length === 0 && curIndex > 0) {
 					pushEntry(0, seqs[curIndex - 1]);
 				}
 
-				assignToSegment(
-					new AttributionCollection({ length: segment.cachedLength, rootEntries }),
-					segment,
-				);
-				cumulativeSegPos += segment.cachedLength;
-			}
+				cumulativeSegPos += segmentLength;
+				return rootEntries;
+			};
 		};
 
-		extractOntoSegments(summary, (collection, segment) => {
-			segment.attribution = collection;
-		});
-		if (channels) {
-			for (const [name, collectionSpec] of Object.entries(channels)) {
-				extractOntoSegments(collectionSpec, (collection, segment) => {
-					if (segment.attribution !== undefined) {
-						// Cast is valid as we just assigned this field above
-						((segment.attribution as AttributionCollection).channels ??= {})[name] =
-							collection;
-					}
-				});
-			}
+		const readRootEntries = createSegmentEntryReader(summary);
+		const channelReaders = Object.entries(channels ?? {}).map(([name, channelSummary]) => ({
+			name,
+			readEntries: createSegmentEntryReader(channelSummary),
+		}));
+		for (const segment of segments) {
+			const length = segment.cachedLength;
+			const rootEntries = readRootEntries(length);
+			const namedChannels =
+				channelReaders.length === 0
+					? undefined
+					: Object.fromEntries(
+							channelReaders.map(({ name, readEntries }): [string, AttributionCollection] => [
+								name,
+								new AttributionCollection({ length, rootEntries: readEntries(length) }),
+							]),
+						);
+			segment.attribution = new AttributionCollection({
+				length,
+				rootEntries,
+				channels: namedChannels,
+			});
 		}
 	}
 

@@ -19,10 +19,12 @@ import type { AttributionKey } from "@fluidframework/runtime-definitions/interna
 
 import {
 	AttributionCollection,
+	type IAttributionCollectionSerializer,
 	type SerializedAttributionCollection,
 } from "../attributionCollection.js";
 import { BaseSegment, type ISegment } from "../mergeTreeNodes.js";
 import type { PropertySet } from "../properties.js";
+import { TextSegment } from "../textSegment.js";
 
 const opKey = (seq: number): AttributionKey => ({ type: "op", seq });
 const detachedKey: AttributionKey = { type: "detached", id: 0 };
@@ -739,6 +741,56 @@ describe("AttributionCollection", () => {
 	});
 
 	describe(".populateAttributionCollections", () => {
+		it("supports a single-pass iterable of segments", () => {
+			const segments = [TextSegment.make("abc"), TextSegment.make("defg")];
+			const summary: SerializedAttributionCollection = {
+				length: 7,
+				posBreakpoints: [0],
+				seqs: [1],
+				channels: { foo: { posBreakpoints: [0, 4], seqs: [2, 3] } },
+			};
+			const serializer: IAttributionCollectionSerializer = AttributionCollection;
+
+			serializer.populateAttributionCollections(segments.values(), summary);
+
+			assert.deepEqual(
+				AttributionCollection.serializeAttributionCollections(segments),
+				summary,
+			);
+		});
+
+		for (const emptyRoot of [false, true]) {
+			it(`replaces existing attribution with a complete summary (emptyRoot=${emptyRoot})`, () => {
+				const segment = TextSegment.make("abc");
+				const previous = new AttributionCollection({
+					length: 3,
+					rootEntries: [{ offset: 0, key: opKey(1) }],
+					channels: {
+						old: new AttributionCollection({
+							length: 3,
+							rootEntries: [{ offset: 0, key: opKey(2) }],
+						}),
+					},
+				});
+				segment.attribution = previous;
+				const expectedPrevious = previous.getAll();
+				AttributionCollection.populateAttributionCollections([segment], {
+					length: 3,
+					posBreakpoints: emptyRoot ? [] : [0],
+					seqs: emptyRoot ? [] : [3],
+					channels: { foo: { posBreakpoints: [0], seqs: [4] } },
+				});
+
+				assert.notEqual(segment.attribution, previous);
+				assert.deepEqual(segment.attribution.getAll(), {
+					length: 3,
+					root: emptyRoot ? [] : [{ offset: 0, key: opKey(3) }],
+					channels: { foo: [{ offset: 0, key: opKey(4) }] },
+				});
+				assert.deepEqual(previous.getAll(), expectedPrevious);
+			});
+		}
+
 		it("correctly splits segment boundaries on breakpoints", () => {
 			const segments = [{ cachedLength: 5 }, { cachedLength: 4 }] as ISegment[];
 			AttributionCollection.populateAttributionCollections(segments, {
@@ -820,6 +872,85 @@ describe("AttributionCollection", () => {
 			blob: SerializedAttributionCollection;
 			segments: ISegment[];
 		}[] = [
+			{
+				name: "no segments",
+				blob: { length: 0, posBreakpoints: [], seqs: [] },
+				segments: [],
+			},
+			{
+				name: "empty root entries",
+				blob: { length: 7, posBreakpoints: [], seqs: [] },
+				segments: [seg(3), seg(4)],
+			},
+			{
+				name: "explicit null root entry",
+				blob: { length: 7, posBreakpoints: [0], seqs: [null] },
+				segments: [seg(3), seg(4)],
+			},
+			{
+				name: "channels without root entries",
+				blob: {
+					length: 7,
+					posBreakpoints: [],
+					seqs: [],
+					channels: {
+						foo: { posBreakpoints: [0, 3, 5], seqs: [4, null, 5] },
+					},
+				},
+				segments: [seg(3), seg(4)],
+			},
+			{
+				name: "empty named-channel entries",
+				blob: {
+					length: 7,
+					posBreakpoints: [0],
+					seqs: [3],
+					channels: { foo: { posBreakpoints: [], seqs: [] } },
+				},
+				segments: [seg(3), seg(4)],
+			},
+			{
+				name: "root with an unattributed prefix",
+				blob: {
+					length: 7,
+					posBreakpoints: [2, 5],
+					seqs: [1, 2],
+				},
+				segments: [seg(1), seg(2), seg(4)],
+			},
+			{
+				name: "named channel with an unattributed prefix",
+				blob: {
+					length: 7,
+					posBreakpoints: [0],
+					seqs: [3],
+					channels: { foo: { posBreakpoints: [2, 5], seqs: [1, 2] } },
+				},
+				segments: [seg(1), seg(2), seg(4)],
+			},
+			{
+				name: "root and channels with independent breakpoints",
+				blob: {
+					length: 7,
+					posBreakpoints: [0, 2, 6],
+					seqs: [3, 4, null],
+					channels: {
+						foo: { posBreakpoints: [0, 3, 5], seqs: [2, null, 5] },
+						bar: { posBreakpoints: [0, 1, 4], seqs: [detachedKey, 7, 8] },
+					},
+				},
+				segments: [seg(1), seg(2), seg(4)],
+			},
+			{
+				name: "channel name matching an object property",
+				blob: {
+					length: 3,
+					posBreakpoints: [0],
+					seqs: [1],
+					channels: { constructor: { posBreakpoints: [0], seqs: [2] } },
+				},
+				segments: [seg(1), seg(2)],
+			},
 			{
 				name: "single key",
 				blob: {
