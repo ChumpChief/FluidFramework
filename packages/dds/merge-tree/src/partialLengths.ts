@@ -224,7 +224,7 @@ export interface PartialSequenceLengthsOptions {
  * 1. The above description and how it relates to the implementation of `getPartialLength` (which implements the above high-level description
  * 2. `PartialSequenceLengthsSet`, which allows binary searching for overall length deltas at a given sequence number and handles updates.
  * 3. The constructor's leaf accounting, which is the base case for the [potential] recursion in `combine`
- * 4. The logic in `combine` to aggregate smaller block entries into larger ones
+ * 4. The constructor's child-partial aggregation to combine smaller block entries into larger ones
  * 5. The incremental code path of `update`
  */
 export class PartialSequenceLengths {
@@ -316,13 +316,15 @@ export class PartialSequenceLengths {
 	public minSeq: number;
 
 	/**
-	 * Initializes partial lengths for the direct child leaves of `block`, or empty partial lengths
-	 * for aggregation if no block is provided.
+	 * Initializes partial lengths from a block's direct child leaves or by aggregating child partials.
+	 * If no source is provided, initializes empty partial lengths.
 	 */
 	constructor(
 		collabWindow: CollaborationWindow,
 		computeLocalPartials: boolean,
-		block?: MergeBlock,
+		source?:
+			| { readonly block: MergeBlock }
+			| { readonly childPartials: readonly PartialSequenceLengths[] },
 	) {
 		this.minSeq = collabWindow.minSeq;
 		if (computeLocalPartials) {
@@ -333,7 +335,8 @@ export class PartialSequenceLengths {
 			};
 		}
 
-		if (block !== undefined) {
+		if (source !== undefined && "block" in source) {
+			const { block } = source;
 			this.segmentCount = block.childCount;
 			for (let i = 0; i < block.childCount; i++) {
 				const child = block.children[i];
@@ -348,6 +351,66 @@ export class PartialSequenceLengths {
 			}
 
 			PartialSequenceLengths.options.verifier?.(this);
+		} else if (source !== undefined) {
+			const { childPartials } = source;
+			const childPartialsLen = childPartials.length;
+
+			const childPartialLengths: PartialSequenceLength[][] = [];
+			const childUnsequencedPartialLengths: PartialSequenceLength[][] = [];
+			const childPerRefSeqAdjustments: Map<number, PartialSequenceLengthsSet>[] = [];
+			for (let i = 0; i < childPartialsLen; i++) {
+				const { segmentCount, minLength, partialLengths, unsequencedRecords } =
+					childPartials[i];
+				this.segmentCount += segmentCount;
+				this.minLength += minLength;
+				childPartialLengths.push(partialLengths.items as PartialSequenceLength[]);
+				if (unsequencedRecords) {
+					childUnsequencedPartialLengths.push(
+						unsequencedRecords.partialLengths.items as PartialSequenceLength[],
+					);
+					childPerRefSeqAdjustments.push(unsequencedRecords.perRefSeqAdjustments);
+				}
+			}
+
+			mergePartialLengths(childPartialLengths, this.partialLengths);
+
+			if (computeLocalPartials) {
+				this.unsequencedRecords = {
+					partialLengths: mergePartialLengths(childUnsequencedPartialLengths),
+					cachedAdjustmentByRefSeq: new Map(),
+					perRefSeqAdjustments: new Map(),
+				};
+
+				for (const perRefSeq of childPerRefSeqAdjustments) {
+					for (const [refSeq, partials] of perRefSeq) {
+						let combinedPartials = this.unsequencedRecords.perRefSeqAdjustments.get(refSeq);
+						if (combinedPartials === undefined) {
+							combinedPartials = new PartialSequenceLengthsSet();
+							this.unsequencedRecords.perRefSeqAdjustments.set(refSeq, combinedPartials);
+						}
+						for (const item of partials.items) {
+							combinedPartials.addOrUpdate({ ...item });
+						}
+					}
+				}
+			}
+
+			// could merge these like we do above rather than do out of order like this
+			for (let i = 0; i < childPartialsLen; i++) {
+				const { perClientAdjustments } = childPartials[i];
+				if (perClientAdjustments.length > 0) {
+					for (let clientId = 0; clientId < perClientAdjustments.length; clientId++) {
+						const clientAdjustment = perClientAdjustments[clientId];
+						if (clientAdjustment === undefined) {
+							continue;
+						}
+
+						for (const partial of perClientAdjustments[clientId].items) {
+							this.addClientAdjustment(clientId, partial.seq, partial.seglen);
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -369,11 +432,9 @@ export class PartialSequenceLengths {
 		recur = false,
 		computeLocalPartials = false,
 	): PartialSequenceLengths {
-		const leafPartialLengths = new PartialSequenceLengths(
-			collabWindow,
-			computeLocalPartials,
+		const leafPartialLengths = new PartialSequenceLengths(collabWindow, computeLocalPartials, {
 			block,
-		);
+		});
 
 		let hasInternalChild = false;
 		const childPartials: PartialSequenceLengths[] = [];
@@ -396,82 +457,14 @@ export class PartialSequenceLengths {
 
 		// If there are no internal children, the leaf partial lengths are exactly correct.
 		// Otherwise, we must additively combine all of the children partial lengths to get this block's totals.
-		const combinedPartialLengths = hasInternalChild
-			? new PartialSequenceLengths(collabWindow, computeLocalPartials)
-			: leafPartialLengths;
-		if (hasInternalChild) {
-			if (leafPartialLengths.partialLengths.size > 0) {
-				// Some children were leaves; add combined partials from these segments
-				childPartials.push(leafPartialLengths);
-			}
-
-			const childPartialsLen = childPartials.length;
-
-			const childPartialLengths: PartialSequenceLength[][] = [];
-			const childUnsequencedPartialLengths: PartialSequenceLength[][] = [];
-			const childPerRefSeqAdjustments: Map<number, PartialSequenceLengthsSet>[] = [];
-			for (let i = 0; i < childPartialsLen; i++) {
-				const { segmentCount, minLength, partialLengths, unsequencedRecords } =
-					childPartials[i];
-				combinedPartialLengths.segmentCount += segmentCount;
-				combinedPartialLengths.minLength += minLength;
-				childPartialLengths.push(partialLengths.items as PartialSequenceLength[]);
-				if (unsequencedRecords) {
-					childUnsequencedPartialLengths.push(
-						unsequencedRecords.partialLengths.items as PartialSequenceLength[],
-					);
-					childPerRefSeqAdjustments.push(unsequencedRecords.perRefSeqAdjustments);
-				}
-			}
-
-			mergePartialLengths(childPartialLengths, combinedPartialLengths.partialLengths);
-
-			if (computeLocalPartials) {
-				combinedPartialLengths.unsequencedRecords = {
-					partialLengths: mergePartialLengths(childUnsequencedPartialLengths),
-					cachedAdjustmentByRefSeq: new Map(),
-					perRefSeqAdjustments: new Map(),
-				};
-
-				for (const perRefSeq of childPerRefSeqAdjustments) {
-					for (const [refSeq, partials] of perRefSeq) {
-						let combinedPartials =
-							combinedPartialLengths.unsequencedRecords.perRefSeqAdjustments.get(refSeq);
-						if (combinedPartials === undefined) {
-							combinedPartials = new PartialSequenceLengthsSet();
-							combinedPartialLengths.unsequencedRecords.perRefSeqAdjustments.set(
-								refSeq,
-								combinedPartials,
-							);
-						}
-						for (const item of partials.items) {
-							combinedPartials.addOrUpdate({ ...item });
-						}
-					}
-				}
-			}
-
-			// could merge these like we do above rather than do out of order like this
-			for (let i = 0; i < childPartialsLen; i++) {
-				const { perClientAdjustments } = childPartials[i];
-				if (perClientAdjustments.length > 0) {
-					for (let clientId = 0; clientId < perClientAdjustments.length; clientId++) {
-						const clientAdjustment = perClientAdjustments[clientId];
-						if (clientAdjustment === undefined) {
-							continue;
-						}
-
-						for (const partial of perClientAdjustments[clientId].items) {
-							combinedPartialLengths.addClientAdjustment(
-								clientId,
-								partial.seq,
-								partial.seglen,
-							);
-						}
-					}
-				}
-			}
+		if (hasInternalChild && leafPartialLengths.partialLengths.size > 0) {
+			// Some children were leaves; add combined partials from these segments
+			childPartials.push(leafPartialLengths);
 		}
+
+		const combinedPartialLengths = hasInternalChild
+			? new PartialSequenceLengths(collabWindow, computeLocalPartials, { childPartials })
+			: leafPartialLengths;
 		// TODO: incremental zamboni during build
 		if (PartialSequenceLengths.options.zamboni) {
 			combinedPartialLengths.zamboni(collabWindow);

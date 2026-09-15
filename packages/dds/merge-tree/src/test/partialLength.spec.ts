@@ -75,7 +75,7 @@ describe("partial lengths", () => {
 			const partials = new PartialSequenceLengths(
 				mergeTree.collabWindow,
 				computeLocalPartials,
-				mergeTree.root,
+				{ block: mergeTree.root },
 			);
 
 			assert.equal(partials.getPartialLength(0, remoteClientId + 1), 12);
@@ -99,7 +99,7 @@ describe("partial lengths", () => {
 			const partials = new PartialSequenceLengths(
 				mergeTree.collabWindow,
 				computeLocalPartials,
-				block,
+				{ block },
 			);
 
 			assert.equal(partials.minSeq, 5);
@@ -226,6 +226,82 @@ describe("partial lengths", () => {
 	});
 
 	describe("aggregation", () => {
+		for (const computeLocalPartials of [false, true]) {
+			it(`constructs an empty aggregate (computeLocalPartials=${computeLocalPartials})`, () => {
+				const partials = new PartialSequenceLengths(
+					mergeTree.collabWindow,
+					computeLocalPartials,
+					{ childPartials: [] },
+				);
+				partials.verify();
+				assert.equal(partials.getPartialLength(0, remoteClientId), 0);
+				if (computeLocalPartials) {
+					assert.equal(partials.getPartialLength(0, localClientId, 0), 0);
+				}
+			});
+
+			it(`aggregates child records without mutating them (computeLocalPartials=${computeLocalPartials})`, () => {
+				const removingClient = makeRemoteClient({ clientId: 19 });
+				mergeTree.insertSegments(
+					0,
+					[TextSegment.make("more ")],
+					remoteClient1.perspectiveAt({ refSeq }),
+					remoteClient1.stampAt({ seq: 1 }),
+					undefined,
+				);
+				mergeTree.markRangeRemoved(
+					0,
+					5,
+					mergeTree.localPerspective,
+					mergeTree.collabWindow.mintNextLocalOperationStamp(),
+					undefined as never,
+				);
+				mergeTree.markRangeRemoved(
+					0,
+					5,
+					removingClient.perspectiveAt({ refSeq: 1 }),
+					removingClient.stampAt({ seq: 2 }),
+					undefined as never,
+				);
+
+				function checkLengths(partials: PartialSequenceLengths, multiplier: number): void {
+					partials.verify();
+					assert.equal(partials.getPartialLength(0, 20), 12 * multiplier);
+					assert.equal(partials.getPartialLength(1, 20), 17 * multiplier);
+					assert.equal(partials.getPartialLength(2, 20), 12 * multiplier);
+					assert.equal(partials.getPartialLength(0, remoteClientId), 17 * multiplier);
+					assert.equal(partials.getPartialLength(0, 19), 12 * multiplier);
+					if (computeLocalPartials) {
+						assert.equal(partials.getPartialLength(1, localClientId, 0), 17 * multiplier);
+						assert.equal(partials.getPartialLength(1, localClientId, 1), 12 * multiplier);
+						assert.equal(partials.getPartialLength(2, localClientId, 0), 12 * multiplier);
+						assert.equal(partials.getPartialLength(2, localClientId, 1), 12 * multiplier);
+					}
+				}
+
+				const childPartials: PartialSequenceLengths[] = [];
+				for (let i = 0; i < 2; i++) {
+					const child = new PartialSequenceLengths(
+						mergeTree.collabWindow,
+						computeLocalPartials,
+						{ block: mergeTree.root },
+					);
+					checkLengths(child, 1);
+					childPartials.push(child);
+				}
+
+				const combined = new PartialSequenceLengths(
+					mergeTree.collabWindow,
+					computeLocalPartials,
+					{ childPartials },
+				);
+				checkLengths(combined, 2);
+				for (const child of childPartials) {
+					checkLengths(child, 1);
+				}
+			});
+		}
+
 		it("includes lengths from multiple permutations in single tree", () => {
 			mergeTree.insertSegments(
 				0,
