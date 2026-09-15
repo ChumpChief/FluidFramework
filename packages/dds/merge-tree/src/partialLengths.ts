@@ -878,30 +878,20 @@ export class PartialSequenceLengths {
 				const childBlock = child;
 				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				const branchPartialLengths = childBlock.partialLengths!;
-				if (branchPartialLengths.lastIncrementalInvalidationSeq === seq) {
+				const contribution = branchPartialLengths.getIncrementalContribution(seq);
+				if (contribution === undefined) {
 					// Bail out.
 					const newPartials = PartialSequenceLengths.combine(node, collabWindow, false);
 					newPartials.lastIncrementalInvalidationSeq = seq;
 					node.partialLengths = newPartials;
 					return;
 				}
-				const partialLengths = branchPartialLengths.partialLengths;
-				const leqPartial = partialLengths.latestLeq(seq);
-				// eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- using ?. could change behavior
-				if (leqPartial && leqPartial.seq === seq) {
-					seqSeglen += leqPartial.seglen;
-				}
-				segCount += branchPartialLengths.segmentCount;
+				seqSeglen += contribution.lengthDelta;
+				segCount += contribution.segmentCount;
 
-				// .forEach natively ignores undefined entries.
-				// eslint-disable-next-line unicorn/no-array-for-each
-				branchPartialLengths.perClientAdjustments.forEach((clientAdjustments) => {
-					const leqBranchPartial = clientAdjustments.latestLeq(seq);
-					// eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- using ?. could change behavior
-					if (leqBranchPartial && leqBranchPartial.seq === seq) {
-						this.addClientAdjustment(clientId, seq, leqBranchPartial.seglen);
-					}
-				});
+				for (const delta of contribution.clientAdjustmentDeltas) {
+					this.addClientAdjustment(clientId, seq, delta);
+				}
 			}
 		}
 
@@ -916,6 +906,44 @@ export class PartialSequenceLengths {
 			this.zamboni(collabWindow);
 		}
 		PartialSequenceLengths.options.verifier?.(this);
+	}
+
+	/**
+	 * Returns this block's contribution at exactly `seq`, or undefined if an incremental update
+	 * at that sequence requires a full rebuild.
+	 *
+	 * Client adjustment deltas are copied in client-index order and kept separate so applying them
+	 * preserves the existing entry-coalescing behavior, including adjustments that cancel out.
+	 */
+	public getIncrementalContribution(seq: number):
+		| {
+				readonly segmentCount: number;
+				readonly lengthDelta: number;
+				readonly clientAdjustmentDeltas: readonly number[];
+		  }
+		| undefined {
+		if (this.lastIncrementalInvalidationSeq === seq) {
+			return undefined;
+		}
+
+		const partial = this.partialLengths.latestLeq(seq);
+		const clientAdjustmentDeltas: number[] = [];
+		// forEach skips holes in the sparse client array.
+		// eslint-disable-next-line unicorn/no-array-for-each
+		this.perClientAdjustments.forEach((clientAdjustments) => {
+			const adjustment = clientAdjustments.latestLeq(seq);
+			// eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- using ?. could change behavior
+			if (adjustment !== undefined && adjustment.seq === seq) {
+				clientAdjustmentDeltas.push(adjustment.seglen);
+			}
+		});
+
+		return {
+			segmentCount: this.segmentCount,
+			// eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- using ?. could change behavior
+			lengthDelta: partial !== undefined && partial.seq === seq ? partial.seglen : 0,
+			clientAdjustmentDeltas,
+		};
 	}
 
 	/**

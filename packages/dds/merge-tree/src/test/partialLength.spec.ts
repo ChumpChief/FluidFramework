@@ -355,6 +355,159 @@ describe("partial lengths", () => {
 		});
 	});
 
+	describe("incremental contributions", () => {
+		it("returns only deltas at the requested sequence, not cumulative or preceding lengths", () => {
+			const empty = new PartialSequenceLengths(mergeTree.collabWindow, false);
+			assert.deepEqual(empty.getIncrementalContribution(1), {
+				segmentCount: 0,
+				lengthDelta: 0,
+				clientAdjustmentDeltas: [],
+			});
+
+			mergeTree.insertSegments(
+				0,
+				[TextSegment.make("more ")],
+				remoteClient1.perspectiveAt({ refSeq }),
+				remoteClient1.stampAt({ seq: 1 }),
+				undefined,
+			);
+			mergeTree.insertSegments(
+				0,
+				[TextSegment.make("text")],
+				remoteClient1.perspectiveAt({ refSeq: 1 }),
+				remoteClient1.stampAt({ seq: 3 }),
+				undefined,
+			);
+			const partials = new PartialSequenceLengths(mergeTree.collabWindow, false, {
+				block: mergeTree.root,
+			});
+
+			for (const [seq, lengthDelta] of [
+				[1, 5],
+				[3, 4],
+			]) {
+				assert.deepEqual(partials.getIncrementalContribution(seq), {
+					segmentCount: 3,
+					lengthDelta,
+					clientAdjustmentDeltas: [lengthDelta],
+				});
+			}
+			for (const seq of [0, 2, 4]) {
+				assert.deepEqual(partials.getIncrementalContribution(seq), {
+					segmentCount: 3,
+					lengthDelta: 0,
+					clientAdjustmentDeltas: [],
+				});
+			}
+		});
+
+		it("preserves separate deltas from sparse client histories", () => {
+			for (const clientId of [19, 20]) {
+				const remoteClient = makeRemoteClient({ clientId });
+				mergeTree.markRangeRemoved(
+					0,
+					5,
+					remoteClient.perspectiveAt({ refSeq }),
+					remoteClient.stampAt({ seq: clientId - 18 }),
+					undefined as never,
+				);
+			}
+			const partials = new PartialSequenceLengths(mergeTree.collabWindow, false, {
+				block: mergeTree.root,
+			});
+			assert.deepEqual(partials.getIncrementalContribution(1), {
+				segmentCount: 2,
+				lengthDelta: -5,
+				clientAdjustmentDeltas: [-5, -5],
+			});
+		});
+
+		it("includes matching adjustment records whose deltas cancel to zero", () => {
+			const stamp = remoteClient1.stampAt({ seq: 1 });
+			const perspective = remoteClient1.perspectiveAt({ refSeq });
+			mergeTree.insertSegments(0, [TextSegment.make("more ")], perspective, stamp, undefined);
+			mergeTree.markRangeRemoved(0, 5, perspective, stamp, undefined as never);
+			const partials = new PartialSequenceLengths(mergeTree.collabWindow, false, {
+				block: mergeTree.root,
+			});
+			assert.deepEqual(partials.getIncrementalContribution(1), {
+				segmentCount: 2,
+				lengthDelta: 0,
+				clientAdjustmentDeltas: [0],
+			});
+		});
+
+		it("returns snapshots that remain unchanged after repeated updates at the same sequence", () => {
+			const stamp = remoteClient1.stampAt({ seq: 1 });
+			const perspective = remoteClient1.perspectiveAt({ refSeq });
+			mergeTree.insertSegments(0, [TextSegment.make("a")], perspective, stamp, undefined);
+			const partials = new PartialSequenceLengths(mergeTree.collabWindow, false, {
+				block: mergeTree.root,
+			});
+			const contribution = partials.getIncrementalContribution(1);
+			mergeTree.insertSegments(0, [TextSegment.make("bc")], perspective, stamp, undefined);
+			for (let i = 0; i < 2; i++) {
+				partials.update(mergeTree.root, 1, remoteClientId, mergeTree.collabWindow);
+				assert.deepEqual(partials.getIncrementalContribution(1), {
+					segmentCount: 3,
+					lengthDelta: 3,
+					clientAdjustmentDeltas: [3],
+				});
+			}
+			assert.deepEqual(contribution, {
+				segmentCount: 2,
+				lengthDelta: 1,
+				clientAdjustmentDeltas: [1],
+			});
+		});
+
+		it("propagates a child's invalidation through full parent rebuilds", () => {
+			mergeTree.insertSegments(
+				0,
+				[TextSegment.make("more ")],
+				remoteClient1.perspectiveAt({ refSeq }),
+				remoteClient1.stampAt({ seq: 1 }),
+				undefined,
+			);
+			const child = mergeTree.root;
+			const parent = new MergeBlock(1);
+			parent.children[0] = child;
+			const grandparent = new MergeBlock(1);
+			grandparent.children[0] = parent;
+			grandparent.partialLengths = PartialSequenceLengths.combine(
+				grandparent,
+				mergeTree.collabWindow,
+				true,
+			);
+
+			const removingClientId = 19;
+			const removingClient = makeRemoteClient({ clientId: removingClientId });
+			mergeTree.markRangeRemoved(
+				0,
+				5,
+				removingClient.perspectiveAt({ refSeq: 1 }),
+				removingClient.stampAt({ seq: 2 }),
+				undefined as never,
+			);
+			assert(child.partialLengths !== undefined);
+			child.partialLengths.update(child, 2, removingClientId, mergeTree.collabWindow);
+			assert.equal(child.partialLengths.getIncrementalContribution(2), undefined);
+
+			for (const ancestor of [parent, grandparent]) {
+				const previous = ancestor.partialLengths;
+				assert(previous !== undefined);
+				previous.update(ancestor, 2, removingClientId, mergeTree.collabWindow);
+				assert.notEqual(ancestor.partialLengths, previous);
+				assert(ancestor.partialLengths !== undefined);
+				assert.equal(ancestor.partialLengths.getIncrementalContribution(2), undefined);
+				assert.notEqual(ancestor.partialLengths.getIncrementalContribution(1), undefined);
+				assert.equal(ancestor.partialLengths.getPartialLength(1, 20), 17);
+				assert.equal(ancestor.partialLengths.getPartialLength(2, 20), 12);
+				ancestor.partialLengths.verify();
+			}
+		});
+	});
+
 	describe("concurrent, overlapping deletes", () => {
 		it("concurrent remote changes are visible to local", () => {
 			const remoteClient2 = makeRemoteClient({ clientId: 19 });
