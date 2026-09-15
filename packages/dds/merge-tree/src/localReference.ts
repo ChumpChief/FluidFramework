@@ -89,7 +89,7 @@ class LocalReference implements LocalReferencePosition {
 
 	private segment: ISegmentInternal | undefined;
 	private offset: number = 0;
-	private listNode: ListNode<LocalReference> | undefined;
+	private listNode: ListNode<LocalReferencePosition> | undefined;
 
 	public callbacks?:
 		| Partial<Record<"beforeSlide" | "afterSlide", (ref: LocalReferencePosition) => void>>
@@ -112,7 +112,7 @@ class LocalReference implements LocalReferencePosition {
 	public link(
 		segment: ISegmentInternal | undefined,
 		offset: number,
-		listNode: ListNode<LocalReference> | undefined,
+		listNode: ListNode<LocalReferencePosition> | undefined,
 	): void {
 		if (listNode !== this.listNode && this.listNode !== undefined) {
 			this.segment?.localRefs?.removeLocalRef(this);
@@ -149,7 +149,7 @@ class LocalReference implements LocalReferencePosition {
 		return this.offset;
 	}
 
-	public getListNode(): ListNode<LocalReference> | undefined {
+	public getListNode(): ListNode<LocalReferencePosition> | undefined {
 		return this.listNode;
 	}
 
@@ -169,10 +169,53 @@ export function createDetachedLocalReferencePosition(
 	return new LocalReference(refType, undefined, slidingPreference);
 }
 
+// Transferred buckets must not expose the implementation-private LocalReference class.
 interface IRefsAtOffset {
-	before?: DoublyLinkedList<LocalReference>;
-	at?: DoublyLinkedList<LocalReference>;
-	after?: DoublyLinkedList<LocalReference>;
+	before?: DoublyLinkedList<LocalReferencePosition>;
+	at?: DoublyLinkedList<LocalReferencePosition>;
+	after?: DoublyLinkedList<LocalReferencePosition>;
+}
+
+interface LocalReferenceTransfer {
+	readonly count: number;
+	readonly buckets: readonly (IRefsAtOffset | undefined)[];
+}
+
+function createLocalReferenceIterator(
+	refsByOffset: readonly (IRefsAtOffset | undefined)[],
+): IterableIterator<LocalReferencePosition> {
+	const subiterators: IterableIterator<ListNode<LocalReferencePosition>>[] = [];
+	for (const refs of refsByOffset) {
+		if (refs) {
+			if (refs.before) {
+				subiterators.push(refs.before[Symbol.iterator]());
+			}
+			if (refs.at) {
+				subiterators.push(refs.at[Symbol.iterator]());
+			}
+			if (refs.after) {
+				subiterators.push(refs.after[Symbol.iterator]());
+			}
+		}
+	}
+
+	return {
+		next(): IteratorResult<LocalReferencePosition> {
+			while (subiterators.length > 0) {
+				const next = subiterators[0].next();
+				if (next.done === true) {
+					subiterators.shift();
+				} else {
+					return { done: next.done, value: next.value.data };
+				}
+			}
+
+			return { value: undefined, done: true };
+		},
+		[Symbol.iterator](): IterableIterator<LocalReferencePosition> {
+			return this;
+		},
+	};
 }
 
 function assertLocalReferences(lref: unknown): asserts lref is LocalReference {
@@ -243,7 +286,7 @@ export class LocalReferenceCollection {
 		return (segment.localRefs ??= new LocalReferenceCollection(segment));
 	}
 
-	private readonly refsByOffset: (IRefsAtOffset | undefined)[];
+	private refsByOffset: (IRefsAtOffset | undefined)[];
 	private refCount: number = 0;
 
 	private constructor(
@@ -270,42 +313,7 @@ export class LocalReferenceCollection {
 		next(): IteratorResult<LocalReferencePosition>;
 		[Symbol.iterator](): IterableIterator<LocalReferencePosition>;
 	} {
-		const subiterators: IterableIterator<ListNode<LocalReferencePosition>>[] = [];
-		for (const refs of this.refsByOffset) {
-			if (refs) {
-				if (refs.before) {
-					subiterators.push(refs.before[Symbol.iterator]());
-				}
-				if (refs.at) {
-					subiterators.push(refs.at[Symbol.iterator]());
-				}
-				if (refs.after) {
-					subiterators.push(refs.after[Symbol.iterator]());
-				}
-			}
-		}
-
-		const iterator = {
-			next(): IteratorResult<LocalReferencePosition> {
-				while (subiterators.length > 0) {
-					const next = subiterators[0].next();
-					if (next.done === true) {
-						subiterators.shift();
-					} else {
-						return { done: next.done, value: next.value.data };
-					}
-				}
-
-				return { value: undefined, done: true };
-			},
-			[Symbol.iterator](): {
-				next(): IteratorResult<LocalReferencePosition>;
-				[Symbol.iterator](): IterableIterator<LocalReferencePosition>;
-			} {
-				return this;
-			},
-		};
-		return iterator;
+		return createLocalReferenceIterator(this.refsByOffset);
 	}
 
 	/**
@@ -315,6 +323,13 @@ export class LocalReferenceCollection {
 	public get empty(): boolean {
 		validateRefCount?.(this);
 		return this.refCount === 0;
+	}
+
+	/**
+	 * The number of references stored in this collection.
+	 */
+	public get size(): number {
+		return this.refCount;
 	}
 
 	/**
@@ -392,6 +407,9 @@ export class LocalReferenceCollection {
 	 *
 	 * @param other - Segment whose local references are transferred to this segment.
 	 * @remarks This method should only be called by mergeTree.
+	 *
+	 * The transfer is not rolled back if a tracking-group callback throws.
+	 * The receiver retains the buckets, but reference positions may be only partially rebound.
 	 */
 	public append(other: ISegmentInternal): void {
 		const otherRefs = other.localRefs;
@@ -404,16 +422,36 @@ export class LocalReferenceCollection {
 			this.refsByOffset.length === this.segment.cachedLength,
 			0x2be /* "LocalReferences array contains a gap" */,
 		);
-		this.refCount += otherRefs.refCount;
-		otherRefs.refCount = 0;
-		for (const lref of otherRefs) {
-			assertLocalReferences(lref);
-			lref.link(this.segment, lref.getOffset() + this.refsByOffset.length, lref.getListNode());
+		assert(otherRefs !== this, "Cannot append a local reference collection to itself");
+		const offset = this.refsByOffset.length;
+		const { count, buckets } = otherRefs.takeReferencesForAppend();
+		this.refCount += count;
+		// Adopt buckets before relinking so a throwing tracking callback cannot orphan them.
+		// Avoid a spread call, which can exceed the argument limit for large transfers.
+		for (const bucket of buckets) {
+			this.refsByOffset.push(bucket);
 		}
-
-		this.refsByOffset.push(...otherRefs.refsByOffset);
-		otherRefs.refsByOffset.length = 0;
+		for (const lref of createLocalReferenceIterator(buckets)) {
+			assertLocalReferences(lref);
+			lref.link(this.segment, lref.getOffset() + offset, lref.getListNode());
+		}
 	}
+
+	/**
+	 * Transfers this collection's buckets and count to the caller for a segment append.
+	 * Reference positions and list-node identities are unchanged.
+	 *
+	 * @remarks This consumes the donor's offset storage; it is not a general-purpose clear.
+	 * The donor segment is expected to be merged away. Do not add references or append
+	 * further content through this collection after the handoff.
+	 */
+	public takeReferencesForAppend(): LocalReferenceTransfer {
+		const transfer = { count: this.refCount, buckets: this.refsByOffset };
+		this.refCount = 0;
+		this.refsByOffset = [];
+		return transfer;
+	}
+
 	/**
 	 * Returns true of the local reference is in the collection, otherwise false.
 	 *
@@ -491,7 +529,7 @@ export class LocalReferenceCollection {
 			refsAtOffset.before ??= beforeRefs;
 		}
 
-		let precedingRef: ListNode<LocalReference> | undefined;
+		let precedingRef: ListNode<LocalReferencePosition> | undefined;
 		for (const iterable of refs) {
 			for (const lref of iterable) {
 				assertLocalReferences(lref);
@@ -600,7 +638,7 @@ export class LocalReferenceCollection {
 			}
 		}
 
-		const listWalker = (pos: DoublyLinkedList<LocalReference>): boolean => {
+		const listWalker = (pos: DoublyLinkedList<LocalReferencePosition>): boolean => {
 			return walkList(
 				pos,
 				(node) => visitor(node.data),

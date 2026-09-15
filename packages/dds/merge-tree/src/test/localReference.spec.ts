@@ -7,6 +7,7 @@ import { strict as assert } from "node:assert";
 
 import { LocalReferenceCollection, type LocalReferencePosition } from "../localReference.js";
 import type { ISegmentInternal } from "../mergeTreeNodes.js";
+import { type Trackable, UnorderedTrackingGroup } from "../mergeTreeTracking.js";
 import { ReferenceType } from "../ops.js";
 import { TextSegment } from "../textSegment.js";
 
@@ -18,6 +19,12 @@ interface TestSetup {
 	 * All refs in collection order (offset ascending, and insertion order within an offset).
 	 */
 	refs: LocalReferencePosition[];
+}
+
+function assertNodeBackedReference(
+	ref: LocalReferencePosition,
+): asserts ref is LocalReferencePosition & { getListNode(): unknown } {
+	assert("getListNode" in ref && typeof ref.getListNode === "function");
 }
 
 /**
@@ -79,7 +86,219 @@ function addTombstones(
 }
 
 describe("LocalReferenceCollection", () => {
+	describe("takeReferencesForAppend", () => {
+		it("takes the buckets without rebinding reference positions", () => {
+			const { collection, refs } = setup("abc", 1);
+			const firstRef = refs[0];
+			const segment = firstRef.getSegment();
+			assertNodeBackedReference(firstRef);
+			const firstNode = firstRef.getListNode();
+			assert(firstNode !== undefined);
+
+			const transfer = collection.takeReferencesForAppend();
+
+			assert.equal(transfer.count, 3);
+			assert.equal(transfer.buckets.length, 3);
+			assert.equal(transfer.buckets[0]?.at?.first, firstNode);
+			assert.equal(collection.size, 0);
+			assert.deepEqual([...collection], []);
+			for (let offset = 0; offset < refs.length; offset++) {
+				assert.equal(refs[offset].getSegment(), segment);
+				assert.equal(refs[offset].getOffset(), offset);
+			}
+			validateRefCount(collection);
+		});
+	});
+
 	describe("append", () => {
+		it("transfers all buckets without replacing references or list nodes", () => {
+			const { collection: sourceRefs, refs } = setup("abc", 2);
+			const source: ISegmentInternal | undefined = refs[0].getSegment();
+			assert(source !== undefined);
+			const before = addTombstones(sourceRefs, "before", ["b-0", "b-1"]);
+			const after = addTombstones(sourceRefs, "after", ["a-0", "a-1"]);
+			const movedRefs = [...sourceRefs];
+			const originalState = new Map<
+				LocalReferencePosition,
+				{ node: unknown; offset: number }
+			>();
+			for (const ref of movedRefs) {
+				assertNodeBackedReference(ref);
+				const node = ref.getListNode();
+				assert(node !== undefined);
+				originalState.set(ref, { node, offset: ref.getOffset() });
+				ref.callbacks = {
+					beforeSlide: () => assert.fail("Appending must not invoke slide callbacks"),
+					afterSlide: () => assert.fail("Appending must not invoke slide callbacks"),
+				};
+			}
+			const target: ISegmentInternal = TextSegment.make("xy");
+			const targetRefs = LocalReferenceCollection.setOrGet(target);
+			const retained = targetRefs.createLocalRef(1, ReferenceType.Simple, { id: "retained" });
+			const expectedOrder = ["retained", ...walk(sourceRefs)];
+
+			target.append(source);
+
+			assert.equal(target.localRefs, targetRefs);
+			assert.equal(source.localRefs, sourceRefs);
+			assert.equal(targetRefs.size, movedRefs.length + 1);
+			assert.equal(sourceRefs.size, 0);
+			assert.deepEqual([...sourceRefs], []);
+			assert.deepEqual([...targetRefs], [retained, ...movedRefs]);
+			assert.equal(retained.getOffset(), 1);
+			assert(targetRefs.has(retained));
+			assert.deepEqual(walk(targetRefs), expectedOrder);
+			assert.deepEqual(walk(targetRefs, undefined, false), [...expectedOrder].reverse());
+			for (const ref of movedRefs) {
+				assertNodeBackedReference(ref);
+				const original = originalState.get(ref);
+				assert(original !== undefined);
+				assert.equal(ref.getListNode(), original.node);
+				assert.equal(ref.getOffset(), original.offset + 2);
+				assert.equal(ref.getSegment(), target);
+				assert(targetRefs.has(ref));
+				assert(!sourceRefs.has(ref));
+			}
+			for (const ref of before) {
+				assert(!targetRefs.isAfterTombstone(ref));
+			}
+			for (const ref of after) {
+				assert(targetRefs.isAfterTombstone(ref));
+			}
+
+			const removed = movedRefs[0];
+			assert.equal(targetRefs.removeLocalRef(removed), removed);
+			assert.equal(targetRefs.size, movedRefs.length);
+			assert.equal(sourceRefs.size, 0);
+			assert.deepEqual([...sourceRefs], []);
+			validateRefCount(targetRefs);
+			validateRefCount(sourceRefs);
+		});
+
+		it("adopts transferred buckets before relinking tracking groups", () => {
+			const source: ISegmentInternal = TextSegment.make("cd");
+			const sourceRefs = LocalReferenceCollection.setOrGet(source);
+			const trackedRef = sourceRefs.createLocalRef(0, ReferenceType.Simple, undefined);
+			sourceRefs.createLocalRef(1, ReferenceType.Simple, undefined);
+			const target: ISegmentInternal = TextSegment.make("ab");
+			const targetRefs = LocalReferenceCollection.setOrGet(target);
+			targetRefs.createLocalRef(0, ReferenceType.Simple, undefined);
+			const events: string[] = [];
+			let observe = false;
+			class ObservingGroup extends UnorderedTrackingGroup {
+				public override unlink(trackable: Trackable): boolean {
+					if (observe) {
+						assert.equal(trackable, trackedRef);
+						assert.equal(sourceRefs.size, 0);
+						assert.equal(targetRefs.size, 3);
+						assert.equal(trackedRef.getSegment(), source);
+						assert(!sourceRefs.has(trackedRef));
+						assert([...targetRefs].includes(trackedRef));
+						validateRefCount(sourceRefs);
+						validateRefCount(targetRefs);
+						events.push("unlink");
+					}
+					return super.unlink(trackable);
+				}
+
+				public override link(trackable: Trackable): void {
+					if (observe) {
+						assert.equal(trackable, trackedRef);
+						assert.equal(sourceRefs.size, 0);
+						assert.equal(targetRefs.size, 3);
+						assert.equal(trackedRef.getSegment(), target);
+						assert(!sourceRefs.has(trackedRef));
+						assert([...targetRefs].includes(trackedRef));
+						validateRefCount(sourceRefs);
+						validateRefCount(targetRefs);
+						events.push("link");
+					}
+					super.link(trackable);
+				}
+			}
+			const group = new ObservingGroup();
+			trackedRef.trackingCollection.link(group);
+			observe = true;
+
+			target.append(source);
+
+			assert.deepEqual(events, ["unlink", "link"]);
+			assert(group.has(trackedRef));
+			assert(targetRefs.has(trackedRef));
+			assert.equal(trackedRef.getOffset(), 2);
+			validateRefCount(targetRefs);
+			validateRefCount(sourceRefs);
+		});
+
+		it("retains all buckets when tracking fails after a reference has been rebound", () => {
+			const source: ISegmentInternal = TextSegment.make("cd");
+			const sourceRefs = LocalReferenceCollection.setOrGet(source);
+			const firstRef = sourceRefs.createLocalRef(0, ReferenceType.Simple, undefined);
+			const failingRef = sourceRefs.createLocalRef(1, ReferenceType.Simple, undefined);
+			const target: ISegmentInternal = TextSegment.make("ab");
+			const failure = new Error("Tracking failure");
+			let throwOnUnlink = false;
+			class ThrowingGroup extends UnorderedTrackingGroup {
+				public override unlink(trackable: Trackable): boolean {
+					if (throwOnUnlink) {
+						throw failure;
+					}
+					return super.unlink(trackable);
+				}
+			}
+			failingRef.trackingCollection.link(new ThrowingGroup());
+			throwOnUnlink = true;
+
+			assert.throws(
+				() => target.append(source),
+				(error) => error === failure,
+			);
+			assert.deepEqual([...sourceRefs], []);
+			assert(target.localRefs !== undefined);
+			assert.deepEqual([...target.localRefs], [firstRef, failingRef]);
+			assert.equal(firstRef.getSegment(), target);
+			assert.equal(firstRef.getOffset(), 2);
+			assert(target.localRefs.has(firstRef));
+			assert.equal(failingRef.getSegment(), source);
+			assert.equal(failingRef.getOffset(), 1);
+			assert(!target.localRefs.has(failingRef));
+			assert(!sourceRefs.has(failingRef));
+			validateRefCount(sourceRefs);
+			validateRefCount(target.localRefs);
+		});
+
+		it("transfers large offset ranges without spreading the bucket array into a call", () => {
+			const length = 200_000;
+			const source: ISegmentInternal = TextSegment.make("x".repeat(length));
+			const sourceRefs = LocalReferenceCollection.setOrGet(source);
+			const ref = sourceRefs.createLocalRef(length - 1, ReferenceType.Simple, undefined);
+			const target: ISegmentInternal = TextSegment.make("a");
+
+			target.append(source);
+
+			assert(target.localRefs !== undefined);
+			assert(target.localRefs.has(ref));
+			assert.equal(ref.getSegment(), target);
+			assert.equal(ref.getOffset(), length);
+			assert.equal(target.cachedLength, length + 1);
+			assert.equal(target.localRefs.size, 1);
+			assert.equal(sourceRefs.size, 0);
+			validateRefCount(target.localRefs);
+			validateRefCount(sourceRefs);
+		});
+
+		it("rejects self-transfer before changing the collection", () => {
+			const segment: ISegmentInternal = TextSegment.make("a");
+			const collection = LocalReferenceCollection.setOrGet(segment);
+			const ref = collection.createLocalRef(0, ReferenceType.Simple, undefined);
+
+			assert.throws(() => segment.append(segment), /itself/);
+			assert.equal(collection.size, 1);
+			assert(collection.has(ref));
+			assert.equal(ref.getOffset(), 0);
+			assert.equal(segment.cachedLength, 1);
+		});
+
 		for (const incomingHasCollection of [false, true]) {
 			it(`does not allocate a receiver collection for unreferenced content (incomingHasCollection=${incomingHasCollection})`, () => {
 				const segment: ISegmentInternal = TextSegment.make("ab");
@@ -223,6 +442,18 @@ describe("LocalReferenceCollection", () => {
 			assert.deepEqual([...collection], [retainedRef]);
 			validateRefCount(collection);
 			validateRefCount(splitSegment.localRefs);
+		});
+	});
+
+	describe("[Symbol.iterator]", () => {
+		it("captures existing bucket lists when creating a collection iterator", () => {
+			const segment: ISegmentInternal = TextSegment.make("ab");
+			const collection = LocalReferenceCollection.setOrGet(segment);
+			const first = collection.createLocalRef(0, ReferenceType.Simple, undefined);
+			const iterator = collection[Symbol.iterator]();
+			collection.createLocalRef(1, ReferenceType.Simple, undefined);
+
+			assert.deepEqual([...iterator], [first]);
 		});
 	});
 
