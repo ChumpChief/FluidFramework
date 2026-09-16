@@ -131,6 +131,48 @@ describe("partial lengths", () => {
 		});
 	}
 
+	for (const zamboni of [false, true]) {
+		it(`verifies after optional history compaction (zamboni=${zamboni})`, () => {
+			mergeTree.insertSegments(
+				0,
+				[TextSegment.make("more ")],
+				remoteClient1.perspectiveAt({ refSeq }),
+				remoteClient1.stampAt({ seq: 1 }),
+				undefined,
+			);
+			const partials = new PartialSequenceLengths(mergeTree.collabWindow, false, {
+				block: mergeTree.root,
+			});
+			mergeTree.collabWindow.minSeq = 1;
+			mergeTree.collabWindow.currentSeq = 1;
+
+			const previousZamboni = PartialSequenceLengths.options.zamboni;
+			const previousVerifier = PartialSequenceLengths.options.verifier;
+			let verifierCalls = 0;
+			PartialSequenceLengths.options.zamboni = zamboni;
+			PartialSequenceLengths.options.verifier = (verified) => {
+				verifierCalls++;
+				assert.equal(verified, partials);
+				assert.equal(verified.minSeq, zamboni ? 1 : 0);
+				assert.deepEqual(verified.getIncrementalContribution(1), {
+					segmentCount: 2,
+					lengthDelta: zamboni ? 0 : 5,
+					clientAdjustmentDeltas: zamboni ? [] : [5],
+				});
+				verified.verify();
+			};
+
+			try {
+				partials.finishUpdate(mergeTree.collabWindow);
+				assert.equal(verifierCalls, 1);
+				assert.equal(partials.getPartialLength(1, remoteClientId), 17);
+			} finally {
+				PartialSequenceLengths.options.zamboni = previousZamboni;
+				PartialSequenceLengths.options.verifier = previousVerifier;
+			}
+		});
+	}
+
 	describe("a single inserted element", () => {
 		it("includes length of local insert for local view", () => {
 			mergeTree.insertSegments(

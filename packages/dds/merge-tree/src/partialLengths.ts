@@ -466,11 +466,7 @@ export class PartialSequenceLengths {
 			? new PartialSequenceLengths(collabWindow, computeLocalPartials, { childPartials })
 			: leafPartialLengths;
 		// TODO: incremental zamboni during build
-		if (PartialSequenceLengths.options.zamboni) {
-			combinedPartialLengths.zamboni(collabWindow);
-		}
-
-		PartialSequenceLengths.options.verifier?.(combinedPartialLengths);
+		combinedPartialLengths.finishUpdate(collabWindow);
 		return combinedPartialLengths;
 	}
 
@@ -902,10 +898,7 @@ export class PartialSequenceLengths {
 		this.unsequencedRecords = undefined;
 		this.partialLengths.addOrUpdate({ seq, seglen: seqSeglen, len: 0, clientId });
 
-		if (PartialSequenceLengths.options.zamboni) {
-			this.zamboni(collabWindow);
-		}
-		PartialSequenceLengths.options.verifier?.(this);
+		this.finishUpdate(collabWindow);
 	}
 
 	/**
@@ -1061,18 +1054,22 @@ export class PartialSequenceLengths {
 		return buf;
 	}
 
-	// Clear away partial sums for sequence numbers earlier than the current window
-
-	private zamboni(segmentWindow: CollaborationWindow): void {
-		this.minLength += this.partialLengths.copyDown(segmentWindow.minSeq);
-		this.minSeq = segmentWindow.minSeq;
-		// eslint-disable-next-line @typescript-eslint/no-for-in-array, guard-for-in, no-restricted-syntax
-		for (const clientId in this.perClientAdjustments) {
-			const cliPartials = this.perClientAdjustments[clientId];
-			if (cliPartials) {
-				cliPartials.copyDown(segmentWindow.minSeq);
+	/**
+	 * Applies optional history compaction, then invokes the verifier after construction or an update.
+	 */
+	public finishUpdate(collabWindow: CollaborationWindow): void {
+		if (PartialSequenceLengths.options.zamboni) {
+			this.minLength += this.partialLengths.copyDown(collabWindow.minSeq);
+			this.minSeq = collabWindow.minSeq;
+			// eslint-disable-next-line @typescript-eslint/no-for-in-array, guard-for-in, no-restricted-syntax
+			for (const clientId in this.perClientAdjustments) {
+				const cliPartials = this.perClientAdjustments[clientId];
+				if (cliPartials) {
+					cliPartials.copyDown(collabWindow.minSeq);
+				}
 			}
 		}
+		PartialSequenceLengths.options.verifier?.(this);
 	}
 
 	private addClientAdjustment(clientId: number, seq: number, seglen: number): void {
