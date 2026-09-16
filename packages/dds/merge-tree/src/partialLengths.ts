@@ -358,16 +358,19 @@ export class PartialSequenceLengths {
 			const childPartialLengths: (readonly Readonly<PartialSequenceLength>[])[] = [];
 			const childUnsequencedPartialLengths: (readonly Readonly<PartialSequenceLength>[])[] =
 				[];
-			const childPerRefSeqAdjustments: Map<number, PartialSequenceLengthsSet>[] = [];
+			const childPerRefSeqAdjustments: Iterable<
+				readonly [refSeq: number, adjustments: readonly Readonly<PartialSequenceLength>[]]
+			>[] = [];
 			for (let i = 0; i < childPartialsLen; i++) {
 				const child = childPartials[i];
-				const { segmentCount, minLength, unsequencedRecords } = child;
+				const { segmentCount, minLength } = child;
 				this.segmentCount += segmentCount;
 				this.minLength += minLength;
 				childPartialLengths.push(child.getSequencedLengths());
-				if (unsequencedRecords) {
-					childUnsequencedPartialLengths.push(unsequencedRecords.partialLengths.items);
-					childPerRefSeqAdjustments.push(unsequencedRecords.perRefSeqAdjustments);
+				const localLengths = child.getLocalLengths();
+				if (localLengths !== undefined) {
+					childUnsequencedPartialLengths.push(localLengths);
+					childPerRefSeqAdjustments.push(child.getLocalAdjustments());
 				}
 			}
 
@@ -387,7 +390,7 @@ export class PartialSequenceLengths {
 							combinedPartials = new PartialSequenceLengthsSet();
 							this.unsequencedRecords.perRefSeqAdjustments.set(refSeq, combinedPartials);
 						}
-						for (const item of partials.items) {
+						for (const item of partials) {
 							combinedPartials.addOrUpdate({ ...item });
 						}
 					}
@@ -958,6 +961,29 @@ export class PartialSequenceLengths {
 			const adjustments = this.perClientAdjustments[clientId];
 			if (adjustments !== undefined) {
 				yield [clientId, adjustments.items];
+			}
+		}
+	}
+
+	/**
+	 * Returns a readonly view of the local length records, or undefined if local partials are
+	 * not computed. The array and records are not copied; their `seq` fields are local sequence numbers.
+	 */
+	public getLocalLengths(): readonly Readonly<PartialSequenceLength>[] | undefined {
+		return this.unsequencedRecords?.partialLengths.items;
+	}
+
+	/**
+	 * Yields readonly local-adjustment lists keyed by reference sequence, in map iteration order.
+	 * The lists and records are not copied; each record's `seq` is a local sequence number.
+	 * Yields nothing if local partials are not computed. The derived adjustment cache is not exposed.
+	 */
+	public *getLocalAdjustments(): Iterable<
+		readonly [refSeq: number, adjustments: readonly Readonly<PartialSequenceLength>[]]
+	> {
+		if (this.unsequencedRecords !== undefined) {
+			for (const [refSeq, adjustments] of this.unsequencedRecords.perRefSeqAdjustments) {
+				yield [refSeq, adjustments.items];
 			}
 		}
 	}

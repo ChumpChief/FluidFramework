@@ -58,6 +58,8 @@ describe("partial lengths", () => {
 			);
 			partials.verify();
 			assert.deepEqual([...partials.getClientAdjustments()], []);
+			assert.deepEqual(partials.getLocalLengths(), computeLocalPartials ? [] : undefined);
+			assert.deepEqual([...partials.getLocalAdjustments()], []);
 		});
 
 		it(`constructs leaf partials (computeLocalPartials=${computeLocalPartials})`, () => {
@@ -90,11 +92,17 @@ describe("partial lengths", () => {
 				{ seq: 1, clientId: remoteClientId, len: 5, seglen: 5 },
 			]);
 			if (computeLocalPartials) {
+				assert.deepEqual(partials.getLocalLengths(), [
+					{ seq: 1, clientId: localClientId, len: 6, seglen: 6 },
+				]);
 				assert.notEqual(localInsert.localSeq, undefined);
 				assert.equal(partials.getPartialLength(0, localClientId, 0), 12);
 				assert.equal(partials.getPartialLength(1, localClientId, 0), 17);
 				assert.equal(partials.getPartialLength(1, localClientId, localInsert.localSeq), 23);
+			} else {
+				assert.equal(partials.getLocalLengths(), undefined);
 			}
+			assert.deepEqual([...partials.getLocalAdjustments()], []);
 		});
 
 		it(`constructs only direct leaf partials (computeLocalPartials=${computeLocalPartials})`, () => {
@@ -203,6 +211,36 @@ describe("partial lengths", () => {
 		]);
 		assert.deepEqual([...partials.getClientAdjustments()], clientAdjustments);
 		assert.equal(partials.getPartialLength(2, remoteClientId), 17);
+	});
+
+	it("reads local records without copying them and copies them into aggregates", () => {
+		mergeTree.insertSegments(
+			0,
+			[TextSegment.make("more ")],
+			mergeTree.localPerspective,
+			mergeTree.collabWindow.mintNextLocalOperationStamp(),
+			undefined,
+		);
+		const child = new PartialSequenceLengths(mergeTree.collabWindow, true, {
+			block: mergeTree.root,
+		});
+		const localRecords = child.getLocalLengths();
+		assert(localRecords !== undefined);
+		assert.deepEqual(localRecords, [{ seq: 1, clientId: localClientId, len: 5, seglen: 5 }]);
+		assert.equal(child.getLocalLengths(), localRecords);
+
+		const combined = new PartialSequenceLengths(mergeTree.collabWindow, true, {
+			childPartials: [child, child],
+		});
+		const combinedRecords = combined.getLocalLengths();
+		assert(combinedRecords !== undefined);
+		assert.deepEqual(combinedRecords, [
+			{ seq: 1, clientId: localClientId, len: 10, seglen: 10 },
+		]);
+		assert.notEqual(combinedRecords, localRecords);
+		assert.notEqual(combinedRecords[0], localRecords[0]);
+		assert.equal(child.getPartialLength(0, localClientId, 1), 17);
+		assert.equal(combined.getPartialLength(0, localClientId, 1), 34);
 	});
 
 	for (const zamboni of [false, true]) {
@@ -388,10 +426,21 @@ describe("partial lengths", () => {
 					assert.equal(partials.getPartialLength(0, remoteClientId), 17 * multiplier);
 					assert.equal(partials.getPartialLength(0, 19), 12 * multiplier);
 					if (computeLocalPartials) {
+						assert.deepEqual(partials.getLocalLengths(), []);
+						assert.deepEqual(
+							[...partials.getLocalAdjustments()],
+							[
+								[1, [{ seq: 1, len: -5 * multiplier, seglen: -5 * multiplier }]],
+								[2, [{ seq: 1, len: 5 * multiplier, seglen: 5 * multiplier }]],
+							],
+						);
 						assert.equal(partials.getPartialLength(1, localClientId, 0), 17 * multiplier);
 						assert.equal(partials.getPartialLength(1, localClientId, 1), 12 * multiplier);
 						assert.equal(partials.getPartialLength(2, localClientId, 0), 12 * multiplier);
 						assert.equal(partials.getPartialLength(2, localClientId, 1), 12 * multiplier);
+					} else {
+						assert.equal(partials.getLocalLengths(), undefined);
+						assert.deepEqual([...partials.getLocalAdjustments()], []);
 					}
 				}
 
@@ -413,6 +462,7 @@ describe("partial lengths", () => {
 				);
 				checkLengths(combined, 2);
 				const combinedClientAdjustments = new Map(combined.getClientAdjustments());
+				const combinedLocalAdjustments = new Map(combined.getLocalAdjustments());
 				for (const child of childPartials) {
 					checkLengths(child, 1);
 					const childRecords = child.getSequencedLengths();
@@ -427,6 +477,18 @@ describe("partial lengths", () => {
 						assert.notEqual(combinedAdjustments, adjustments);
 						for (let i = 0; i < adjustments.length; i++) {
 							assert.notEqual(combinedAdjustments[i], adjustments[i]);
+						}
+					}
+					const localAdjustments = [...child.getLocalAdjustments()];
+					const repeatedLocalAdjustments = [...child.getLocalAdjustments()];
+					for (let i = 0; i < localAdjustments.length; i++) {
+						const [adjustmentRefSeq, adjustments] = localAdjustments[i];
+						assert.equal(repeatedLocalAdjustments[i][1], adjustments);
+						const combinedAdjustments = combinedLocalAdjustments.get(adjustmentRefSeq);
+						assert(combinedAdjustments !== undefined);
+						assert.notEqual(combinedAdjustments, adjustments);
+						for (let j = 0; j < adjustments.length; j++) {
+							assert.notEqual(combinedAdjustments[j], adjustments[j]);
 						}
 					}
 				}
