@@ -427,13 +427,7 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 	 */
 	// eslint-disable-next-line @rushstack/no-new-null -- Explicit null entries are part of the legacy attribution format.
 	public getRootEntries(): { offset: number; key: AttributionKey | null }[] {
-		type ExtractGeneric<T> = T extends Iterable<infer Q> ? Q : unknown;
-		const rootEntries: ExtractGeneric<IAttributionCollectionSpec<AttributionKey>["root"]>[] =
-			Array.from({ length: this.keys.length });
-		for (let i = 0; i < this.keys.length; i++) {
-			rootEntries[i] = { offset: this.offsets[i], key: this.keys[i] };
-		}
-		return rootEntries;
+		return this.keys.map((key, index) => ({ offset: this.offsets[index], key }));
 	}
 
 	/**
