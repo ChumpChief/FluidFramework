@@ -396,17 +396,9 @@ export class PartialSequenceLengths {
 
 			// could merge these like we do above rather than do out of order like this
 			for (let i = 0; i < childPartialsLen; i++) {
-				const { perClientAdjustments } = childPartials[i];
-				if (perClientAdjustments.length > 0) {
-					for (let clientId = 0; clientId < perClientAdjustments.length; clientId++) {
-						const clientAdjustment = perClientAdjustments[clientId];
-						if (clientAdjustment === undefined) {
-							continue;
-						}
-
-						for (const partial of perClientAdjustments[clientId].items) {
-							this.addClientAdjustment(clientId, partial.seq, partial.seglen);
-						}
+				for (const [clientId, adjustments] of childPartials[i].getClientAdjustments()) {
+					for (const partial of adjustments) {
+						this.addClientAdjustment(clientId, partial.seq, partial.seglen);
 					}
 				}
 			}
@@ -952,6 +944,22 @@ export class PartialSequenceLengths {
 	 */
 	public getSequencedLengths(): readonly Readonly<PartialSequenceLength>[] {
 		return this.partialLengths.items;
+	}
+
+	/**
+	 * Yields existing client adjustment lists in client-ID order, skipping sparse slots but
+	 * including existing empty lists. The lists and their records are live, readonly views
+	 * and are not copied.
+	 */
+	public *getClientAdjustments(): Iterable<
+		readonly [clientId: number, adjustments: readonly Readonly<PartialSequenceLength>[]]
+	> {
+		for (let clientId = 0; clientId < this.perClientAdjustments.length; clientId++) {
+			const adjustments = this.perClientAdjustments[clientId];
+			if (adjustments !== undefined) {
+				yield [clientId, adjustments.items];
+			}
+		}
 	}
 
 	/**

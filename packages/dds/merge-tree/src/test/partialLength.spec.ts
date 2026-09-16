@@ -52,7 +52,12 @@ describe("partial lengths", () => {
 
 	for (const computeLocalPartials of [false, true]) {
 		it(`verifies empty partials (computeLocalPartials=${computeLocalPartials})`, () => {
-			new PartialSequenceLengths(mergeTree.collabWindow, computeLocalPartials).verify();
+			const partials = new PartialSequenceLengths(
+				mergeTree.collabWindow,
+				computeLocalPartials,
+			);
+			partials.verify();
+			assert.deepEqual([...partials.getClientAdjustments()], []);
 		});
 
 		it(`constructs leaf partials (computeLocalPartials=${computeLocalPartials})`, () => {
@@ -158,6 +163,46 @@ describe("partial lengths", () => {
 		partials.finishUpdate(mergeTree.collabWindow);
 		assert.deepEqual(records, []);
 		assert.equal(partials.getPartialLength(1, remoteClientId), 17);
+	});
+
+	it("exposes live client adjustment lists in client-ID order without copying them", () => {
+		const remoteClient2 = makeRemoteClient({ clientId: 20 });
+		mergeTree.insertSegments(
+			0,
+			[TextSegment.make("abc")],
+			remoteClient2.perspectiveAt({ refSeq }),
+			remoteClient2.stampAt({ seq: 1 }),
+			undefined,
+		);
+		mergeTree.insertSegments(
+			3,
+			[TextSegment.make("de")],
+			remoteClient1.perspectiveAt({ refSeq: 1 }),
+			remoteClient1.stampAt({ seq: 2 }),
+			undefined,
+		);
+		const partials = new PartialSequenceLengths(mergeTree.collabWindow, false, {
+			block: mergeTree.root,
+		});
+		const clientAdjustments = [...partials.getClientAdjustments()];
+		assert.deepEqual(clientAdjustments, [
+			[remoteClientId, [{ seq: 2, len: 2, seglen: 2 }]],
+			[20, [{ seq: 1, len: 3, seglen: 3 }]],
+		]);
+		const repeated = [...partials.getClientAdjustments()];
+		for (let i = 0; i < clientAdjustments.length; i++) {
+			assert.equal(repeated[i][1], clientAdjustments[i][1]);
+		}
+
+		mergeTree.collabWindow.minSeq = 2;
+		mergeTree.collabWindow.currentSeq = 2;
+		partials.finishUpdate(mergeTree.collabWindow);
+		assert.deepEqual(clientAdjustments, [
+			[remoteClientId, []],
+			[20, []],
+		]);
+		assert.deepEqual([...partials.getClientAdjustments()], clientAdjustments);
+		assert.equal(partials.getPartialLength(2, remoteClientId), 17);
 	});
 
 	for (const zamboni of [false, true]) {
@@ -367,6 +412,7 @@ describe("partial lengths", () => {
 					{ childPartials },
 				);
 				checkLengths(combined, 2);
+				const combinedClientAdjustments = new Map(combined.getClientAdjustments());
 				for (const child of childPartials) {
 					checkLengths(child, 1);
 					const childRecords = child.getSequencedLengths();
@@ -374,6 +420,14 @@ describe("partial lengths", () => {
 					assert.notEqual(combinedRecords, childRecords);
 					for (let i = 0; i < childRecords.length; i++) {
 						assert.notEqual(combinedRecords[i], childRecords[i]);
+					}
+					for (const [clientId, adjustments] of child.getClientAdjustments()) {
+						const combinedAdjustments = combinedClientAdjustments.get(clientId);
+						assert(combinedAdjustments !== undefined);
+						assert.notEqual(combinedAdjustments, adjustments);
+						for (let i = 0; i < adjustments.length; i++) {
+							assert.notEqual(combinedAdjustments[i], adjustments[i]);
+						}
 					}
 				}
 			});
