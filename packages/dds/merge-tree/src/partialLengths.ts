@@ -355,19 +355,18 @@ export class PartialSequenceLengths {
 			const { childPartials } = source;
 			const childPartialsLen = childPartials.length;
 
-			const childPartialLengths: PartialSequenceLength[][] = [];
-			const childUnsequencedPartialLengths: PartialSequenceLength[][] = [];
+			const childPartialLengths: (readonly Readonly<PartialSequenceLength>[])[] = [];
+			const childUnsequencedPartialLengths: (readonly Readonly<PartialSequenceLength>[])[] =
+				[];
 			const childPerRefSeqAdjustments: Map<number, PartialSequenceLengthsSet>[] = [];
 			for (let i = 0; i < childPartialsLen; i++) {
-				const { segmentCount, minLength, partialLengths, unsequencedRecords } =
-					childPartials[i];
+				const child = childPartials[i];
+				const { segmentCount, minLength, unsequencedRecords } = child;
 				this.segmentCount += segmentCount;
 				this.minLength += minLength;
-				childPartialLengths.push(partialLengths.items as PartialSequenceLength[]);
+				childPartialLengths.push(child.getSequencedLengths());
 				if (unsequencedRecords) {
-					childUnsequencedPartialLengths.push(
-						unsequencedRecords.partialLengths.items as PartialSequenceLength[],
-					);
+					childUnsequencedPartialLengths.push(unsequencedRecords.partialLengths.items);
 					childPerRefSeqAdjustments.push(unsequencedRecords.perRefSeqAdjustments);
 				}
 			}
@@ -457,7 +456,7 @@ export class PartialSequenceLengths {
 
 		// If there are no internal children, the leaf partial lengths are exactly correct.
 		// Otherwise, we must additively combine all of the children partial lengths to get this block's totals.
-		if (hasInternalChild && leafPartialLengths.partialLengths.size > 0) {
+		if (hasInternalChild && leafPartialLengths.getSequencedLengths().length > 0) {
 			// Some children were leaves; add combined partials from these segments
 			childPartials.push(leafPartialLengths);
 		}
@@ -948,6 +947,14 @@ export class PartialSequenceLengths {
 	}
 
 	/**
+	 * Returns a live, readonly view of the sequenced length records, ordered by sequence number.
+	 * The array and its records are not copied and may change when this instance is updated.
+	 */
+	public getSequencedLengths(): readonly Readonly<PartialSequenceLength>[] {
+		return this.partialLengths.items;
+	}
+
+	/**
 	 * Returns the length of this block as viewed from the perspective of `clientId` at `refSeq`.
 	 * This is the total length of all segments sequenced at or before refSeq OR submitted by `clientId`.
 	 * If `clientId` is the local client, `localSeq` can also be provided. In that case, it is the total
@@ -1259,7 +1266,7 @@ export function verifyExpectedPartialLengths(
  * ```
  */
 function mergePartialLengths(
-	childPartialLengths: PartialSequenceLength[][],
+	childPartialLengths: readonly (readonly Readonly<PartialSequenceLength>[])[],
 	mergedLengths: PartialSequenceLengthsSet = new PartialSequenceLengthsSet(),
 ): PartialSequenceLengthsSet {
 	for (const partialLength of mergeSortedListsBySeq(childPartialLengths)) {
@@ -1277,7 +1284,9 @@ function mergePartialLengths(
  * This is equivalent to flattening the input list and sorting it by sequence number. If the number of lists to merge is
  * a constant, however, this approach is advantageous asymptotically.
  */
-function mergeSortedListsBySeq<T extends PartialSequenceLength>(lists: T[][]): Iterable<T> {
+function mergeSortedListsBySeq<T extends Readonly<PartialSequenceLength>>(
+	lists: readonly (readonly T[])[],
+): Iterable<T> {
 	class PartialSequenceLengthIterator {
 		/**
 		 * nextSmallestIndex[i] is the next element of sublists[i] to check.
@@ -1286,7 +1295,7 @@ function mergeSortedListsBySeq<T extends PartialSequenceLength>(lists: T[][]): I
 		 */
 		private readonly nextSmallestIndex: number[];
 
-		constructor(private readonly sublists: T[][]) {
+		constructor(private readonly sublists: readonly (readonly T[])[]) {
 			this.nextSmallestIndex = Array.from({ length: sublists.length });
 			for (let i = 0; i < sublists.length; i++) {
 				this.nextSmallestIndex[i] = 0;

@@ -81,6 +81,9 @@ describe("partial lengths", () => {
 			assert.equal(partials.getPartialLength(0, remoteClientId + 1), 12);
 			assert.equal(partials.getPartialLength(0, remoteClientId), 17);
 			assert.equal(partials.getPartialLength(1, remoteClientId + 1), 17);
+			assert.deepEqual(partials.getSequencedLengths(), [
+				{ seq: 1, clientId: remoteClientId, len: 5, seglen: 5 },
+			]);
 			if (computeLocalPartials) {
 				assert.notEqual(localInsert.localSeq, undefined);
 				assert.equal(partials.getPartialLength(0, localClientId, 0), 12);
@@ -130,6 +133,32 @@ describe("partial lengths", () => {
 			}
 		});
 	}
+
+	it("exposes a live sequenced-length view without copying the array or records", () => {
+		const partials = new PartialSequenceLengths(mergeTree.collabWindow, false, {
+			block: mergeTree.root,
+		});
+		const records = partials.getSequencedLengths();
+		assert.deepEqual(records, []);
+
+		mergeTree.insertSegments(
+			0,
+			[TextSegment.make("more ")],
+			remoteClient1.perspectiveAt({ refSeq }),
+			remoteClient1.stampAt({ seq: 1 }),
+			undefined,
+		);
+		partials.update(mergeTree.root, 1, remoteClientId, mergeTree.collabWindow);
+		assert.deepEqual(records, [{ seq: 1, clientId: remoteClientId, len: 5, seglen: 5 }]);
+		assert.equal(partials.getSequencedLengths(), records);
+		assert.equal(partials.getSequencedLengths()[0], records[0]);
+
+		mergeTree.collabWindow.minSeq = 1;
+		mergeTree.collabWindow.currentSeq = 1;
+		partials.finishUpdate(mergeTree.collabWindow);
+		assert.deepEqual(records, []);
+		assert.equal(partials.getPartialLength(1, remoteClientId), 17);
+	});
 
 	for (const zamboni of [false, true]) {
 		it(`verifies after optional history compaction (zamboni=${zamboni})`, () => {
@@ -340,6 +369,12 @@ describe("partial lengths", () => {
 				checkLengths(combined, 2);
 				for (const child of childPartials) {
 					checkLengths(child, 1);
+					const childRecords = child.getSequencedLengths();
+					const combinedRecords = combined.getSequencedLengths();
+					assert.notEqual(combinedRecords, childRecords);
+					for (let i = 0; i < childRecords.length; i++) {
+						assert.notEqual(combinedRecords[i], childRecords[i]);
+					}
 				}
 			});
 		}
