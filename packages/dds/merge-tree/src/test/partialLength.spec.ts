@@ -356,6 +356,24 @@ describe("partial lengths", () => {
 	});
 
 	describe("incremental contributions", () => {
+		it("marks the last invalidated sequence without changing calculated lengths", () => {
+			const partials = new PartialSequenceLengths(mergeTree.collabWindow, false, {
+				block: mergeTree.root,
+			});
+			const contribution = partials.getIncrementalContribution(1);
+			assert(contribution !== undefined);
+
+			partials.invalidateIncrementalPropagation(1);
+			assert.equal(partials.getIncrementalContribution(1), undefined);
+			assert.deepEqual(partials.getIncrementalContribution(2), contribution);
+			assert.equal(partials.getPartialLength(1, remoteClientId), 12);
+
+			partials.invalidateIncrementalPropagation(2);
+			assert.deepEqual(partials.getIncrementalContribution(1), contribution);
+			assert.equal(partials.getIncrementalContribution(2), undefined);
+			assert.equal(partials.getPartialLength(2, remoteClientId), 12);
+		});
+
 		it("returns only deltas at the requested sequence, not cumulative or preceding lengths", () => {
 			const empty = new PartialSequenceLengths(mergeTree.collabWindow, false);
 			assert.deepEqual(empty.getIncrementalContribution(1), {

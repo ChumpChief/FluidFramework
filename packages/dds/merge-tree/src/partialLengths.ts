@@ -882,7 +882,7 @@ export class PartialSequenceLengths {
 				if (contribution === undefined) {
 					// Bail out.
 					const newPartials = PartialSequenceLengths.combine(node, collabWindow, false);
-					newPartials.lastIncrementalInvalidationSeq = seq;
+					newPartials.invalidateIncrementalPropagation(seq);
 					node.partialLengths = newPartials;
 					return;
 				}
@@ -896,7 +896,7 @@ export class PartialSequenceLengths {
 		}
 
 		if (failIncrementalPropagation) {
-			this.lastIncrementalInvalidationSeq = seq;
+			this.invalidateIncrementalPropagation(seq);
 		}
 		this.segmentCount = segCount;
 		this.unsequencedRecords = undefined;
@@ -906,6 +906,14 @@ export class PartialSequenceLengths {
 			this.zamboni(collabWindow);
 		}
 		PartialSequenceLengths.options.verifier?.(this);
+	}
+
+	/**
+	 * Marks `seq` as requiring full parent rebuilds rather than incremental propagation.
+	 * Replaces the previous invalidation marker without changing the calculated lengths.
+	 */
+	public invalidateIncrementalPropagation(seq: number): void {
+		this.lastIncrementalInvalidationSeq = seq;
 	}
 
 	/**
