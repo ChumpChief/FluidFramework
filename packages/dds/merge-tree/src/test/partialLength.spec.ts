@@ -57,6 +57,8 @@ describe("partial lengths", () => {
 				computeLocalPartials,
 			);
 			partials.verify();
+			assert.equal(partials.getSegmentCount(), 0);
+			assert.equal(partials.getBaselineLength(), 0);
 			assert.deepEqual([...partials.getClientAdjustments()], []);
 			assert.deepEqual(partials.getLocalLengths(), computeLocalPartials ? [] : undefined);
 			assert.deepEqual([...partials.getLocalAdjustments()], []);
@@ -88,6 +90,8 @@ describe("partial lengths", () => {
 			assert.equal(partials.getPartialLength(0, remoteClientId + 1), 12);
 			assert.equal(partials.getPartialLength(0, remoteClientId), 17);
 			assert.equal(partials.getPartialLength(1, remoteClientId + 1), 17);
+			assert.equal(partials.getSegmentCount(), 3);
+			assert.equal(partials.getBaselineLength(), 12);
 			assert.deepEqual(partials.getSequencedLengths(), [
 				{ seq: 1, clientId: remoteClientId, len: 5, seglen: 5 },
 			]);
@@ -119,6 +123,8 @@ describe("partial lengths", () => {
 			);
 
 			assert.equal(partials.minSeq, 5);
+			assert.equal(partials.getSegmentCount(), block.childCount);
+			assert.equal(partials.getBaselineLength(), 12);
 			assert.equal(partials.getPartialLength(5, remoteClientId), 12);
 		});
 
@@ -266,6 +272,8 @@ describe("partial lengths", () => {
 				verifierCalls++;
 				assert.equal(verified, partials);
 				assert.equal(verified.minSeq, zamboni ? 1 : 0);
+				assert.equal(verified.getSegmentCount(), 2);
+				assert.equal(verified.getBaselineLength(), zamboni ? 17 : 12);
 				assert.deepEqual(verified.getIncrementalContribution(1), {
 					segmentCount: 2,
 					lengthDelta: zamboni ? 0 : 5,
@@ -420,6 +428,8 @@ describe("partial lengths", () => {
 
 				function checkLengths(partials: PartialSequenceLengths, multiplier: number): void {
 					partials.verify();
+					assert.equal(partials.getSegmentCount(), 2 * multiplier);
+					assert.equal(partials.getBaselineLength(), 12 * multiplier);
 					assert.equal(partials.getPartialLength(0, 20), 12 * multiplier);
 					assert.equal(partials.getPartialLength(1, 20), 17 * multiplier);
 					assert.equal(partials.getPartialLength(2, 20), 12 * multiplier);

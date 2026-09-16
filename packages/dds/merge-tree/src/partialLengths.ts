@@ -363,9 +363,8 @@ export class PartialSequenceLengths {
 			>[] = [];
 			for (let i = 0; i < childPartialsLen; i++) {
 				const child = childPartials[i];
-				const { segmentCount, minLength } = child;
-				this.segmentCount += segmentCount;
-				this.minLength += minLength;
+				this.segmentCount += child.getSegmentCount();
+				this.minLength += child.getBaselineLength();
 				childPartialLengths.push(child.getSequencedLengths());
 				const localLengths = child.getLocalLengths();
 				if (localLengths !== undefined) {
@@ -939,6 +938,20 @@ export class PartialSequenceLengths {
 			lengthDelta: partial !== undefined && partial.seq === seq ? partial.seglen : 0,
 			clientAdjustmentDeltas,
 		};
+	}
+
+	/**
+	 * Returns the tracked segment count, independent of visibility at a particular sequence.
+	 */
+	public getSegmentCount(): number {
+		return this.segmentCount;
+	}
+
+	/**
+	 * Returns the baseline length at `minSeq`, before sequence and client adjustments.
+	 */
+	public getBaselineLength(): number {
+		return this.minLength;
 	}
 
 	/**
