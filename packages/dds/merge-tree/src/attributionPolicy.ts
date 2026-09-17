@@ -76,6 +76,7 @@ const ensureAttributionCollectionCallbacks: AttributionCallbacks = {
 		if (op.type === MergeTreeDeltaType.INSERT) {
 			for (const { segment } of deltaSegments) {
 				segment.attribution = new AttributionCollection({
+					type: "entries",
 					length: segment.cachedLength,
 					rootEntries: [],
 				});
@@ -105,6 +106,7 @@ const attributeInsertionOnSegments = (
 			segment.attribution?.update(
 				undefined,
 				new AttributionCollection({
+					type: "entries",
 					length: segment.cachedLength,
 					rootEntries: [{ offset: 0, key }],
 				}),
@@ -161,6 +163,7 @@ function createPropertyTrackingMergeTreeCallbacks(
 					segment.attribution?.update(
 						channelName,
 						new AttributionCollection({
+							type: "entries",
 							length: segment.cachedLength,
 							rootEntries: [{ offset: 0, key }],
 						}),

@@ -38,10 +38,12 @@ describe("AttributionCollection", () => {
 		seq: number;
 	}): AttributionCollection => {
 		return new AttributionCollection({
+			type: "entries",
 			length,
 			rootEntries: [{ offset: 0, key: null }],
 			channels: {
 				foo: new AttributionCollection({
+					type: "entries",
 					length,
 					rootEntries: [{ offset: 0, key: opKey(seq) }],
 				}),
@@ -59,6 +61,7 @@ describe("AttributionCollection", () => {
 			];
 			const expected = rootEntries.map((entry) => ({ ...entry }));
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 4,
 				rootEntries: rootEntries.values(),
 			});
@@ -72,19 +75,28 @@ describe("AttributionCollection", () => {
 
 		it("distinguishes empty roots, explicit null entries, and an empty channel map", () => {
 			for (const length of [0, 2]) {
-				assert.deepEqual(new AttributionCollection({ length, rootEntries: [] }).getAll(), {
-					length,
-					root: [],
-				});
+				assert.deepEqual(
+					new AttributionCollection({ type: "entries", length, rootEntries: [] }).getAll(),
+					{
+						length,
+						root: [],
+					},
+				);
 				assert.deepEqual(
 					new AttributionCollection({
+						type: "entries",
 						length,
 						rootEntries: [{ offset: 0, key: null }],
 					}).getAll(),
 					{ length, root: [{ offset: 0, key: null }] },
 				);
 				assert.deepEqual(
-					new AttributionCollection({ length, rootEntries: [], channels: {} }).getAll(),
+					new AttributionCollection({
+						type: "entries",
+						length,
+						rootEntries: [],
+						channels: {},
+					}).getAll(),
 					{ length, root: [], channels: {} },
 				);
 			}
@@ -92,17 +104,31 @@ describe("AttributionCollection", () => {
 
 		it("copies the channel map but retains the supplied channel collections", () => {
 			const channel = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [{ offset: 0, key: opKey(10) }],
 			});
 			const channels = { foo: channel };
-			const collection = new AttributionCollection({ length: 2, rootEntries: [], channels });
-			channels.foo = new AttributionCollection({ length: 2, rootEntries: [] });
+			const collection = new AttributionCollection({
+				type: "entries",
+				length: 2,
+				rootEntries: [],
+				channels,
+			});
+			channels.foo = new AttributionCollection({
+				type: "entries",
+				length: 2,
+				rootEntries: [],
+			});
 
 			assert.deepEqual(collection.getAtOffset(0, "foo"), opKey(10));
 			channel.update(
 				undefined,
-				new AttributionCollection({ length: 2, rootEntries: [{ offset: 0, key: opKey(20) }] }),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(20) }],
+				}),
 			);
 			assert.deepEqual(collection.getAtOffset(0, "foo"), opKey(20));
 		});
@@ -111,9 +137,12 @@ describe("AttributionCollection", () => {
 			assert.throws(
 				() =>
 					new AttributionCollection({
+						type: "entries",
 						length: 2,
 						rootEntries: [],
-						channels: { foo: new AttributionCollection({ length: 3, rootEntries: [] }) },
+						channels: {
+							foo: new AttributionCollection({ type: "entries", length: 3, rootEntries: [] }),
+						},
 					}),
 				/same length/,
 			);
@@ -127,7 +156,11 @@ describe("AttributionCollection", () => {
 				{ offset: 0, key },
 				{ offset: 1, key: null },
 			];
-			const collection = new AttributionCollection({ length: 2, rootEntries: expected });
+			const collection = new AttributionCollection({
+				type: "entries",
+				length: 2,
+				rootEntries: expected,
+			});
 			const rootEntries = collection.getRootEntries();
 			assert.deepEqual(rootEntries, expected);
 			assert.equal(rootEntries[0].key, key);
@@ -146,19 +179,30 @@ describe("AttributionCollection", () => {
 			}
 			const expected = [{ offset: 0, key: opKey(10) }];
 			const source = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: expected,
-				channels: { nested: new UnreadableChannel({ length: 2, rootEntries: [] }) },
+				channels: {
+					nested: new UnreadableChannel({ type: "entries", length: 2, rootEntries: [] }),
+				},
 			});
 			assert.deepEqual(source.getRootEntries(), expected);
 
-			const destination = new AttributionCollection({ length: 2, rootEntries: [] });
+			const destination = new AttributionCollection({
+				type: "entries",
+				length: 2,
+				rootEntries: [],
+			});
 			destination.update(undefined, source);
 			assert.deepEqual(destination.getRootEntries(), expected);
 			assert.deepEqual(destination.channelNames, []);
 			source.update(
 				undefined,
-				new AttributionCollection({ length: 2, rootEntries: [{ offset: 0, key: null }] }),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: null }],
+				}),
 			);
 			assert.deepEqual(destination.getRootEntries(), expected);
 		});
@@ -167,10 +211,12 @@ describe("AttributionCollection", () => {
 	describe(".getChannels", () => {
 		it("returns an independent map containing the original channel collections", () => {
 			const channel = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [{ offset: 0, key: opKey(10) }],
 			});
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [],
 				channels: { foo: channel },
@@ -178,14 +224,23 @@ describe("AttributionCollection", () => {
 			const channels = collection.getChannels();
 			assert(channels !== undefined);
 			assert.equal(channels.foo, channel);
-			channels.foo = new AttributionCollection({ length: 2, rootEntries: [] });
-			channels.bar = new AttributionCollection({ length: 2, rootEntries: [] });
+			channels.foo = new AttributionCollection({
+				type: "entries",
+				length: 2,
+				rootEntries: [],
+			});
+			channels.bar = new AttributionCollection({
+				type: "entries",
+				length: 2,
+				rootEntries: [],
+			});
 			assert.deepEqual(collection.channelNames, ["foo"]);
 			assert.equal(collection.getChannels()?.foo, channel);
 
 			channel.update(
 				undefined,
 				new AttributionCollection({
+					type: "entries",
 					length: 2,
 					rootEntries: [{ offset: 0, key: opKey(20) }],
 				}),
@@ -195,11 +250,20 @@ describe("AttributionCollection", () => {
 
 		it("distinguishes absent and initialized-empty channel maps", () => {
 			assert.equal(
-				new AttributionCollection({ length: 2, rootEntries: [] }).getChannels(),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [],
+				}).getChannels(),
 				undefined,
 			);
 			assert.deepEqual(
-				new AttributionCollection({ length: 2, rootEntries: [], channels: {} }).getChannels(),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [],
+					channels: {},
+				}).getChannels(),
 				{},
 			);
 		});
@@ -208,6 +272,7 @@ describe("AttributionCollection", () => {
 	describe(".getAtOffset", () => {
 		describe("on a collection with a single entry", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 5,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
@@ -226,11 +291,13 @@ describe("AttributionCollection", () => {
 
 		describe("on a collection with multiple entries", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 3,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
 			collection.append(
 				new AttributionCollection({
+					type: "entries",
 					length: 5,
 					rootEntries: [{ offset: 0, key: opKey(101) }],
 				}),
@@ -257,6 +324,7 @@ describe("AttributionCollection", () => {
 	describe(".getKeysInOffsetRange", () => {
 		describe("on a collection with a single entry", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 5,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
@@ -295,29 +363,34 @@ describe("AttributionCollection", () => {
 
 		describe("on a collection with multiple entries", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 10,
 				rootEntries: [{ offset: 0, key: opKey(10) }],
 			});
 			collection.append(
 				new AttributionCollection({
+					type: "entries",
 					length: 10,
 					rootEntries: [{ offset: 0, key: opKey(20) }],
 				}),
 			);
 			collection.append(
 				new AttributionCollection({
+					type: "entries",
 					length: 10,
 					rootEntries: [{ offset: 0, key: opKey(30) }],
 				}),
 			);
 			collection.append(
 				new AttributionCollection({
+					type: "entries",
 					length: 10,
 					rootEntries: [{ offset: 0, key: opKey(40) }],
 				}),
 			);
 			collection.append(
 				new AttributionCollection({
+					type: "entries",
 					length: 10,
 					rootEntries: [{ offset: 0, key: opKey(50) }],
 				}),
@@ -364,7 +437,11 @@ describe("AttributionCollection", () => {
 	describe(".splitAt", () => {
 		it("preserves empty roots without introducing undefined entries", () => {
 			for (const pos of [0, 2, 4]) {
-				const collection = new AttributionCollection({ length: 4, rootEntries: [] });
+				const collection = new AttributionCollection({
+					type: "entries",
+					length: 4,
+					rootEntries: [],
+				});
 				const splitCollection = collection.splitAt(pos);
 				assert.deepEqual(collection.getAll(), { length: pos, root: [] });
 				assert.deepEqual(splitCollection.getAll(), { length: 4 - pos, root: [] });
@@ -373,10 +450,12 @@ describe("AttributionCollection", () => {
 
 		it("splits channel breakpoints without sharing the resulting collections", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 4,
 				rootEntries: [],
 				channels: {
 					foo: new AttributionCollection({
+						type: "entries",
 						length: 4,
 						rootEntries: [
 							{ offset: 0, key: null },
@@ -409,7 +488,11 @@ describe("AttributionCollection", () => {
 			});
 			splitCollection.update(
 				"foo",
-				new AttributionCollection({ length: 2, rootEntries: [{ offset: 0, key: opKey(20) }] }),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(20) }],
+				}),
 			);
 			assert.deepEqual(collection.getAtOffset(1, "foo"), opKey(10));
 		});
@@ -418,17 +501,20 @@ describe("AttributionCollection", () => {
 			let collection: AttributionCollection;
 			beforeEach(() => {
 				collection = new AttributionCollection({
+					type: "entries",
 					length: 3,
 					rootEntries: [{ offset: 0, key: opKey(100) }],
 				});
 				collection.append(
 					new AttributionCollection({
+						type: "entries",
 						length: 2,
 						rootEntries: [{ offset: 0, key: opKey(101) }],
 					}),
 				);
 				collection.append(
 					new AttributionCollection({
+						type: "entries",
 						length: 1,
 						rootEntries: [{ offset: 0, key: opKey(102) }],
 					}),
@@ -463,6 +549,7 @@ describe("AttributionCollection", () => {
 
 		it("can split collection with a single value", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 5,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
@@ -475,12 +562,14 @@ describe("AttributionCollection", () => {
 
 		it("splits channels", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 5,
 				rootEntries: [{ offset: 0, key: null }],
 			});
 			collection.update(
 				"foo",
 				new AttributionCollection({
+					type: "entries",
 					length: 5,
 					rootEntries: [{ offset: 0, key: opKey(100) }],
 				}),
@@ -498,12 +587,14 @@ describe("AttributionCollection", () => {
 	describe(".append", () => {
 		it("modifies the receiving collection", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
 			assert.deepEqual(collection.getAll().root, [{ offset: 0, key: opKey(100) }]);
 			collection.append(
 				new AttributionCollection({
+					type: "entries",
 					length: 1,
 					rootEntries: [{ offset: 0, key: opKey(101) }],
 				}),
@@ -516,10 +607,12 @@ describe("AttributionCollection", () => {
 
 		it("does not modify the argument collection", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
 			const appendedCollection = new AttributionCollection({
+				type: "entries",
 				length: 1,
 				rootEntries: [{ offset: 0, key: opKey(101) }],
 			});
@@ -530,11 +623,13 @@ describe("AttributionCollection", () => {
 
 		it("coalesces referentially equal values at the join point", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
 			collection.append(
 				new AttributionCollection({
+					type: "entries",
 					length: 7,
 					rootEntries: [{ offset: 0, key: opKey(100) }],
 				}),
@@ -548,7 +643,11 @@ describe("AttributionCollection", () => {
 				const appendOrder: string[] = [];
 				class TrackedChannel extends AttributionCollection {
 					public constructor(private readonly name: string) {
-						super({ length: 2, rootEntries: [{ offset: 0, key: opKey(10) }] });
+						super({
+							type: "entries",
+							length: 2,
+							rootEntries: [{ offset: 0, key: opKey(10) }],
+						});
 					}
 
 					public override append(other: AttributionCollection): void {
@@ -557,6 +656,7 @@ describe("AttributionCollection", () => {
 					}
 				}
 				const collection = new AttributionCollection({
+					type: "entries",
 					length: 2,
 					rootEntries: [],
 					channels: {
@@ -566,10 +666,12 @@ describe("AttributionCollection", () => {
 				});
 				collection.append(
 					new AttributionCollection({
+						type: "entries",
 						length: 3,
 						rootEntries: [],
 						channels: {
 							shared: new AttributionCollection({
+								type: "entries",
 								length: 3,
 								rootEntries: [{ offset: 0, key: opKey(20) }],
 							}),
@@ -584,11 +686,13 @@ describe("AttributionCollection", () => {
 				for (const donorHasMap of [false, true]) {
 					it(`preserves empty-map presence (receiver=${receiverHasMap}, donor=${donorHasMap})`, () => {
 						const collection = new AttributionCollection({
+							type: "entries",
 							length: 2,
 							rootEntries: [],
 							channels: receiverHasMap ? {} : undefined,
 						});
 						const other = new AttributionCollection({
+							type: "entries",
 							length: 3,
 							rootEntries: [],
 							channels: donorHasMap ? {} : undefined,
@@ -606,14 +710,17 @@ describe("AttributionCollection", () => {
 
 			it("appends nested channels without flattening them or modifying the donor", () => {
 				const nested = new AttributionCollection({
+					type: "entries",
 					length: 2,
 					rootEntries: [{ offset: 0, key: opKey(10) }],
 				});
 				const collection = new AttributionCollection({
+					type: "entries",
 					length: 2,
 					rootEntries: [],
 					channels: {
 						foo: new AttributionCollection({
+							type: "entries",
 							length: 2,
 							rootEntries: [],
 							channels: { nested },
@@ -621,14 +728,17 @@ describe("AttributionCollection", () => {
 					},
 				});
 				const donorNested = new AttributionCollection({
+					type: "entries",
 					length: 3,
 					rootEntries: [{ offset: 0, key: opKey(20) }],
 				});
 				const other = new AttributionCollection({
+					type: "entries",
 					length: 3,
 					rootEntries: [],
 					channels: {
 						foo: new AttributionCollection({
+							type: "entries",
 							length: 3,
 							rootEntries: [],
 							channels: { nested: donorNested },
@@ -673,6 +783,7 @@ describe("AttributionCollection", () => {
 
 			it("when only appended collection has a channel", () => {
 				const appender = new AttributionCollection({
+					type: "entries",
 					length: 2,
 					rootEntries: [{ offset: 0, key: null }],
 				});
@@ -698,7 +809,11 @@ describe("AttributionCollection", () => {
 			it("when only segment being appended to has a channel", () => {
 				const appender = makeCollectionWithChannel({ length: 2, seq: 100 });
 				appender.append(
-					new AttributionCollection({ length: 5, rootEntries: [{ offset: 0, key: null }] }),
+					new AttributionCollection({
+						type: "entries",
+						length: 5,
+						rootEntries: [{ offset: 0, key: null }],
+					}),
 				);
 				assert.deepEqual(appender.getAll(), {
 					length: 7,
@@ -723,6 +838,7 @@ describe("AttributionCollection", () => {
 	describe(".channelNames", () => {
 		it("is empty when collection has no channels", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
@@ -731,11 +847,18 @@ describe("AttributionCollection", () => {
 
 		it("returns all channels with content for collection with channels", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
-			collection.update("foo", new AttributionCollection({ length: 2, rootEntries: [] }));
-			collection.update("bar", new AttributionCollection({ length: 2, rootEntries: [] }));
+			collection.update(
+				"foo",
+				new AttributionCollection({ type: "entries", length: 2, rootEntries: [] }),
+			);
+			collection.update(
+				"bar",
+				new AttributionCollection({ type: "entries", length: 2, rootEntries: [] }),
+			);
 			assert.deepEqual(collection.channelNames, ["foo", "bar"]);
 		});
 	});
@@ -763,10 +886,12 @@ describe("AttributionCollection", () => {
 			it(`replaces existing attribution with a complete summary (emptyRoot=${emptyRoot})`, () => {
 				const segment = TextSegment.make("abc");
 				const previous = new AttributionCollection({
+					type: "entries",
 					length: 3,
 					rootEntries: [{ offset: 0, key: opKey(1) }],
 					channels: {
 						old: new AttributionCollection({
+							type: "entries",
 							length: 3,
 							rootEntries: [{ offset: 0, key: opKey(2) }],
 						}),
@@ -842,6 +967,7 @@ describe("AttributionCollection", () => {
 			const segments = [
 				{
 					attribution: new AttributionCollection({
+						type: "entries",
 						length: 4,
 						rootEntries: [{ offset: 0, key: opKey(0) }],
 					}),
@@ -849,6 +975,7 @@ describe("AttributionCollection", () => {
 				},
 				{
 					attribution: new AttributionCollection({
+						type: "entries",
 						length: 5,
 						rootEntries: [{ offset: 0, key: opKey(0) }],
 					}),
@@ -1025,6 +1152,136 @@ describe("AttributionCollection", () => {
 	});
 
 	describe(".clone", () => {
+		it("does not materialize root-entry snapshots", () => {
+			class WithoutRootSnapshots extends AttributionCollection {
+				public override getRootEntries(): never {
+					throw new Error("Cloning must copy root arrays directly");
+				}
+			}
+			const key = opKey(10);
+			const rootEntries = [
+				{ offset: 0, key },
+				{ offset: 1, key },
+				{ offset: 2, key: null },
+			];
+			const collection = new WithoutRootSnapshots({ type: "entries", length: 3, rootEntries });
+			const copy = collection.clone();
+			assert.deepEqual(copy.getRootEntries(), rootEntries);
+			assert.equal(copy.getAtOffset(0), key);
+
+			copy.splitAt(1);
+			assert.equal(collection.length, 3);
+			assert.equal(collection.getAtOffset(1), key);
+			assert.equal(collection.getAtOffset(2), undefined);
+		});
+
+		it("copies readonly root arrays and recursively clones supplied channels", () => {
+			const key = opKey(10);
+			const offsets = [0, 1];
+			const keys = [key, null];
+			const channel = new AttributionCollection({
+				type: "entries",
+				length: 2,
+				rootEntries: [{ offset: 0, key: opKey(20) }],
+			});
+			const channelsToClone = { foo: channel };
+			const copy = new AttributionCollection({
+				type: "clone",
+				length: 2,
+				rootArrays: { offsets, keys },
+				channelsToClone,
+			});
+
+			offsets.length = 0;
+			keys.length = 0;
+			channelsToClone.foo = new AttributionCollection({
+				type: "entries",
+				length: 2,
+				rootEntries: [],
+			});
+			channel.update(
+				undefined,
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: null }],
+				}),
+			);
+
+			assert.deepEqual(copy.getAll(), {
+				length: 2,
+				root: [
+					{ offset: 0, key },
+					{ offset: 1, key: null },
+				],
+				channels: { foo: [{ offset: 0, key: opKey(20) }] },
+			});
+			assert.equal(copy.getAtOffset(0), key);
+			assert.notEqual(copy.getChannels()?.foo, channel);
+		});
+
+		it("rejects mismatched root arrays", () => {
+			assert.throws(
+				() =>
+					new AttributionCollection({
+						type: "clone",
+						length: 2,
+						rootArrays: { offsets: [0], keys: [] },
+					}),
+				/root arrays must have matching lengths/,
+			);
+		});
+
+		it("captures root data before cloning channels", () => {
+			const collection = new AttributionCollection({
+				type: "entries",
+				length: 2,
+				rootEntries: [{ offset: 0, key: opKey(10) }],
+			});
+			class MutatingChannel extends AttributionCollection {
+				public override clone(): AttributionCollection {
+					const clonedChannel = super.clone();
+					collection.append(
+						new AttributionCollection({
+							type: "entries",
+							length: 1,
+							rootEntries: [{ offset: 0, key: opKey(20) }],
+						}),
+					);
+					return clonedChannel;
+				}
+			}
+			collection.update(
+				"foo",
+				new MutatingChannel({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(30) }],
+				}),
+			);
+
+			const copy = collection.clone();
+
+			assert.equal(collection.length, 3);
+			assert.deepEqual(copy.getAll(), {
+				length: 2,
+				root: [{ offset: 0, key: opKey(10) }],
+				channels: { foo: [{ offset: 0, key: opKey(30) }] },
+			});
+		});
+
+		it("preserves absent and initialized-empty channel maps", () => {
+			for (const channels of [undefined, {}]) {
+				const collection = new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [],
+					channels,
+				});
+				assert.deepEqual(collection.clone().getAll(), collection.getAll());
+			}
+		});
+
 		it("recursively clones nested channels", () => {
 			const nestedClones: AttributionCollection[] = [];
 			class TrackedAttributionCollection extends AttributionCollection {
@@ -1035,15 +1292,18 @@ describe("AttributionCollection", () => {
 				}
 			}
 			const nested = new TrackedAttributionCollection({
+				type: "entries",
 				length: 3,
 				rootEntries: [{ offset: 0, key: opKey(10) }],
 			});
 			const channel = new AttributionCollection({
+				type: "entries",
 				length: 3,
 				rootEntries: [],
 				channels: { nested },
 			});
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 3,
 				rootEntries: [],
 				channels: { foo: channel },
@@ -1064,12 +1324,17 @@ describe("AttributionCollection", () => {
 			for (const length of [0, 2]) {
 				for (const key of [undefined, null]) {
 					const collection = new AttributionCollection({
+						type: "entries",
 						length,
 						rootEntries: key === undefined ? [] : [{ offset: 0, key }],
 					});
 					collection.update(
 						"foo",
-						new AttributionCollection({ length, rootEntries: [{ offset: 0, key: null }] }),
+						new AttributionCollection({
+							type: "entries",
+							length,
+							rootEntries: [{ offset: 0, key: null }],
+						}),
 					);
 					const expected = collection.getAll();
 					const copy = collection.clone();
@@ -1078,6 +1343,7 @@ describe("AttributionCollection", () => {
 					copy.update(
 						undefined,
 						new AttributionCollection({
+							type: "entries",
 							length,
 							rootEntries: [{ offset: 0, key: opKey(100) }],
 						}),
@@ -1085,6 +1351,7 @@ describe("AttributionCollection", () => {
 					copy.update(
 						"foo",
 						new AttributionCollection({
+							type: "entries",
 							length,
 							rootEntries: [{ offset: 0, key: opKey(200) }],
 						}),
@@ -1096,10 +1363,12 @@ describe("AttributionCollection", () => {
 
 		it("copies the original collection", () => {
 			const collection = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [{ offset: 0, key: opKey(100) }],
 			});
 			const appendedCollection = new AttributionCollection({
+				type: "entries",
 				length: 1,
 				rootEntries: [{ offset: 0, key: opKey(101) }],
 			});
@@ -1129,12 +1398,17 @@ describe("AttributionCollection", () => {
 		let collection: AttributionCollection;
 		beforeEach(() => {
 			collection = new AttributionCollection({
+				type: "entries",
 				length: 2,
 				rootEntries: [{ offset: 0, key: null }],
 			});
 			collection.update(
 				"bar",
-				new AttributionCollection({ length: 2, rootEntries: [{ offset: 0, key: opKey(10) }] }),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(10) }],
+				}),
 			);
 			assert.deepEqual(
 				collection.getAtOffset(0, "foo"),
@@ -1154,7 +1428,11 @@ describe("AttributionCollection", () => {
 		it("creates a new channel when updating from an undefined state", () => {
 			collection.update(
 				"foo",
-				new AttributionCollection({ length: 2, rootEntries: [{ offset: 0, key: opKey(5) }] }),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(5) }],
+				}),
 			);
 			assert.deepEqual(collection.getAtOffset(0, "foo"), opKey(5));
 		});
@@ -1162,11 +1440,19 @@ describe("AttributionCollection", () => {
 		it("overrides earlier calls with later ones", () => {
 			collection.update(
 				"foo",
-				new AttributionCollection({ length: 2, rootEntries: [{ offset: 0, key: opKey(3) }] }),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(3) }],
+				}),
 			);
 			collection.update(
 				"foo",
-				new AttributionCollection({ length: 2, rootEntries: [{ offset: 0, key: opKey(5) }] }),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(5) }],
+				}),
 			);
 			assert.deepEqual(collection.getAtOffset(0, "foo"), opKey(5));
 		});
@@ -1174,7 +1460,11 @@ describe("AttributionCollection", () => {
 		it("can update the root channel", () => {
 			collection.update(
 				undefined,
-				new AttributionCollection({ length: 2, rootEntries: [{ offset: 0, key: opKey(3) }] }),
+				new AttributionCollection({
+					type: "entries",
+					length: 2,
+					rootEntries: [{ offset: 0, key: opKey(3) }],
+				}),
 			);
 			assert.deepEqual(collection.getAtOffset(0), opKey(3));
 		});
@@ -1183,7 +1473,11 @@ describe("AttributionCollection", () => {
 			assert.throws(() =>
 				collection.update(
 					"foo",
-					new AttributionCollection({ length: 3, rootEntries: [{ offset: 0, key: null }] }),
+					new AttributionCollection({
+						type: "entries",
+						length: 3,
+						rootEntries: [{ offset: 0, key: null }],
+					}),
 				),
 			);
 		});
@@ -1252,6 +1546,7 @@ describe("AttributionCollection", () => {
 					({ random }) => {
 						const length = random.integer(1, 20);
 						const collection = new AttributionCollection({
+							type: "entries",
 							length,
 							rootEntries: [{ offset: 0, key: generateAttributionKey(random) }],
 						});
@@ -1261,6 +1556,7 @@ describe("AttributionCollection", () => {
 									collection.update(
 										channel,
 										new AttributionCollection({
+											type: "entries",
 											length,
 											rootEntries: [{ offset: 0, key: generateAttributionKey(random) }],
 										}),

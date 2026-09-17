@@ -174,13 +174,46 @@ export function areEqualAttributionKeys(
 	}
 }
 
-interface AttributionCollectionInit {
+type AttributionCollectionInit =
+	| AttributionCollectionEntriesInit
+	| AttributionCollectionCloneInit;
+
+interface AttributionCollectionEntriesInit {
+	readonly type: "entries";
 	readonly length: number;
 	readonly rootEntries: IAttributionCollectionSpec<AttributionKey>["root"];
 	/**
 	 * The channel map is copied, but its collections are retained by reference.
 	 */
 	readonly channels?: Readonly<Record<string, AttributionCollection>>;
+}
+
+interface AttributionCollectionCloneInit {
+	readonly type: "clone";
+	readonly length: number;
+	/**
+	 * The parallel root arrays are copied before recursively cloning the named channels.
+	 */
+	readonly rootArrays: {
+		readonly offsets: readonly number[];
+		// eslint-disable-next-line @rushstack/no-new-null -- Explicit null entries are part of the legacy attribution format.
+		readonly keys: readonly (AttributionKey | null)[];
+	};
+	readonly channelsToClone?: Readonly<Record<string, AttributionCollection>>;
+}
+
+function copyRootEntries(rootEntries: IAttributionCollectionSpec<AttributionKey>["root"]): {
+	offsets: number[];
+	// eslint-disable-next-line @rushstack/no-new-null -- Explicit null entries are part of the legacy attribution format.
+	keys: (AttributionKey | null)[];
+} {
+	const offsets: number[] = [];
+	const keys: (AttributionKey | null)[] = [];
+	for (const { offset, key } of rootEntries) {
+		offsets.push(offset);
+		keys.push(key);
+	}
+	return { offsets, keys };
 }
 
 /**
@@ -245,8 +278,8 @@ class AttributionEntryReader {
 
 export class AttributionCollection implements IAttributionCollection<AttributionKey> {
 	private _length: number;
-	private offsets: number[] = [];
-	private keys: (AttributionKey | null)[] = [];
+	private offsets: number[];
+	private keys: (AttributionKey | null)[];
 
 	private channels?: { [name: string]: AttributionCollection };
 
@@ -254,16 +287,47 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 		return Object.entries(this.channels ?? {});
 	}
 
-	public constructor({ length, rootEntries, channels }: AttributionCollectionInit) {
-		this._length = length;
-		for (const { offset, key } of rootEntries) {
-			this.offsets.push(offset);
-			this.keys.push(key);
+	public constructor(initial: AttributionCollectionInit) {
+		let channels: Readonly<Record<string, AttributionCollection>> | undefined;
+		switch (initial.type) {
+			case "entries": {
+				const { length, rootEntries, channels: initialChannels } = initial;
+				this._length = length;
+				channels = initialChannels;
+				const rootArrays = copyRootEntries(rootEntries);
+				this.offsets = rootArrays.offsets;
+				this.keys = rootArrays.keys;
+				break;
+			}
+			case "clone": {
+				const { length, rootArrays, channelsToClone } = initial;
+				this._length = length;
+				const { offsets, keys } = rootArrays;
+				assert(
+					offsets.length === keys.length,
+					"AttributionCollection root arrays must have matching lengths",
+				);
+				this.offsets = [...offsets];
+				this.keys = [...keys];
+				channels =
+					channelsToClone === undefined
+						? undefined
+						: Object.fromEntries(
+								Object.entries(channelsToClone).map(([name, channel]) => [
+									name,
+									channel.clone(),
+								]),
+							);
+				break;
+			}
+			default: {
+				unreachableCase(initial, "Unexpected AttributionCollection initialization type");
+			}
 		}
 		if (channels !== undefined) {
 			for (const channel of Object.values(channels)) {
 				assert(
-					channel.length === length,
+					channel.length === this._length,
 					"AttributionCollection channels must have the same length as the collection",
 				);
 			}
@@ -362,6 +426,7 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			rootEntries.push({ offset: Math.max(this.offsets[i] - pos, 0), key: this.keys[i] });
 		}
 		const splitCollection = new AttributionCollection({
+			type: "entries",
 			length: this.length - pos,
 			rootEntries,
 			channels:
@@ -396,6 +461,7 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			this.channels ??= {};
 			for (const [channelName, sourceChannel] of Object.entries(otherChannels)) {
 				const targetChannel = (this.channels[channelName] ??= new AttributionCollection({
+					type: "entries",
 					length: this.length,
 					// eslint-disable-next-line unicorn/no-null
 					rootEntries: [{ offset: 0, key: null }],
@@ -410,6 +476,7 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 				if (otherChannels?.[channelName] === undefined) {
 					targetChannel.append(
 						new AttributionCollection({
+							type: "entries",
 							length: other.length,
 							// eslint-disable-next-line unicorn/no-null
 							rootEntries: [{ offset: 0, key: null }],
@@ -454,14 +521,10 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 
 	public clone(): AttributionCollection {
 		return new AttributionCollection({
+			type: "clone",
 			length: this.length,
-			rootEntries: this.getRootEntries(),
-			channels:
-				this.channels === undefined
-					? undefined
-					: Object.fromEntries(
-							this.channelEntries.map(([name, collection]) => [name, collection.clone()]),
-						),
+			rootArrays: { offsets: this.offsets, keys: this.keys },
+			channelsToClone: this.channels,
 		});
 	}
 
@@ -471,9 +534,9 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			0x5c0 /* AttributionCollection channel update should have consistent segment length */,
 		);
 		if (name === undefined) {
-			const rootEntries = channel.getRootEntries();
-			this.offsets = rootEntries.map(({ offset }) => offset);
-			this.keys = rootEntries.map(({ key }) => key);
+			const rootArrays = copyRootEntries(channel.getRootEntries());
+			this.offsets = rootArrays.offsets;
+			this.keys = rootArrays.keys;
 		} else {
 			this.channels ??= {};
 			if (this.channels[name] === undefined) {
@@ -513,12 +576,17 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 				for (const [name, reader] of channelReaders) {
 					channelEntries.push([
 						name,
-						new AttributionCollection({ length, rootEntries: reader.readEntries(length) }),
+						new AttributionCollection({
+							type: "entries",
+							length,
+							rootEntries: reader.readEntries(length),
+						}),
 					]);
 				}
 				namedChannels = Object.fromEntries(channelEntries);
 			}
 			segment.attribution = new AttributionCollection({
+				type: "entries",
 				length,
 				rootEntries,
 				channels: namedChannels,
@@ -545,6 +613,7 @@ export class AttributionCollection implements IAttributionCollection<Attribution
 			const collection =
 				segment.attribution ??
 				new AttributionCollection({
+					type: "entries",
 					length: segment.cachedLength,
 					// eslint-disable-next-line unicorn/no-null
 					rootEntries: [{ offset: 0, key: null }],

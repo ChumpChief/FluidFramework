@@ -17,6 +17,7 @@ import { TextSegmentGranularity } from "../textSegment.js";
 
 interface IAttributionCollectionCtor {
 	new (initial: {
+		type: "entries";
 		length: number;
 		rootEntries: IAttributionCollectionSpec<AttributionKey>["root"];
 	}): IAttributionCollection<AttributionKey>;
@@ -43,25 +44,36 @@ function getCollectionSizes(
 	type: BenchmarkType;
 }[] {
 	const singleKeyCollection = new ctor({
+		type: "entries",
 		length: 5,
 		rootEntries: [{ offset: 0, key: { type: "op", seq: 42 } }],
 	});
 	const tenKeyCollection = new ctor({
+		type: "entries",
 		length: 2,
 		rootEntries: [{ offset: 0, key: { type: "op", seq: 0 } }],
 	});
 	for (let i = 1; i < 10; i++) {
 		tenKeyCollection.append(
-			new ctor({ length: 3 * i, rootEntries: [{ offset: 0, key: { type: "op", seq: i } }] }),
+			new ctor({
+				type: "entries",
+				length: 3 * i,
+				rootEntries: [{ offset: 0, key: { type: "op", seq: i } }],
+			}),
 		);
 	}
 	const maxSizeCollection = new ctor({
+		type: "entries",
 		length: 1,
 		rootEntries: [{ offset: 0, key: { type: "op", seq: 0 } }],
 	});
 	for (let i = 1; i < TextSegmentGranularity; i++) {
 		maxSizeCollection.append(
-			new ctor({ length: 1, rootEntries: [{ offset: 0, key: { type: "op", seq: i } }] }),
+			new ctor({
+				type: "entries",
+				length: 1,
+				rootEntries: [{ offset: 0, key: { type: "op", seq: i } }],
+			}),
 		);
 	}
 	return [
@@ -148,7 +160,11 @@ function runAttributionCollectionSuite(
 		title: "construction",
 		...benchmarkDuration({
 			benchmarkFn: () =>
-				new ctor({ length: 42, rootEntries: [{ offset: 0, key: { type: "op", seq: 5 } }] }),
+				new ctor({
+					type: "entries",
+					length: 42,
+					rootEntries: [{ offset: 0, key: { type: "op", seq: 5 } }],
+				}),
 		}),
 		type: suiteBaseType,
 	});
