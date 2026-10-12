@@ -6,15 +6,20 @@
 import type { requireAssignableTo } from "@fluidframework/build-tools";
 
 import type { SimpleCell, SimpleCellView } from "../../simpleCell.js";
-import type { SimpleCellChannel } from "../../simpleCellChannel.js";
-import type { createSimpleCell } from "../../simpleCellFactory.js";
+import type { createSimpleCell, SimpleCellFactory } from "../../simpleCellFactory.js";
+import type { ReplicatedDataStructure } from "../../replicatedDataStructure.js";
 
 type ConsumerKeys = "get" | "set" | "delete" | "empty" | "events";
 type CreatedCell = ReturnType<typeof createSimpleCell>;
+type CellChannel = ReturnType<SimpleCellFactory["create"]>;
 
 declare type _implementationMatchesView = requireAssignableTo<
 	SimpleCell<number>,
 	SimpleCellView<number>
+>;
+declare type _implementationMatchesHost = requireAssignableTo<
+	SimpleCell<number>,
+	ReplicatedDataStructure
 >;
 declare type _viewHasOnlyConsumerMethods = requireAssignableTo<
 	keyof SimpleCellView,
@@ -33,10 +38,10 @@ declare type _createdHandleValueIsScoped = requireAssignableTo<
 	ConsumerKeys
 >;
 declare type _channelEntryPointIsScoped = requireAssignableTo<
-	keyof SimpleCellChannel["entryPoint"],
+	keyof CellChannel["entryPoint"],
 	ConsumerKeys
 >;
 declare type _channelHandleValueIsScoped = requireAssignableTo<
-	keyof Awaited<ReturnType<SimpleCellChannel["handle"]["get"]>>,
+	keyof Awaited<ReturnType<CellChannel["handle"]["get"]>>,
 	ConsumerKeys
 >;

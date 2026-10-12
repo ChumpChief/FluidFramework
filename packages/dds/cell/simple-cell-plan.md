@@ -99,7 +99,7 @@ Document the separate state and replay information needed to restore a replica w
 
 ## Runtime-facing identity
 
-The proposed target is a runtime-facing `SimpleCellChannel<T>` and a distinct app-facing `SimpleCell<T>`.
+The target is a runtime-facing `DdsChannel<SimpleCellView<T>>` and a distinct app-facing `SimpleCell<T>`.
 Only the adapter implements `IChannel` and the loadable/handle contracts required by Fluid.
 The Cell does not implement `IChannel`, `ISharedObject`, or `IFluidLoadable`.
 
@@ -188,9 +188,10 @@ The existing Cell and its factory remain unchanged.
 | `receive(operation, local)` | Processes a remote operation, or acknowledges the oldest pending local edit without reapplying it or emitting another data-change event. |
 | `resubmit(operation)` | Publishes the host-supplied pending operation without applying it again or modifying the pending queue. |
 | `replay(operation)` | Recreates a persisted edit; publishes it only if replication has started. |
-| `rollback()` | Removes the newest pending edit after the host withdraws it from delivery. |
+| `rollback(operation)` | Removes the newest pending edit after the host withdraws it from delivery. Cell uses its pending queue rather than inspecting the supplied contents. |
 | `getSnapshot()` | Captures sequenced state, excluding pending local edits. |
 | `getPendingOperations()` | Captures pending operations in replay order. |
+| `getReferenceData()` | Exposes retained sequenced and pending data for host reference traversal. |
 
 Values are unconstrained `T`.
 Cell does not clone or encode them; callers must not mutate stored payloads.
@@ -241,8 +242,8 @@ The adapter described below uses this same standalone implementation.
 
 ## Stage 2 implementation
 
-[SimpleCellChannel](./src/simpleCellChannel.ts) implements `IChannel` and contains a `SimpleCell`.
-[SimpleCellFactory](./src/simpleCellFactory.ts) creates and loads channels under the distinct `https://graph.microsoft.com/types/experimental-simple-cell` type.
+Stage 2 introduced a Cell-specific channel, now replaced by [DdsChannel](./src/ddsChannel.ts), a generic adapter.
+[SimpleCellFactory](./src/simpleCellFactory.ts) creates and loads Cells through this adapter under the distinct `https://graph.microsoft.com/types/experimental-simple-cell` type.
 These experimental types remain source-module exports, not package entry-point exports.
 The adapter does not extend `SharedObject` or `SharedObjectCore`, use `SharedKernel`, or forward Cell methods onto itself.
 The existing Cell implementation and its format remain unchanged.
@@ -255,7 +256,8 @@ Before attachment, local edits are represented in the attach snapshot.
 Disconnection does not stop replication: the runtime continues to accept pending operations and requests their resubmission later.
 
 Incoming message collections pass each operation's contents through `serializer.decode()` and then forward them with the `local` flag to `receive(operation, local)`.
-Resubmission calls `resubmit(operation)`, and rollback calls `rollback()`.
+Resubmission calls `resubmit(operation)`, and rollback calls `rollback(operation)`.
+Rollback contents also pass through `serializer.decode()` before reaching the DDS.
 Stashed-op replay always calls `replay(operation)`.
 Cell handles replay in both states: detached replay updates local state without pending operations, while replicated replay also submits the edit.
 The channel does not inspect Cell operation tags or fields, including during detached replay.
@@ -279,7 +281,8 @@ The handle and GC visitor are exposed through the shared-object-base internal en
 Operations and snapshots use Fluid handle encoding, decoding, and reference binding.
 For operations, the channel only performs Fluid serialization; Cell owns further parsing and interpretation.
 The adapter also honors the runtime mode in which submission binds handles but the container runtime performs encoding.
-GC visits both the sequenced state and pending operation values without binding or attaching objects.
+GC visits the DDS's `getReferenceData()` result without binding or attaching objects.
+For Cell, this includes both the sequenced state and pending operation values.
 This retains references that can become visible after acknowledgment or rollback.
 
 ### Scope and limitations
@@ -303,7 +306,7 @@ Cell behavior, operation format, and snapshot format are unchanged.
 
 `ChannelWithEntryPoint<T>` is an internal, opt-in extension of `IChannel` in `datastore-definitions`.
 It supplies a stable `entryPoint` object and a handle that resolves to that same object.
-`SimpleCellChannel.entryPoint` returns its contained Cell typed as `SimpleCellView`.
+The Cell definition supplies a `SimpleCellView` as `DdsChannel.entryPoint`.
 The adapter still implements the runtime's channel/loadable contract; the Cell does not acquire those interfaces.
 
 The data store runtime uses the entry point when resolving a channel path.
@@ -342,7 +345,7 @@ The creation result keeps Fluid-specific access beside the application value.
 
 `SimpleCellView<T>` exposes only `get`, `set`, `delete`, `empty`, and data-change events.
 It does not expose replication setup, message processing, acknowledgment, resubmission, replay, rollback, or snapshots.
-The adapter retains the full `SimpleCell` through its `cell` property for host operations.
+The adapter retains the DDS implementation through its `dds` property and its host-facing interface.
 This is a TypeScript interface boundary, not a runtime wrapper: the view and implementation are the same object, preserving handle identity and event subscriptions.
 
 ### Scope
@@ -354,3 +357,49 @@ The general `SharedObjectKind` creation/type-check helpers and `fluid-static` in
 They still assume loadable application objects and need a separate design before adopting this model.
 
 Integration coverage includes creation through the new helper, attachment through a legacy Cell, local and serialized handle identity, lazy loading in another runtime, continued edits and summaries through the retained adapter, and legacy channels resolving to themselves.
+
+## Generic adapter experiment
+
+The contract and adapter remain in the Cell package for now.
+They are source-module exports, not new package entry-point exports.
+No other production DDS is migrated in this experiment.
+
+### Host-facing contract
+
+[ReplicatedDataStructure](./src/replicatedDataStructure.ts) exposes replication startup, incoming operations, resubmission, replay, rollback, synchronous snapshots, and retained reference data.
+The contract has no imports or Fluid-specific types.
+`SimpleCell` implements it alongside `SimpleCellView`, keeping data and replication behavior in one implementation.
+
+Rollback accepts decoded operation contents so DDSs that need the original operation can interpret it.
+Cell does not need those contents: reverse-order rollback uses its own pending queue.
+The contract retains the host guarantees about total ordering, acknowledgments, reverse-order rollback, and deduplication.
+
+`getReferenceData()` returns data containing any external references still retained by the DDS.
+It does not return Fluid handles or GC routes as a contract.
+Cell returns sequenced and pending state; another DDS can also expose references in undo state or other retained structures.
+The Fluid adapter uses `GCHandleVisitor` to interpret Fluid references in that data.
+
+### Construction and application views
+
+`DataStructureDefinition<TView>` supplies `create()` and `restore(snapshot)`.
+Both return `{ dds, value }`, with a host-facing DDS and a scoped application value.
+These can be the same object or distinct objects.
+Restoration receives contents after Fluid decoding and is responsible for DDS-specific snapshot validation.
+
+The generic channel invokes the definition itself; factories do not supply already-constructed DDS instances.
+`SimpleCellFactory` supplies a Cell-specific definition and retains registration attributes and format-version checks.
+The definition creates an empty Cell or restores its existing snapshot shape.
+The generic channel has no imports from Cell and does not interpret its operation tags, snapshot fields, or pending queue.
+No operation codec is injected: DDSs interpret their own operation contents.
+
+### Limits and evaluation
+
+This adapter supports ordered operations with synchronous, non-undefined snapshots stored in one `header` blob.
+It retains explicit rejection of squashed resubmission.
+Local metadata, batching-specific behavior, sequencing information, and asynchronous or incremental snapshots are not added to the contract here.
+Those require further design before adapting DDSs that need them.
+
+The existing Cell integration cases now run through `DdsChannel`.
+[Generic adapter coverage](./src/test/ddsChannel.spec.ts) uses a test log with different operation fields, array snapshots, and a separate application view.
+It checks operation delivery, replay, resubmission, decoded rollback contents, and references retained only in undo state.
+The test log is not a new supported DDS; it checks that the adapter does not depend on Cell's data model.

@@ -112,7 +112,7 @@ class OrderedHost<T> {
 		assert(!this.history.includes(submission), "Cannot withdraw a sequenced operation");
 		this.queue = this.queue.filter((entry) => entry !== submission);
 		replica.pending.pop();
-		replica.cell.rollback();
+		replica.cell.rollback(submission.operation);
 	}
 
 	public restart(replica: Replica<T>): void {
@@ -377,7 +377,7 @@ describe("SimpleCell", () => {
 				() => cell.receive(operation, false),
 				() => cell.receive(operation, true),
 				() => cell.resubmit(operation),
-				() => cell.rollback(),
+				() => cell.rollback(operation),
 			]) {
 				assert.throws(call, /has not started/);
 			}
@@ -733,18 +733,24 @@ describe("SimpleCell", () => {
 		it("rolls back newest edits first and rejects rollback with no pending edits", () => {
 			const cell = new SimpleCell<number>();
 			collectSubmissions(cell);
-			assert.throws(() => cell.rollback(), /without a pending operation/);
+			assert.throws(
+				() => cell.rollback({ type: "set", value: 1 }),
+				/without a pending operation/,
+			);
 			cell.set(1);
 			cell.set(2);
 			assert.equal(cell.get(), 2);
 			assert.equal(cell.getPendingOperations().length, 2);
-			cell.rollback();
+			cell.rollback({ type: "set", value: 2 });
 			assert.equal(cell.get(), 1);
 			assert.deepEqual(cell.getPendingOperations(), [{ type: "set", value: 1 }]);
-			cell.rollback();
+			cell.rollback({ type: "set", value: 1 });
 			assert(cell.empty());
 			assert.deepEqual(cell.getPendingOperations(), []);
-			assert.throws(() => cell.rollback(), /without a pending operation/);
+			assert.throws(
+				() => cell.rollback({ type: "set", value: 1 }),
+				/without a pending operation/,
+			);
 			cell.receive({ type: "set", value: 3 }, false);
 			assert.equal(cell.get(), 3);
 		});
@@ -775,9 +781,10 @@ describe("SimpleCell", () => {
 				() => cell.receive(undefined, false),
 				() => cell.resubmit(undefined),
 				() => cell.replay(undefined),
-				() => cell.rollback(),
+				() => cell.rollback({ type: "set", value: 2 }),
 				() => cell.getSnapshot(),
 				() => cell.getPendingOperations(),
+				() => cell.getReferenceData(),
 			]) {
 				assert.throws(
 					call,
@@ -876,7 +883,7 @@ describe("SimpleCell", () => {
 							break;
 						}
 						case "rollback": {
-							cell.rollback();
+							cell.rollback({ type: "set", value: 1 });
 							break;
 						}
 						default: {

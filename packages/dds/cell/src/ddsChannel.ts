@@ -12,7 +12,6 @@ import type {
 	IDeltaHandler,
 	IFluidDataStoreRuntime,
 	IFluidDataStoreRuntimeInternalConfig,
-	Serializable,
 } from "@fluidframework/datastore-definitions/internal";
 import type {
 	IGarbageCollectionData,
@@ -26,22 +25,25 @@ import {
 	SharedObjectHandle,
 } from "@fluidframework/shared-object-base/internal";
 
-import { SimpleCell, type SimpleCellSnapshot, type SimpleCellView } from "./simpleCell.js";
+import type {
+	DataStructureDefinition,
+	ReplicatedDataStructure,
+} from "./replicatedDataStructure.js";
 
 /**
- * A Fluid channel containing a standalone {@link SimpleCell}.
+ * An experimental Fluid adapter for an ordered-operation distributed data structure (DDS).
  * @remarks
- * The runtime manages this adapter, while handles resolve to its Cell entry point.
- * Cell owns the data and replication algorithm. This adapter owns Fluid lifecycle and encoding.
+ * The runtime manages this adapter, while handles resolve to its application-facing entry point.
+ * The DDS owns data and replication behavior. This adapter owns Fluid lifecycle and encoding.
+ * Snapshots are synchronous and stored in a single blob.
  * Squashed resubmission is not supported by this experiment.
- * @typeParam T - The Fluid-serializable value type.
+ * @typeParam TView - The application-facing interface.
  * @internal
  */
-export class SimpleCellChannel<T = unknown>
-	implements ChannelWithEntryPoint<SimpleCellView<Serializable<T>>>
-{
-	public readonly cell: SimpleCell<Serializable<T>>;
-	public readonly handle: SharedObjectHandle<SimpleCellView<Serializable<T>>>;
+export class DdsChannel<TView extends object> implements ChannelWithEntryPoint<TView> {
+	public readonly dds: ReplicatedDataStructure;
+	public readonly entryPoint: TView;
+	public readonly handle: SharedObjectHandle<TView>;
 	private readonly serializer: FluidSerializer;
 	private services: IChannelServices | undefined;
 	private bound = false;
@@ -52,26 +54,27 @@ export class SimpleCellChannel<T = unknown>
 		return this;
 	}
 
-	public get entryPoint(): SimpleCellView<Serializable<T>> {
-		return this.cell;
-	}
-
 	/**
-	 * Creates a local channel, optionally from an encoded snapshot.
+	 * Constructs a local-only DDS using the supplied definition.
 	 * The factory connects loaded channels after construction.
+	 * @param snapshot - Encoded initial state to restore, or undefined to create a new DDS.
 	 */
 	public constructor(
 		public readonly id: string,
 		private readonly runtime: IFluidDataStoreRuntime,
 		public readonly attributes: IChannelAttributes,
-		snapshot: SimpleCellSnapshot<unknown> = {},
+		definition: DataStructureDefinition<TView>,
+		snapshot?: unknown,
 	) {
 		assert(!id.includes("/"), "Channel id cannot contain slashes");
 		this.verifyUsable();
 		this.serializer = new FluidSerializer(runtime.channelsRoutingContext);
-		this.cell = new SimpleCell<Serializable<T>>({
-			value: this.serializer.decode(snapshot.value) as Serializable<T> | undefined,
-		});
+		const instance =
+			snapshot === undefined
+				? definition.create()
+				: definition.restore(this.serializer.decode(snapshot));
+		this.dds = instance.dds;
+		this.entryPoint = instance.value;
 		this.handle = new SharedObjectHandle(this, this.entryPoint, id, runtime);
 		runtime.once("attaching", this.startReplicationIfAttached);
 		runtime.once("dispose", () => runtime.off("attaching", this.startReplicationIfAttached));
@@ -111,7 +114,7 @@ export class SimpleCellChannel<T = unknown>
 		this.verifyUsable();
 		return createSingleBlobSummary(
 			"header",
-			this.serializer.stringify(this.cell.getSnapshot(), this.handle),
+			this.serializer.stringify(this.dds.getSnapshot(), this.handle),
 		);
 	}
 
@@ -122,18 +125,14 @@ export class SimpleCellChannel<T = unknown>
 	public getGCData(): IGarbageCollectionData {
 		this.verifyUsable();
 		const visitor = new GCHandleVisitor(this.runtime.channelsRoutingContext);
-		// Pending values can become the sequenced value or be exposed by rollback.
-		visitor.stringify(
-			{ snapshot: this.cell.getSnapshot(), pending: this.cell.getPendingOperations() },
-			this.handle,
-		);
+		visitor.stringify(this.dds.getReferenceData(), this.handle);
 		return { gcNodes: { "/": visitor.getVisitedHandlePaths() } };
 	}
 
 	private readonly startReplicationIfAttached = (): void => {
 		if (!this.replicating && this.services !== undefined && this.isAttached()) {
 			this.verifyUsable();
-			this.cell.startReplication((operation) => this.submit(operation));
+			this.dds.startReplication((operation) => this.submit(operation));
 			this.replicating = true;
 			this.runtime.off("attaching", this.startReplicationIfAttached);
 		}
@@ -143,25 +142,25 @@ export class SimpleCellChannel<T = unknown>
 		processMessages: ({ local, messagesContent }) => {
 			this.verifyUsable();
 			for (const { contents } of messagesContent) {
-				this.cell.receive(this.serializer.decode(contents), local);
+				this.dds.receive(this.serializer.decode(contents), local);
 			}
 		},
-		// Disconnection changes delivery, not Cell's replication state. The runtime queues edits.
+		// Disconnection changes delivery, not replication state. The runtime queues edits.
 		setConnectionState: () => {},
 		reSubmit: (content: unknown, _localOpMetadata: unknown, squash?: boolean) => {
 			this.verifyUsable();
 			if (squash === true) {
-				throw new Error("SimpleCell does not support squashed resubmission");
+				throw new Error("DdsChannel does not support squashed resubmission");
 			}
-			this.cell.resubmit(this.serializer.decode(content));
+			this.dds.resubmit(this.serializer.decode(content));
 		},
 		applyStashedOp: (content: unknown) => {
 			this.verifyUsable();
-			this.cell.replay(this.serializer.decode(content));
+			this.dds.replay(this.serializer.decode(content));
 		},
-		rollback: () => {
+		rollback: (content: unknown) => {
 			this.verifyUsable();
-			this.cell.rollback();
+			this.dds.rollback(this.serializer.decode(content));
 		},
 	};
 
@@ -179,7 +178,7 @@ export class SimpleCellChannel<T = unknown>
 
 	private verifyUsable(): void {
 		if (this.runtime.disposed) {
-			throw new Error("SimpleCellChannel runtime is disposed");
+			throw new Error("DdsChannel runtime is disposed");
 		}
 	}
 }

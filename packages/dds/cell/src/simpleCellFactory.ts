@@ -7,6 +7,7 @@ import type { IFluidHandle } from "@fluidframework/core-interfaces";
 import { assert, isObject } from "@fluidframework/core-utils/internal";
 import type {
 	IChannelAttributes,
+	IChannel,
 	IChannelFactory,
 	IChannelServices,
 	IFluidDataStoreRuntime,
@@ -14,16 +15,44 @@ import type {
 } from "@fluidframework/datastore-definitions/internal";
 import { readAndParse } from "@fluidframework/driver-utils/internal";
 
+import { DdsChannel } from "./ddsChannel.js";
 import { pkgVersion } from "./packageVersion.js";
-import type { SimpleCellView } from "./simpleCell.js";
-import { SimpleCellChannel } from "./simpleCellChannel.js";
+import type {
+	DataStructureDefinition,
+	DataStructureInstance,
+} from "./replicatedDataStructure.js";
+import { SimpleCell, type SimpleCellView } from "./simpleCell.js";
 
 /**
- * Factory for the experimental {@link SimpleCellChannel}.
+ * Constructs Cell instances for the generic channel without exposing host services to Cell.
+ */
+const simpleCellDefinition: DataStructureDefinition<SimpleCellView<Serializable<unknown>>> = {
+	create: () => createCellInstance(undefined),
+	restore: (snapshot) => {
+		if (!isObject(snapshot) || Array.isArray(snapshot)) {
+			throw new TypeError("SimpleCell snapshot must be an object");
+		}
+		return createCellInstance(
+			("value" in snapshot ? snapshot.value : undefined) as Serializable<unknown>,
+		);
+	},
+};
+
+function createCellInstance(
+	value: Serializable<unknown> | undefined,
+): DataStructureInstance<SimpleCellView<Serializable<unknown>>> {
+	const cell = new SimpleCell<Serializable<unknown>>({ value });
+	return { dds: cell, value: cell };
+}
+
+/**
+ * Factory for experimental Cells hosted by {@link DdsChannel}.
  * Its type and snapshot format are separate from the existing Cell.
  * @internal
  */
-export class SimpleCellFactory implements IChannelFactory<SimpleCellChannel> {
+export class SimpleCellFactory
+	implements IChannelFactory<DdsChannel<SimpleCellView<Serializable<unknown>>>>
+{
 	public static readonly Type = "https://graph.microsoft.com/types/experimental-simple-cell";
 	public static readonly Attributes: IChannelAttributes = {
 		type: SimpleCellFactory.Type,
@@ -34,8 +63,11 @@ export class SimpleCellFactory implements IChannelFactory<SimpleCellChannel> {
 	public readonly type = SimpleCellFactory.Type;
 	public readonly attributes = SimpleCellFactory.Attributes;
 
-	public create(runtime: IFluidDataStoreRuntime, id: string): SimpleCellChannel {
-		return new SimpleCellChannel(id, runtime, this.attributes);
+	public create(
+		runtime: IFluidDataStoreRuntime,
+		id: string,
+	): DdsChannel<SimpleCellView<Serializable<unknown>>> {
+		return new DdsChannel(id, runtime, this.attributes, simpleCellDefinition);
 	}
 
 	public async load(
@@ -43,20 +75,14 @@ export class SimpleCellFactory implements IChannelFactory<SimpleCellChannel> {
 		id: string,
 		services: IChannelServices,
 		attributes: IChannelAttributes,
-	): Promise<SimpleCellChannel> {
+	): Promise<DdsChannel<SimpleCellView<Serializable<unknown>>>> {
 		assert(
 			attributes.type === this.type &&
 				attributes.snapshotFormatVersion === this.attributes.snapshotFormatVersion,
 			"Unsupported SimpleCell channel type or snapshot format",
 		);
 		const snapshot = await readAndParse<unknown>(services.objectStorage, "header");
-		assert(
-			isObject(snapshot) && !Array.isArray(snapshot),
-			"SimpleCell snapshot must be an object",
-		);
-		const channel = new SimpleCellChannel(id, runtime, attributes, {
-			value: "value" in snapshot ? snapshot.value : undefined,
-		});
+		const channel = new DdsChannel(id, runtime, attributes, simpleCellDefinition, snapshot);
 		channel.connect(services);
 		return channel;
 	}
@@ -80,8 +106,22 @@ export function createSimpleCell(
 } {
 	const channel = runtime.createChannel(id, SimpleCellFactory.Type);
 	assert(
-		channel instanceof SimpleCellChannel,
-		"The registered SimpleCell factory must create a SimpleCellChannel",
+		isSimpleCellChannel(channel),
+		"The registered SimpleCell factory must create a Cell hosted by DdsChannel",
 	);
 	return { value: channel.entryPoint, handle: channel.handle };
+}
+
+/**
+ * Narrows a runtime channel to a Cell hosted by the experimental adapter.
+ * @internal
+ */
+export function isSimpleCellChannel(
+	channel: IChannel,
+): channel is DdsChannel<SimpleCellView<Serializable<unknown>>> {
+	return (
+		channel instanceof DdsChannel &&
+		channel.attributes.type === SimpleCellFactory.Type &&
+		channel.dds instanceof SimpleCell
+	);
 }

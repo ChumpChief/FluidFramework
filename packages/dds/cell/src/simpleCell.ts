@@ -7,6 +7,8 @@ import { createEmitter } from "@fluid-internal/client-utils";
 import type { Listenable } from "@fluidframework/core-interfaces/internal";
 import { isObject } from "@fluidframework/core-utils/internal";
 
+import type { ReplicatedDataStructure } from "./replicatedDataStructure.js";
+
 /**
  * An edit to a {@link SimpleCell}.
  * Payload values are opaque to Cell; their encoding and validation belong to the host.
@@ -108,7 +110,7 @@ export interface SimpleCellView<T = unknown> {
  * failure as its cause. Reads through {@link SimpleCell.get} and {@link SimpleCell.empty} remain available.
  * @internal
  */
-export class SimpleCell<T = unknown> implements SimpleCellView<T> {
+export class SimpleCell<T = unknown> implements SimpleCellView<T>, ReplicatedDataStructure {
 	private value: T | undefined;
 	private sequencedValue: T | undefined;
 	private readonly pending: SimpleCellOperation<T>[] = [];
@@ -247,9 +249,10 @@ export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 	 * An operation already sequenced cannot be rolled back.
 	 * Without other pending edits, rollback reveals the latest sequenced value, including
 	 * remote edits received while the rolled-back edit was pending.
+	 * @param _content - The host-supplied operation contents. Cell uses its pending queue rather than inspecting them.
 	 * @throws An Error if replication has not started or there are no pending edits.
 	 */
-	public rollback(): void {
+	public rollback(_content: unknown): void {
 		this.verifyReplicating();
 		if (this.pending.length === 0) {
 			throw new Error("Cannot roll back without a pending operation");
@@ -282,6 +285,13 @@ export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 	public getPendingOperations(): readonly SimpleCellOperation<T>[] {
 		this.verifyNotFaulted();
 		return this.pending.map((operation) => ({ ...operation }));
+	}
+
+	/**
+	 * Returns sequenced and pending data for host reference traversal without encoding it.
+	 */
+	public getReferenceData(): unknown {
+		return { snapshot: this.getSnapshot(), pending: this.getPendingOperations() };
 	}
 
 	private applyLocal(operation: SimpleCellOperation<T>): void {
