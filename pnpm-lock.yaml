@@ -6896,6 +6896,12 @@ importers:
 
   packages/dds/cell:
     dependencies:
+      '@fluid-internal/client-utils':
+        specifier: workspace:~
+        version: link:../../common/client-utils
+      '@fluidframework/core-interfaces':
+        specifier: workspace:~
+        version: link:../../common/core-interfaces
       '@fluidframework/core-utils':
         specifier: workspace:~
         version: link:../../common/core-utils
