@@ -5,10 +5,11 @@
 
 import { createEmitter } from "@fluid-internal/client-utils";
 import type { Listenable } from "@fluidframework/core-interfaces/internal";
+import { isObject } from "@fluidframework/core-utils/internal";
 
 /**
  * An edit to a {@link SimpleCell}.
- * Values are opaque to Cell; encoding and validation belong to the host.
+ * Payload values are opaque to Cell; their encoding and validation belong to the host.
  * @internal
  */
 export type SimpleCellOperation<T> =
@@ -180,22 +181,25 @@ export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 	 * Local operations acknowledge the oldest pending edit without reapplying it or notifying listeners.
 	 * Pending local edits keep their visible value until acknowledged or rolled back.
 	 * The host must deliver each operation exactly once and preserve submission order.
+	 * @param content - Operation contents after any host-specific decoding.
 	 * @param local - Whether the operation acknowledges an edit from this Cell.
 	 * @throws An Error if replication has not started or a local operation has no pending edit to acknowledge.
+	 * @throws A TypeError if the contents do not describe a supported Cell operation.
 	 */
-	public receive(operation: SimpleCellOperation<T>, local: boolean): void {
+	public receive(content: unknown, local: boolean): void {
 		this.verifyReplicating();
+		const operation = parseOperation<T>(content);
 		if (local) {
 			const first = this.pending[0];
 			if (first === undefined) {
 				throw new Error("Cannot acknowledge without a pending operation");
 			}
-			this.sequencedValue = this.operationValue(first);
+			this.sequencedValue = operationValue(first);
 			this.pending.shift();
 			return;
 		}
 
-		const value = this.operationValue(operation);
+		const value = operationValue(operation);
 		this.sequencedValue = value;
 		if (this.pending.length === 0) {
 			this.value = value;
@@ -209,24 +213,30 @@ export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 	 * The host supplies unacknowledged operations in their original submission order and suppresses duplicate delivery.
 	 * Several operations may be resubmitted before any acknowledgments arrive.
 	 * Cell trusts the host to supply the correct operation; it does not match operation identities.
+	 * @param content - Operation contents after any host-specific decoding.
 	 * @throws An Error if replication has not started.
+	 * @throws A TypeError if the contents do not describe a supported Cell operation.
 	 */
-	public resubmit(operation: SimpleCellOperation<T>): void {
+	public resubmit(content: unknown): void {
 		const submit = this.verifyReplicating();
+		const operation = parseOperation<T>(content);
 		this.invokeCallback(() => submit(operation));
 	}
 
 	/**
-	 * Recreates a persisted pending edit as a local edit, including publication.
+	 * Recreates a persisted operation as a local edit.
 	 * @remarks
 	 * Restore the sequenced snapshot and replay pending edits in their original order.
+	 * Before replication starts, replay updates local state without publication or pending operations.
+	 * After replication starts, replay also publishes the edit.
 	 * The host must associate replay submissions with persisted transport records,
 	 * including edits already sequenced before the restart.
-	 * @throws An Error if replication has not started.
+	 * @param content - Operation contents after any host-specific decoding.
+	 * @throws A TypeError if the contents do not describe a supported Cell operation.
 	 */
-	public replay(operation: SimpleCellOperation<T>): void {
-		this.verifyReplicating();
-		this.applyLocal({ ...operation });
+	public replay(content: unknown): void {
+		this.verifyNotFaulted();
+		this.applyLocal(parseOperation<T>(content));
 	}
 
 	/**
@@ -246,8 +256,7 @@ export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 		}
 		this.pending.pop();
 		const remaining = this.pending.at(-1);
-		this.value =
-			remaining === undefined ? this.sequencedValue : this.operationValue(remaining);
+		this.value = remaining === undefined ? this.sequencedValue : operationValue(remaining);
 		this.notify(
 			this.value === undefined ? { type: "delete" } : { type: "set", value: this.value },
 		);
@@ -277,7 +286,7 @@ export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 
 	private applyLocal(operation: SimpleCellOperation<T>): void {
 		this.verifyNotFaulted();
-		this.value = this.operationValue(operation);
+		this.value = operationValue(operation);
 		const submit = this.submit;
 		if (submit === undefined) {
 			this.sequencedValue = this.value;
@@ -296,20 +305,6 @@ export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 				this.emitter.emit("delete");
 			}
 		});
-	}
-
-	private operationValue(operation: SimpleCellOperation<T>): T | undefined {
-		switch (operation.type) {
-			case "set": {
-				return operation.value;
-			}
-			case "delete": {
-				return undefined;
-			}
-			default: {
-				throw new TypeError("Unsupported SimpleCell operation");
-			}
-		}
 	}
 
 	private invokeCallback(callback: () => void): void {
@@ -334,5 +329,42 @@ export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 			throw new Error("Replication has not started");
 		}
 		return this.submit;
+	}
+}
+
+/**
+ * Validates the operation shape; payload typing is the host's responsibility.
+ */
+function parseOperation<T>(content: unknown): SimpleCellOperation<T> {
+	if (!isObject(content) || !("type" in content)) {
+		throw new TypeError("SimpleCell operation must be an object with a type");
+	}
+	switch (content.type) {
+		case "set": {
+			return {
+				type: "set",
+				value: ("value" in content ? content.value : undefined) as T,
+			};
+		}
+		case "delete": {
+			return { type: "delete" };
+		}
+		default: {
+			throw new TypeError("Unsupported SimpleCell operation");
+		}
+	}
+}
+
+function operationValue<T>(operation: SimpleCellOperation<T>): T | undefined {
+	switch (operation.type) {
+		case "set": {
+			return operation.value;
+		}
+		case "delete": {
+			return undefined;
+		}
+		default: {
+			throw new TypeError("Unsupported SimpleCell operation");
+		}
 	}
 }

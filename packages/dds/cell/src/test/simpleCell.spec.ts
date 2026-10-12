@@ -370,14 +370,13 @@ describe("SimpleCell", () => {
 			assert(second.cell.empty());
 		});
 
-		it("requires replication before accepting host calls", () => {
+		it("requires replication for sequenced delivery, resubmission, and rollback", () => {
 			const cell = new SimpleCell<number>();
 			const operation: SimpleCellOperation<number> = { type: "set", value: 1 };
 			for (const call of [
 				() => cell.receive(operation, false),
 				() => cell.receive(operation, true),
 				() => cell.resubmit(operation),
-				() => cell.replay(operation),
 				() => cell.rollback(),
 			]) {
 				assert.throws(call, /has not started/);
@@ -412,7 +411,102 @@ describe("SimpleCell", () => {
 		});
 	});
 
+	describe("operation parsing", () => {
+		it("interprets host-decoded contents while leaving payload values opaque", () => {
+			const cell = new SimpleCell();
+			collectSubmissions(cell);
+			const events = recordEvents(cell);
+			const payload = { type: "delete" };
+			const content: unknown = { type: "set", value: payload };
+			cell.receive(content, false);
+			assert.equal(cell.get(), payload);
+			assert.equal(cell.getSnapshot().value, payload);
+			cell.receive({ type: "set" }, false);
+			assert(cell.empty());
+			cell.receive({ type: "delete" }, false);
+			assert.deepEqual(events, [
+				{ type: "set", value: payload },
+				{ type: "set", value: undefined },
+				{ type: "delete" },
+			]);
+		});
+
+		it("rejects malformed contents before changing state, acknowledging, or publishing", () => {
+			const cell = new SimpleCell<number>({ value: 0 });
+			const submissions = collectSubmissions(cell);
+			const events = recordEvents(cell);
+			cell.set(1);
+			const pending = cell.getPendingOperations();
+			const invalidContents: unknown[] = [
+				undefined,
+				// eslint-disable-next-line unicorn/no-null -- JSON operations can decode to null.
+				null,
+				1,
+				"set",
+				[],
+				{},
+				{ type: 1 },
+				{ type: "unknown" },
+			];
+			for (const content of invalidContents) {
+				for (const call of [
+					() => cell.receive(content, false),
+					() => cell.receive(content, true),
+					() => cell.resubmit(content),
+					() => cell.replay(content),
+				]) {
+					assert.throws(call, TypeError);
+					assert.equal(cell.get(), 1);
+					assert.deepEqual(cell.getSnapshot(), { value: 0 });
+					assert.deepEqual(cell.getPendingOperations(), pending);
+					assert.deepEqual(submissions, [{ type: "set", value: 1 }]);
+					assert.deepEqual(events, [{ type: "set", value: 1 }]);
+				}
+			}
+			cell.receive({ type: "set", value: 1 }, true);
+			cell.receive({ type: "set", value: 2 }, false);
+			assert.equal(cell.get(), 2);
+		});
+
+		it("rejects malformed local-only replay without faulting the Cell", () => {
+			const cell = new SimpleCell<number>({ value: 1 });
+			assert.throws(() => cell.replay({ type: "unknown" }), TypeError);
+			assert.deepEqual(cell.getSnapshot(), { value: 1 });
+			assert.deepEqual(cell.getPendingOperations(), []);
+			cell.replay({ type: "set", value: 2 });
+			assert.equal(cell.get(), 2);
+		});
+	});
+
 	describe("reconnection and replay", () => {
+		it("replays local-only edits without publication and begins submitting after replication starts", () => {
+			const cell = new SimpleCell<number | undefined>();
+			const events = recordEvents(cell);
+			cell.replay({ type: "set", value: 1 });
+			cell.replay({ type: "delete" });
+			cell.replay({ type: "set" });
+			assert(cell.empty());
+			cell.replay({ type: "set", value: 2 });
+			assert.deepEqual(cell.getSnapshot(), { value: 2 });
+			assert.deepEqual(cell.getPendingOperations(), []);
+			assert.deepEqual(events, [
+				{ type: "set", value: 1 },
+				{ type: "delete" },
+				{ type: "set", value: undefined },
+				{ type: "set", value: 2 },
+			]);
+
+			const submissions = collectSubmissions(cell);
+			assert.deepEqual(submissions, []);
+			cell.replay({ type: "set", value: 3 });
+			assert.deepEqual(submissions, [{ type: "set", value: 3 }]);
+			assert.deepEqual(cell.getPendingOperations(), submissions);
+			assert.deepEqual(cell.getSnapshot(), { value: 2 });
+			cell.receive({ type: "set", value: 3 }, true);
+			assert.deepEqual(cell.getSnapshot(), { value: 3 });
+			assert.equal(events.length, 5);
+		});
+
 		it("resubmits several supplied operations before acknowledgments without reapplying edits", () => {
 			const cell = new SimpleCell<number>();
 			const submissions = collectSubmissions(cell);
@@ -678,6 +772,9 @@ describe("SimpleCell", () => {
 				() => cell.receive({ type: "set", value: 2 }, true),
 				() => cell.resubmit({ type: "set", value: 2 }),
 				() => cell.replay({ type: "delete" }),
+				() => cell.receive(undefined, false),
+				() => cell.resubmit(undefined),
+				() => cell.replay(undefined),
 				() => cell.rollback(),
 				() => cell.getSnapshot(),
 				() => cell.getPendingOperations(),

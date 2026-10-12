@@ -242,6 +242,11 @@ describe("SimpleCellChannel", () => {
 			const loaded = await factory.load(runtime, "cell", services, factory.attributes);
 			delta.applyStashedOp({ type: "set", value: 2 });
 			assert.deepEqual(loaded.cell.getSnapshot(), { value: 2 });
+			delta.applyStashedOp({ type: "delete" });
+			assert(loaded.cell.empty());
+			delta.applyStashedOp({ type: "set", value: 3 });
+			assert.deepEqual(loaded.cell.getSnapshot(), { value: 3 });
+			assert.deepEqual(loaded.cell.getPendingOperations(), []);
 			assert.deepEqual(submitted, []);
 			runtime.setAttachState(AttachState.Attached);
 			loaded.cell.delete();

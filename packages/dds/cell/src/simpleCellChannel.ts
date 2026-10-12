@@ -4,7 +4,7 @@
  */
 
 import { AttachState } from "@fluidframework/container-definitions";
-import { assert, isObject } from "@fluidframework/core-utils/internal";
+import { assert } from "@fluidframework/core-utils/internal";
 import type {
 	ChannelWithEntryPoint,
 	IChannelAttributes,
@@ -26,12 +26,7 @@ import {
 	SharedObjectHandle,
 } from "@fluidframework/shared-object-base/internal";
 
-import {
-	SimpleCell,
-	type SimpleCellOperation,
-	type SimpleCellSnapshot,
-	type SimpleCellView,
-} from "./simpleCell.js";
+import { SimpleCell, type SimpleCellSnapshot, type SimpleCellView } from "./simpleCell.js";
 
 /**
  * A Fluid channel containing a standalone {@link SimpleCell}.
@@ -148,7 +143,7 @@ export class SimpleCellChannel<T = unknown>
 		processMessages: ({ local, messagesContent }) => {
 			this.verifyUsable();
 			for (const { contents } of messagesContent) {
-				this.cell.receive(this.decodeOperation(contents), local);
+				this.cell.receive(this.serializer.decode(contents), local);
 			}
 		},
 		// Disconnection changes delivery, not Cell's replication state. The runtime queues edits.
@@ -158,18 +153,11 @@ export class SimpleCellChannel<T = unknown>
 			if (squash === true) {
 				throw new Error("SimpleCell does not support squashed resubmission");
 			}
-			this.cell.resubmit(this.decodeOperation(content));
+			this.cell.resubmit(this.serializer.decode(content));
 		},
 		applyStashedOp: (content: unknown) => {
 			this.verifyUsable();
-			const operation = this.decodeOperation(content);
-			if (this.replicating) {
-				this.cell.replay(operation);
-			} else if (operation.type === "set") {
-				this.cell.set(operation.value);
-			} else {
-				this.cell.delete();
-			}
+			this.cell.replay(this.serializer.decode(content));
 		},
 		rollback: () => {
 			this.verifyUsable();
@@ -177,29 +165,7 @@ export class SimpleCellChannel<T = unknown>
 		},
 	};
 
-	private decodeOperation(content: unknown): SimpleCellOperation<Serializable<T>> {
-		const decoded = this.serializer.decode(content);
-		assert(
-			isObject(decoded) && "type" in decoded,
-			"SimpleCell operation must be an object with a type",
-		);
-		switch (decoded.type) {
-			case "set": {
-				return {
-					type: "set",
-					value: ("value" in decoded ? decoded.value : undefined) as Serializable<T>,
-				};
-			}
-			case "delete": {
-				return { type: "delete" };
-			}
-			default: {
-				throw new Error("Unsupported SimpleCell operation");
-			}
-		}
-	}
-
-	private submit(operation: SimpleCellOperation<Serializable<T>>): void {
+	private submit(operation: unknown): void {
 		this.verifyUsable();
 		assert(this.services !== undefined, "Replicating channel must have services");
 		const onlyBind =

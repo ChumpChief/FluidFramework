@@ -187,7 +187,7 @@ The existing Cell and its factory remain unchanged.
 | `startReplication(submit)` | Installs a synchronous submission callback once and returns the initial snapshot. |
 | `receive(operation, local)` | Processes a remote operation, or acknowledges the oldest pending local edit without reapplying it or emitting another data-change event. |
 | `resubmit(operation)` | Publishes the host-supplied pending operation without applying it again or modifying the pending queue. |
-| `replay(operation)` | Recreates a persisted pending edit, including publication. |
+| `replay(operation)` | Recreates a persisted edit; publishes it only if replication has started. |
 | `rollback()` | Removes the newest pending edit after the host withdraws it from delivery. |
 | `getSnapshot()` | Captures sequenced state, excluding pending local edits. |
 | `getPendingOperations()` | Captures pending operations in replay order. |
@@ -195,6 +195,8 @@ The existing Cell and its factory remain unchanged.
 Values are unconstrained `T`.
 Cell does not clone or encode them; callers must not mutate stored payloads.
 Operation and snapshot encoding, transport identity, queuing, and duplicate suppression belong to the host.
+`receive`, `resubmit`, and `replay` accept unknown contents after host-specific decoding.
+Cell validates and interprets its operation tags and fields; it does not decode or validate the opaque payload value's type.
 
 The submission callback receives only an operation.
 Cell has no operation tokens or identity lookups.
@@ -228,6 +230,7 @@ Publication and listener failures propagate and permanently fault the Cell.
 Further edits, replication calls, and checkpoint requests throw an error whose cause is the first failure.
 `get` and `empty` remain available for inspection.
 Invalid lifecycle calls and attempts to acknowledge or roll back an empty pending queue throw before mutation and do not independently fault the Cell.
+Malformed operation contents throw a `TypeError` before changing state or publishing.
 Cell trusts the host's operation ordering instead of validating operation identity.
 The standalone implementation uses ordinary JavaScript errors; a future Fluid adapter owns Fluid-specific error classification.
 
@@ -251,10 +254,11 @@ Creation in an already-attached data store does not make an unbound channel repl
 Before attachment, local edits are represented in the attach snapshot.
 Disconnection does not stop replication: the runtime continues to accept pending operations and requests their resubmission later.
 
-Incoming message collections pass each decoded operation and its `local` flag to `receive(operation, local)`.
+Incoming message collections pass each operation's contents through `serializer.decode()` and then forward them with the `local` flag to `receive(operation, local)`.
 Resubmission calls `resubmit(operation)`, and rollback calls `rollback()`.
-Attached stashed-op replay calls `replay(operation)`.
-Detached replay applies ordinary local edits without creating pending operations.
+Stashed-op replay always calls `replay(operation)`.
+Cell handles replay in both states: detached replay updates local state without pending operations, while replicated replay also submits the edit.
+The channel does not inspect Cell operation tags or fields, including during detached replay.
 The existing runtime capture mechanism associates replayed submissions with the original operation; the adapter introduces no operation tokens.
 
 Snapshots use one `header` blob containing Cell's sequenced state.
@@ -273,6 +277,7 @@ Stage 3 separates its application-facing value from that channel.
 The handle and GC visitor are exposed through the shared-object-base internal entry point.
 
 Operations and snapshots use Fluid handle encoding, decoding, and reference binding.
+For operations, the channel only performs Fluid serialization; Cell owns further parsing and interpretation.
 The adapter also honors the runtime mode in which submission binds handles but the container runtime performs encoding.
 GC visits both the sequenced state and pending operation values without binding or attaching objects.
 This retains references that can become visible after acknowledgment or rollback.
