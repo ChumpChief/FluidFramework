@@ -13,6 +13,7 @@ import { FluidSerializer } from "./serializer.js";
  *
  * @remarks This is given to DDS code that typically produces a serialization of the data, which is then ignored.
  * All that is needed is getSerializedRoutes() to get the routes. This strategy could be optimized if needed.
+ * @internal
  */
 export class GCHandleVisitor extends FluidSerializer {
 	private readonly visitedHandlePaths: Set<string> = new Set();

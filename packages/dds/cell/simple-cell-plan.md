@@ -235,4 +235,57 @@ The standalone implementation uses ordinary JavaScript errors; a future Fluid ad
 The standalone cases and the in-memory ordered host are in [src/test/simpleCell.spec.ts](./src/test/simpleCell.spec.ts).
 The host separates sequencing from delivery, retains a delivery cursor, queues disconnected edits, and preserves transport records across resubmission and replay to suppress duplicate delivery.
 It uses no Fluid runtime mocks.
-Stage 2's adapter and stage 3's runtime identity changes are not implemented here.
+The adapter described below uses this same standalone implementation.
+
+## Stage 2 implementation
+
+[SimpleCellChannel](./src/simpleCellChannel.ts) implements `IChannel` and contains a `SimpleCell`.
+[SimpleCellFactory](./src/simpleCellFactory.ts) creates and loads channels under the distinct `https://graph.microsoft.com/types/experimental-simple-cell` type.
+These experimental types remain source-module exports, not package entry-point exports.
+The adapter does not extend `SharedObject` or `SharedObjectCore`, use `SharedKernel`, or forward Cell methods onto itself.
+The existing Cell implementation and its format remain unchanged.
+
+### Runtime integration
+
+The adapter starts Cell replication when the channel is bound, has services, and its data store is attaching or attached.
+Creation in an already-attached data store does not make an unbound channel replicated.
+Before attachment, local edits are represented in the attach snapshot.
+Disconnection does not stop replication: the runtime continues to accept pending operations and requests their resubmission later.
+
+Incoming message collections map local messages to `acknowledge()` and remote messages to `receive(operation)`.
+Resubmission calls `resubmit(operation)`, and rollback calls `rollback()`.
+Attached stashed-op replay calls `replay(operation)`.
+Detached replay applies ordinary local edits without creating pending operations.
+The existing runtime capture mechanism associates replayed submissions with the original operation; the adapter introduces no operation tokens.
+
+Snapshots use one `header` blob containing Cell's sequenced state.
+Pending local edits are restored through the runtime's pending-state replay rather than being written into that blob.
+The factory rejects unsupported channel types and snapshot versions.
+Runtime-facing operations reject a disposed runtime, and disposal removes a pending attachment listener.
+The retained Cell can still be inspected; an attempted replicated edit after disposal fails through its submission callback and faults the Cell.
+
+### Reused helpers
+
+The adapter composes the existing `SharedObjectHandle`, `FluidSerializer`, and `GCHandleVisitor` helpers.
+`SharedObjectHandle` now accepts a channel with `bindToContext()` rather than requiring all of `ISharedObject`.
+Its binding and attachment behavior is unchanged, and its `get()` result is typed to the contained channel.
+`ISharedObjectHandle` describes the binding capability without constraining the type of the referenced object.
+The handle and GC visitor are exposed through the shared-object-base internal entry point.
+
+Operations and snapshots use Fluid handle encoding, decoding, and reference binding.
+The adapter also honors the runtime mode in which submission binds handles but the container runtime performs encoding.
+GC visits both the sequenced state and pending operation values without binding or attaching objects.
+This retains references that can become visible after acknowledgment or rollback.
+
+### Scope and limitations
+
+Applications currently access `channel.cell`.
+In-memory and serialized handles resolve to the adapter, not to the Cell.
+There are no runtime routing changes; returning the Cell as a channel entry point remains stage 3.
+
+Squashed resubmission is explicitly unsupported and throws before submitting anything.
+The adapter reuses staging-aware handle binding, but does not claim to support committing staging changes through squashed operations.
+SharedObject-specific `pre-op`/`op` events and sampled callback telemetry are not reproduced.
+
+[Adapter coverage](./src/test/simpleCellChannel.spec.ts) exercises attachment, detached loading, concurrent edits, disconnection, resubmission, rollback, summaries, nested handles, and GC.
+It also exercises creation, cyclic reference attachment, serialized handle resolution, and stashed-op capture through the real `FluidDataStoreRuntime`.

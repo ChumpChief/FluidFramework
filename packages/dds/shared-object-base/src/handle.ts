@@ -5,18 +5,22 @@
 
 import type { IFluidHandleInternal } from "@fluidframework/core-interfaces/internal";
 import { FluidObjectHandle } from "@fluidframework/datastore/internal";
-import type { IFluidDataStoreRuntime } from "@fluidframework/datastore-definitions/internal";
+import type {
+	IChannel,
+	IFluidDataStoreRuntime,
+} from "@fluidframework/datastore-definitions/internal";
 import { isFluidHandle } from "@fluidframework/runtime-utils/internal";
 
 import type { ISharedObject } from "./types.js";
 
 /**
- * Handle for a shared object. See also `SharedObjectHandle`.
+ * Handle supporting reference binding. See also {@link SharedObjectHandle}.
+ * The referenced object need not implement {@link ISharedObject}.
  * Supports binding other handles to the underlying Shared Object (see {@link ISharedObjectHandle.bind}).
  *
  * @internal
  */
-export interface ISharedObjectHandle extends IFluidHandleInternal<ISharedObject> {
+export interface ISharedObjectHandle extends IFluidHandleInternal {
 	/**
 	 * Binds the given handle to this DDS or attach the given handle if this DDS is attached.
 	 * A bound handle will also be attached once this DDS is attached.
@@ -43,9 +47,12 @@ export function isISharedObjectHandle(handle: unknown): handle is ISharedObjectH
  *
  * It provides a "bind" function that is expected to be invoked on all handles stored in this DDS,
  * ensuring the target object becomes attached along with this DDS.
+ * The channel need not implement the app-facing or event APIs of {@link ISharedObject}.
+ * @typeParam T - The channel referenced by the handle.
+ * @internal
  */
-export class SharedObjectHandle
-	extends FluidObjectHandle<ISharedObject>
+export class SharedObjectHandle<T extends IChannel & { bindToContext(): void } = ISharedObject>
+	extends FluidObjectHandle<T>
 	implements ISharedObjectHandle
 {
 	/**
@@ -89,11 +96,15 @@ export class SharedObjectHandle
 	 * to this handle.
 	 */
 	constructor(
-		protected readonly value: ISharedObject,
+		protected readonly value: T,
 		path: string,
 		private readonly runtime: IFluidDataStoreRuntime,
 	) {
 		super(value, path, runtime.IFluidHandleContext);
+	}
+
+	public override async get(): Promise<T> {
+		return this.value;
 	}
 
 	/**

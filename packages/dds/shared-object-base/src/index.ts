@@ -3,7 +3,12 @@
  * Licensed under the MIT License.
  */
 
-export { type ISharedObjectHandle, isISharedObjectHandle } from "./handle.js";
+export {
+	type ISharedObjectHandle,
+	isISharedObjectHandle,
+	SharedObjectHandle,
+} from "./handle.js";
+export { GCHandleVisitor } from "./gcHandleVisitor.js";
 export { FluidSerializer, type IFluidSerializer } from "./serializer.js";
 export {
 	SharedObject,

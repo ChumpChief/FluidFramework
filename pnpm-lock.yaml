@@ -6899,6 +6899,9 @@ importers:
       '@fluid-internal/client-utils':
         specifier: workspace:~
         version: link:../../common/client-utils
+      '@fluidframework/container-definitions':
+        specifier: workspace:~
+        version: link:../../common/container-definitions
       '@fluidframework/core-interfaces':
         specifier: workspace:~
         version: link:../../common/core-interfaces
@@ -6945,12 +6948,15 @@ importers:
       '@fluidframework/cell-previous':
         specifier: npm:@fluidframework/cell@3.6.0
         version: '@fluidframework/cell@3.6.0(supports-color@10.2.2)'
-      '@fluidframework/container-definitions':
+      '@fluidframework/datastore':
         specifier: workspace:~
-        version: link:../../common/container-definitions
+        version: link:../../runtime/datastore
       '@fluidframework/eslint-config-fluid':
         specifier: catalog:eslint
         version: 14.0.0(@typescript-eslint/utils@8.66.0)(eslint@9.39.1)(supports-color@10.2.2)(typescript@6.0.3)
+      '@fluidframework/runtime-utils':
+        specifier: workspace:~
+        version: link:../../runtime/runtime-utils
       '@fluidframework/test-runtime-utils':
         specifier: workspace:~
         version: link:../../runtime/test-runtime-utils
