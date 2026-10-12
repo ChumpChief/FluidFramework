@@ -185,8 +185,7 @@ The existing Cell and its factory remain unchanged.
 | `get`, `set`, `delete`, `empty` | Reads and edits the visible value. |
 | `events.on`, `events.off` | Subscribes to `valueChanged` and `delete`; `on` also returns an unsubscribe function. |
 | `startReplication(submit)` | Installs a synchronous submission callback once and returns the initial snapshot. |
-| `receive(operation)` | Processes a remote operation in sequencing order. |
-| `acknowledge()` | Retires the oldest pending local edit without another data-change event. |
+| `receive(operation, local)` | Processes a remote operation, or acknowledges the oldest pending local edit without reapplying it or emitting another data-change event. |
 | `resubmit(operation)` | Publishes the host-supplied pending operation without applying it again or modifying the pending queue. |
 | `replay(operation)` | Recreates a persisted pending edit, including publication. |
 | `rollback()` | Removes the newest pending edit after the host withdraws it from delivery. |
@@ -252,7 +251,7 @@ Creation in an already-attached data store does not make an unbound channel repl
 Before attachment, local edits are represented in the attach snapshot.
 Disconnection does not stop replication: the runtime continues to accept pending operations and requests their resubmission later.
 
-Incoming message collections map local messages to `acknowledge()` and remote messages to `receive(operation)`.
+Incoming message collections pass each decoded operation and its `local` flag to `receive(operation, local)`.
 Resubmission calls `resubmit(operation)`, and rollback calls `rollback()`.
 Attached stashed-op replay calls `replay(operation)`.
 Detached replay applies ordinary local edits without creating pending operations.

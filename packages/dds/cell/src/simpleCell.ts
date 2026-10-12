@@ -176,33 +176,31 @@ export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 	}
 
 	/**
-	 * Applies one remote operation in sequencing order.
+	 * Processes an operation in sequencing order.
+	 * Local operations acknowledge the oldest pending edit without reapplying it or notifying listeners.
 	 * Pending local edits keep their visible value until acknowledged or rolled back.
-	 * @throws An Error if replication has not started.
+	 * The host must deliver each operation exactly once and preserve submission order.
+	 * @param local - Whether the operation acknowledges an edit from this Cell.
+	 * @throws An Error if replication has not started or a local operation has no pending edit to acknowledge.
 	 */
-	public receive(operation: SimpleCellOperation<T>): void {
+	public receive(operation: SimpleCellOperation<T>, local: boolean): void {
 		this.verifyReplicating();
+		if (local) {
+			const first = this.pending[0];
+			if (first === undefined) {
+				throw new Error("Cannot acknowledge without a pending operation");
+			}
+			this.sequencedValue = this.operationValue(first);
+			this.pending.shift();
+			return;
+		}
+
 		const value = this.operationValue(operation);
 		this.sequencedValue = value;
 		if (this.pending.length === 0) {
 			this.value = value;
 			this.notify(operation);
 		}
-	}
-
-	/**
-	 * Acknowledges the oldest pending local edit without notifying listeners.
-	 * The host must deliver acknowledgments exactly once and in submission order.
-	 * @throws An Error if replication has not started or there are no pending edits.
-	 */
-	public acknowledge(): void {
-		this.verifyReplicating();
-		const first = this.pending[0];
-		if (first === undefined) {
-			throw new Error("Cannot acknowledge without a pending operation");
-		}
-		this.sequencedValue = this.operationValue(first);
-		this.pending.shift();
 	}
 
 	/**

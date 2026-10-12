@@ -420,6 +420,22 @@ describe("SimpleCellChannel", () => {
 			assert.deepEqual(parent.getGCData(), { gcNodes: { "/": [] } });
 		});
 
+		it("acknowledges encoded local operations without replacing the original value or reemitting events", () => {
+			const runtime = new MockFluidDataStoreRuntime();
+			const child = factory.create(runtime, "child");
+			const parent = factory.create(runtime, "parent");
+			const { services, delta, submitted } = createServices();
+			parent.connect(services);
+			const events: unknown[] = [];
+			parent.cell.events.on("valueChanged", (value) => events.push(value));
+			parent.cell.set(child.handle);
+			delta.processMessages(messages(submitted, true));
+			assert.equal(parent.cell.get(), child.handle);
+			assert.equal(parent.cell.getSnapshot().value, child.handle);
+			assert.deepEqual(parent.cell.getPendingOperations(), []);
+			assert.deepEqual(events, [child.handle]);
+		});
+
 		it("round-trips nested handles through summaries, operations, and reconnection", async () => {
 			const runtimeFactory = new MockContainerRuntimeFactoryForReconnection();
 			const first = createConnected(runtimeFactory);

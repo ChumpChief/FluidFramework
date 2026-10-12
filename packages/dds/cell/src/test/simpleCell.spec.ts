@@ -74,12 +74,11 @@ class OrderedHost<T> {
 			while (replica.connected && replica.cursor < this.history.length) {
 				const submission = this.history[replica.cursor++];
 				assert(submission !== undefined);
-				if (submission.sender === replica) {
+				const local = submission.sender === replica;
+				if (local) {
 					assert.equal(replica.pending.shift(), submission);
-					replica.cell.acknowledge();
-				} else {
-					replica.cell.receive(submission.operation);
 				}
+				replica.cell.receive(submission.operation, local);
 			}
 		}
 	}
@@ -242,7 +241,7 @@ describe("SimpleCell", () => {
 			first.set(3);
 			const [operation] = submissions;
 			assert(operation !== undefined);
-			second.receive(operation);
+			second.receive(operation, false);
 			assert.equal(second.get(), 3);
 			assert.throws(() => first.startReplication(() => {}), /already started/);
 		});
@@ -375,8 +374,8 @@ describe("SimpleCell", () => {
 			const cell = new SimpleCell<number>();
 			const operation: SimpleCellOperation<number> = { type: "set", value: 1 };
 			for (const call of [
-				() => cell.receive(operation),
-				() => cell.acknowledge(),
+				() => cell.receive(operation, false),
+				() => cell.receive(operation, true),
 				() => cell.resubmit(operation),
 				() => cell.replay(operation),
 				() => cell.rollback(),
@@ -389,21 +388,26 @@ describe("SimpleCell", () => {
 
 		it("acknowledges pending edits in order without changing the optimistic value", () => {
 			const cell = new SimpleCell<number>();
-			collectSubmissions(cell);
-			assert.throws(() => cell.acknowledge(), /without a pending operation/);
+			const submissions = collectSubmissions(cell);
+			assert.throws(
+				() => cell.receive({ type: "set", value: 1 }, true),
+				/without a pending operation/,
+			);
 			cell.set(1);
 			cell.set(2);
+			const [first, second] = submissions;
+			assert(first !== undefined && second !== undefined);
 			assert.deepEqual(cell.getSnapshot(), { value: undefined });
 			assert.equal(cell.getPendingOperations().length, 2);
-			cell.acknowledge();
+			cell.receive(first, true);
 			assert.equal(cell.get(), 2);
 			assert.deepEqual(cell.getSnapshot(), { value: 1 });
 			assert.deepEqual(cell.getPendingOperations(), [{ type: "set", value: 2 }]);
-			cell.acknowledge();
+			cell.receive(second, true);
 			assert.deepEqual(cell.getSnapshot(), { value: 2 });
 			assert.deepEqual(cell.getPendingOperations(), []);
-			assert.throws(() => cell.acknowledge(), /without a pending operation/);
-			cell.receive({ type: "set", value: 3 });
+			assert.throws(() => cell.receive(second, true), /without a pending operation/);
+			cell.receive({ type: "set", value: 3 }, false);
 			assert.equal(cell.get(), 3);
 		});
 	});
@@ -426,7 +430,7 @@ describe("SimpleCell", () => {
 			assert.deepEqual(cell.getSnapshot(), { value: undefined });
 			assert.deepEqual(cell.getPendingOperations(), originals);
 			for (const operation of originals) {
-				cell.acknowledge();
+				cell.receive(operation, true);
 				assert.deepEqual(cell.getSnapshot(), {
 					value: operation.type === "set" ? operation.value : undefined,
 				});
@@ -647,7 +651,7 @@ describe("SimpleCell", () => {
 			assert(cell.empty());
 			assert.deepEqual(cell.getPendingOperations(), []);
 			assert.throws(() => cell.rollback(), /without a pending operation/);
-			cell.receive({ type: "set", value: 3 });
+			cell.receive({ type: "set", value: 3 }, false);
 			assert.equal(cell.get(), 3);
 		});
 
@@ -670,8 +674,8 @@ describe("SimpleCell", () => {
 				() => cell.set(2),
 				() => cell.delete(),
 				() => cell.startReplication(() => {}),
-				() => cell.receive({ type: "set", value: 2 }),
-				() => cell.acknowledge(),
+				() => cell.receive({ type: "set", value: 2 }, false),
+				() => cell.receive({ type: "set", value: 2 }, true),
 				() => cell.resubmit({ type: "set", value: 2 }),
 				() => cell.replay({ type: "delete" }),
 				() => cell.rollback(),
@@ -767,7 +771,7 @@ describe("SimpleCell", () => {
 							break;
 						}
 						case "remote": {
-							cell.receive({ type: "delete" });
+							cell.receive({ type: "delete" }, false);
 							break;
 						}
 						case "replay": {

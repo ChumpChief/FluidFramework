@@ -148,11 +148,7 @@ export class SimpleCellChannel<T = unknown>
 		processMessages: ({ local, messagesContent }) => {
 			this.verifyUsable();
 			for (const { contents } of messagesContent) {
-				if (local) {
-					this.cell.acknowledge();
-				} else {
-					this.cell.receive(this.decodeOperation(contents));
-				}
+				this.cell.receive(this.decodeOperation(contents), local);
 			}
 		},
 		// Disconnection changes delivery, not Cell's replication state. The runtime queues edits.
