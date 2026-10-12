@@ -5,12 +5,18 @@
 
 import { strict as assert } from "node:assert";
 
+import { MockFluidDataStoreRuntime } from "@fluidframework/test-runtime-utils/internal";
+
 import { isISharedObjectHandle, SharedObjectHandle } from "../handle.js";
 
 describe("isISharedObjectHandle", () => {
 	it("should return true for a SharedObjectHandle class instance", () => {
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-		const sharedObjectHandle = new SharedObjectHandle({} as any, "", {} as any);
+		const sharedObjectHandle = new SharedObjectHandle(
+			{ isAttached: () => false, bindToContext: () => {} },
+			{},
+			"object",
+			new MockFluidDataStoreRuntime(),
+		);
 		assert.strictEqual(
 			isISharedObjectHandle(sharedObjectHandle),
 			true,
@@ -84,5 +90,33 @@ describe("isISharedObjectHandle", () => {
 
 	it("should return false for an array", () => {
 		assert.strictEqual(isISharedObjectHandle([]), false, "Array should return false.");
+	});
+});
+
+describe("SharedObjectHandle entry point", () => {
+	it("resolves the value but attaches the channel", async () => {
+		let attached = false;
+		let binds = 0;
+		const channel = {
+			isAttached: () => attached,
+			bindToContext: () => {
+				binds++;
+				attached = true;
+			},
+		};
+		const value = { data: 42 };
+		const handle = new SharedObjectHandle(
+			channel,
+			value,
+			"cell",
+			new MockFluidDataStoreRuntime(),
+		);
+		assert.equal(await handle.get(), value);
+		assert.equal(handle.isAttached, false);
+		handle.attachGraph();
+		handle.attachGraph();
+		assert.equal(binds, 1);
+		assert.equal(handle.isAttached, true);
+		assert.equal(await handle.get(), value);
 	});
 });

@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import type { IFluidLoadable } from "@fluidframework/core-interfaces";
+import type { IFluidHandle, IFluidLoadable } from "@fluidframework/core-interfaces";
 import type { ISnapshotTree } from "@fluidframework/driver-definitions/internal";
 import type {
 	IExperimentalIncrementalSummaryContext,
@@ -131,6 +131,29 @@ export interface IChannel extends IFluidLoadable {
 	 * @param fullGC - true to bypass optimizations and force full generation of GC data.
 	 */
 	getGCData(fullGC?: boolean): IGarbageCollectionData;
+}
+
+/**
+ * An experimental channel that exposes a separate object to applications.
+ * @typeParam T - The application-facing object type.
+ * @remarks
+ * The runtime retains the channel for lifecycle, messages, and summaries.
+ * Resolving a channel path returns its entry point instead of the channel.
+ * Channels without this capability continue to resolve to themselves.
+ * @internal
+ */
+export interface ChannelWithEntryPoint<T extends object = object> extends IChannel {
+	/**
+	 * The application-facing object, which must remain stable for the lifetime of this channel.
+	 * It need not implement IFluidLoadable or any channel APIs.
+	 */
+	readonly entryPoint: T;
+
+	/**
+	 * A handle resolving to the same object as {@link ChannelWithEntryPoint.entryPoint}.
+	 * Attachment and reference binding still belong to the channel.
+	 */
+	readonly handle: IFluidHandle<T>;
 }
 
 /**

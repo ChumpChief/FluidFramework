@@ -50,6 +50,46 @@ export interface SimpleCellEvents<T> {
 }
 
 /**
+ * The application-facing API for reading and editing a {@link SimpleCell}.
+ * @typeParam T - The value type. Values are not cloned; callers must not mutate stored payloads.
+ * @remarks
+ * Replication, lifecycle, and snapshot methods are reserved for the host.
+ * This interface scopes access to the existing Cell instance; it does not create a separate object.
+ * @internal
+ */
+export interface SimpleCellView<T = unknown> {
+	/**
+	 * Returns the visible value, including pending local edits.
+	 */
+	get(): T | undefined;
+
+	/**
+	 * Sets the visible value and emits `valueChanged`, even if the value is unchanged.
+	 */
+	set(value: T): void;
+
+	/**
+	 * Clears the visible value and emits `delete`, even if the Cell is already empty.
+	 */
+	delete(): void;
+
+	/**
+	 * Returns whether the visible value is undefined.
+	 */
+	empty(): boolean;
+
+	/**
+	 * Subscribes to data changes without exposing event emission.
+	 * @remarks
+	 * Registering the same listener twice for an event throws an Error.
+	 * Adding a listener during notification does not include it in that notification.
+	 * Removing a listener before its turn skips it.
+	 * The function returned by `on` unsubscribes the listener.
+	 */
+	readonly events: Listenable<SimpleCellEvents<T>>;
+}
+
+/**
  * An experimental replicated Cell independent of the Fluid runtime.
  * @typeParam T - The value type. Values are not cloned; callers must not mutate stored payloads.
  * @remarks
@@ -67,7 +107,7 @@ export interface SimpleCellEvents<T> {
  * failure as its cause. Reads through {@link SimpleCell.get} and {@link SimpleCell.empty} remain available.
  * @internal
  */
-export class SimpleCell<T = unknown> {
+export class SimpleCell<T = unknown> implements SimpleCellView<T> {
 	private value: T | undefined;
 	private sequencedValue: T | undefined;
 	private readonly pending: SimpleCellOperation<T>[] = [];
@@ -77,12 +117,7 @@ export class SimpleCell<T = unknown> {
 	private readonly emitter = createEmitter<SimpleCellEvents<T>>();
 
 	/**
-	 * Subscribes to data changes without exposing event emission.
-	 * @remarks
-	 * Registering the same listener twice for an event throws an Error.
-	 * Adding a listener during notification does not include it in that notification.
-	 * Removing a listener before its turn skips it.
-	 * The function returned by `on` unsubscribes the listener.
+	 * {@inheritDoc SimpleCellView.events}
 	 */
 	public readonly events: Listenable<SimpleCellEvents<T>> = this.emitter;
 
@@ -96,28 +131,28 @@ export class SimpleCell<T = unknown> {
 	}
 
 	/**
-	 * Returns the visible value, including pending local edits.
+	 * {@inheritDoc SimpleCellView.get}
 	 */
 	public get(): T | undefined {
 		return this.value;
 	}
 
 	/**
-	 * Returns whether the visible value is undefined.
+	 * {@inheritDoc SimpleCellView.empty}
 	 */
 	public empty(): boolean {
 		return this.value === undefined;
 	}
 
 	/**
-	 * Sets the visible value and emits `valueChanged`, even if the value is unchanged.
+	 * {@inheritDoc SimpleCellView.set}
 	 */
 	public set(value: T): void {
 		this.applyLocal({ type: "set", value });
 	}
 
 	/**
-	 * Clears the visible value and emits `delete`, even if the Cell is already empty.
+	 * {@inheritDoc SimpleCellView.delete}
 	 */
 	public delete(): void {
 		this.applyLocal({ type: "delete" });

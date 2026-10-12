@@ -20,10 +20,12 @@ import {
 	assert,
 	debugAssert,
 	Deferred,
+	isObject,
 	LazyPromise,
 	unreachableCase,
 } from "@fluidframework/core-utils/internal";
 import type {
+	ChannelWithEntryPoint,
 	IChannel,
 	IChannelFactory,
 	IFluidDataStoreRuntime,
@@ -614,9 +616,14 @@ export class FluidDataStoreRuntime
 				const context = this.contexts.get(id);
 				if (context !== undefined && parser.isLeaf(1)) {
 					try {
-						const channel = await context.getChannel();
-
-						return { mimeType: "fluid/object", status: 200, value: channel };
+						const channel: IChannel & Partial<Pick<ChannelWithEntryPoint, "entryPoint">> =
+							await context.getChannel();
+						const value = "entryPoint" in channel ? channel.entryPoint : channel;
+						assert(
+							isObject(value) || typeof value === "function",
+							"Channel entry point must be an object",
+						);
+						return { mimeType: "fluid/object", status: 200, value };
 					} catch (error) {
 						this.mc.logger.sendErrorEvent({ eventName: "GetChannelFailedInRequest" }, error);
 

@@ -267,8 +267,9 @@ The retained Cell can still be inspected; an attempted replicated edit after dis
 ### Reused helpers
 
 The adapter composes the existing `SharedObjectHandle`, `FluidSerializer`, and `GCHandleVisitor` helpers.
-`SharedObjectHandle` now accepts a channel with `bindToContext()` rather than requiring all of `ISharedObject`.
-Its binding and attachment behavior is unchanged, and its `get()` result is typed to the contained channel.
+`SharedObjectHandle` accepts a channel with `bindToContext()` rather than requiring all of `ISharedObject`.
+Its binding and attachment behavior is unchanged.
+Stage 3 separates its application-facing value from that channel.
 `ISharedObjectHandle` describes the binding capability without constraining the type of the referenced object.
 The handle and GC visitor are exposed through the shared-object-base internal entry point.
 
@@ -279,9 +280,8 @@ This retains references that can become visible after acknowledgment or rollback
 
 ### Scope and limitations
 
-Applications currently access `channel.cell`.
-In-memory and serialized handles resolve to the adapter, not to the Cell.
-There are no runtime routing changes; returning the Cell as a channel entry point remains stage 3.
+Stage 2 initially exposed the adapter through handles and used `channel.cell` for application access.
+Stage 3, described below, changes handle resolution and provides an application-facing creation helper.
 
 Squashed resubmission is explicitly unsupported and throws before submitting anything.
 The adapter reuses staging-aware handle binding, but does not claim to support committing staging changes through squashed operations.
@@ -289,3 +289,64 @@ SharedObject-specific `pre-op`/`op` events and sampled callback telemetry are no
 
 [Adapter coverage](./src/test/simpleCellChannel.spec.ts) exercises attachment, detached loading, concurrent edits, disconnection, resubmission, rollback, summaries, nested handles, and GC.
 It also exercises creation, cyclic reference attachment, serialized handle resolution, and stashed-op capture through the real `FluidDataStoreRuntime`.
+
+## Stage 3 implementation
+
+The runtime-facing adapter and the app-facing Cell now have distinct roles in creation and handle resolution.
+Cell behavior, operation format, and snapshot format are unchanged.
+
+### Channel entry-point contract
+
+`ChannelWithEntryPoint<T>` is an internal, opt-in extension of `IChannel` in `datastore-definitions`.
+It supplies a stable `entryPoint` object and a handle that resolves to that same object.
+`SimpleCellChannel.entryPoint` returns its contained Cell typed as `SimpleCellView`.
+The adapter still implements the runtime's channel/loadable contract; the Cell does not acquire those interfaces.
+
+The data store runtime uses the entry point when resolving a channel path.
+Channels without an entry point continue to resolve to themselves.
+`runtime.createChannel()` and `runtime.getChannel()` still return the adapter, and the runtime retains it for operation processing, attachment, summaries, and GC.
+Factories continue to create and load channels rather than application objects.
+
+`SharedObjectHandle` now takes a channel and a separate resolved value.
+Attachment and reference binding use the channel, while `get()` returns the value.
+Existing SharedObjects pass themselves for both roles.
+SimpleCell passes its adapter as the channel and its Cell as the value.
+Both local handles and serialized handles therefore return the Cell within the corresponding runtime.
+Loading the same document in another runtime creates a different local Cell instance, as expected.
+
+### Application-facing creation
+
+`createSimpleCell(runtime, id?)`, in [simpleCellFactory.ts](./src/simpleCellFactory.ts), returns `{ value, handle }`.
+The value is a `SimpleCellView<Serializable<unknown>>`, and the handle resolves to that same scoped interface.
+Register `SimpleCellFactory` with the runtime before calling it.
+The helper uses `runtime.createChannel()` so the adapter remains registered even though the return value does not expose it.
+The experimental helper and Cell types remain source-module exports, not package entry-point exports.
+
+```typescript
+const { value: cell, handle } = createSimpleCell(runtime, "cell");
+cell.set(42);
+
+// Store the handle in an attached object to share the Cell.
+parent.set(handle);
+
+const resolvedCell = await handle.get();
+resolvedCell.set(43);
+```
+
+No `.handle`, `IFluidLoadable`, or runtime management methods are added to Cell.
+The creation result keeps Fluid-specific access beside the application value.
+
+`SimpleCellView<T>` exposes only `get`, `set`, `delete`, `empty`, and data-change events.
+It does not expose replication setup, message processing, acknowledgment, resubmission, replay, rollback, or snapshots.
+The adapter retains the full `SimpleCell` through its `cell` property for host operations.
+This is a TypeScript interface boundary, not a runtime wrapper: the view and implementation are the same object, preserving handle identity and event subscriptions.
+
+### Scope
+
+This is an opt-in runtime experiment, not a migration of every DDS.
+The adapter requires the updated runtime for serialized handles to resolve to Cell.
+No compatibility negotiation with older runtimes is added.
+The general `SharedObjectKind` creation/type-check helpers and `fluid-static` initial-object APIs remain unchanged.
+They still assume loadable application objects and need a separate design before adopting this model.
+
+Integration coverage includes creation through the new helper, attachment through a legacy Cell, local and serialized handle identity, lazy loading in another runtime, continued edits and summaries through the retained adapter, and legacy channels resolving to themselves.

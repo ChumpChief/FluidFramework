@@ -11,6 +11,7 @@
  */
 
 export type {
+	ChannelWithEntryPoint,
 	IChannel,
 	IChannelFactory,
 	IChannelServices,

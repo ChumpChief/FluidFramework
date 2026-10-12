@@ -43,15 +43,15 @@ export function isISharedObjectHandle(handle: unknown): handle is ISharedObjectH
  *
  * @remarks
  *
- * This object is used for already loaded (in-memory) shared objects.
+ * This object is used for already loaded (in-memory) channels and their application-facing values.
  *
  * It provides a "bind" function that is expected to be invoked on all handles stored in this DDS,
  * ensuring the target object becomes attached along with this DDS.
  * The channel need not implement the app-facing or event APIs of {@link ISharedObject}.
- * @typeParam T - The channel referenced by the handle.
+ * @typeParam T - The application-facing value returned by the handle.
  * @internal
  */
-export class SharedObjectHandle<T extends IChannel & { bindToContext(): void } = ISharedObject>
+export class SharedObjectHandle<T extends object = ISharedObject>
 	extends FluidObjectHandle<T>
 	implements ISharedObjectHandle
 {
@@ -59,7 +59,7 @@ export class SharedObjectHandle<T extends IChannel & { bindToContext(): void } =
 	 * Whether services have been attached for the associated shared object.
 	 */
 	public get isAttached(): boolean {
-		return this.value.isAttached();
+		return this.channel.isAttached();
 	}
 
 	/**
@@ -90,12 +90,13 @@ export class SharedObjectHandle<T extends IChannel & { bindToContext(): void } =
 
 	/**
 	 * Creates a new SharedObjectHandle.
-	 * @param value - The shared object this handle is for.
-	 * @param path - The id of the shared object. It is also the path to this object relative to the routeContext.
-	 * @param routeContext - The parent {@link @fluidframework/core-interfaces#IFluidHandleContext} that has a route
-	 * to this handle.
+	 * @param channel - The channel responsible for attachment and binding.
+	 * @param value - The application-facing value returned by `get`.
+	 * @param path - The channel id, relative to the runtime's handle context.
+	 * @param runtime - The data store runtime containing the channel.
 	 */
 	constructor(
+		private readonly channel: Pick<IChannel, "isAttached"> & { bindToContext(): void },
 		protected readonly value: T,
 		path: string,
 		private readonly runtime: IFluidDataStoreRuntime,
@@ -124,7 +125,7 @@ export class SharedObjectHandle<T extends IChannel & { bindToContext(): void } =
 		this.pendingHandles.clear();
 
 		// Bind this SharedObject to its context (typically the DataStore) so it attaches with it
-		this.value.bindToContext();
+		this.channel.bindToContext();
 
 		// This will trigger the context (typically the DataStore) to attach its graph
 		super.attachGraph();

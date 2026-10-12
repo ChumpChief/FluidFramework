@@ -164,7 +164,7 @@ export abstract class SharedObjectCore<
 
 		assert(!id.includes("/"), 0x304 /* Id cannot contain slashes */);
 
-		this.handle = new SharedObjectHandle(this, id, runtime);
+		this.handle = new SharedObjectHandle(this, this, id, runtime);
 
 		const internalLogger = createChildLogger({
 			logger: runtime.logger,

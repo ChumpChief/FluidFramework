@@ -6,7 +6,7 @@
 import { AttachState } from "@fluidframework/container-definitions";
 import { assert, isObject } from "@fluidframework/core-utils/internal";
 import type {
-	IChannel,
+	ChannelWithEntryPoint,
 	IChannelAttributes,
 	IChannelServices,
 	IDeltaHandler,
@@ -30,20 +30,23 @@ import {
 	SimpleCell,
 	type SimpleCellOperation,
 	type SimpleCellSnapshot,
+	type SimpleCellView,
 } from "./simpleCell.js";
 
 /**
  * A Fluid channel containing a standalone {@link SimpleCell}.
  * @remarks
- * The runtime and handles expose this adapter; applications use its `cell`.
+ * The runtime manages this adapter, while handles resolve to its Cell entry point.
  * Cell owns the data and replication algorithm. This adapter owns Fluid lifecycle and encoding.
  * Squashed resubmission is not supported by this experiment.
  * @typeParam T - The Fluid-serializable value type.
  * @internal
  */
-export class SimpleCellChannel<T = unknown> implements IChannel {
+export class SimpleCellChannel<T = unknown>
+	implements ChannelWithEntryPoint<SimpleCellView<Serializable<T>>>
+{
 	public readonly cell: SimpleCell<Serializable<T>>;
-	public readonly handle: SharedObjectHandle<SimpleCellChannel<T>>;
+	public readonly handle: SharedObjectHandle<SimpleCellView<Serializable<T>>>;
 	private readonly serializer: FluidSerializer;
 	private services: IChannelServices | undefined;
 	private bound = false;
@@ -52,6 +55,10 @@ export class SimpleCellChannel<T = unknown> implements IChannel {
 
 	public get IFluidLoadable(): this {
 		return this;
+	}
+
+	public get entryPoint(): SimpleCellView<Serializable<T>> {
+		return this.cell;
 	}
 
 	/**
@@ -70,7 +77,7 @@ export class SimpleCellChannel<T = unknown> implements IChannel {
 		this.cell = new SimpleCell<Serializable<T>>({
 			value: this.serializer.decode(snapshot.value) as Serializable<T> | undefined,
 		});
-		this.handle = new SharedObjectHandle(this, id, runtime);
+		this.handle = new SharedObjectHandle(this, this.entryPoint, id, runtime);
 		runtime.once("attaching", this.startReplicationIfAttached);
 		runtime.once("dispose", () => runtime.off("attaching", this.startReplicationIfAttached));
 	}

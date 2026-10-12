@@ -10,7 +10,10 @@ import {
 	DataStoreMessageType,
 	FluidDataStoreRuntime,
 } from "@fluidframework/datastore/internal";
-import type { IChannelServices } from "@fluidframework/datastore-definitions/internal";
+import type {
+	IChannelFactory,
+	IChannelServices,
+} from "@fluidframework/datastore-definitions/internal";
 import type { ISummaryTree } from "@fluidframework/driver-definitions";
 import { buildSnapshotTree } from "@fluidframework/driver-utils/internal";
 import type {
@@ -33,10 +36,13 @@ import {
 } from "@fluidframework/test-runtime-utils/internal";
 
 import { CellFactory } from "../cellFactory.js";
+import { SharedCell as SharedCellClass } from "../cell.js";
+import { SimpleCell } from "../simpleCell.js";
 import { SimpleCellChannel } from "../simpleCellChannel.js";
-import { SimpleCellFactory } from "../simpleCellFactory.js";
+import { createSimpleCell, SimpleCellFactory } from "../simpleCellFactory.js";
 
 const factory = new SimpleCellFactory();
+const legacyFactory = new CellFactory();
 
 function messages(contents: readonly unknown[], local = false): IRuntimeMessageCollection {
 	return {
@@ -138,7 +144,10 @@ function createDataStore(
 	};
 	const runtime = new FluidDataStoreRuntime(
 		context,
-		new Map([[factory.type, factory]]),
+		new Map<string, IChannelFactory>([
+			[factory.type, factory],
+			[legacyFactory.type, legacyFactory],
+		]),
 		attachState !== AttachState.Detached,
 		async (dataStore) => dataStore,
 	);
@@ -171,7 +180,8 @@ describe("SimpleCellChannel", () => {
 			assert(!("handle" in channel.cell));
 			assert(!("IFluidLoadable" in channel.cell));
 			assert.equal(channel.IFluidLoadable, channel);
-			assert.equal(await channel.handle.get(), channel);
+			assert.equal(channel.entryPoint, channel.cell);
+			assert.equal(await channel.handle.get(), channel.cell);
 			assert.notEqual(factory.type, CellFactory.Type);
 		});
 
@@ -499,7 +509,7 @@ describe("SimpleCellChannel", () => {
 			});
 		});
 
-		it("resolves serialized handles to adapters without grafting Cell APIs", async () => {
+		it("resolves serialized handles to Cell entry points without grafting APIs", async () => {
 			const { runtime } = createDataStore();
 			const parent = runtime.createChannel("parent", factory.type);
 			const child = runtime.createChannel("child", factory.type);
@@ -515,8 +525,129 @@ describe("SimpleCellChannel", () => {
 			const handle = loaded.cell.get();
 			assert(isFluidHandle(handle));
 			assert.equal(toFluidHandleInternal(handle).absolutePath, child.handle.absolutePath);
-			assert.equal(await handle.get(), child);
+			assert.equal(await handle.get(), child.cell);
+			assert.equal(await child.handle.get(), child.cell);
+			assert.equal(await runtime.getChannel("child"), child);
 			assert.equal(child.cell.get(), 42);
+		});
+
+		it("creates an app-facing Cell and handle while retaining the adapter in the runtime", async () => {
+			const { runtime, submitted } = createDataStore();
+			const { value, handle } = createSimpleCell(runtime, "cell");
+			const channel = await runtime.getChannel("cell");
+			assert(channel instanceof SimpleCellChannel);
+			assert.equal(value, channel.entryPoint);
+			assert.equal(handle, channel.handle);
+			assert.equal(await handle.get(), value);
+			assert(!("IFluidLoadable" in value));
+			assert(!("handle" in value));
+			assert(!("summarize" in value));
+			assert(value.empty());
+			const events: unknown[] = [];
+			const unsubscribe = value.events.on("valueChanged", (next) => events.push(next));
+			const unsubscribeDelete = value.events.on("delete", () => events.push("delete"));
+			value.set(42);
+			assert(!handle.isAttached);
+			assert.equal(submitted.length, 0);
+
+			const parent = runtime.createChannel("parent", legacyFactory.type);
+			assert(parent instanceof SharedCellClass);
+			parent.handle.attachGraph();
+			parent.set(handle);
+			assert(handle.isAttached);
+			const resolved = await handle.get();
+			assert.equal(resolved.get(), 42);
+			resolved.set(43);
+			assert.deepEqual(submitted.at(-1)?.content, {
+				address: "cell",
+				contents: { type: "set", value: 43 },
+			});
+			resolved.delete();
+			assert(value.empty());
+			assert.equal(value.get(), undefined);
+			assert.deepEqual(events, [42, 43, "delete"]);
+			unsubscribe();
+			unsubscribeDelete();
+		});
+
+		it("supports creation with runtime-generated identifiers", async () => {
+			const { runtime } = createDataStore();
+			const first = createSimpleCell(runtime);
+			const second = createSimpleCell(runtime);
+			assert.notEqual(first.value, second.value);
+			assert.notEqual(
+				toFluidHandleInternal(first.handle).absolutePath,
+				toFluidHandleInternal(second.handle).absolutePath,
+			);
+			assert.equal(await first.handle.get(), first.value);
+			assert.equal(await second.handle.get(), second.value);
+		});
+
+		it("resolves a lazily loaded entry point in another runtime and keeps the adapter usable", async () => {
+			const source = createDataStore(AttachState.Detached);
+			const parent = createSimpleCell(source.runtime, "parent");
+			const child = createSimpleCell(source.runtime, "child");
+			child.value.set(42);
+			parent.value.set(child.handle);
+			toFluidHandleInternal(parent.handle).attachGraph();
+			const snapshot = source.runtime.getAttachSummary();
+			const target = createDataStore(AttachState.Attached, snapshot.summary);
+			const loadedParent = await target.runtime.getChannel("parent");
+			assert(loadedParent instanceof SimpleCellChannel);
+			const remoteHandle = loadedParent.cell.get();
+			assert(isFluidHandle(remoteHandle));
+			const resolved = await remoteHandle.get();
+			assert(resolved instanceof SimpleCell);
+			assert.equal(resolved.get(), 42);
+			assert.notEqual(resolved, child.value);
+			const loadedChild = await target.runtime.getChannel("child");
+			assert(loadedChild instanceof SimpleCellChannel);
+			assert.equal(resolved, loadedChild.entryPoint);
+			assert.equal(resolved, await loadedChild.handle.get());
+			assert.equal(resolved, await remoteHandle.get());
+			const routed = await target.runtime.resolveHandle({ url: "/_channels/child" });
+			assert.equal(routed.status, 200);
+			assert.equal(routed.value, resolved);
+
+			resolved.set(43);
+			const [submission] = target.submitted;
+			assert(submission !== undefined);
+			assert.deepEqual(submission.content, {
+				address: "child",
+				contents: { type: "set", value: 43 },
+			});
+			target.runtime.processMessages(messages([submission.content], true));
+			const nextSnapshot = await target.runtime.summarize(true, false);
+			const reloaded = createDataStore(AttachState.Attached, nextSnapshot.summary);
+			const latest = await reloaded.runtime.getChannel("child");
+			assert(latest instanceof SimpleCellChannel);
+			assert.equal(latest.cell.get(), 43);
+		});
+
+		it("preserves legacy channel identity for local and serialized handles", async () => {
+			const { runtime } = createDataStore();
+			const legacy = runtime.createChannel("legacy", legacyFactory.type);
+			assert(legacy instanceof SharedCellClass);
+			legacy.set(42);
+			legacy.handle.attachGraph();
+			const serializer = new FluidSerializer(runtime.channelsRoutingContext);
+			const remoteHandle = serializer.decode(serializer.encode(legacy.handle, legacy.handle));
+			assert(isFluidHandle(remoteHandle));
+			assert.equal(await legacy.handle.get(), legacy);
+			assert.equal(await remoteHandle.get(), legacy);
+			assert.equal(await runtime.getChannel("legacy"), legacy);
+			const response = await runtime.resolveHandle({ url: "/legacy" });
+			assert.equal(response.status, 200);
+			assert.equal(response.value, legacy);
+		});
+
+		it("does not silently fall back to the adapter for an invalid entry point", async () => {
+			const { runtime } = createDataStore();
+			const channel = runtime.createChannel("cell", factory.type);
+			Object.defineProperty(channel, "entryPoint", { value: undefined });
+			const response = await runtime.resolveHandle({ url: "/cell" });
+			assert.equal(response.status, 500);
+			assert.notEqual(response.value, channel);
 		});
 
 		it("attaches a cycle of channel references without duplicate binding", () => {
