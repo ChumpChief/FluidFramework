@@ -290,8 +290,9 @@ This retains references that can become visible after acknowledgment or rollback
 Stage 2 initially exposed the adapter through handles and used `channel.cell` for application access.
 Stage 3, described below, changes handle resolution and provides an application-facing creation helper.
 
-Squashed resubmission is explicitly unsupported and throws before submitting anything.
-The adapter reuses staging-aware handle binding, but does not claim to support committing staging changes through squashed operations.
+Stage 2 initially rejected squashed resubmission before submitting anything.
+The generic adapter extension described below now forwards squash requests to the DDS and retains staging-aware handle binding.
+SimpleCell preserves its operations unchanged rather than removing intermediate edits.
 SharedObject-specific `pre-op`/`op` events and sampled callback telemetry are not reproduced.
 
 [Adapter coverage](./src/test/simpleCellChannel.spec.ts) exercises attachment, detached loading, concurrent edits, disconnection, resubmission, rollback, summaries, nested handles, and GC.
@@ -379,6 +380,25 @@ It does not return Fluid handles or GC routes as a contract.
 Cell returns sequenced and pending state; another DDS can also expose references in undo state or other retained structures.
 The Fluid adapter uses `GCHandleVisitor` to interpret Fluid references in that data.
 
+### Local operation metadata and resubmission
+
+The submission callback accepts optional, opaque local metadata.
+The host retains it without encoding, cloning, or sending it to other replicas.
+The adapter returns the same value on local acknowledgment, resubmission, and rollback; remote operations carry no local metadata.
+Only operation contents pass through the Fluid serializer.
+Metadata may contain object identities and non-serializable bookkeeping.
+The DDS remains responsible for exposing any retained references needed for garbage collection through `getReferenceData()`.
+
+Resubmission receives the original operation's metadata and a boolean squash request.
+The DDS may publish zero, one, or multiple replacement operations with their own metadata and must keep its pending state consistent with the resulting acknowledgments.
+The adapter does not interpret the request or combine operations.
+SimpleCell continues to use its ordered pending queue, submits no metadata, and republishes operations unchanged even when squashing is requested.
+No Cell compaction is implemented.
+
+`replay(content)` is unchanged.
+The DDS recreates local metadata when replay submits edits, and the runtime captures those submissions for the persisted transport record.
+This preserves the existing stashed-operation handling without encoding or persisting the metadata itself.
+
 ### Construction and application views
 
 `DataStructureDefinition<TView>` supplies `create()` and `restore(snapshot)`.
@@ -395,11 +415,27 @@ No operation codec is injected: DDSs interpret their own operation contents.
 ### Limits and evaluation
 
 This adapter supports ordered operations with synchronous, non-undefined snapshots stored in one `header` blob.
-It retains explicit rejection of squashed resubmission.
-Local metadata, batching-specific behavior, sequencing information, and asynchronous or incremental snapshots are not added to the contract here.
+It forwards opaque local metadata and squash requests while leaving their interpretation to the DDS.
+Batching-specific behavior, sequencing information, and asynchronous or incremental snapshots are not added to the contract here.
 Those require further design before adapting DDSs that need them.
 
 The existing Cell integration cases now run through `DdsChannel`.
 [Generic adapter coverage](./src/test/ddsChannel.spec.ts) uses a test log with different operation fields, array snapshots, and a separate application view.
 It checks operation delivery, replay, resubmission, decoded rollback contents, and references retained only in undo state.
+It also checks opaque metadata identity, squash forwarding, and metadata reconstruction through the real runtime's stashed-operation capture path.
 The test log is not a new supported DDS; it checks that the adapter does not depend on Cell's data model.
+
+### Deferred: multipart snapshots
+
+Revisit multipart snapshot support when exploring a DDS that already needs multiple blobs or child trees.
+No multipart capability is implemented for now.
+SimpleCell keeps its existing snapshot object, root-level `header` blob, and snapshot format version.
+
+The direction to evaluate is to keep part selection, layout, and reconstruction private to the DDS rather than introduce a generic snapshot tree that the channel assembles.
+`getSnapshot()` could return ordinary data for the adapter to serialize with `createSingleBlobSummary`, or a prebuilt `ISummaryTreeWithStats` that the adapter forwards unchanged.
+The latter would let a DDS explicitly opt into Fluid's storage representation without requiring it of other DDSs.
+
+Open questions include how to distinguish ordinary data from a prebuilt summary and how to preserve channel-owned handle serialization.
+A channel-supplied `stringify(value)` callback could let a multipart DDS encode its blobs while constructing its own summary.
+Loading should follow the same ownership boundary: the DDS chooses its parts and reconstructs state, while the adapter supplies decoded reads.
+These are candidate directions, not settled contracts; asynchronous snapshot generation and incremental summary references remain separate concerns.

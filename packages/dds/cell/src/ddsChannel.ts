@@ -36,7 +36,7 @@ import type {
  * The runtime manages this adapter, while handles resolve to its application-facing entry point.
  * The DDS owns data and replication behavior. This adapter owns Fluid lifecycle and encoding.
  * Snapshots are synchronous and stored in a single blob.
- * Squashed resubmission is not supported by this experiment.
+ * Local operation metadata and squash requests pass through to the DDS without interpretation.
  * @typeParam TView - The application-facing interface.
  * @internal
  */
@@ -132,7 +132,9 @@ export class DdsChannel<TView extends object> implements ChannelWithEntryPoint<T
 	private readonly startReplicationIfAttached = (): void => {
 		if (!this.replicating && this.services !== undefined && this.isAttached()) {
 			this.verifyUsable();
-			this.dds.startReplication((operation) => this.submit(operation));
+			this.dds.startReplication((operation, localMetadata) =>
+				this.submit(operation, localMetadata),
+			);
 			this.replicating = true;
 			this.runtime.off("attaching", this.startReplicationIfAttached);
 		}
@@ -141,30 +143,27 @@ export class DdsChannel<TView extends object> implements ChannelWithEntryPoint<T
 	private readonly deltaHandler: IDeltaHandler = {
 		processMessages: ({ local, messagesContent }) => {
 			this.verifyUsable();
-			for (const { contents } of messagesContent) {
-				this.dds.receive(this.serializer.decode(contents), local);
+			for (const { contents, localOpMetadata } of messagesContent) {
+				this.dds.receive(this.serializer.decode(contents), local, localOpMetadata);
 			}
 		},
 		// Disconnection changes delivery, not replication state. The runtime queues edits.
 		setConnectionState: () => {},
-		reSubmit: (content: unknown, _localOpMetadata: unknown, squash?: boolean) => {
+		reSubmit: (content: unknown, localOpMetadata: unknown, squash?: boolean) => {
 			this.verifyUsable();
-			if (squash === true) {
-				throw new Error("DdsChannel does not support squashed resubmission");
-			}
-			this.dds.resubmit(this.serializer.decode(content));
+			this.dds.resubmit(this.serializer.decode(content), localOpMetadata, squash === true);
 		},
 		applyStashedOp: (content: unknown) => {
 			this.verifyUsable();
 			this.dds.replay(this.serializer.decode(content));
 		},
-		rollback: (content: unknown) => {
+		rollback: (content: unknown, localOpMetadata: unknown) => {
 			this.verifyUsable();
-			this.dds.rollback(this.serializer.decode(content));
+			this.dds.rollback(this.serializer.decode(content), localOpMetadata);
 		},
 	};
 
-	private submit(operation: unknown): void {
+	private submit(operation: unknown, localMetadata: unknown): void {
 		this.verifyUsable();
 		assert(this.services !== undefined, "Replicating channel must have services");
 		const onlyBind =
@@ -173,7 +172,7 @@ export class DdsChannel<TView extends object> implements ChannelWithEntryPoint<T
 		const content = onlyBind
 			? bindHandles(operation, this.handle)
 			: this.serializer.encode(operation, this.handle);
-		this.services.deltaConnection.submit(content, undefined);
+		this.services.deltaConnection.submit(content, localMetadata);
 	}
 
 	private verifyUsable(): void {

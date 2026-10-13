@@ -376,14 +376,38 @@ describe("SimpleCell with DdsChannel", () => {
 			assert.equal(channel.entryPoint.get(), 2);
 		});
 
-		it("fails explicitly for squashed resubmission and invalid operations", () => {
+		it("preserves operations when squashing is requested without reapplying edits", () => {
+			const channel = factory.create(new MockFluidDataStoreRuntime(), "cell");
+			const { services, delta, submitted } = createServices();
+			channel.connect(services);
+			const events: unknown[] = [];
+			channel.entryPoint.events.on("valueChanged", (value) => events.push(value));
+			channel.entryPoint.events.on("delete", () => events.push("delete"));
+			channel.entryPoint.set(1);
+			channel.entryPoint.delete();
+			channel.entryPoint.set(3);
+			const original = [...submitted];
+			const pending = getCell(channel).getPendingOperations();
+			for (const operation of original) {
+				delta.reSubmit(operation, undefined, true);
+			}
+			assert.deepEqual(submitted, [...original, ...original]);
+			assert.deepEqual(getCell(channel).getPendingOperations(), pending);
+			assert.deepEqual(events, [1, "delete", 3]);
+			assert.equal(channel.entryPoint.get(), 3);
+			delta.processMessages(messages(submitted.slice(original.length), true));
+			assert.deepEqual(getCell(channel).getPendingOperations(), []);
+			assert.deepEqual(getCell(channel).getSnapshot(), { value: 3 });
+			assert.deepEqual(events, [1, "delete", 3]);
+		});
+
+		it("fails explicitly for invalid operations", () => {
 			const channel = factory.create(new MockFluidDataStoreRuntime(), "cell");
 			const { services, delta } = createServices();
 			channel.connect(services);
-			channel.entryPoint.set(1);
 			assert.throws(
-				() => delta.reSubmit({ type: "set", value: 1 }, undefined, true),
-				/does not support squashed resubmission/,
+				() => delta.reSubmit({ type: "unknown" }, undefined, true),
+				/Unsupported SimpleCell operation/,
 			);
 			assert.throws(
 				() => delta.processMessages(messages([{ type: "unknown" }])),
