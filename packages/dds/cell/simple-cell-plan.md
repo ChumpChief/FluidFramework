@@ -181,17 +181,17 @@ The existing Cell and its factory remain unchanged.
 
 | API | Purpose |
 | --- | --- |
-| `new SimpleCell<T>(snapshot?)` | Creates a local-only Cell, optionally restoring sequenced state. |
+| `new SimpleCell<T>(snapshot?)` | Creates a local-only Cell, optionally restoring a visible value. |
 | `get`, `set`, `delete`, `empty` | Reads and edits the visible value. |
 | `events.on`, `events.off` | Subscribes to `valueChanged` and `delete`; `on` also returns an unsubscribe function. |
 | `startReplication(submit)` | Installs a synchronous submission callback once and returns the initial snapshot. |
-| `receive(operation, local)` | Processes a remote operation, or acknowledges the oldest pending local edit without reapplying it or emitting another data-change event. |
-| `resubmit(operation)` | Publishes the host-supplied pending operation without applying it again or modifying the pending queue. |
+| `receive(operation, local, localMetadata)` | Processes a remote operation when no local edits are pending, or acknowledges the oldest pending edit using its message ID. |
+| `resubmit(operation, localMetadata, squash?)` | Publishes the host-supplied operation and metadata without applying it again or modifying the pending queue. Squash requests preserve operations unchanged. |
 | `replay(operation)` | Recreates a persisted edit; publishes it only if replication has started. |
-| `rollback(operation)` | Removes the newest pending edit after the host withdraws it from delivery. Cell uses its pending queue rather than inspecting the supplied contents. |
-| `getSnapshot()` | Captures sequenced state, excluding pending local edits. |
+| `rollback(operation, localMetadata)` | Validates the newest pending message ID and restores the previous value recorded in its local metadata. |
+| `getSnapshot()` | Captures the current visible value, including pending local edits. |
 | `getPendingOperations()` | Captures pending operations in replay order. |
-| `getReferenceData()` | Exposes retained sequenced and pending data for host reference traversal. |
+| `getReferenceData()` | Exposes visible data, pending operations, and previous values retained for rollback. |
 
 Values are unconstrained `T`.
 Cell does not clone or encode them; callers must not mutate stored payloads.
@@ -199,8 +199,10 @@ Operation and snapshot encoding, transport identity, queuing, and duplicate supp
 `receive`, `resubmit`, and `replay` accept unknown contents after host-specific decoding.
 Cell validates and interprets its operation tags and fields; it does not decode or validate the opaque payload value's type.
 
-The submission callback receives only an operation.
-Cell has no operation tokens or identity lookups.
+Operations use the existing Cell's `setCell` and `deleteCell` tags.
+Set operations wrap their payload as `{ type: "setCell", value: { value } }`, including when the value is undefined.
+The submission callback receives an operation and opaque local metadata containing `pendingMessageId` and `previousValue`.
+Message IDs match acknowledgments and rollback requests to pending edits; they are not transport identities and do not perform deduplication.
 The host guarantees that acknowledgments arrive in submission order and rollback removes edits in reverse submission order.
 Resubmission still flows through the DDS: the host supplies unacknowledged operations in submission order, and Cell republishes each through the callback.
 Several resubmit calls can occur before any acknowledgment, so Cell uses the supplied operation rather than repeatedly reading the head of its pending queue.
@@ -210,14 +212,15 @@ The host must deliver each edit exactly once, as either a remote operation or a 
 
 ### State and failure decisions
 
-Cell keeps the latest sequenced value alongside its pending operations.
-The visible value comes from the newest pending edit, when one exists.
-Remote operations still update sequenced state underneath pending edits, so rollback can reveal the current shared value rather than an obsolete pre-edit value.
-Both responsibilities remain in the same Cell implementation.
+Cell keeps a visible value and pending operations with their local metadata, matching the existing Cell's value and rollback behavior.
+Remote operations are ignored while local edits are pending; they are not retained in a separate sequenced value.
+Acknowledgments retire pending operations without changing the visible value.
+Rollback restores the previous value captured when the edit was made, not a remote value ignored while the edit was pending.
 
-A checkpoint consists of the sequenced snapshot, pending operations, and host-owned delivery position and transport identities.
-Restore the snapshot, start replication, and replay pending operations before catching up with later sequenced messages.
-The visible value alone is not a sufficient checkpoint.
+Snapshots capture the visible value and do not contain pending metadata or delivery state.
+To replay pending edits and reconstruct their rollback values, the host must select a baseline preceding those edits and retain the pending operations, delivery position, and transport identities.
+Restore that baseline, start replication, and replay pending operations before catching up with later messages.
+Do not use a visible snapshot containing pending edits as their rollback reconstruction baseline.
 
 Local edits update state and register pending work before calling the submission callback, then notify listeners.
 The callback must accept or queue the operation synchronously, even while disconnected.
@@ -232,7 +235,8 @@ Further edits, replication calls, and checkpoint requests throw an error whose c
 `get` and `empty` remain available for inspection.
 Invalid lifecycle calls and attempts to acknowledge or roll back an empty pending queue throw before mutation and do not independently fault the Cell.
 Malformed operation contents throw a `TypeError` before changing state or publishing.
-Cell trusts the host's operation ordering instead of validating operation identity.
+Cell validates pending message IDs before changing acknowledgment or rollback state.
+The host still owns transport ordering and duplicate suppression.
 The standalone implementation uses ordinary JavaScript errors; a future Fluid adapter owns Fluid-specific error classification.
 
 The standalone cases and the in-memory ordered host are in [src/test/simpleCell.spec.ts](./src/test/simpleCell.spec.ts).
@@ -255,16 +259,17 @@ Creation in an already-attached data store does not make an unbound channel repl
 Before attachment, local edits are represented in the attach snapshot.
 Disconnection does not stop replication: the runtime continues to accept pending operations and requests their resubmission later.
 
-Incoming message collections pass each operation's contents through `serializer.decode()` and then forward them with the `local` flag to `receive(operation, local)`.
-Resubmission calls `resubmit(operation)`, and rollback calls `rollback(operation)`.
+Incoming message collections pass each operation's contents through `serializer.decode()` and then forward them with the `local` flag and local metadata to `receive(operation, local, localMetadata)`.
+Resubmission calls `resubmit(operation, localMetadata, squash)`, and rollback calls `rollback(operation, localMetadata)`.
 Rollback contents also pass through `serializer.decode()` before reaching the DDS.
 Stashed-op replay always calls `replay(operation)`.
 Cell handles replay in both states: detached replay updates local state without pending operations, while replicated replay also submits the edit.
 The channel does not inspect Cell operation tags or fields, including during detached replay.
 The existing runtime capture mechanism associates replayed submissions with the original operation; the adapter introduces no operation tokens.
 
-Snapshots use one `header` blob containing Cell's sequenced state.
-Pending local edits are restored through the runtime's pending-state replay rather than being written into that blob.
+Snapshots use one `header` blob containing Cell's visible value, matching the existing Cell's format without attribution.
+The value can reflect pending local edits, but their bookkeeping is not written into that blob.
+The runtime's pending-state replay reconstructs local metadata from its restore baseline.
 The factory rejects unsupported channel types and snapshot versions.
 Runtime-facing operations reject a disposed runtime, and disposal removes a pending attachment listener.
 The retained Cell can still be inspected; an attempted replicated edit after disposal fails through its submission callback and faults the Cell.
@@ -282,7 +287,7 @@ Operations and snapshots use Fluid handle encoding, decoding, and reference bind
 For operations, the channel only performs Fluid serialization; Cell owns further parsing and interpretation.
 The adapter also honors the runtime mode in which submission binds handles but the container runtime performs encoding.
 GC visits the DDS's `getReferenceData()` result without binding or attaching objects.
-For Cell, this includes both the sequenced state and pending operation values.
+For Cell, this includes the visible value, pending operation values, and previous values retained for rollback.
 This retains references that can become visible after acknowledgment or rollback.
 
 ### Scope and limitations
@@ -371,13 +376,13 @@ No other production DDS is migrated in this experiment.
 The contract has no imports or Fluid-specific types.
 `SimpleCell` implements it alongside `SimpleCellView`, keeping data and replication behavior in one implementation.
 
-Rollback accepts decoded operation contents so DDSs that need the original operation can interpret it.
-Cell does not need those contents: reverse-order rollback uses its own pending queue.
+Rollback accepts decoded operation contents and local metadata so DDSs can interpret either.
+Cell validates the operation and uses the metadata's pending message ID and previous value.
 The contract retains the host guarantees about total ordering, acknowledgments, reverse-order rollback, and deduplication.
 
 `getReferenceData()` returns data containing any external references still retained by the DDS.
 It does not return Fluid handles or GC routes as a contract.
-Cell returns sequenced and pending state; another DDS can also expose references in undo state or other retained structures.
+Cell returns visible and pending state, including rollback values; another DDS can also expose references in undo state or other retained structures.
 The Fluid adapter uses `GCHandleVisitor` to interpret Fluid references in that data.
 
 ### Local operation metadata and resubmission
@@ -392,7 +397,8 @@ The DDS remains responsible for exposing any retained references needed for garb
 Resubmission receives the original operation's metadata and a boolean squash request.
 The DDS may publish zero, one, or multiple replacement operations with their own metadata and must keep its pending state consistent with the resulting acknowledgments.
 The adapter does not interpret the request or combine operations.
-SimpleCell continues to use its ordered pending queue, submits no metadata, and republishes operations unchanged even when squashing is requested.
+SimpleCell uses an ordered pending queue and submits the existing Cell's message ID and previous-value metadata.
+It republishes operations with their original metadata unchanged even when squashing is requested.
 No Cell compaction is implemented.
 
 `replay(content)` is unchanged.
@@ -415,6 +421,7 @@ No operation codec is injected: DDSs interpret their own operation contents.
 ### Limits and evaluation
 
 This adapter supports ordered operations with synchronous, non-undefined snapshots stored in one `header` blob.
+Snapshot contents and the relationship between snapshots and pending replay are DDS-defined, not restricted to sequenced state.
 It forwards opaque local metadata and squash requests while leaving their interpretation to the DDS.
 Batching-specific behavior, sequencing information, and asynchronous or incremental snapshots are not added to the contract here.
 Those require further design before adapting DDSs that need them.
@@ -424,6 +431,7 @@ The existing Cell integration cases now run through `DdsChannel`.
 It checks operation delivery, replay, resubmission, decoded rollback contents, and references retained only in undo state.
 It also checks opaque metadata identity, squash forwarding, and metadata reconstruction through the real runtime's stashed-operation capture path.
 The test log is not a new supported DDS; it checks that the adapter does not depend on Cell's data model.
+Cell-specific coverage compares snapshots and pending/rollback behavior with the existing Cell and exchanges operations between the two implementations.
 
 ### Deferred: multipart snapshots
 

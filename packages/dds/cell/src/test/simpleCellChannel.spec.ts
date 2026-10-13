@@ -53,7 +53,11 @@ function getCell(channel: CellChannel): SimpleCell {
 	return channel.dds;
 }
 
-function messages(contents: readonly unknown[], local = false): IRuntimeMessageCollection {
+function messages(
+	contents: readonly unknown[],
+	local = false,
+	metadata: readonly unknown[] = [],
+): IRuntimeMessageCollection {
 	return {
 		envelope: {
 			type: "op",
@@ -66,7 +70,7 @@ function messages(contents: readonly unknown[], local = false): IRuntimeMessageC
 		local,
 		messagesContent: contents.map((content, index) => ({
 			contents: content,
-			localOpMetadata: undefined,
+			localOpMetadata: local ? metadata[index] : undefined,
 			clientSequenceNumber: index + 1,
 		})),
 	};
@@ -76,11 +80,13 @@ function createServices(): {
 	services: IChannelServices;
 	delta: MockDeltaConnection;
 	submitted: unknown[];
+	metadata: unknown[];
 } {
 	const submitted: unknown[] = [];
+	const metadata: unknown[] = [];
 	const delta = new MockDeltaConnection(
-		(content: unknown, metadata) => {
-			assert.equal(metadata, undefined);
+		(content: unknown, localMetadata) => {
+			metadata.push(localMetadata);
 			return submitted.push(content);
 		},
 		() => {},
@@ -89,6 +95,7 @@ function createServices(): {
 		services: { deltaConnection: delta, objectStorage: new MockStorage() },
 		delta,
 		submitted,
+		metadata,
 	};
 }
 
@@ -206,7 +213,7 @@ describe("SimpleCell with DdsChannel", () => {
 		it("starts replication on attachment, not on connection to detached services", () => {
 			const runtime = new MockFluidDataStoreRuntime({ attachState: AttachState.Detached });
 			const channel = factory.create(runtime, "cell");
-			const { services, submitted, delta } = createServices();
+			const { services, submitted, delta, metadata } = createServices();
 			channel.connect(services);
 			channel.entryPoint.set(1);
 			assert.deepEqual(submitted, []);
@@ -216,8 +223,8 @@ describe("SimpleCell with DdsChannel", () => {
 			channel.entryPoint.set(2);
 			runtime.setAttachState(AttachState.Attached);
 			channel.connect(services);
-			assert.deepEqual(submitted, [{ type: "set", value: 2 }]);
-			delta.processMessages(messages(submitted, true));
+			assert.deepEqual(submitted, [{ type: "setCell", value: { value: 2 } }]);
+			delta.processMessages(messages(submitted, true, metadata));
 			assert.deepEqual(getCell(channel).getSnapshot(), { value: 2 });
 			assert.deepEqual(getCell(channel).getPendingOperations(), []);
 		});
@@ -249,20 +256,20 @@ describe("SimpleCell with DdsChannel", () => {
 			);
 			const runtime = new MockFluidDataStoreRuntime({ attachState: AttachState.Detached });
 			const loaded = await factory.load(runtime, "cell", services, factory.attributes);
-			delta.applyStashedOp({ type: "set", value: 2 });
+			delta.applyStashedOp({ type: "setCell", value: { value: 2 } });
 			assert.deepEqual(getCell(loaded).getSnapshot(), { value: 2 });
-			delta.applyStashedOp({ type: "delete" });
+			delta.applyStashedOp({ type: "deleteCell" });
 			assert(loaded.entryPoint.empty());
-			delta.applyStashedOp({ type: "set", value: 3 });
+			delta.applyStashedOp({ type: "setCell", value: { value: 3 } });
 			assert.deepEqual(getCell(loaded).getSnapshot(), { value: 3 });
 			assert.deepEqual(getCell(loaded).getPendingOperations(), []);
 			assert.deepEqual(submitted, []);
 			runtime.setAttachState(AttachState.Attached);
 			loaded.entryPoint.delete();
-			assert.deepEqual(submitted, [{ type: "delete" }]);
+			assert.deepEqual(submitted, [{ type: "deleteCell" }]);
 		});
 
-		it("summarizes sequenced state rather than unacknowledged local edits", async () => {
+		it("summarizes the visible value including unacknowledged local edits", async () => {
 			const channel = factory.create(new MockFluidDataStoreRuntime(), "cell");
 			channel.entryPoint.set(1);
 			const { services } = createServices();
@@ -276,7 +283,33 @@ describe("SimpleCell with DdsChannel", () => {
 				factory.attributes,
 			);
 			assert.equal(channel.entryPoint.get(), 2);
-			assert.equal(loaded.entryPoint.get(), 1);
+			assert.equal(loaded.entryPoint.get(), 2);
+		});
+
+		it("uses real Cell's header format and restores snapshots in either implementation", async () => {
+			for (const value of [undefined, 42, { nested: [1, 2] }]) {
+				const channel = factory.create(new MockFluidDataStoreRuntime(), "cell");
+				const legacy = legacyFactory.create(new MockFluidDataStoreRuntime(), "cell");
+				channel.entryPoint.set(value);
+				legacy.set(value);
+				const summary = channel.getAttachSummary();
+				const legacySummary = legacy.getAttachSummary();
+				assert.deepEqual(summary, legacySummary);
+				const loadedLegacy = await legacyFactory.load(
+					new MockFluidDataStoreRuntime(),
+					"legacy",
+					MockSharedObjectServices.createFromSummary(summary.summary),
+					legacyFactory.attributes,
+				);
+				const loaded = await factory.load(
+					new MockFluidDataStoreRuntime(),
+					"loaded",
+					MockSharedObjectServices.createFromSummary(legacySummary.summary),
+					factory.attributes,
+				);
+				assert.deepEqual(loadedLegacy.get(), value);
+				assert.deepEqual(loaded.entryPoint.get(), value);
+			}
 		});
 
 		it("rejects unsupported formats and malformed snapshots", async () => {
@@ -306,12 +339,83 @@ describe("SimpleCell with DdsChannel", () => {
 			assert.throws(() => channel.entryPoint.set(1), /runtime is disposed/);
 			assert.throws(() => channel.getAttachSummary(), /runtime is disposed/);
 			assert.throws(() => channel.getGCData(), /runtime is disposed/);
-			assert.throws(() => delta.processMessages(messages([{ type: "delete" }])), /disposed/);
+			assert.throws(
+				() => delta.processMessages(messages([{ type: "deleteCell" }])),
+				/disposed/,
+			);
 			assert.throws(() => channel.entryPoint.set(2), /SimpleCell is faulted/);
 		});
 	});
 
 	describe("messages and pending state", () => {
+		it("interoperates with real Cell's operation format", () => {
+			const runtimeFactory = new MockContainerRuntimeFactoryForReconnection();
+			const channel = createConnected(runtimeFactory).channel;
+			const legacyRuntime = new MockFluidDataStoreRuntime();
+			runtimeFactory.createContainerRuntime(legacyRuntime);
+			const legacy = legacyFactory.create(legacyRuntime, "cell");
+			legacy.connect({
+				deltaConnection: legacyRuntime.createDeltaConnection(),
+				objectStorage: new MockStorage(),
+			});
+			channel.entryPoint.set(1);
+			runtimeFactory.processAllMessages();
+			assert.equal(legacy.get(), 1);
+			legacy.set(2);
+			runtimeFactory.processAllMessages();
+			assert.equal(channel.entryPoint.get(), 2);
+			channel.entryPoint.set(undefined);
+			runtimeFactory.processAllMessages();
+			assert(legacy.empty());
+			legacy.delete();
+			runtimeFactory.processAllMessages();
+			assert(channel.entryPoint.empty());
+			assert.deepEqual(getCell(channel).getPendingOperations(), []);
+		});
+
+		it("matches real Cell's pending suppression, visible snapshots, and rollback metadata", () => {
+			const channel = factory.create(new MockFluidDataStoreRuntime(), "cell");
+			const legacy = legacyFactory.create(new MockFluidDataStoreRuntime(), "cell");
+			const currentServices = createServices();
+			const legacyServices = createServices();
+			channel.entryPoint.set(0);
+			legacy.set(0);
+			channel.connect(currentServices.services);
+			legacy.connect(legacyServices.services);
+			for (const value of [1, 2]) {
+				channel.entryPoint.set(value);
+				legacy.set(value);
+			}
+			assert.deepEqual(currentServices.submitted, legacyServices.submitted);
+			assert.deepEqual(currentServices.metadata, legacyServices.metadata);
+			const remote = { type: "setCell", value: { value: 9 } };
+			currentServices.delta.processMessages(messages([remote]));
+			legacyServices.delta.processMessages(messages([remote]));
+			assert.equal(channel.entryPoint.get(), 2);
+			assert.equal(legacy.get(), 2);
+			assert.deepEqual(channel.getAttachSummary(), legacy.getAttachSummary());
+			currentServices.delta.rollback?.(
+				currentServices.submitted.pop(),
+				currentServices.metadata.pop(),
+			);
+			legacyServices.delta.rollback?.(
+				legacyServices.submitted.pop(),
+				legacyServices.metadata.pop(),
+			);
+			assert.equal(channel.entryPoint.get(), 1);
+			assert.equal(legacy.get(), 1);
+			assert.deepEqual(channel.getAttachSummary(), legacy.getAttachSummary());
+			currentServices.delta.processMessages(
+				messages(currentServices.submitted, true, currentServices.metadata),
+			);
+			legacyServices.delta.processMessages(
+				messages(legacyServices.submitted, true, legacyServices.metadata),
+			);
+			assert.equal(channel.entryPoint.get(), 1);
+			assert.equal(legacy.get(), 1);
+			assert.deepEqual(getCell(channel).getPendingOperations(), []);
+		});
+
 		it("converges under concurrent edits and does not reemit acknowledged edits", () => {
 			const runtimeFactory = new MockContainerRuntimeFactoryForReconnection();
 			const first = createConnected(runtimeFactory).channel;
@@ -338,7 +442,11 @@ describe("SimpleCell with DdsChannel", () => {
 			channel.entryPoint.events.on("valueChanged", (value) => events.push(value));
 			channel.entryPoint.events.on("delete", () => events.push("delete"));
 			delta.processMessages(
-				messages([{ type: "set", value: 1 }, { type: "delete" }, { type: "set" }]),
+				messages([
+					{ type: "setCell", value: { value: 1 } },
+					{ type: "deleteCell" },
+					{ type: "setCell", value: {} },
+				]),
 			);
 			assert.deepEqual(events, [1, "delete", undefined]);
 			assert(channel.entryPoint.empty());
@@ -363,22 +471,22 @@ describe("SimpleCell with DdsChannel", () => {
 
 		it("rolls back in reverse order and then accepts remote edits", () => {
 			const channel = factory.create(new MockFluidDataStoreRuntime(), "cell");
-			const { services, delta, submitted } = createServices();
+			const { services, delta, submitted, metadata } = createServices();
 			channel.connect(services);
 			channel.entryPoint.set(1);
 			channel.entryPoint.delete();
 			const last = submitted.pop();
-			delta.rollback?.(last, undefined);
+			delta.rollback?.(last, metadata.pop());
 			assert.equal(channel.entryPoint.get(), 1);
-			delta.rollback?.(submitted.pop(), undefined);
+			delta.rollback?.(submitted.pop(), metadata.pop());
 			assert(channel.entryPoint.empty());
-			delta.processMessages(messages([{ type: "set", value: 2 }]));
+			delta.processMessages(messages([{ type: "setCell", value: { value: 2 } }]));
 			assert.equal(channel.entryPoint.get(), 2);
 		});
 
 		it("preserves operations when squashing is requested without reapplying edits", () => {
 			const channel = factory.create(new MockFluidDataStoreRuntime(), "cell");
-			const { services, delta, submitted } = createServices();
+			const { services, delta, submitted, metadata } = createServices();
 			channel.connect(services);
 			const events: unknown[] = [];
 			channel.entryPoint.events.on("valueChanged", (value) => events.push(value));
@@ -388,14 +496,17 @@ describe("SimpleCell with DdsChannel", () => {
 			channel.entryPoint.set(3);
 			const original = [...submitted];
 			const pending = getCell(channel).getPendingOperations();
-			for (const operation of original) {
-				delta.reSubmit(operation, undefined, true);
+			const originalMetadata = [...metadata];
+			for (const [index, operation] of original.entries()) {
+				delta.reSubmit(operation, originalMetadata[index], true);
 			}
 			assert.deepEqual(submitted, [...original, ...original]);
 			assert.deepEqual(getCell(channel).getPendingOperations(), pending);
 			assert.deepEqual(events, [1, "delete", 3]);
 			assert.equal(channel.entryPoint.get(), 3);
-			delta.processMessages(messages(submitted.slice(original.length), true));
+			delta.processMessages(
+				messages(submitted.slice(original.length), true, metadata.slice(original.length)),
+			);
 			assert.deepEqual(getCell(channel).getPendingOperations(), []);
 			assert.deepEqual(getCell(channel).getSnapshot(), { value: 3 });
 			assert.deepEqual(events, [1, "delete", 3]);
@@ -436,25 +547,25 @@ describe("SimpleCell with DdsChannel", () => {
 			assert(child.isAttached());
 		});
 
-		it("collects sequenced and pending references and releases them after acknowledgment", () => {
+		it("collects visible and rollback references and releases them after acknowledgment", () => {
 			const runtime = new MockFluidDataStoreRuntime();
 			const child = factory.create(runtime, "child");
 			const pendingChild = factory.create(runtime, "pending");
 			const parent = factory.create(runtime, "parent");
 			parent.entryPoint.set(child.handle);
-			const { services, delta, submitted } = createServices();
+			const { services, delta, submitted, metadata } = createServices();
 			parent.connect(services);
 			parent.entryPoint.set({ nested: [pendingChild.handle] });
 			assert.deepEqual(parent.getGCData(), {
-				gcNodes: { "/": [child.handle.absolutePath, pendingChild.handle.absolutePath] },
+				gcNodes: { "/": [pendingChild.handle.absolutePath, child.handle.absolutePath] },
 			});
 			assert(pendingChild.isAttached());
-			delta.processMessages(messages(submitted.splice(0), true));
+			delta.processMessages(messages(submitted.splice(0), true, metadata.splice(0)));
 			assert.deepEqual(parent.getGCData(), {
 				gcNodes: { "/": [pendingChild.handle.absolutePath] },
 			});
 			parent.entryPoint.delete();
-			delta.processMessages(messages(submitted.splice(0), true));
+			delta.processMessages(messages(submitted.splice(0), true, metadata.splice(0)));
 			assert.deepEqual(parent.getGCData(), { gcNodes: { "/": [] } });
 		});
 
@@ -462,12 +573,12 @@ describe("SimpleCell with DdsChannel", () => {
 			const runtime = new MockFluidDataStoreRuntime();
 			const child = factory.create(runtime, "child");
 			const parent = factory.create(runtime, "parent");
-			const { services, delta, submitted } = createServices();
+			const { services, delta, submitted, metadata } = createServices();
 			parent.connect(services);
 			const events: unknown[] = [];
 			parent.entryPoint.events.on("valueChanged", (value) => events.push(value));
 			parent.entryPoint.set(child.handle);
-			delta.processMessages(messages(submitted, true));
+			delta.processMessages(messages(submitted, true, metadata));
 			assert.equal(parent.entryPoint.get(), child.handle);
 			assert.equal(getCell(parent).getSnapshot().value, child.handle);
 			assert.deepEqual(getCell(parent).getPendingOperations(), []);
@@ -503,7 +614,7 @@ describe("SimpleCell with DdsChannel", () => {
 			const { services, submitted } = createServices();
 			parent.connect(services);
 			parent.entryPoint.set(child.handle);
-			assert.deepEqual(submitted, [{ type: "set", value: child.handle }]);
+			assert.deepEqual(submitted, [{ type: "setCell", value: { value: child.handle } }]);
 			assert(child.isAttached());
 		});
 
@@ -515,12 +626,12 @@ describe("SimpleCell with DdsChannel", () => {
 			};
 			const parent = factory.create(runtime, "parent");
 			const child = factory.create(runtime, "child");
-			const { services, delta, submitted } = createServices();
+			const { services, delta, submitted, metadata } = createServices();
 			parent.connect(services);
 			parent.entryPoint.set(child.handle);
 			assert.equal(binds, 0);
 			assert(!child.isAttached());
-			delta.rollback?.(submitted.pop(), undefined);
+			delta.rollback?.(submitted.pop(), metadata.pop());
 			assert(parent.entryPoint.empty());
 			assert.deepEqual(parent.getGCData(), { gcNodes: { "/": [] } });
 		});
@@ -539,8 +650,8 @@ describe("SimpleCell with DdsChannel", () => {
 			channel.entryPoint.set(2);
 			assert.deepEqual(submitted[1], {
 				type: "op",
-				content: { address: "cell", contents: { type: "set", value: 2 } },
-				metadata: undefined,
+				content: { address: "cell", contents: { type: "setCell", value: { value: 2 } } },
+				metadata: { pendingMessageId: 0, previousValue: 1 },
 			});
 		});
 
@@ -559,7 +670,7 @@ describe("SimpleCell with DdsChannel", () => {
 			assert.equal(submitted.length, 1);
 			assert.deepEqual(submitted[0]?.content, {
 				address: "cell",
-				contents: { type: "set", value: 2 },
+				contents: { type: "setCell", value: { value: 2 } },
 			});
 		});
 
@@ -614,7 +725,7 @@ describe("SimpleCell with DdsChannel", () => {
 			resolved.set(43);
 			assert.deepEqual(submitted.at(-1)?.content, {
 				address: "cell",
-				contents: { type: "set", value: 43 },
+				contents: { type: "setCell", value: { value: 43 } },
 			});
 			resolved.delete();
 			assert(value.empty());
@@ -668,9 +779,11 @@ describe("SimpleCell with DdsChannel", () => {
 			assert(submission !== undefined);
 			assert.deepEqual(submission.content, {
 				address: "child",
-				contents: { type: "set", value: 43 },
+				contents: { type: "setCell", value: { value: 43 } },
 			});
-			target.runtime.processMessages(messages([submission.content], true));
+			target.runtime.processMessages(
+				messages([submission.content], true, [submission.metadata]),
+			);
 			const nextSnapshot = await target.runtime.summarize(true, false);
 			const reloaded = createDataStore(AttachState.Attached, nextSnapshot.summary);
 			const latest = await reloaded.runtime.getChannel("child");
@@ -725,7 +838,7 @@ describe("SimpleCell with DdsChannel", () => {
 
 		it("replays stashed edits through the runtime capture path without double submission", async () => {
 			const { runtime, submitted, channel } = await createLoadedDataStore();
-			const op = { address: "cell", contents: { type: "set", value: 1 } };
+			const op = { address: "cell", contents: { type: "setCell", value: { value: 1 } } };
 			const metadata = await runtime.applyStashedOp({ type: "op", content: op });
 			assert.equal(channel.entryPoint.get(), 1);
 			assert.equal(submitted.length, 0);
@@ -748,7 +861,10 @@ describe("SimpleCell with DdsChannel", () => {
 			const serializer = new FluidSerializer(runtime.channelsRoutingContext);
 			const content = {
 				address: "cell",
-				contents: serializer.encode({ type: "set", value: child.handle }, channel.handle),
+				contents: serializer.encode(
+					{ type: "setCell", value: { value: child.handle } },
+					channel.handle,
+				),
 			};
 			submitted.length = 0;
 			const metadata = await runtime.applyStashedOp({ type: "op", content });
@@ -757,7 +873,7 @@ describe("SimpleCell with DdsChannel", () => {
 			assert.equal(submitted.length, 1);
 			assert.deepEqual(submitted[0]?.content, content);
 			assert.equal(getCell(channel).getPendingOperations().length, 1);
-			runtime.processMessages(messages([content], true));
+			runtime.processMessages(messages([content], true, [submitted[0]?.metadata]));
 			assert.deepEqual(getCell(channel).getPendingOperations(), []);
 			assert(isFluidHandle(channel.entryPoint.get()));
 			assert.deepEqual(channel.getGCData(), {
@@ -767,14 +883,14 @@ describe("SimpleCell with DdsChannel", () => {
 
 		it("rolls back a replayed edit using the runtime's captured metadata", async () => {
 			const { runtime, channel } = await createLoadedDataStore();
-			const content = { address: "cell", contents: { type: "set", value: 1 } };
+			const content = { address: "cell", contents: { type: "setCell", value: { value: 1 } } };
 			const metadata = await runtime.applyStashedOp({ type: "op", content });
 			assert(runtime.rollback !== undefined);
 			runtime.rollback(DataStoreMessageType.ChannelOp, content, metadata);
 			assert(channel.entryPoint.empty());
 			assert.deepEqual(getCell(channel).getPendingOperations(), []);
 			runtime.processMessages(
-				messages([{ address: "cell", contents: { type: "set", value: 2 } }]),
+				messages([{ address: "cell", contents: { type: "setCell", value: { value: 2 } } }]),
 			);
 			assert.equal(channel.entryPoint.get(), 2);
 		});

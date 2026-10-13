@@ -60,10 +60,11 @@ export interface ReplicatedDataStructure {
 	rollback(content: unknown, localMetadata: unknown): void;
 
 	/**
-	 * Captures sequenced state synchronously, excluding pending local edits.
-	 * Before replication starts, captures the current local state.
+	 * Captures DDS-defined state synchronously.
 	 * The result must be serializable by the host and must not be undefined.
-	 * Restoring pending edits also requires the host's delivery position and replay records.
+	 * The DDS defines whether the snapshot includes pending edits.
+	 * The host must choose snapshot points and replay baselines consistent with those semantics.
+	 * A snapshot alone need not capture pending metadata, delivery position, or replay records.
 	 */
 	getSnapshot(): unknown;
 
