@@ -631,6 +631,22 @@ describe("Summary Manager", () => {
 	describe("Stop Timeout", () => {
 		const summarizerCloseTimeoutMs = 2 * 60 * 1000; // matches production value
 
+		it("Should drain a loading session after manager disposal without restarting", async () => {
+			createSummaryManager({ opsToBypassInitialDelay: 0, connected: true });
+			clientElection.electClient(thisClientId);
+			await flushPromises();
+			const lateSummarizer = summarizer;
+			summaryManager.dispose();
+			clock.tick(summarizerCloseTimeoutMs);
+			await flushPromises();
+			assertState(SummaryManagerState.Off, "disposed manager releases its session");
+			assertRequests(1, "disposed manager must not restart");
+			completeSummarizerRequest();
+			await flushPromises();
+			assert.equal(lateSummarizer.closeCount, 1);
+			assert.equal(lateSummarizer.state, "notStarted");
+		});
+
 		it("Should close a summarizer that finishes loading after the stop timeout", async () => {
 			createSummaryManager({ opsToBypassInitialDelay: 0, connected: true });
 			clientElection.electClient(thisClientId);

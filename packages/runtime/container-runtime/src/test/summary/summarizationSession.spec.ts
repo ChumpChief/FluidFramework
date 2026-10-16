@@ -43,6 +43,10 @@ describe("Summarization Session", () => {
 		const result = session.run("parent");
 		summarizer.runResult.resolve("parentNotConnected");
 		assert.equal(await result, "parentNotConnected");
+		assert.deepEqual(await session.closed, {
+			kind: "completed",
+			reason: "parentNotConnected",
+		});
 		assert.deepEqual(summarizer.run.args, [["parent"]]);
 		assert.equal(summarizer.close.callCount, 1);
 		assert.equal(session.summarizer, undefined);
@@ -80,6 +84,7 @@ describe("Summarization Session", () => {
 		const result = session.run("parent");
 		summarizer.runResult.reject(error);
 		await assert.rejects(result, error);
+		assert.deepEqual(await session.closed, { kind: "failed", error });
 		assert.equal(summarizer.close.callCount, 1);
 	});
 
@@ -89,6 +94,7 @@ describe("Summarization Session", () => {
 			throw error;
 		});
 		await assert.rejects(session.loaded, error);
+		assert.deepEqual(await session.closed, { kind: "failed", error });
 		session.close();
 	});
 
@@ -99,5 +105,67 @@ describe("Summarization Session", () => {
 		assert.equal(await session.loaded, undefined);
 		creation.reject(new Error("Late load failure"));
 		await new Promise((resolve) => process.nextTick(resolve));
+	});
+
+	it("bounds graceful stopping during creation and closes a late result", async () => {
+		const clock = sinon.useFakeTimers();
+		try {
+			const creation = new Deferred<ISummarizer>();
+			const summarizer = new TestSummarizer();
+			const session = new SummarizationSession(async () => creation.promise);
+			session.stop("parentNotConnected");
+			await clock.tickAsync(2 * 60 * 1000);
+			assert.deepEqual(await session.closed, {
+				kind: "timeout",
+				reason: "parentNotConnected",
+			});
+			assert.equal(await session.loaded, undefined);
+			creation.resolve(summarizer);
+			await clock.tickAsync(0);
+			assert.equal(summarizer.close.callCount, 1);
+			assert.equal(summarizer.run.callCount, 0);
+		} finally {
+			clock.restore();
+		}
+	});
+
+	it("settles run at the stop deadline even if the underlying run never completes", async () => {
+		const clock = sinon.useFakeTimers();
+		try {
+			const summarizer = new TestSummarizer();
+			const session = new SummarizationSession(async () => summarizer);
+			await session.loaded;
+			const run = session.run("parent");
+			session.stop("notElectedParent");
+			await clock.tickAsync(2 * 60 * 1000);
+			assert.equal(await run, undefined);
+			const outcome = await session.closed;
+			assert.deepEqual(outcome, { kind: "timeout", reason: "notElectedParent" });
+			summarizer.runResult.reject(new Error("Late execution failure"));
+			await clock.tickAsync(0);
+			assert.equal(await session.closed, outcome);
+			assert.equal(summarizer.close.callCount, 1);
+			assert.equal(clock.countTimers(), 0);
+		} finally {
+			clock.restore();
+		}
+	});
+
+	it("clears the stop deadline when graceful execution completes", async () => {
+		const clock = sinon.useFakeTimers();
+		try {
+			const summarizer = new TestSummarizer();
+			const session = new SummarizationSession(async () => summarizer);
+			await session.loaded;
+			const run = session.run("parent");
+			session.stop("parentNotConnected");
+			summarizer.runResult.resolve("parentNotConnected");
+			await run;
+			assert.equal(clock.countTimers(), 0);
+			const outcome = await session.closed;
+			assert.equal(outcome.kind, "completed");
+		} finally {
+			clock.restore();
+		}
 	});
 });

@@ -8,6 +8,15 @@ import { Deferred } from "@fluidframework/core-utils/internal";
 
 import type { ISummarizer } from "./summarizerTypes.js";
 
+const stopTimeoutMs = 2 * 60 * 1000;
+
+/** The terminal outcome of the locally owned session, not a quorum departure notification. */
+export type SummarizationSessionOutcome =
+	| { readonly kind: "completed"; readonly reason: SummarizerStopReason }
+	| { readonly kind: "closed" }
+	| { readonly kind: "timeout"; readonly reason: SummarizerStopReason }
+	| { readonly kind: "failed"; readonly error: unknown };
+
 /**
  * Owns a summarizer from the beginning of asynchronous creation through closure.
  * Stop requests during creation are delivered when the summarizer becomes available.
@@ -15,7 +24,9 @@ import type { ISummarizer } from "./summarizerTypes.js";
  */
 export class SummarizationSession {
 	private readonly closeDeferred = new Deferred<undefined>();
-	private closed = false;
+	private readonly completion = new Deferred<SummarizationSessionOutcome>();
+	private isClosed = false;
+	private stopTimer: ReturnType<typeof setTimeout> | undefined;
 	private stopReason: SummarizerStopReason | undefined;
 	private ownedSummarizer: ISummarizer | undefined;
 
@@ -25,6 +36,9 @@ export class SummarizationSession {
 	 */
 	public readonly loaded: Promise<ISummarizer | undefined>;
 
+	/** Settles once local ownership ends, even when an underlying load or run is still pending. */
+	public readonly closed = this.completion.promise;
+
 	public get summarizer(): ISummarizer | undefined {
 		return this.ownedSummarizer;
 	}
@@ -33,7 +47,7 @@ export class SummarizationSession {
 		// Defer creation so the caller can retain the session before loading emits quorum events.
 		const creation = Promise.resolve().then(async () => {
 			const summarizer = await createSummarizer();
-			if (this.closed) {
+			if (this.isClosed) {
 				summarizer.close();
 				return undefined;
 			}
@@ -45,6 +59,10 @@ export class SummarizationSession {
 		});
 		// The race also observes a creation failure after closure, when nobody is awaiting the load.
 		this.loaded = Promise.race([creation, this.closeDeferred.promise]);
+		// eslint-disable-next-line no-void
+		void this.loaded.catch((error: unknown) => {
+			this.finish({ kind: "failed", error });
+		});
 	}
 
 	/**
@@ -53,12 +71,20 @@ export class SummarizationSession {
 	public async run(onBehalfOf: string): Promise<SummarizerStopReason | undefined> {
 		try {
 			const summarizer = this.ownedSummarizer ?? (await this.loaded);
-			if (this.closed || summarizer === undefined) {
+			if (this.isClosed || summarizer === undefined) {
 				return undefined;
 			}
-			return await summarizer.run(onBehalfOf);
-		} finally {
-			this.close();
+			const result = await Promise.race([
+				summarizer.run(onBehalfOf),
+				this.closeDeferred.promise,
+			]);
+			if (result !== undefined) {
+				this.finish({ kind: "completed", reason: result });
+			}
+			return result;
+		} catch (error) {
+			this.finish({ kind: "failed", error });
+			throw error;
 		}
 	}
 
@@ -67,10 +93,13 @@ export class SummarizationSession {
 	 * The existing summarizer decides whether to finish work or attempt a last summary.
 	 */
 	public stop(reason: SummarizerStopReason): void {
-		if (this.closed || this.stopReason !== undefined) {
+		if (this.isClosed || this.stopReason !== undefined) {
 			return;
 		}
 		this.stopReason = reason;
+		this.stopTimer = setTimeout(() => {
+			this.finish({ kind: "timeout", reason });
+		}, stopTimeoutMs);
 		this.ownedSummarizer?.stop(reason);
 	}
 
@@ -78,13 +107,25 @@ export class SummarizationSession {
 	 * Abandons the session and closes its summarizer, including a result that arrives after closure.
 	 */
 	public close(): void {
-		if (this.closed) {
+		this.finish({ kind: "closed" });
+	}
+
+	private finish(outcome: SummarizationSessionOutcome): void {
+		if (this.isClosed) {
 			return;
 		}
-		this.closed = true;
+		this.isClosed = true;
+		if (this.stopTimer !== undefined) {
+			clearTimeout(this.stopTimer);
+			this.stopTimer = undefined;
+		}
 		const summarizer = this.ownedSummarizer;
 		this.ownedSummarizer = undefined;
 		this.closeDeferred.resolve(undefined);
-		summarizer?.close();
+		try {
+			summarizer?.close();
+		} finally {
+			this.completion.resolve(outcome);
+		}
 	}
 }
