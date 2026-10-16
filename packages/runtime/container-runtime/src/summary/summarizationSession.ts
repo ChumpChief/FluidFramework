@@ -41,6 +41,7 @@ export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 	private isClosed = false;
 	private stopTimer: ReturnType<typeof setTimeout> | undefined;
 	private stopReason: SummarizerStopReason | undefined;
+	private started = false;
 	private ownedSummarizer: ISummarizer | undefined;
 	private readonly removeForwardedEvents: (() => void)[] = [];
 
@@ -114,16 +115,26 @@ export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 	}
 
 	/**
-	 * Runs the existing summarizer lifecycle and releases ownership when it finishes or fails.
+	 * Starts the owned lifecycle once. All callers observe its terminal outcome through closed.
 	 */
-	public async run(onBehalfOf: string): Promise<SummarizerStopReason | undefined> {
+	public start(onBehalfOf: string): void {
+		if (this.started || this.isClosed) {
+			return;
+		}
+		this.started = true;
+		// Execution failures become terminal outcomes, not a second rejecting completion promise.
+		// eslint-disable-next-line no-void
+		void this.execute(onBehalfOf);
+	}
+
+	private async execute(onBehalfOf: string): Promise<void> {
 		try {
 			if (!this.isLoaded) {
 				await this.loaded;
 			}
 			const summarizer = this.ownedSummarizer;
 			if (this.isClosed || summarizer === undefined) {
-				return undefined;
+				return;
 			}
 			const result = await Promise.race([
 				summarizer.run(onBehalfOf),
@@ -132,10 +143,8 @@ export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 			if (result !== undefined) {
 				this.finish({ kind: "completed", reason: result });
 			}
-			return result;
 		} catch (error) {
 			this.finish({ kind: "failed", error });
-			throw error;
 		}
 	}
 

@@ -24,7 +24,10 @@ import {
 
 import type { IThrottler } from "../throttler.js";
 
-import type { SummarizationSession } from "./summarizationSession.js";
+import type {
+	SummarizationSession,
+	SummarizationSessionOutcome,
+} from "./summarizationSession.js";
 import type { ISummarizerClientElection } from "./summarizerClientElection.js";
 import type {
 	IEnqueueSummarizeOptions,
@@ -276,18 +279,8 @@ export class SummaryManager
 		const session = this.openSession();
 		this.session = session;
 		this.setupForwardedEvents(session);
-		// Completion is local; quorum election still controls permission to open a replacement.
-		// eslint-disable-next-line no-void
-		void session.closed.then((outcome) => {
-			if (outcome.kind === "timeout") {
-				this.logger.sendTelemetryEvent({
-					eventName: "SummarizerStopTimeout",
-					timeoutMs: 2 * 60 * 1000,
-					stopReason: outcome.reason,
-				});
-			}
-		});
 		if (!(await session.loaded)) {
+			this.reportSessionOutcome(await session.closed);
 			return "session closed during creation";
 		}
 
@@ -304,8 +297,25 @@ export class SummaryManager
 		return PerformanceEvent.timedExecAsync(
 			this.logger,
 			{ eventName: "RunningSummarizer", attempt: this.startThrottler.numAttempts },
-			async () => session.run(clientId),
+			async () => {
+				session.start(clientId);
+				return this.reportSessionOutcome(await session.closed);
+			},
 		);
+	}
+
+	private reportSessionOutcome(outcome: SummarizationSessionOutcome): string | undefined {
+		if (outcome.kind === "failed") {
+			throw outcome.error;
+		}
+		if (outcome.kind === "timeout") {
+			this.logger.sendTelemetryEvent({
+				eventName: "SummarizerStopTimeout",
+				timeoutMs: 2 * 60 * 1000,
+				stopReason: outcome.reason,
+			});
+		}
+		return outcome.kind === "closed" ? undefined : outcome.reason;
 	}
 
 	private cleanupAfterSummarizerStop(): void {

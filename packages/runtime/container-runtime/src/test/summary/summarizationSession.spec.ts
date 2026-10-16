@@ -16,6 +16,21 @@ import sinon from "sinon";
 import { type ISummarizer, SummarizationSession } from "../../summary/index.js";
 
 describe("Summarization Session", () => {
+	it("starts only one execution while all observers share its terminal outcome", async () => {
+		const summarizer = new TestSummarizer();
+		const session = new SummarizationSession(async () => summarizer);
+		session.start("first-parent");
+		session.start("second-parent");
+		await session.loaded;
+		await new Promise((resolve) => process.nextTick(resolve));
+		assert.deepEqual(summarizer.run.args, [["first-parent"]]);
+		summarizer.runResult.resolve("parentNotConnected");
+		const outcome = await session.closed;
+		assert.deepEqual(outcome, { kind: "completed", reason: "parentNotConnected" });
+		session.start("third-parent");
+		assert.equal(await session.closed, outcome);
+		assert.equal(summarizer.run.callCount, 1);
+	});
 	class TestSummarizer extends TypedEventEmitter<ISummarizerEvents> implements ISummarizer {
 		public readonly runResult = new Deferred<SummarizerStopReason>();
 		public readonly run = sinon
@@ -42,9 +57,8 @@ describe("Summarization Session", () => {
 		creation.resolve(summarizer);
 		assert.equal(await session.loaded, true);
 		assert.deepEqual(summarizer.stop.args, [["parentNotConnected"]]);
-		const result = session.run("parent");
+		session.start("parent");
 		summarizer.runResult.resolve("parentNotConnected");
-		assert.equal(await result, "parentNotConnected");
 		assert.deepEqual(await session.closed, {
 			kind: "completed",
 			reason: "parentNotConnected",
@@ -62,7 +76,7 @@ describe("Summarization Session", () => {
 		assert.equal(await session.loaded, false);
 		creation.resolve(summarizer);
 		await new Promise((resolve) => process.nextTick(resolve));
-		assert.equal(await session.run("parent"), undefined);
+		session.start("parent");
 		assert.equal(summarizer.run.callCount, 0);
 		assert.equal(summarizer.close.callCount, 1);
 	});
@@ -73,7 +87,7 @@ describe("Summarization Session", () => {
 		await session.loaded;
 		session.close();
 		session.close();
-		assert.equal(await session.run("parent"), undefined);
+		session.start("parent");
 		assert.equal(summarizer.run.callCount, 0);
 		assert.equal(summarizer.close.callCount, 1);
 	});
@@ -83,9 +97,8 @@ describe("Summarization Session", () => {
 		const summarizer = new TestSummarizer();
 		const session = new SummarizationSession(async () => summarizer);
 		await session.loaded;
-		const result = session.run("parent");
+		session.start("parent");
 		summarizer.runResult.reject(error);
-		await assert.rejects(result, error);
 		assert.deepEqual(await session.closed, { kind: "failed", error });
 		assert.equal(summarizer.close.callCount, 1);
 	});
@@ -226,10 +239,9 @@ describe("Summarization Session", () => {
 			const summarizer = new TestSummarizer();
 			const session = new SummarizationSession(async () => summarizer);
 			await session.loaded;
-			const run = session.run("parent");
+			session.start("parent");
 			session.stop("notElectedParent");
 			await clock.tickAsync(2 * 60 * 1000);
-			assert.equal(await run, undefined);
 			const outcome = await session.closed;
 			assert.deepEqual(outcome, { kind: "timeout", reason: "notElectedParent" });
 			summarizer.runResult.reject(new Error("Late execution failure"));
@@ -248,10 +260,10 @@ describe("Summarization Session", () => {
 			const summarizer = new TestSummarizer();
 			const session = new SummarizationSession(async () => summarizer);
 			await session.loaded;
-			const run = session.run("parent");
+			session.start("parent");
 			session.stop("parentNotConnected");
 			summarizer.runResult.resolve("parentNotConnected");
-			await run;
+			await session.closed;
 			assert.equal(clock.countTimers(), 0);
 			const outcome = await session.closed;
 			assert.equal(outcome.kind, "completed");
