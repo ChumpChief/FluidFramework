@@ -99,6 +99,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 	>();
 
 	private readonly stopDeferred = new Deferred<SummarizerStopReason>();
+	private readonly disposedDeferred = new Deferred<undefined>();
 
 	constructor(
 		/**
@@ -215,7 +216,14 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 				numUnsummarizedNonRuntimeOps: this._heuristicData?.numNonRuntimeOps,
 			});
 
-			const runningSummarizer = await this.start(parentId, runCoordinator);
+			const runningSummarizer = await Promise.race([
+				this.start(parentId, runCoordinator),
+				this.disposedDeferred.promise,
+			]);
+			if (runningSummarizer === undefined) {
+				stopReason = "summarizerClientDisconnected";
+				return stopReason;
+			}
 			this.executorReady.resolve({ executor: runningSummarizer });
 			stopReason = await stopP;
 			await this.drain(
@@ -263,6 +271,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 					}
 					return coordinator;
 				}),
+				this.disposedDeferred.promise,
 				new Promise<undefined>((resolve) => {
 					timer = setTimeout(() => {
 						coordinatorTimedOut = true;
@@ -286,11 +295,14 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			return undefined;
 		}
 
+		if (this._disposed) {
+			return undefined;
+		}
 		assert(
 			coordinatorResult !== undefined,
 			0xcd6 /* Expect coordinatorResult to be defined */,
 		);
-		return this._disposed ? undefined : coordinatorResult;
+		return coordinatorResult;
 	}
 
 	/** Drains execution before cancelling its connection controller, with a bounded wait. */
@@ -412,10 +424,14 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 	 * Called by ContainerRuntime when it is disposed, as well as at the end the run().
 	 */
 	public dispose(): void {
+		if (this._disposed) {
+			return;
+		}
 		// Given that the call can come from own ContainerRuntime, ensure that we stop all the processes.
 		this.stop("summarizerClientDisconnected");
 
 		this._disposed = true;
+		this.disposedDeferred.resolve(undefined);
 		this.executorReady.resolve({
 			error: new UsageError("Summarizer was disposed before becoming ready"),
 		});

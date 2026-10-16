@@ -111,6 +111,56 @@ describe("Runtime", () => {
 				}
 
 				for (const mode of ["automatic", "on-demand"] as const) {
+					it(`releases ${mode} connection startup immediately on disposal`, async () => {
+						const test = createTestSummarizer();
+						const creation = new Deferred<ICancellableSummarizerController>();
+						test.createController.returns(creation.promise);
+						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
+						const request =
+							mode === "on-demand"
+								? test.summarizer.summarizeOnDemand({ reason: "test" })
+								: undefined;
+						let stopped = false;
+						test.summarizer.on("summarizerStop", () => {
+							stopped = true;
+						});
+						test.summarizer.dispose();
+						await clock.tickAsync(0);
+						assert.equal(stopped, true, "disposal must not wait for the connection deadline");
+						await run;
+						if (request !== undefined) {
+							const result = await request.summarySubmitted;
+							assert.equal(result.success, false);
+						}
+						assert.equal(test.start.callCount, 0);
+						assert.equal(clock.countTimers(), 0);
+						creation.resolve(test.controller);
+						await clock.tickAsync(0);
+						assert.equal(test.stop.calledWith("summarizerClientDisconnected"), true);
+					});
+
+					it(`releases ${mode} executor startup on disposal and disposes a late executor`, async () => {
+						const test = createTestSummarizer();
+						const startup = new Deferred<RunningSummarizer>();
+						test.start.returns(startup.promise);
+						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
+						if (mode === "on-demand") {
+							test.summarizer.summarizeOnDemand({ reason: "test" });
+						}
+						await clock.tickAsync(0);
+						assert.equal(test.start.callCount, 1);
+						test.summarizer.dispose();
+						await clock.tickAsync(0);
+						await run;
+						assert.equal(test.stop.calledWith("summarizerClientDisconnected"), true);
+						assert.equal(test.dispose.callCount, 1);
+						startup.resolve(test.executor as unknown as RunningSummarizer);
+						await clock.tickAsync(0);
+						assert.equal(test.executor.dispose.callCount, 1);
+						assert.equal(test.executor.summarizeOnDemand.callCount, 0);
+						assert.equal(clock.countTimers(), 0);
+					});
+
 					it(`cleans up ${mode} executor startup failure and emits its terminal event before disposal`, async () => {
 						const test = createTestSummarizer();
 						const error = new Error("Executor startup failed");
