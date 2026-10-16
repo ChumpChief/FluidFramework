@@ -2330,6 +2330,20 @@ describe("Runtime", () => {
 		});
 
 		describe("EntryPoint initialized correctly", () => {
+			it("does not evaluate the application entrypoint when inspecting summary execution", async () => {
+				let entryPointCalls = 0;
+				const { runtime } = await ContainerRuntime.loadRuntime2({
+					context: getMockContext() as IContainerContext,
+					provideEntryPoint: async () => {
+						entryPointCalls++;
+						return {};
+					},
+					existing: false,
+					registry: new FluidDataStoreRegistry([]),
+				});
+				assert.equal(await runtime.getSummaryExecution(), undefined);
+				assert.equal(entryPointCalls, 0);
+			});
 			it("when using new loadRuntime2 method", async () => {
 				const myEntryPoint: FluidObject = {
 					myProp: "myValue",

@@ -45,7 +45,7 @@ export type {
 	ISnapshotTreeWithBlobContents,
 } from "./loader.js";
 export { ConnectionState, LoaderHeader } from "./loader.js";
-export type { SummaryClientLoader } from "./summaryClient.js";
+export type { SummaryClientLoader, SummaryExecutionProvider } from "./summaryClient.js";
 export type { IFluidModule } from "./fluidModule.js";
 export type {
 	IFluidPackage,

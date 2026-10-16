@@ -46,6 +46,29 @@ const documentServiceFactoryFailProxy = failSometimeProxy<
 });
 
 describe("loader unit test", () => {
+	it("retrieves dedicated runtime summary execution without invoking its application entrypoint", async () => {
+		const execution = {};
+		const getEntryPoint = sinon.stub().rejects(new Error("App entrypoint must not run"));
+		const container = {
+			_disposed: false,
+			_runtime: { getSummaryExecution: async () => execution },
+			getEntryPoint,
+		} as unknown as Container;
+		assert.equal(await Container.prototype.getSummaryExecution.call(container), execution);
+		assert.equal(getEntryPoint.callCount, 0);
+	});
+
+	it("falls back to entrypoint discovery for an older runtime", async () => {
+		const execution = {};
+		const getEntryPoint = sinon.stub().resolves(execution);
+		const container = {
+			_disposed: false,
+			_runtime: {},
+			getEntryPoint,
+		} as unknown as Container;
+		assert.equal(await Container.prototype.getSummaryExecution.call(container), execution);
+		assert.equal(getEntryPoint.callCount, 1);
+	});
 	it("opens a summary client directly with non-interactive and no-reconnect policies", async () => {
 		const resolvedUrl = { type: "fluid", id: "document", url: "https://example.com/document" };
 		const child = {} as unknown as Container;

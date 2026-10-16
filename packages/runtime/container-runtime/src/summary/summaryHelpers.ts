@@ -4,7 +4,10 @@
  */
 
 import { type ILoader, LoaderHeader } from "@fluidframework/container-definitions/internal";
-import type { SummaryClientLoader } from "@fluidframework/container-definitions/internal";
+import type {
+	SummaryClientLoader,
+	SummaryExecutionProvider,
+} from "@fluidframework/container-definitions/internal";
 import type { FluidObject, IRequest, IResponse } from "@fluidframework/core-interfaces";
 import { DriverHeader } from "@fluidframework/driver-definitions/internal";
 import { responseToException } from "@fluidframework/runtime-utils/internal";
@@ -111,10 +114,14 @@ export function formCreateSummarizerFn(
 		signal?.addEventListener("abort", disposeContainer, { once: true });
 		try {
 			let fluidObject: FluidObject<ISummarizer> | undefined;
+			const executionProvider = resolvedContainer as typeof resolvedContainer &
+				Partial<SummaryExecutionProvider>;
 
 			// Older containers may not have the "getEntryPoint" API
 			// ! This check will need to stay until LTS of loader moves past 2.0.0-internal.7.0.0
-			if (resolvedContainer.getEntryPoint === undefined) {
+			if (executionProvider.getSummaryExecution !== undefined) {
+				fluidObject = await executionProvider.getSummaryExecution();
+			} else if (resolvedContainer.getEntryPoint === undefined) {
 				// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
 				const response = (await (resolvedContainer as any).request({
 					url: `/${summarizerRequestUrl}`,

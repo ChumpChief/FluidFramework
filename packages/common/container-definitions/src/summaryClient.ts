@@ -4,6 +4,17 @@
  */
 
 import type { IContainer } from "./loader.js";
+import type { FluidObject } from "@fluidframework/core-interfaces";
+
+/**
+ * Dedicated access to runtime-specific summary execution, independent of the application entrypoint.
+ * The loader transports the object without depending on its runtime-specific execution contract.
+ * @internal
+ */
+export interface SummaryExecutionProvider {
+	/** Returns summary execution services, or undefined when this is not a summarizer runtime. */
+	getSummaryExecution(): Promise<FluidObject | undefined>;
+}
 
 /**
  * Optional loader capability for opening a second client of the current document for summarization.

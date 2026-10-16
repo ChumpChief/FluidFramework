@@ -2851,6 +2851,15 @@ export class ContainerRuntime
 	public async getEntryPoint(): Promise<FluidObject> {
 		return this.entryPoint;
 	}
+
+	/**
+	 * Exposes summary execution separately from the application's entrypoint.
+	 * @internal
+	 */
+	// eslint-disable-next-line @fluid-internal/fluid/no-member-release-tags -- Optional internal layer capability, not a public runtime API.
+	public async getSummaryExecution(): Promise<FluidObject | undefined> {
+		return this._summarizer;
+	}
 	private readonly entryPoint: LazyPromise<FluidObject>;
 
 	private internalId(maybeAlias: string): string {

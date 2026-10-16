@@ -17,6 +17,29 @@ import {
 } from "../../summary/index.js";
 
 describe("Summarizer loading ownership", () => {
+	it("discovers execution through its dedicated capability without evaluating the app entrypoint", async () => {
+		const getEntryPoint = sinon.stub().rejects(new Error("App entrypoint must not run"));
+		const test = createLoader(getEntryPoint);
+		const execution = { ISummarizer: {} };
+		const getSummaryExecution = sinon.stub().resolves(execution);
+		Object.assign(test.container, { getSummaryExecution });
+		const load = formCreateSummarizerFn(test.loader)();
+		test.resolution.resolve(test.container);
+		assert.equal(await load, execution.ISummarizer);
+		assert.equal(getEntryPoint.callCount, 0);
+		assert.equal(getSummaryExecution.callCount, 1);
+	});
+
+	it("does not fall back to an application entrypoint when dedicated execution is absent", async () => {
+		const getEntryPoint = sinon.stub().resolves({ ISummarizer: {} });
+		const test = createLoader(getEntryPoint);
+		Object.assign(test.container, { getSummaryExecution: async () => undefined });
+		const load = formCreateSummarizerFn(test.loader)();
+		test.resolution.resolve(test.container);
+		await assert.rejects(load, /does not implement ISummarizer/);
+		assert.equal(getEntryPoint.callCount, 0);
+		assert.equal(test.dispose.callCount, 1);
+	});
 	it("uses explicit summary-client loading when available without issuing a resolve request", async () => {
 		const test = createLoader(async () => ({ ISummarizer: {} }));
 		const loadSummaryClient = sinon.stub().resolves(test.container);

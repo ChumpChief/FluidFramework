@@ -31,6 +31,7 @@ import type {
 	IProvideFluidCodeDetailsComparer,
 	IProvideRuntimeFactory,
 	IRuntime,
+	SummaryExecutionProvider,
 	ReadOnlyInfo,
 	ILoader,
 	ILoaderOptions,
@@ -738,6 +739,25 @@ export class Container
 	}
 
 	private readonly _lifecycleEvents = new TypedEventEmitter<IContainerLifecycleEvents>();
+
+	/**
+	 * Retrieves summary execution without evaluating the application entrypoint on capable runtimes.
+	 * @internal
+	 */
+	// eslint-disable-next-line @fluid-internal/fluid/no-member-release-tags -- Optional internal layer capability, not a public container API.
+	public async getSummaryExecution(): Promise<FluidObject | undefined> {
+		if (this._disposed) {
+			throw new UsageError("The context is already disposed");
+		}
+		const runtime = this._runtime as
+			| (IRuntime & Partial<SummaryExecutionProvider>)
+			| undefined;
+		if (runtime?.getSummaryExecution !== undefined) {
+			return runtime.getSummaryExecution();
+		}
+		// Older runtimes expose summary execution through their container entrypoint.
+		return this.getEntryPoint();
+	}
 
 	constructor(
 		createProps: IContainerCreateProps,
