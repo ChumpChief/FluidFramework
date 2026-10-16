@@ -324,6 +324,30 @@ describe("Runtime", () => {
 					assert.equal(test.dispose.callCount, 1);
 				});
 
+				it("reports readiness only after connection and executor initialization", async () => {
+					const test = createTestSummarizer();
+					const connection = new Deferred<"connected" | "stopped" | "timeout">();
+					const startup = new Deferred<RunningSummarizer>();
+					test.controller.ready = connection.promise;
+					test.start.returns(startup.promise);
+					let ready = false;
+					const readiness = test.summarizer.waitUntilReady().then(() => {
+						ready = true;
+					});
+					const run = test.summarizer.run("parent");
+					await clock.tickAsync(0);
+					assert.equal(ready, false);
+					connection.resolve("connected");
+					await clock.tickAsync(0);
+					assert.equal(ready, false);
+					startup.resolve(test.executor as unknown as RunningSummarizer);
+					await readiness;
+					assert.equal(ready, true);
+					test.summarizer.stop("parentNotConnected");
+					await clock.tickAsync(0);
+					await run;
+				});
+
 				it("lets an explicit request share automatic startup without changing last-summary policy", async () => {
 					const test = createTestSummarizer();
 					const creation = new Deferred<"connected" | "stopped" | "timeout">();

@@ -100,6 +100,58 @@ describe("Summarization Session", () => {
 		session.close();
 	});
 
+	it("distinguishes loading from executor readiness without starting execution", async () => {
+		const summarizer = new TestSummarizer();
+		const executorReady = new Deferred<void>();
+		const child = Object.assign(summarizer, {
+			waitUntilReady: async () => executorReady.promise,
+		});
+		const session = new SummarizationSession(async () => child);
+		assert.equal(await session.loaded, true);
+		let ready = false;
+		const readiness = session.ready.then((result) => {
+			ready = true;
+			return result;
+		});
+		await new Promise((resolve) => process.nextTick(resolve));
+		assert.equal(ready, false);
+		assert.equal(summarizer.run.callCount, 0);
+		executorReady.resolve();
+		assert.deepEqual(await readiness, { kind: "ready" });
+		session.close();
+	});
+
+	it("reports legacy loading honestly when the child has no readiness capability", async () => {
+		const session = new SummarizationSession(async () => new TestSummarizer());
+		assert.deepEqual(await session.ready, { kind: "legacy-loaded" });
+		session.close();
+	});
+
+	it("releases readiness on closure and observes late child readiness failures", async () => {
+		const executorReady = new Deferred<void>();
+		const child = Object.assign(new TestSummarizer(), {
+			waitUntilReady: async () => executorReady.promise,
+		});
+		const session = new SummarizationSession(async () => child);
+		await session.loaded;
+		session.close();
+		assert.deepEqual(await session.ready, { kind: "closed" });
+		executorReady.reject(new Error("Late executor failure"));
+		await new Promise((resolve) => process.nextTick(resolve));
+	});
+
+	it("reports child startup failure through readiness", async () => {
+		const error = new Error("Executor startup failed");
+		const child = Object.assign(new TestSummarizer(), {
+			waitUntilReady: async () => {
+				throw error;
+			},
+		});
+		const session = new SummarizationSession(async () => child);
+		assert.deepEqual(await session.ready, { kind: "failed", error });
+		session.close();
+	});
+
 	it("forwards events from stop intent delivered during loading and detaches on closure", async () => {
 		const creation = new Deferred<ISummarizer>();
 		const summarizer = new TestSummarizer();

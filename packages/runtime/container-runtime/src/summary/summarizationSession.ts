@@ -15,6 +15,13 @@ import type { ISummarizer } from "./summarizerTypes.js";
 
 const stopTimeoutMs = 2 * 60 * 1000;
 
+/** Readiness is distinct from loading, and older children cannot report executor readiness. */
+export type SummarizationSessionReadiness =
+	| { readonly kind: "ready" }
+	| { readonly kind: "legacy-loaded" }
+	| { readonly kind: "closed" }
+	| { readonly kind: "failed"; readonly error: unknown };
+
 /** The terminal outcome of the locally owned session, not a quorum departure notification. */
 export type SummarizationSessionOutcome =
 	| { readonly kind: "completed"; readonly reason: SummarizerStopReason }
@@ -42,6 +49,12 @@ export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 	 * Loading does not imply connection or executor readiness; those remain part of run().
 	 */
 	public readonly loaded: Promise<boolean>;
+
+	/**
+	 * Reports executor readiness once run or an explicit request starts the child lifecycle.
+	 * Legacy children report only that loading completed; this never starts execution itself.
+	 */
+	public readonly ready: Promise<SummarizationSessionReadiness>;
 
 	/** Settles once local ownership ends, even when an underlying load or run is still pending. */
 	public readonly closed = this.completion.promise;
@@ -76,6 +89,28 @@ export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 		void this.loaded.catch((error: unknown) => {
 			this.finish({ kind: "failed", error });
 		});
+		const readiness = this.loaded.then(
+			async (loaded): Promise<SummarizationSessionReadiness> => {
+				if (!loaded || this.isClosed) {
+					return { kind: "closed" };
+				}
+				const child = this.getSummarizer() as ISummarizer & {
+					waitUntilReady?: () => Promise<void>;
+				};
+				if (child.waitUntilReady === undefined) {
+					return { kind: "legacy-loaded" };
+				}
+				await child.waitUntilReady();
+				return { kind: "ready" };
+			},
+		);
+		this.ready = Promise.race([
+			readiness,
+			this.closed.then(
+				(outcome): SummarizationSessionReadiness =>
+					outcome.kind === "failed" ? outcome : { kind: "closed" },
+			),
+		]).catch((error: unknown): SummarizationSessionReadiness => ({ kind: "failed", error }));
 	}
 
 	/**

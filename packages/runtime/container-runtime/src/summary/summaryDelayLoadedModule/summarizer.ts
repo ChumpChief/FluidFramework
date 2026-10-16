@@ -150,6 +150,17 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		this.stopDeferred.resolve(reason);
 	}
 
+	/**
+	 * Waits for connection and executor initialization after an invocation starts the lifecycle.
+	 * This does not start execution or change the first invocation's scheduling policy.
+	 */
+	public async waitUntilReady(): Promise<void> {
+		const result = await this.executorReady.promise;
+		if ("error" in result) {
+			throw result.error;
+		}
+	}
+
 	public close(): void {
 		// This will result in "summarizerClientDisconnected" stop reason recorded in telemetry,
 		// unless stop() was called earlier
