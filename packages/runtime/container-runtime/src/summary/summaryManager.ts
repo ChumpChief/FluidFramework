@@ -14,7 +14,7 @@ import type {
 	IEventProvider,
 	ITelemetryBaseLogger,
 } from "@fluidframework/core-interfaces";
-import { assert } from "@fluidframework/core-utils/internal";
+import { assert, Deferred } from "@fluidframework/core-utils/internal";
 import { DriverErrorTypes } from "@fluidframework/driver-definitions/internal";
 import {
 	createChildLogger,
@@ -104,6 +104,7 @@ export class SummaryManager
 	private state = SummaryManagerState.Off;
 	private session?: SummarizationSession;
 	private _disposed = false;
+	private readonly disposedDeferred = new Deferred<void>();
 
 	public get disposed(): boolean {
 		return this._disposed;
@@ -434,26 +435,20 @@ export class SummaryManager
 		}
 
 		if (delayMs > 0) {
-			let timer: number | undefined;
-			let resolveOpPromiseFn: (value: void | PromiseLike<void>) => void;
-			// Create a listener that will break the delay if we've exceeded the initial delay ops count.
+			const delay = new Deferred<void>();
 			const opsListenerFn = (): void => {
 				if (this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay) {
-					clearTimeout(timer);
-					resolveOpPromiseFn();
+					delay.resolve();
 				}
 			};
-			// Create a Promise that will resolve when the delay expires.
-			const delayPromise = new Promise<void>((resolve) => {
-				timer = setTimeout(() => resolve(), delayMs);
-			});
-			// Create a Promise that will resolve if the ops count passes the threshold.
-			const opPromise = new Promise<void>((resolve) => {
-				resolveOpPromiseFn = resolve;
-			});
+			const timer = setTimeout(() => delay.resolve(), delayMs);
 			this.summaryCollection.addOpListener(opsListenerFn);
-			await Promise.race([delayPromise, opPromise]);
-			this.summaryCollection.removeOpListener(opsListenerFn);
+			try {
+				await Promise.race([delay.promise, this.disposedDeferred.promise]);
+			} finally {
+				clearTimeout(timer);
+				this.summaryCollection.removeOpListener(opsListenerFn);
+			}
 		}
 		return startWithInitialDelay;
 	}
@@ -480,6 +475,7 @@ export class SummaryManager
 		this.connectedState.off("disconnected", this.handleDisconnected);
 		this.cleanupForwardedEvents();
 		this._disposed = true;
+		this.disposedDeferred.resolve();
 		this.session?.stop("parentNotConnected");
 	}
 

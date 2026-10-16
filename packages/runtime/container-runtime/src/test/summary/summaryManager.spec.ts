@@ -376,6 +376,38 @@ describe("Summary Manager", () => {
 	});
 
 	describe("Start Summarizer Delay", () => {
+		for (const delay of ["initial", "throttler"] as const) {
+			it(`Should release the ${delay} delay and op listener when disposed`, async () => {
+				const addListener = sinon.spy(summaryCollection, "addOpListener");
+				const removeListener = sinon.spy(summaryCollection, "removeOpListener");
+				try {
+					throttler.delayMs = delay === "throttler" ? 1000 : 0;
+					createSummaryManager({
+						connected: true,
+						initialDelayMs: 1000,
+						opsToBypassInitialDelay: delay === "initial" ? 1000 : 0,
+					});
+					clientElection.electClient(thisClientId);
+					await flushPromises();
+					assertState(SummaryManagerState.Starting, "startup is delayed");
+					assert.equal(addListener.callCount, 1);
+					summaryManager.dispose();
+					await flushPromises();
+					assertState(SummaryManagerState.Off, "disposal releases the delayed startup");
+					assert.equal(removeListener.callCount, 1);
+					assert.equal(removeListener.firstCall.args[0], addListener.firstCall.args[0]);
+					assert.equal(clock.countTimers(), 0);
+					assertRequests(0, "disposal must not create a child");
+					clock.tick(1000);
+					await flushPromises();
+					assertRequests(0, "expired delay must not restart disposed manager");
+				} finally {
+					addListener.restore();
+					removeListener.restore();
+				}
+			});
+		}
+
 		it("Should wait for initial delay before first start", async () => {
 			mockDeltaManager.lastSequenceNumber = 999; // 999 < 1000, so do not bypass
 			createSummaryManager({
