@@ -30,6 +30,7 @@ export type SummarizationSessionOutcome =
 export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 	private readonly closeDeferred = new Deferred<undefined>();
 	private readonly completion = new Deferred<SummarizationSessionOutcome>();
+	private readonly loadAbortController = new AbortController();
 	private isClosed = false;
 	private stopTimer: ReturnType<typeof setTimeout> | undefined;
 	private stopReason: SummarizerStopReason | undefined;
@@ -49,11 +50,11 @@ export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 		return this.ownedSummarizer !== undefined;
 	}
 
-	constructor(createSummarizer: () => Promise<ISummarizer>) {
+	constructor(createSummarizer: (signal?: AbortSignal) => Promise<ISummarizer>) {
 		super();
 		// Defer creation so the caller can retain the session before loading emits quorum events.
 		const creation = Promise.resolve().then(async () => {
-			const summarizer = await createSummarizer();
+			const summarizer = await createSummarizer(this.loadAbortController.signal);
 			if (this.isClosed) {
 				summarizer.close();
 				return false;
@@ -176,6 +177,7 @@ export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 		try {
 			summarizer?.close();
 		} finally {
+			this.loadAbortController.abort();
 			for (const remove of this.removeForwardedEvents) {
 				remove();
 			}

@@ -125,7 +125,7 @@ export class SummaryManager
 		 * Creates summarizer by asking interactive container to spawn summarizing container and
 		 * get back its Summarizer instance.
 		 */
-		private readonly createSummarizerFn: () => Promise<ISummarizer>,
+		private readonly createSummarizerFn: (signal?: AbortSignal) => Promise<ISummarizer>,
 		private readonly startThrottler: IThrottler,
 		{
 			initialDelayMs = defaultInitialDelayMs,

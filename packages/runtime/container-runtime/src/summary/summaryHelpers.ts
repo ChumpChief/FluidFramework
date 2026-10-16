@@ -59,10 +59,15 @@ export const DefaultSummaryConfiguration: ISummaryConfiguration = {
 };
 
 /**
- * Returns a function that will create and retrieve a Summarizer.
+ * Returns a function that creates and retrieves a summarizer.
+ * An optional signal releases the resolved container when its owning session closes.
+ * Entrypoint discovery failures also dispose the resolved container.
  */
-export function formCreateSummarizerFn(loader: ILoader): () => Promise<ISummarizer> {
-	return async () => {
+export function formCreateSummarizerFn(
+	loader: ILoader,
+): (signal?: AbortSignal) => Promise<ISummarizer> {
+	return async (signal) => {
+		signal?.throwIfAborted();
 		const request: IRequest = {
 			headers: {
 				[LoaderHeader.cache]: false,
@@ -77,28 +82,46 @@ export function formCreateSummarizerFn(loader: ILoader): () => Promise<ISummariz
 		};
 
 		const resolvedContainer = await loader.resolve(request);
-		let fluidObject: FluidObject<ISummarizer> | undefined;
-
-		// Older containers may not have the "getEntryPoint" API
-		// ! This check will need to stay until LTS of loader moves past 2.0.0-internal.7.0.0
-		if (resolvedContainer.getEntryPoint === undefined) {
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
-			const response = (await (resolvedContainer as any).request({
-				url: `/${summarizerRequestUrl}`,
-			})) as IResponse;
-			if (response.status !== 200 || response.mimeType !== "fluid/object") {
-				throw responseToException(response, request);
+		const disposeContainer = (): void => {
+			if (resolvedContainer.disposed !== true) {
+				resolvedContainer.dispose();
 			}
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-			fluidObject = response.value;
-		} else {
-			fluidObject = await resolvedContainer.getEntryPoint();
+		};
+		// The loader protocol cannot cancel resolve(). Adopt and close any result arriving after abort.
+		if (signal?.aborted === true) {
+			disposeContainer();
+			signal.throwIfAborted();
 		}
+		signal?.addEventListener("abort", disposeContainer, { once: true });
+		try {
+			let fluidObject: FluidObject<ISummarizer> | undefined;
 
-		if (fluidObject?.ISummarizer === undefined) {
-			throw new UsageError("Fluid object does not implement ISummarizer");
+			// Older containers may not have the "getEntryPoint" API
+			// ! This check will need to stay until LTS of loader moves past 2.0.0-internal.7.0.0
+			if (resolvedContainer.getEntryPoint === undefined) {
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
+				const response = (await (resolvedContainer as any).request({
+					url: `/${summarizerRequestUrl}`,
+				})) as IResponse;
+				if (response.status !== 200 || response.mimeType !== "fluid/object") {
+					throw responseToException(response, request);
+				}
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+				fluidObject = response.value;
+			} else {
+				fluidObject = await resolvedContainer.getEntryPoint();
+			}
+			signal?.throwIfAborted();
+
+			if (fluidObject?.ISummarizer === undefined) {
+				throw new UsageError("Fluid object does not implement ISummarizer");
+			}
+			return fluidObject.ISummarizer;
+		} catch (error) {
+			signal?.removeEventListener("abort", disposeContainer);
+			disposeContainer();
+			throw error;
 		}
-		return fluidObject.ISummarizer;
 	};
 }
 
