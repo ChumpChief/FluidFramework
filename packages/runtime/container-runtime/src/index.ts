@@ -96,6 +96,7 @@ export {
 	type OpActionEventListener,
 	type OpActionEventName,
 	type ICancellableSummarizerController,
+	type SummarizerConnection,
 	type SubmitSummaryFailureData,
 	type SummaryStage,
 	type IRetriableFailureError,

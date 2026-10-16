@@ -27,6 +27,15 @@ describe("Run While Connected Coordinator", () => {
 		}
 	}
 
+	it("can stop an immediately owned controller before it connects", async () => {
+		const runtime = new Runtime();
+		const coordinator = RunWhileConnectedCoordinator.open(runtime, () => true);
+		coordinator.stop("notElectedParent");
+		await coordinator.ready;
+		assert.equal(await coordinator.waitCancelled, "notElectedParent");
+		assertNoListeners(runtime);
+	});
+
 	it("detaches connection and disposal listeners when explicitly stopped", async () => {
 		const runtime = new Runtime();
 		runtime.connected = true;

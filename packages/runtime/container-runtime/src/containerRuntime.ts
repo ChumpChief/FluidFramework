@@ -2527,8 +2527,8 @@ export class ContainerRuntime
 				this.handleContext,
 				summaryCollection,
 
-				async (runtime: IConnectableRuntime) =>
-					module.RunWhileConnectedCoordinator.create(
+				(runtime: IConnectableRuntime) =>
+					module.RunWhileConnectedCoordinator.open(
 						runtime,
 						// Summarization runs in summarizer client and needs access to the real (non-proxy) active
 						// information. The proxy delta manager would always return false for summarizer client.

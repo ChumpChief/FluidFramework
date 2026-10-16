@@ -10,6 +10,7 @@ export {
 } from "./summarizer.js";
 export {
 	type ICancellableSummarizerController,
+	type SummarizerConnection,
 	neverCancelledSummaryToken,
 	RunWhileConnectedCoordinator,
 } from "./runWhileConnectedCoordinator.js";

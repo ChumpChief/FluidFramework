@@ -124,6 +124,7 @@ export {
 	defaultMaxAttempts,
 	defaultMaxAttemptsForSubmitFailures,
 	type ICancellableSummarizerController,
+	type SummarizerConnection,
 	neverCancelledSummaryToken,
 	RunWhileConnectedCoordinator,
 	Summarizer,

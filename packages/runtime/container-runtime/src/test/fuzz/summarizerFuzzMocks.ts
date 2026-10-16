@@ -116,8 +116,8 @@ export class MockContainerRuntimeForSummarizer
 			this /* ISummarizerInternalsProvider */,
 			{} as unknown as IFluidHandleContext /* handleContext */,
 			this.summaryCollection,
-			async (runtime: IConnectableRuntime) =>
-				RunWhileConnectedCoordinator.create(runtime, () => this.deltaManager.active),
+			(runtime: IConnectableRuntime) =>
+				RunWhileConnectedCoordinator.open(runtime, () => this.deltaManager.active),
 		);
 
 		this.summaryManager = new SummaryManager(

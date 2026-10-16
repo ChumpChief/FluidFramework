@@ -18,6 +18,14 @@ export interface ICancellableSummarizerController extends ISummaryCancellationTo
 }
 
 /**
+ * Immediately owned connection lifetime, with readiness separate from construction.
+ * @internal
+ */
+export interface SummarizerConnection extends ICancellableSummarizerController {
+	readonly ready: Promise<void>;
+}
+
+/**
  * Can be useful in testing as well as in places where caller does not use cancellation.
  * This object implements ISummaryCancellationToken interface but cancellation is never leveraged.
  * @internal
@@ -33,7 +41,8 @@ export const neverCancelledSummaryToken: ISummaryCancellationToken = {
  * This provides promises that resolve as it starts or stops.  Stopping happens
  * when disconnected or if stop() is called.
  */
-export class RunWhileConnectedCoordinator implements ICancellableSummarizerController {
+export class RunWhileConnectedCoordinator implements SummarizerConnection {
+	public readonly ready: Promise<void>;
 	private _cancelled = false;
 	private readonly stopDeferred = new Deferred<SummarizerStopReason>();
 	private readonly disconnected = (): void => this.stop("summarizerClientDisconnected");
@@ -72,14 +81,24 @@ export class RunWhileConnectedCoordinator implements ICancellableSummarizerContr
 		active: () => boolean,
 	): Promise<RunWhileConnectedCoordinator> {
 		const obj = new RunWhileConnectedCoordinator(runtime, active);
-		await obj.waitStart();
+		await obj.ready;
 		return obj;
+	}
+
+	/** Returns ownership before waiting for the child connection. */
+	public static open(
+		runtime: IConnectableRuntime,
+		active: () => boolean,
+	): RunWhileConnectedCoordinator {
+		return new RunWhileConnectedCoordinator(runtime, active);
 	}
 
 	protected constructor(
 		private readonly runtime: IConnectableRuntime,
 		private readonly active: () => boolean,
-	) {}
+	) {
+		this.ready = this.waitStart();
+	}
 
 	/**
 	 * Starts and waits for a promise which resolves when connected.

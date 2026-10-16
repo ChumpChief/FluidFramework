@@ -32,7 +32,10 @@ import type {
 } from "../summarizerTypes.js";
 import type { SummaryCollection } from "../summaryCollection.js";
 
-import type { ICancellableSummarizerController } from "./runWhileConnectedCoordinator.js";
+import type {
+	ICancellableSummarizerController,
+	SummarizerConnection,
+} from "./runWhileConnectedCoordinator.js";
 import { RunningSummarizer } from "./runningSummarizer.js";
 import { SummarizeHeuristicData } from "./summarizerHeuristics.js";
 import { SummarizeResultBuilder } from "./summaryResultBuilder.js";
@@ -120,7 +123,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		public readonly summaryCollection: SummaryCollection,
 		private readonly runCoordinatorCreateFn: (
 			runtime: IConnectableRuntime,
-		) => Promise<ICancellableSummarizerController>,
+		) => SummarizerConnection,
 	) {
 		super();
 		this.logger = createChildLogger({
@@ -178,17 +181,17 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		onBehalfOf: string | undefined;
 		allowLastSummary: boolean;
 	}): Promise<SummarizerStopReason> {
-		let runCoordinator: ICancellableSummarizerController | undefined;
+		let runCoordinator: SummarizerConnection | undefined;
 		let stopReason: SummarizerStopReason = "summarizerException";
 		let failure: unknown;
 		try {
-			runCoordinator = await this.createRunCoordinator(onBehalfOf);
-			if (runCoordinator === undefined) {
+			runCoordinator = this.runCoordinatorCreateFn(this.runtime);
+			this.runCoordinator = runCoordinator;
+			if (!(await this.waitForConnection(runCoordinator, onBehalfOf))) {
 				stopReason = "summarizerClientDisconnected";
 				return "summarizerClientDisconnected";
 			}
 			const parentId = onBehalfOf ?? this.runtime.clientId;
-			this.runCoordinator = runCoordinator;
 			assert(parentId !== undefined, "A connected summarizer must have a parent client ID.");
 
 			// Wait for either external signal to cancel, or loss of connectivity.
@@ -256,56 +259,36 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		}
 	}
 
-	/** Creates the connection controller with the same bounded wait for either execution mode. */
-	private async createRunCoordinator(
+	/** Bounds connection readiness while the lifecycle already owns its cancellation handle. */
+	private async waitForConnection(
+		connection: SummarizerConnection,
 		onBehalfOf: string | undefined,
-	): Promise<ICancellableSummarizerController | undefined> {
-		// Race coordinator creation against a timeout to ensure we don't hang indefinitely
-		// if the summarizer container fails to connect.
-		let coordinatorTimedOut = false;
+	): Promise<boolean> {
 		const coordinatorTimeoutMs = 2 * 60 * 1000; // 2 minutes
 		let timer: ReturnType<typeof setTimeout> | undefined;
-		let coordinatorResult: ICancellableSummarizerController | undefined;
 		try {
-			coordinatorResult = await Promise.race([
-				this.runCoordinatorCreateFn(this.runtime).then((coordinator) => {
-					if (coordinatorTimedOut || this._disposed) {
-						coordinator.stop("summarizerClientDisconnected");
-					}
-					return coordinator;
-				}),
-				this.disposedDeferred.promise,
-				new Promise<undefined>((resolve) => {
+			const result = await Promise.race([
+				connection.ready.then(() => "ready" as const),
+				connection.waitCancelled.then(() => "cancelled" as const),
+				new Promise<"timeout">((resolve) => {
 					timer = setTimeout(() => {
-						coordinatorTimedOut = true;
-						resolve(undefined);
+						resolve("timeout");
 					}, coordinatorTimeoutMs);
 				}),
 			]);
+			if (result === "timeout") {
+				this.logger.sendTelemetryEvent({
+					eventName: "CreateRunCoordinatorTimeout",
+					onBehalfOf,
+					timeoutMs: coordinatorTimeoutMs,
+				});
+			}
+			return result !== "timeout" && !this._disposed;
 		} finally {
 			if (timer !== undefined) {
 				clearTimeout(timer);
 			}
 		}
-
-		// If we timed out before coordinator was created, exit early
-		if (coordinatorTimedOut) {
-			this.logger.sendTelemetryEvent({
-				eventName: "CreateRunCoordinatorTimeout",
-				onBehalfOf,
-				timeoutMs: coordinatorTimeoutMs,
-			});
-			return undefined;
-		}
-
-		if (this._disposed) {
-			return undefined;
-		}
-		assert(
-			coordinatorResult !== undefined,
-			0xcd6 /* Expect coordinatorResult to be defined */,
-		);
-		return coordinatorResult;
 	}
 
 	/** Drains execution before cancelling its connection controller, with a bounded wait. */
