@@ -23,12 +23,14 @@ describe("Summarization Session", () => {
 			.callsFake(async (_onBehalfOf: string) => this.runResult.promise);
 		public readonly stop = sinon.stub<[SummarizerStopReason], void>();
 		public readonly close = sinon.stub<[], void>();
-		public summarizeOnDemand(): never {
-			throw new Error("Not used by lifecycle tests");
-		}
-		public enqueueSummarize(): never {
-			throw new Error("Not used by lifecycle tests");
-		}
+		public readonly summarizeOnDemand = sinon.stub<
+			Parameters<ISummarizer["summarizeOnDemand"]>,
+			ReturnType<ISummarizer["summarizeOnDemand"]>
+		>();
+		public readonly enqueueSummarize = sinon.stub<
+			Parameters<ISummarizer["enqueueSummarize"]>,
+			ReturnType<ISummarizer["enqueueSummarize"]>
+		>();
 	}
 
 	it("delivers the first graceful stop requested during creation and still allows run", async () => {
@@ -38,7 +40,7 @@ describe("Summarization Session", () => {
 		session.stop("parentNotConnected");
 		session.stop("notElectedParent");
 		creation.resolve(summarizer);
-		assert.equal(await session.loaded, summarizer);
+		assert.equal(await session.loaded, true);
 		assert.deepEqual(summarizer.stop.args, [["parentNotConnected"]]);
 		const result = session.run("parent");
 		summarizer.runResult.resolve("parentNotConnected");
@@ -49,7 +51,7 @@ describe("Summarization Session", () => {
 		});
 		assert.deepEqual(summarizer.run.args, [["parent"]]);
 		assert.equal(summarizer.close.callCount, 1);
-		assert.equal(session.summarizer, undefined);
+		assert.equal(session.isLoaded, false);
 	});
 
 	it("closes a late-created summarizer without running it", async () => {
@@ -57,7 +59,7 @@ describe("Summarization Session", () => {
 		const summarizer = new TestSummarizer();
 		const session = new SummarizationSession(async () => creation.promise);
 		session.close();
-		assert.equal(await session.loaded, undefined);
+		assert.equal(await session.loaded, false);
 		creation.resolve(summarizer);
 		await new Promise((resolve) => process.nextTick(resolve));
 		assert.equal(await session.run("parent"), undefined);
@@ -98,11 +100,48 @@ describe("Summarization Session", () => {
 		session.close();
 	});
 
+	it("forwards events from stop intent delivered during loading and detaches on closure", async () => {
+		const creation = new Deferred<ISummarizer>();
+		const summarizer = new TestSummarizer();
+		const session = new SummarizationSession(async () => creation.promise);
+		const reasons: SummarizerStopReason[] = [];
+		session.on("summarizerStop", ({ stopReason }) => reasons.push(stopReason));
+		summarizer.stop.callsFake((reason) => {
+			summarizer.emit("summarizerStop", { stopReason: reason });
+		});
+		session.stop("parentNotConnected");
+		creation.resolve(summarizer);
+		await session.loaded;
+		assert.deepEqual(reasons, ["parentNotConnected"]);
+		session.close();
+		assert.equal(summarizer.listenerCount("summarizerStop"), 0);
+		summarizer.emit("summarizerStop", { stopReason: "notElectedParent" });
+		assert.deepEqual(reasons, ["parentNotConnected"]);
+	});
+
+	it("delegates summary requests only while a child is loaded", async () => {
+		const creation = new Deferred<ISummarizer>();
+		const summarizer = new TestSummarizer();
+		const session = new SummarizationSession(async () => creation.promise);
+		const options = { reason: "explicit request" };
+		assert.throws(() => session.summarizeOnDemand(options), /not loaded or has closed/);
+		assert.throws(() => session.enqueueSummarize(options), /not loaded or has closed/);
+		creation.resolve(summarizer);
+		await session.loaded;
+		session.summarizeOnDemand(options);
+		session.enqueueSummarize(options);
+		assert.deepEqual(summarizer.summarizeOnDemand.args, [[options]]);
+		assert.deepEqual(summarizer.enqueueSummarize.args, [[options]]);
+		session.close();
+		assert.throws(() => session.summarizeOnDemand(options), /not loaded or has closed/);
+		assert.throws(() => session.enqueueSummarize(options), /not loaded or has closed/);
+	});
+
 	it("observes a creation failure after closure", async () => {
 		const creation = new Deferred<ISummarizer>();
 		const session = new SummarizationSession(async () => creation.promise);
 		session.close();
-		assert.equal(await session.loaded, undefined);
+		assert.equal(await session.loaded, false);
 		creation.reject(new Error("Late load failure"));
 		await new Promise((resolve) => process.nextTick(resolve));
 	});
@@ -119,7 +158,7 @@ describe("Summarization Session", () => {
 				kind: "timeout",
 				reason: "parentNotConnected",
 			});
-			assert.equal(await session.loaded, undefined);
+			assert.equal(await session.loaded, false);
 			creation.resolve(summarizer);
 			await clock.tickAsync(0);
 			assert.equal(summarizer.close.callCount, 1);

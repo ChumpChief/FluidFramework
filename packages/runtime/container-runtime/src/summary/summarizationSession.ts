@@ -3,8 +3,13 @@
  * Licensed under the MIT License.
  */
 
-import type { SummarizerStopReason } from "@fluidframework/container-runtime-definitions/internal";
+import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import type {
+	ISummarizerEvents,
+	SummarizerStopReason,
+} from "@fluidframework/container-runtime-definitions/internal";
 import { Deferred } from "@fluidframework/core-utils/internal";
+import { UsageError } from "@fluidframework/telemetry-utils/internal";
 
 import type { ISummarizer } from "./summarizerTypes.js";
 
@@ -22,43 +27,46 @@ export type SummarizationSessionOutcome =
  * Stop requests during creation are delivered when the summarizer becomes available.
  * Closing cannot cancel the underlying load, but closes a late result without running it.
  */
-export class SummarizationSession {
+export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 	private readonly closeDeferred = new Deferred<undefined>();
 	private readonly completion = new Deferred<SummarizationSessionOutcome>();
 	private isClosed = false;
 	private stopTimer: ReturnType<typeof setTimeout> | undefined;
 	private stopReason: SummarizerStopReason | undefined;
 	private ownedSummarizer: ISummarizer | undefined;
+	private readonly removeForwardedEvents: (() => void)[] = [];
 
 	/**
-	 * Resolves when the summarizer object is loaded, or with undefined if the session closes first.
+	 * Resolves to true when the summarizer is loaded, or false if the session closes first.
 	 * Loading does not imply connection or executor readiness; those remain part of run().
 	 */
-	public readonly loaded: Promise<ISummarizer | undefined>;
+	public readonly loaded: Promise<boolean>;
 
 	/** Settles once local ownership ends, even when an underlying load or run is still pending. */
 	public readonly closed = this.completion.promise;
 
-	public get summarizer(): ISummarizer | undefined {
-		return this.ownedSummarizer;
+	public get isLoaded(): boolean {
+		return this.ownedSummarizer !== undefined;
 	}
 
 	constructor(createSummarizer: () => Promise<ISummarizer>) {
+		super();
 		// Defer creation so the caller can retain the session before loading emits quorum events.
 		const creation = Promise.resolve().then(async () => {
 			const summarizer = await createSummarizer();
 			if (this.isClosed) {
 				summarizer.close();
-				return undefined;
+				return false;
 			}
 			this.ownedSummarizer = summarizer;
+			this.forwardEvents(summarizer);
 			if (this.stopReason !== undefined) {
 				summarizer.stop(this.stopReason);
 			}
-			return summarizer;
+			return true;
 		});
 		// The race also observes a creation failure after closure, when nobody is awaiting the load.
-		this.loaded = Promise.race([creation, this.closeDeferred.promise]);
+		this.loaded = Promise.race([creation, this.closeDeferred.promise.then(() => false)]);
 		// eslint-disable-next-line no-void
 		void this.loaded.catch((error: unknown) => {
 			this.finish({ kind: "failed", error });
@@ -70,7 +78,10 @@ export class SummarizationSession {
 	 */
 	public async run(onBehalfOf: string): Promise<SummarizerStopReason | undefined> {
 		try {
-			const summarizer = this.ownedSummarizer ?? (await this.loaded);
+			if (!this.isLoaded) {
+				await this.loaded;
+			}
+			const summarizer = this.ownedSummarizer;
 			if (this.isClosed || summarizer === undefined) {
 				return undefined;
 			}
@@ -110,6 +121,46 @@ export class SummarizationSession {
 		this.finish({ kind: "closed" });
 	}
 
+	/** Requests a summary from the loaded child using its existing execution policy. */
+	public summarizeOnDemand(
+		...args: Parameters<ISummarizer["summarizeOnDemand"]>
+	): ReturnType<ISummarizer["summarizeOnDemand"]> {
+		return this.getSummarizer().summarizeOnDemand(...args);
+	}
+
+	/** Enqueues a summary in the loaded child's existing execution queue. */
+	public enqueueSummarize(
+		...args: Parameters<ISummarizer["enqueueSummarize"]>
+	): ReturnType<ISummarizer["enqueueSummarize"]> {
+		return this.getSummarizer().enqueueSummarize(...args);
+	}
+
+	private getSummarizer(): ISummarizer {
+		if (this.ownedSummarizer === undefined) {
+			throw new UsageError("The summarization session is not loaded or has closed.");
+		}
+		return this.ownedSummarizer;
+	}
+
+	private forwardEvents(summarizer: ISummarizer): void {
+		for (const event of [
+			"summarize",
+			"summarizeAllAttemptsFailed",
+			"summarizerStop",
+			"summarizerStart",
+			"summarizerStartupFailed",
+			"summarizeTimeout",
+		] as const) {
+			const listener = (...args: unknown[]): void => {
+				this.emit(event, ...args);
+			};
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+			summarizer.on(event as any, listener);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+			this.removeForwardedEvents.push(() => summarizer.off(event as any, listener));
+		}
+	}
+
 	private finish(outcome: SummarizationSessionOutcome): void {
 		if (this.isClosed) {
 			return;
@@ -125,6 +176,11 @@ export class SummarizationSession {
 		try {
 			summarizer?.close();
 		} finally {
+			for (const remove of this.removeForwardedEvents) {
+				remove();
+			}
+			this.removeForwardedEvents.length = 0;
+			this.removeAllListeners();
 			this.completion.resolve(outcome);
 		}
 	}

@@ -103,9 +103,6 @@ export class SummaryManager
 	private latestClientId: string | undefined;
 	private state = SummaryManagerState.Off;
 	private session?: SummarizationSession;
-	private get summarizer(): ISummarizer | undefined {
-		return this.session?.summarizer;
-	}
 	private _disposed = false;
 
 	public get disposed(): boolean {
@@ -280,6 +277,7 @@ export class SummaryManager
 
 				const session = new SummarizationSession(this.createSummarizerFn);
 				this.session = session;
+				this.setupForwardedEvents(session);
 				// Completion describes local ownership only; election still gates replacement on quorum.
 				// eslint-disable-next-line no-void
 				void session.closed.then((outcome) => {
@@ -291,12 +289,11 @@ export class SummaryManager
 						});
 					}
 				});
-				const summarizer = await session.loaded;
-				if (summarizer === undefined || this.session !== session) {
+				const loaded = await session.loaded;
+				if (!loaded || this.session !== session) {
 					session.close();
 					return "session closed during creation";
 				}
-				this.setupForwardedEvents(summarizer);
 
 				// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
 				// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
@@ -311,7 +308,7 @@ export class SummaryManager
 						!stopReasonCanRunLastSummary(shouldSummarizeState.stopReason)
 					) {
 						this.state = SummaryManagerState.Starting;
-						summarizer.stop(shouldSummarizeState.stopReason);
+						session.stop(shouldSummarizeState.stopReason);
 						return `early exit after starting summarizer ${shouldSummarizeState.stopReason}`;
 					}
 					this.logger.sendTelemetryEvent({
@@ -351,7 +348,10 @@ export class SummaryManager
 				// means it also lost connection), and error happened on load (we do not have summarizer).
 				// We could annotate the error raised in Container.load where the container closed during load with no error
 				// and check for that case here, but that does not seem to be necessary.
-				if (this.getShouldSummarizeState().shouldSummarize || this.summarizer !== undefined) {
+				if (
+					this.getShouldSummarizeState().shouldSummarize ||
+					this.session?.isLoaded === true
+				) {
 					// Report any failure as an error unless it was due to cancellation (like "disconnected" error)
 					// If failure happened on container load, we may not yet realized that socket disconnected, so check
 					// offlineError.
@@ -459,19 +459,19 @@ export class SummaryManager
 	}
 
 	public summarizeOnDemand(options: IOnDemandSummarizeOptions): ISummarizeResults {
-		if (this.summarizer === undefined) {
+		if (this.session?.isLoaded !== true) {
 			throw new Error("No running summarizer client");
 			// TODO: could spawn a summarizer client temporarily.
 		}
-		return this.summarizer.summarizeOnDemand(options);
+		return this.session.summarizeOnDemand(options);
 	}
 
 	public enqueueSummarize(options: IEnqueueSummarizeOptions): EnqueueSummarizeResult {
-		if (this.summarizer === undefined) {
+		if (this.session?.isLoaded !== true) {
 			throw new Error("No running summarizer client");
 			// TODO: could spawn a summarizer client temporarily.
 		}
-		return this.summarizer.enqueueSummarize(options);
+		return this.session.enqueueSummarize(options);
 	}
 
 	public dispose(): void {
@@ -485,7 +485,7 @@ export class SummaryManager
 
 	private readonly forwardedEventsCleanup: (() => void)[] = [];
 
-	private setupForwardedEvents(summarizer: ISummarizer): void {
+	private setupForwardedEvents(summarizer: SummarizationSession): void {
 		for (const event of [
 			"summarize",
 			"summarizeAllAttemptsFailed",
