@@ -207,6 +207,71 @@ describe("Runtime", () => {
 						test.logger.assertMatch([{ eventName: "Summarizer:SummarizerStopTimeout" }]);
 					});
 				}
+
+				it("shares connection and executor startup between simultaneous explicit requests", async () => {
+					const test = createTestSummarizer();
+					const creation = new Deferred<ICancellableSummarizerController>();
+					test.createController.returns(creation.promise);
+					const first = test.summarizer.summarizeOnDemand({ reason: "first" });
+					const second = test.summarizer.summarizeOnDemand({ reason: "second" });
+					assert.equal(test.createController.callCount, 1);
+					creation.resolve(test.controller);
+					await clock.tickAsync(0);
+					assert.equal(test.start.callCount, 1);
+					assert.equal(test.executor.summarizeOnDemand.callCount, 2);
+					assert.deepEqual(test.executor.summarizeOnDemand.firstCall.args[0], {
+						reason: "first",
+					});
+					assert.deepEqual(test.executor.summarizeOnDemand.secondCall.args[0], {
+						reason: "second",
+					});
+					test.summarizer.stop("parentNotConnected");
+					await clock.tickAsync(0);
+					const firstResult = await first.summarySubmitted;
+					const secondResult = await second.summarySubmitted;
+					assert.equal(firstResult.success, false);
+					assert.equal(secondResult.success, false);
+					assert.deepEqual(test.executor.waitStop.args, [[false]]);
+					assert.equal(test.dispose.callCount, 1);
+				});
+
+				it("lets an explicit request share automatic startup without changing last-summary policy", async () => {
+					const test = createTestSummarizer();
+					const creation = new Deferred<ICancellableSummarizerController>();
+					test.createController.returns(creation.promise);
+					const run = test.summarizer.run("parent");
+					test.summarizer.summarizeOnDemand({ reason: "explicit" });
+					creation.resolve(test.controller);
+					await clock.tickAsync(0);
+					assert.equal(test.createController.callCount, 1);
+					assert.equal(test.start.callCount, 1);
+					assert.equal(test.executor.summarizeOnDemand.callCount, 1);
+					test.summarizer.stop("parentNotConnected");
+					await clock.tickAsync(0);
+					await run;
+					assert.deepEqual(test.executor.waitStop.args, [[true]]);
+					assert.equal(test.dispose.callCount, 1);
+				});
+
+				it("fails every waiting request when shared startup fails", async () => {
+					const test = createTestSummarizer();
+					const creation = new Deferred<ICancellableSummarizerController>();
+					test.createController.returns(creation.promise);
+					const first = test.summarizer.summarizeOnDemand({ reason: "first" });
+					const second = test.summarizer.summarizeOnDemand({ reason: "second" });
+					creation.reject(new Error("Connection failed"));
+					await clock.tickAsync(0);
+					const results = await Promise.all([
+						first.receivedSummaryAckOrNack,
+						second.receivedSummaryAckOrNack,
+					]);
+					assert.deepEqual(
+						results.map((result) => result.success),
+						[false, false],
+					);
+					assert.equal(test.dispose.callCount, 1);
+					assert.equal(clock.countTimers(), 0);
+				});
 			});
 		});
 	});

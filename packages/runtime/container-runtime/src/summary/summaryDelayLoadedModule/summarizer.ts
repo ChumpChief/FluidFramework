@@ -93,7 +93,10 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 	private readonly logger: TelemetryLoggerExt;
 	private runningSummarizer?: RunningSummarizer;
 	private _disposed: boolean = false;
-	private starting: boolean = false;
+	private lifecycle: Promise<SummarizerStopReason> | undefined;
+	private readonly executorReady = new Deferred<
+		{ readonly executor: RunningSummarizer } | { readonly error: unknown }
+	>();
 
 	private readonly stopDeferred = new Deferred<SummarizerStopReason>();
 
@@ -126,10 +129,9 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 
 	public async run(onBehalfOf: string): Promise<SummarizerStopReason> {
 		try {
-			return await this.runLifecycle({
+			return await this.ensureLifecycle({
 				onBehalfOf,
 				allowLastSummary: true,
-				onReady: () => {},
 			});
 		} catch (error) {
 			throw SummarizingWarning.wrap(error, false /* logged */, this.logger);
@@ -152,15 +154,27 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		this.runtime.disposeFn();
 	}
 
+	/** The first invocation owns the child's lifecycle policy; later callers share its startup. */
+	private async ensureLifecycle(options: {
+		onBehalfOf: string | undefined;
+		allowLastSummary: boolean;
+	}): Promise<SummarizerStopReason> {
+		if (this.lifecycle === undefined) {
+			this.lifecycle = this.runLifecycle(options);
+			// Explicit requests observe startup failures through executorReady instead of this promise.
+			// eslint-disable-next-line no-void
+			void this.lifecycle.catch(() => {});
+		}
+		return this.lifecycle;
+	}
+
 	/** Owns connection, executor startup, graceful drain, and closure for either invocation mode. */
 	private async runLifecycle({
 		onBehalfOf,
 		allowLastSummary,
-		onReady,
 	}: {
 		onBehalfOf: string | undefined;
 		allowLastSummary: boolean;
-		onReady: (executor: RunningSummarizer) => void;
 	}): Promise<SummarizerStopReason> {
 		let runCoordinator: ICancellableSummarizerController | undefined;
 		let stopReason: SummarizerStopReason = "summarizerException";
@@ -202,7 +216,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			});
 
 			const runningSummarizer = await this.start(parentId, runCoordinator);
-			onReady(runningSummarizer);
+			this.executorReady.resolve({ executor: runningSummarizer });
 			stopReason = await stopP;
 			await this.drain(
 				runningSummarizer,
@@ -213,9 +227,13 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			return stopReason;
 		} catch (error) {
 			failure = error;
+			this.executorReady.resolve({ error });
 			this.stop("summarizerException");
 			throw error;
 		} finally {
+			this.executorReady.resolve({
+				error: new UsageError("Summarizer stopped before becoming ready"),
+			});
 			this.emit("summarizerStop", {
 				stopReason,
 				error: failure,
@@ -341,10 +359,6 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			}
 			return this.runningSummarizer;
 		}
-		if (this.starting) {
-			throw new UsageError("Attempting to start a summarizer that is already starting");
-		}
-		this.starting = true;
 		// Initialize values and first ack (time is not exact)
 		this.logger.sendTelemetryEvent({
 			eventName: "RunningSummarizer",
@@ -388,7 +402,6 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		}
 		this.runningSummarizer = runningSummarizer;
 		this.setupForwardedEvents(runningSummarizer);
-		this.starting = false;
 		return runningSummarizer;
 	}
 
@@ -403,6 +416,9 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		this.stop("summarizerClientDisconnected");
 
 		this._disposed = true;
+		this.executorReady.resolve({
+			error: new UsageError("Summarizer was disposed before becoming ready"),
+		});
 		if (this.runningSummarizer) {
 			this.cleanupForwardedEvents();
 			this.runningSummarizer.dispose();
@@ -432,18 +448,23 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 				return this.runningSummarizer.summarizeOnDemand(options, builder);
 			}
 
-			// Summarizer isn't running, so we need to start it, which is an async operation.
-			// Manage the promise related to creating the cancellation token here.
-			// The promises related to starting, summarizing,
-			// and submitting are communicated to the caller through the results builder.
-			// eslint-disable-next-line no-void
-			void this.runLifecycle({
+			const lifecycle = this.ensureLifecycle({
 				onBehalfOf: undefined,
 				allowLastSummary: false,
-				onReady: (executor) => {
-					executor.summarizeOnDemand(options, builder);
-				},
-			})
+			});
+			// Each request waits for the same executor; its existing lock decides concurrency policy.
+			// eslint-disable-next-line no-void
+			void this.executorReady.promise
+				.then(async (ready) => {
+					if ("error" in ready) {
+						throw ready.error;
+					}
+					if (this._disposed || ready.executor.disposed) {
+						throw new UsageError("Summarizer closed before the request could run");
+					}
+					ready.executor.summarizeOnDemand(options, builder);
+					return lifecycle;
+				})
 				.then(() => {
 					if (!builder.receivedSummaryAckOrNack.isCompleted) {
 						builder.fail(
