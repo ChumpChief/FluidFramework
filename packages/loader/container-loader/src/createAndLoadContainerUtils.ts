@@ -9,7 +9,6 @@ import type {
 	IFluidCodeDetails,
 	IContainerPolicies,
 } from "@fluidframework/container-definitions/internal";
-import { LoaderHeader } from "@fluidframework/container-definitions/internal";
 import type {
 	FluidObject,
 	IConfigProviderBase,
@@ -27,7 +26,7 @@ import type {
 	ISnapshotTree,
 	IUrlResolver,
 } from "@fluidframework/driver-definitions/internal";
-import { DriverHeader, FetchSource } from "@fluidframework/driver-definitions/internal";
+import { FetchSource } from "@fluidframework/driver-definitions/internal";
 import { getSnapshotTree } from "@fluidframework/driver-utils/internal";
 import {
 	GenericError,
@@ -61,6 +60,7 @@ import { Loader } from "./loader.js";
 import { pkgVersion } from "./packageVersion.js";
 import type { ProtocolHandlerBuilder } from "./protocol.js";
 import type { IPendingContainerState } from "./serializedStateManager.js";
+import { getSummaryExecution, summaryClientRequest } from "./summaryClient.js";
 import type {
 	LoadSummarizerSummaryResult,
 	OnDemandSummaryResults,
@@ -808,20 +808,7 @@ async function loadSummarizerContainerAndMakeSummaryInternal(
 		mc.logger,
 		{ eventName: "SummarizerOnDemandSummary" },
 		async (event) => {
-			const baseHeaders = originalRequest.headers;
-			const request = {
-				...originalRequest,
-				headers: {
-					...baseHeaders,
-					[LoaderHeader.cache]: false,
-					[LoaderHeader.clientDetails]: {
-						capabilities: { interactive: false },
-						type: "summarizer",
-					},
-					[DriverHeader.summarizingClient]: true,
-					[LoaderHeader.reconnect]: false,
-				},
-			};
+			const request = summaryClientRequest(originalRequest);
 
 			const container = await loadExistingContainer({
 				...loadSummarizerContainerProps,
@@ -834,7 +821,9 @@ async function loadSummarizerContainerAndMakeSummaryInternal(
 				if (container.getEntryPoint === undefined) {
 					throw new GenericError("container.getEntryPoint() is undefined");
 				}
-				const fluidObject = (await container.getEntryPoint()) as FluidObject<SummarizerLike>;
+				const fluidObject = (await getSummaryExecution(container)) as
+					| FluidObject<SummarizerLike>
+					| undefined;
 				const summarizer = fluidObject?.ISummarizer;
 				if (summarizer === undefined) {
 					throw new GenericError("Summarizer entry point not available");

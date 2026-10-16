@@ -43,6 +43,7 @@ import { mixinDebugLogger } from "./debugLogger.js";
 import { pkgVersion } from "./packageVersion.js";
 import type { ProtocolHandlerBuilder } from "./protocol.js";
 import type { IPendingContainerState } from "./serializedStateManager.js";
+import { summaryClientCreateProps } from "./summaryClient.js";
 import {
 	getAttachedContainerStateFromSerializedContainer,
 	tryParseCompatibleResolvedUrl,
@@ -69,13 +70,7 @@ export class RelativeLoader implements ILoader, SummaryClientLoader {
 		ensureResolvedUrlDefined(this.container.resolvedUrl);
 		return this.container.clone(
 			{ resolvedUrl: { ...this.container.resolvedUrl }, version: undefined },
-			{
-				canReconnect: false,
-				clientDetailsOverride: {
-					capabilities: { interactive: false },
-					type: "summarizer",
-				},
-			},
+			summaryClientCreateProps(),
 		);
 	}
 
