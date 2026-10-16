@@ -94,6 +94,7 @@ export {
 	isSummariesDisabled,
 	isSummaryOnRequest,
 } from "./summaryHelpers.js";
+export { SummarizationSession } from "./summarizationSession.js";
 export {
 	type IdCompressorMode,
 	type IDocumentSchemaCurrent,

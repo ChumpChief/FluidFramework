@@ -24,6 +24,7 @@ import {
 
 import type { IThrottler } from "../throttler.js";
 
+import { SummarizationSession } from "./summarizationSession.js";
 import type { ISummarizerClientElection } from "./summarizerClientElection.js";
 import type {
 	IEnqueueSummarizeOptions,
@@ -101,8 +102,10 @@ export class SummaryManager
 	private readonly initialDelayMs: number;
 	private latestClientId: string | undefined;
 	private state = SummaryManagerState.Off;
-	private summarizer?: ISummarizer;
-	private pendingStopReason?: SummarizerStopReason;
+	private session?: SummarizationSession;
+	private get summarizer(): ISummarizer | undefined {
+		return this.session?.summarizer;
+	}
 	private _disposed = false;
 	private summarizerStopTimeout?: ReturnType<typeof setTimeout>;
 	/**
@@ -200,9 +203,11 @@ export class SummaryManager
 			return { shouldSummarize: false, stopReason: "notElectedParent" };
 		}
 
-		// We are not already running the summarizer and we are not the current elected client id.
+		// During running or draining, a child can join quorum before its load promise resolves.
+		// Its parent remains responsible even though the child is now the elected client.
 		if (
 			this.state !== SummaryManagerState.Running &&
+			this.state !== SummaryManagerState.Stopping &&
 			this.connectedState.clientId !== this.clientElection.electedClientId
 		) {
 			return { shouldSummarize: false, stopReason: "notElectedClient" };
@@ -252,7 +257,7 @@ export class SummaryManager
 		assert(this.state === SummaryManagerState.Off, 0x261 /* "Expected: off" */);
 		this.state = SummaryManagerState.Starting;
 
-		assert(this.summarizer === undefined, 0x262 /* "Old summarizer is still working!" */);
+		assert(this.session === undefined, "The previous summarization session must be closed.");
 
 		const generation = this.summarizerGeneration;
 
@@ -284,16 +289,14 @@ export class SummaryManager
 				assert(this.state === SummaryManagerState.Starting, 0x263 /* "Expected: starting" */);
 				this.state = SummaryManagerState.Running;
 
-				const summarizer = await this.createSummarizerFn();
-				this.summarizer = summarizer;
-				this.setupForwardedEvents(summarizer);
-
-				// A stop may have been requested while we were awaiting summarizer creation.
-				// Replay it now so the summarizer can observe the stop intent and move to exit.
-				if (this.pendingStopReason !== undefined) {
-					summarizer.stop(this.pendingStopReason);
-					this.pendingStopReason = undefined;
+				const session = new SummarizationSession(this.createSummarizerFn);
+				this.session = session;
+				const summarizer = await session.loaded;
+				if (summarizer === undefined || this.session !== session) {
+					session.close();
+					return "session closed during creation";
 				}
+				this.setupForwardedEvents(summarizer);
 
 				// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
 				// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
@@ -322,10 +325,10 @@ export class SummaryManager
 				return PerformanceEvent.timedExecAsync(
 					this.logger,
 					{ eventName: "RunningSummarizer", attempt: this.startThrottler.numAttempts },
-					async () => summarizer.run(clientId),
+					async () => session.run(clientId),
 				);
 			})
-			.then((reason: string) => {
+			.then((reason) => {
 				this.logger.sendTelemetryEvent({
 					eventName: "EndingSummarizer",
 					reason,
@@ -383,7 +386,6 @@ export class SummaryManager
 	private cleanupAfterSummarizerStop(): void {
 		this.summarizerGeneration++;
 		this.state = SummaryManagerState.Off;
-		this.pendingStopReason = undefined;
 
 		// Clear any pending stop timeout to avoid it firing for a different summarizer
 		if (this.summarizerStopTimeout !== undefined) {
@@ -392,8 +394,8 @@ export class SummaryManager
 		}
 
 		this.cleanupForwardedEvents();
-		this.summarizer?.close();
-		this.summarizer = undefined;
+		this.session?.close();
+		this.session = undefined;
 
 		if (this.getShouldSummarizeState().shouldSummarize) {
 			this.startSummarization();
@@ -405,11 +407,10 @@ export class SummaryManager
 			return;
 		}
 		this.state = SummaryManagerState.Stopping;
-		this.pendingStopReason = reason;
 
 		// Stopping the running summarizer client should trigger a change
 		// in states when the running summarizer closes
-		this.summarizer?.stop(reason);
+		this.session?.stop(reason);
 
 		const summarizerCloseTimeoutMs = 2 * 60 * 1000; // 2 minutes
 		// Clear any existing timeout before setting a new one
@@ -418,7 +419,7 @@ export class SummaryManager
 		}
 		// Set a timeout to force cleanup if the summarizer doesn't close in time
 		this.summarizerStopTimeout = setTimeout(() => {
-			if (this.state === SummaryManagerState.Stopping && this.summarizer !== undefined) {
+			if (this.state === SummaryManagerState.Stopping && this.session !== undefined) {
 				this.logger.sendTelemetryEvent({
 					eventName: "SummarizerStopTimeout",
 					timeoutMs: summarizerCloseTimeoutMs,
@@ -512,7 +513,6 @@ export class SummaryManager
 		this.connectedState.off("connected", this.handleConnected);
 		this.connectedState.off("disconnected", this.handleDisconnected);
 		this.cleanupForwardedEvents();
-		this.pendingStopReason = undefined;
 		if (this.summarizerStopTimeout !== undefined) {
 			clearTimeout(this.summarizerStopTimeout);
 		}

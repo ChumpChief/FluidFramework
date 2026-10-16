@@ -149,7 +149,10 @@ describe("Summary Manager", () => {
 			// Approximation, as ideally it should become cancelled immediately after stop() call
 			return this.state !== "running";
 		}
-		public close() {}
+		public closeCount = 0;
+		public close() {
+			this.closeCount++;
+		}
 		public stop(reason?: string): void {
 			this.testStopReason = reason;
 			this.stopDeferred.resolve(reason);
@@ -242,10 +245,11 @@ describe("Summary Manager", () => {
 	 */
 	const requestSummarizer = async (): Promise<ISummarizer> => {
 		summarizer = new TestSummarizer();
+		const requestedSummarizer = summarizer;
 		requestCalls++;
 		requestDeferred = new Deferred();
 		await requestDeferred.promise;
-		return summarizer;
+		return requestedSummarizer;
 	};
 
 	/**
@@ -626,6 +630,46 @@ describe("Summary Manager", () => {
 
 	describe("Stop Timeout", () => {
 		const summarizerCloseTimeoutMs = 2 * 60 * 1000; // matches production value
+
+		it("Should close a summarizer that finishes loading after the stop timeout", async () => {
+			createSummaryManager({ opsToBypassInitialDelay: 0, connected: true });
+			clientElection.electClient(thisClientId);
+			await flushPromises();
+			assertRequests(1);
+			const lateSummarizer = summarizer;
+			connectedState.disconnect();
+			clock.tick(summarizerCloseTimeoutMs);
+			await flushPromises();
+			assertState(SummaryManagerState.Off, "timeout releases the loading session");
+			completeSummarizerRequest();
+			await flushPromises();
+			assert.equal(lateSummarizer.closeCount, 1);
+			assert.equal(lateSummarizer.state, "notStarted");
+			assertState(SummaryManagerState.Off, "late completion must not restart the session");
+		});
+
+		it("Should not let an expired load replace a new session", async () => {
+			createSummaryManager({ opsToBypassInitialDelay: 0, connected: true });
+			clientElection.electClient(thisClientId);
+			await flushPromises();
+			const oldLoad = requestDeferred;
+			const oldSummarizer = summarizer;
+			connectedState.disconnect();
+			connectedState.connect();
+			clock.tick(summarizerCloseTimeoutMs);
+			await flushPromises();
+			assertRequests(2);
+			const newSummarizer = summarizer;
+			oldLoad.resolve();
+			await flushPromises();
+			assert.equal(oldSummarizer.closeCount, 1);
+			assert.equal(oldSummarizer.state, "notStarted");
+			completeSummarizerRequest();
+			await flushPromises();
+			assert.equal(newSummarizer.state, "running");
+			assert.equal(newSummarizer.closeCount, 0);
+			assertState(SummaryManagerState.Running, "new session retains ownership");
+		});
 
 		it("Should not assert when stop timeout fires before promise chain completes", async () => {
 			createSummaryManager({ opsToBypassInitialDelay: 0 });
