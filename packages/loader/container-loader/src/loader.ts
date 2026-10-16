@@ -38,6 +38,7 @@ import type { ITelemetryLoggerExt } from "@fluidframework/telemetry-utils/legacy
 import { v4 as uuid } from "uuid";
 
 import { Container } from "./container.js";
+import type { SummaryClientLoader } from "@fluidframework/container-definitions/internal";
 import { mixinDebugLogger } from "./debugLogger.js";
 import { pkgVersion } from "./packageVersion.js";
 import type { ProtocolHandlerBuilder } from "./protocol.js";
@@ -57,11 +58,26 @@ function ensureResolvedUrlDefined(
 /**
  * @internal
  */
-export class RelativeLoader implements ILoader {
+export class RelativeLoader implements ILoader, SummaryClientLoader {
 	constructor(
 		private readonly container: Container,
 		private readonly loader: ILoader | undefined,
 	) {}
+
+	/** Opens the same document with the loader policies required by summary execution. */
+	public async loadSummaryClient(): Promise<IContainer> {
+		ensureResolvedUrlDefined(this.container.resolvedUrl);
+		return this.container.clone(
+			{ resolvedUrl: { ...this.container.resolvedUrl }, version: undefined },
+			{
+				canReconnect: false,
+				clientDetailsOverride: {
+					capabilities: { interactive: false },
+					type: "summarizer",
+				},
+			},
+		);
+	}
 
 	public async resolve(request: IRequest): Promise<IContainer> {
 		if (request.url.startsWith("/")) {

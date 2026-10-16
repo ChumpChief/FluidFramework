@@ -28,7 +28,8 @@ import {
 import { v4 as uuid } from "uuid";
 
 import { Container } from "../container.js";
-import { Loader } from "../loader.js";
+import { Loader, RelativeLoader } from "../loader.js";
+import sinon from "sinon";
 import type { IPendingDetachedContainerState } from "../serializedStateManager.js";
 
 import { AbsentProperty, failProxy, failSometimeProxy } from "./failProxy.js";
@@ -45,6 +46,25 @@ const documentServiceFactoryFailProxy = failSometimeProxy<
 });
 
 describe("loader unit test", () => {
+	it("opens a summary client directly with non-interactive and no-reconnect policies", async () => {
+		const resolvedUrl = { type: "fluid", id: "document", url: "https://example.com/document" };
+		const child = {} as unknown as Container;
+		const clone = sinon.stub().resolves(child);
+		const parent = { resolvedUrl, clone } as unknown as Container;
+		const loader = new RelativeLoader(parent, undefined);
+		assert.equal(await loader.loadSummaryClient(), child);
+		assert.deepEqual(clone.firstCall.args, [
+			{ resolvedUrl, version: undefined },
+			{
+				canReconnect: false,
+				clientDetailsOverride: {
+					capabilities: { interactive: false },
+					type: "summarizer",
+				},
+			},
+		]);
+		assert.equal(clone.callCount, 1);
+	});
 	it("rehydrateDetachedContainerFromSnapshot with invalid format", async () => {
 		const loader = new Loader({
 			codeLoader: failProxy(),

@@ -4,6 +4,7 @@
  */
 
 import { type ILoader, LoaderHeader } from "@fluidframework/container-definitions/internal";
+import type { SummaryClientLoader } from "@fluidframework/container-definitions/internal";
 import type { FluidObject, IRequest, IResponse } from "@fluidframework/core-interfaces";
 import { DriverHeader } from "@fluidframework/driver-definitions/internal";
 import { responseToException } from "@fluidframework/runtime-utils/internal";
@@ -80,6 +81,7 @@ export function formCreateSummarizerFn(
 ): (signal?: AbortSignal) => Promise<ISummarizer> {
 	return async (signal) => {
 		signal?.throwIfAborted();
+		const summaryLoader = loader as ILoader & Partial<SummaryClientLoader>;
 		const request: IRequest = {
 			headers: {
 				[LoaderHeader.cache]: false,
@@ -93,7 +95,9 @@ export function formCreateSummarizerFn(
 			url: `/${summarizerRequestUrl}`,
 		};
 
-		const resolvedContainer = await loader.resolve(request);
+		const resolvedContainer = await (summaryLoader.loadSummaryClient === undefined
+			? loader.resolve(request)
+			: summaryLoader.loadSummaryClient());
 		const disposeContainer = (): void => {
 			if (resolvedContainer.disposed !== true) {
 				resolvedContainer.dispose();

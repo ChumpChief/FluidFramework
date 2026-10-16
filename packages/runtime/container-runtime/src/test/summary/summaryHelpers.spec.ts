@@ -17,6 +17,26 @@ import {
 } from "../../summary/index.js";
 
 describe("Summarizer loading ownership", () => {
+	it("uses explicit summary-client loading when available without issuing a resolve request", async () => {
+		const test = createLoader(async () => ({ ISummarizer: {} }));
+		const loadSummaryClient = sinon.stub().resolves(test.container);
+		const loader = { ...test.loader, loadSummaryClient };
+		const controller = new AbortController();
+		const child = await formCreateSummarizerFn(loader)(controller.signal);
+		assert.notEqual(child, undefined);
+		assert.equal(loadSummaryClient.callCount, 1);
+		assert.equal(test.resolve.callCount, 0);
+		controller.abort();
+		assert.equal(test.dispose.callCount, 1);
+	});
+
+	it("propagates explicit loading failure without retrying through the legacy resolve path", async () => {
+		const test = createLoader(async () => ({}));
+		const error = new Error("Summary client load failed");
+		const loader = { ...test.loader, loadSummaryClient: sinon.stub().rejects(error) };
+		await assert.rejects(formCreateSummarizerFn(loader)(), error);
+		assert.equal(test.resolve.callCount, 0);
+	});
 	it("opens independent sessions without starting loader work until after ownership is returned", async () => {
 		const first = createLoader(async () => ({}));
 		const second = createLoader(async () => ({}));
