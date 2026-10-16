@@ -50,6 +50,10 @@ export class SummarizationSession extends TypedEventEmitter<ISummarizerEvents> {
 		return this.ownedSummarizer !== undefined;
 	}
 
+	public get isStopping(): boolean {
+		return this.stopReason !== undefined;
+	}
+
 	constructor(createSummarizer: (signal?: AbortSignal) => Promise<ISummarizer>) {
 		super();
 		// Defer creation so the caller can retain the session before loading emits quorum events.

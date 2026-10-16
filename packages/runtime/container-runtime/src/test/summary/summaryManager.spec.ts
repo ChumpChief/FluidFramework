@@ -534,7 +534,13 @@ describe("Summary Manager", () => {
 			assertRequests(1, "should request summarizer and run the last summary.");
 			completeSummarizerRequest();
 			await flushPromises();
-			assertState(SummaryManagerState.Running, "summarizer should be running");
+			assertState(SummaryManagerState.Stopping, "urgent session is draining after disconnect");
+			assert.equal(
+				summarizer.state,
+				"running",
+				"the child still executes its last-summary flow",
+			);
+			assert.equal(summarizer.testStopReason, "parentNotConnected");
 		});
 
 		it("Should create last summary when summarizer created without delay, then disconnected", async () => {

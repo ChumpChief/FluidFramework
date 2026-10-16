@@ -100,7 +100,7 @@ export class SummaryManager
 	private readonly opsToBypassInitialDelay: number;
 	private readonly initialDelayMs: number;
 	private latestClientId: string | undefined;
-	private state = SummaryManagerState.Off;
+	private task: Promise<void> | undefined;
 	private session?: SummarizationSession;
 	private _disposed = false;
 	private readonly disposedDeferred = new Deferred<void>();
@@ -110,7 +110,15 @@ export class SummaryManager
 	}
 
 	public get currentState(): SummaryManagerState {
-		return this.state;
+		if (this.task === undefined) {
+			return SummaryManagerState.Off;
+		}
+		if (this.session === undefined) {
+			return SummaryManagerState.Starting;
+		}
+		return this.session.isStopping
+			? SummaryManagerState.Stopping
+			: SummaryManagerState.Running;
 	}
 
 	constructor(
@@ -170,34 +178,15 @@ export class SummaryManager
 		this.refreshSummarizer();
 	};
 
-	private static readonly isStartingOrRunning = (
-		state: SummaryManagerState,
-	): state is SummaryManagerState.Starting | SummaryManagerState.Running =>
-		state === SummaryManagerState.Starting || state === SummaryManagerState.Running;
-
-	private getShouldSummarizeState(): ShouldSummarizeState {
+	/** Existing sessions retain responsibility when their child becomes the elected client. */
+	private getResponsibility(): ShouldSummarizeState {
 		if (this.disposed) {
 			return { shouldSummarize: false, stopReason: "parentNotConnected" };
 		}
 
-		// Note that if we're in the Running state, the electedClient may be a summarizer client, so we can't
-		// enforce connectedState.clientId === clientElection.electedClientId. But once we're Running, we should
-		// only transition to Stopping when the electedParentId changes. Stopping the summarizer without
-		// changing the electedParent will just cause us to transition to Starting again.
-
 		// New Parent has been elected and it is not the current client, or
 		if (this.connectedState.clientId !== this.clientElection.electedParentId) {
 			return { shouldSummarize: false, stopReason: "notElectedParent" };
-		}
-
-		// During running or draining, a child can join quorum before its load promise resolves.
-		// Its parent remains responsible even though the child is now the elected client.
-		if (
-			this.state !== SummaryManagerState.Running &&
-			this.state !== SummaryManagerState.Stopping &&
-			this.connectedState.clientId !== this.clientElection.electedClientId
-		) {
-			return { shouldSummarize: false, stopReason: "notElectedClient" };
 		}
 
 		if (!this.connectedState.connected) {
@@ -207,123 +196,33 @@ export class SummaryManager
 		return { shouldSummarize: true };
 	}
 
+	/** Opening requires both parent responsibility and permission to replace the previous child. */
+	private getOpeningEligibility(): ShouldSummarizeState {
+		const responsibility = this.getResponsibility();
+		if (!responsibility.shouldSummarize) {
+			return responsibility;
+		}
+		return this.connectedState.clientId === this.clientElection.electedClientId
+			? responsibility
+			: { shouldSummarize: false, stopReason: "notElectedClient" };
+	}
+
 	private readonly refreshSummarizer = (): void => {
-		// Transition states depending on shouldSummarize, which is a calculated property
-		// that is only true if this client is connected and is the elected summarizer.
-		const shouldSummarizeState = this.getShouldSummarizeState();
-		switch (this.state) {
-			case SummaryManagerState.Off: {
-				if (shouldSummarizeState.shouldSummarize) {
-					this.startSummarization();
-				}
-				return;
+		if (this.session !== undefined) {
+			const responsibility = this.getResponsibility();
+			if (!responsibility.shouldSummarize) {
+				this.session.stop(responsibility.stopReason);
 			}
-			case SummaryManagerState.Starting: {
-				// Cannot take any action until summarizer is created
-				// state transition will occur after creation
-				return;
-			}
-			case SummaryManagerState.Running: {
-				if (shouldSummarizeState.shouldSummarize === false) {
-					this.stop(shouldSummarizeState.stopReason);
-				}
-				return;
-			}
-			case SummaryManagerState.Stopping: {
-				// Cannot take any action until running summarizer finishes
-				// state transition will occur after it stops
-				return;
-			}
-			default: {
-				return;
-			}
+		} else if (this.task === undefined && this.getOpeningEligibility().shouldSummarize) {
+			this.startSummarization();
 		}
 	};
 
 	private startSummarization(): void {
-		assert(this.state === SummaryManagerState.Off, 0x261 /* "Expected: off" */);
-		this.state = SummaryManagerState.Starting;
-
+		assert(this.task === undefined, "Only one supervisor task may own a session.");
 		assert(this.session === undefined, "The previous summarization session must be closed.");
 
-		this.delayBeforeCreatingSummarizer()
-			.then(async (startWithInitialDelay: boolean) => {
-				if (this.disposed) {
-					return "early exit (disposed)";
-				}
-
-				// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
-				// but only if creation was delayed. If it was not, then we want to ensure we always create
-				// a summarizer to kick off lastSummary. Without that, we would not be able to summarize and get
-				// document out of broken state if it has too many ops and ordering service keeps nacking main
-				// container (and thus it goes into cycle of reconnects)
-				// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
-				// the summarizer at all.
-				const shouldSummarizeStateEarlyStage = this.getShouldSummarizeState();
-				if (
-					startWithInitialDelay &&
-					shouldSummarizeStateEarlyStage.shouldSummarize === false
-				) {
-					return `early exit ${shouldSummarizeStateEarlyStage.stopReason}`;
-				}
-
-				// We transition to Running before requesting the summarizer, because after requesting we can't predict
-				// when the electedClient will be replaced with the new summarizer client.
-				// The alternative would be to let connectedState.clientId !== clientElection.electedClientId when
-				// state === Starting || state === Running.
-				assert(this.state === SummaryManagerState.Starting, 0x263 /* "Expected: starting" */);
-				this.state = SummaryManagerState.Running;
-
-				const session = this.openSession();
-				this.session = session;
-				this.setupForwardedEvents(session);
-				// Completion describes local ownership only; election still gates replacement on quorum.
-				// eslint-disable-next-line no-void
-				void session.closed.then((outcome) => {
-					if (outcome.kind === "timeout") {
-						this.logger.sendTelemetryEvent({
-							eventName: "SummarizerStopTimeout",
-							timeoutMs: 2 * 60 * 1000,
-							stopReason: outcome.reason,
-						});
-					}
-				});
-				const loaded = await session.loaded;
-				if (!loaded || this.session !== session) {
-					session.close();
-					return "session closed during creation";
-				}
-
-				// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
-				// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
-				// the summarizer at all.
-				const shouldSummarizeState = this.getShouldSummarizeState();
-				if (shouldSummarizeState.shouldSummarize === false) {
-					// In order to allow the last summary to run, we not only need a stop reason that would
-					// allow it but also, startWithInitialDelay to be false (start the summarization immediately),
-					// which would happen when we have a high enough number of unsummarized ops.
-					if (
-						startWithInitialDelay ||
-						!stopReasonCanRunLastSummary(shouldSummarizeState.stopReason)
-					) {
-						this.state = SummaryManagerState.Starting;
-						session.stop(shouldSummarizeState.stopReason);
-						return `early exit after starting summarizer ${shouldSummarizeState.stopReason}`;
-					}
-					this.logger.sendTelemetryEvent({
-						eventName: "LastAttemptToSummarize",
-					});
-				}
-
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-				const clientId = this.latestClientId!;
-
-				return PerformanceEvent.timedExecAsync(
-					this.logger,
-					{ eventName: "RunningSummarizer", attempt: this.startThrottler.numAttempts },
-					async () => session.run(clientId),
-				);
-			})
+		this.task = this.superviseSession()
 			.then((reason) => {
 				this.logger.sendTelemetryEvent({
 					eventName: "EndingSummarizer",
@@ -339,18 +238,8 @@ export class SummaryManager
 					error,
 				);
 
-				// Most of exceptions happen due to container being closed while loading it, due to
-				// summarizer container loosing connection while load.
-				// Not worth reporting such errors as errors. That said, we might miss some real errors if
-				// we ignore blindly, so try to narrow signature we are looking for - skip logging
-				// error only if this client should no longer be a summarizer (which in practice
-				// means it also lost connection), and error happened on load (we do not have summarizer).
-				// We could annotate the error raised in Container.load where the container closed during load with no error
-				// and check for that case here, but that does not seem to be necessary.
-				if (
-					this.getShouldSummarizeState().shouldSummarize ||
-					this.session?.isLoaded === true
-				) {
+				// Lost responsibility during load is expected; report other execution failures.
+				if (this.getResponsibility().shouldSummarize || this.session?.isLoaded === true) {
 					// Report any failure as an error unless it was due to cancellation (like "disconnected" error)
 					// If failure happened on container load, we may not yet realized that socket disconnected, so check
 					// offlineError.
@@ -367,32 +256,64 @@ export class SummaryManager
 				}
 			})
 			.finally(() => {
-				assert(this.state !== SummaryManagerState.Off, 0x264 /* "Expected: Not Off" */);
 				this.cleanupAfterSummarizerStop();
 			});
 	}
 
-	private cleanupAfterSummarizerStop(): void {
-		this.state = SummaryManagerState.Off;
+	/** One task owns delay, opening, execution, and draining before eligibility is reconsidered. */
+	private async superviseSession(): Promise<string | undefined> {
+		const delayed = await this.delayBeforeCreatingSummarizer();
+		if (this.disposed) {
+			return "early exit (disposed)";
+		}
+		const eligibility = this.getOpeningEligibility();
+		// Urgent startup is allowed to finish a last summary even if its parent has disconnected.
+		// Preserve that recovery policy when the service is rejecting unsummarized ops.
+		if (delayed && !eligibility.shouldSummarize) {
+			return `early exit ${eligibility.stopReason}`;
+		}
 
+		const session = this.openSession();
+		this.session = session;
+		this.setupForwardedEvents(session);
+		// Completion is local; quorum election still controls permission to open a replacement.
+		// eslint-disable-next-line no-void
+		void session.closed.then((outcome) => {
+			if (outcome.kind === "timeout") {
+				this.logger.sendTelemetryEvent({
+					eventName: "SummarizerStopTimeout",
+					timeoutMs: 2 * 60 * 1000,
+					stopReason: outcome.reason,
+				});
+			}
+		});
+		if (!(await session.loaded)) {
+			return "session closed during creation";
+		}
+
+		const responsibility = this.getResponsibility();
+		if (!responsibility.shouldSummarize) {
+			session.stop(responsibility.stopReason);
+			if (delayed || !stopReasonCanRunLastSummary(responsibility.stopReason)) {
+				return `early exit after starting summarizer ${responsibility.stopReason}`;
+			}
+			this.logger.sendTelemetryEvent({ eventName: "LastAttemptToSummarize" });
+		}
+		const clientId = this.latestClientId;
+		assert(clientId !== undefined, "An elected supervisor must have a parent client ID.");
+		return PerformanceEvent.timedExecAsync(
+			this.logger,
+			{ eventName: "RunningSummarizer", attempt: this.startThrottler.numAttempts },
+			async () => session.run(clientId),
+		);
+	}
+
+	private cleanupAfterSummarizerStop(): void {
 		this.cleanupForwardedEvents();
 		this.session?.close();
 		this.session = undefined;
-
-		if (this.getShouldSummarizeState().shouldSummarize) {
-			this.startSummarization();
-		}
-	}
-
-	private stop(reason: SummarizerStopReason): void {
-		if (!SummaryManager.isStartingOrRunning(this.state)) {
-			return;
-		}
-		this.state = SummaryManagerState.Stopping;
-
-		// Stopping the running summarizer client should trigger a change
-		// in states when the running summarizer closes
-		this.session?.stop(reason);
+		this.task = undefined;
+		this.refreshSummarizer();
 	}
 
 	/**
