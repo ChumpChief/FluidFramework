@@ -22,8 +22,7 @@ describe("Run While Connected Coordinator", () => {
 			const runtime = new Runtime();
 			const connection = RunWhileConnectedCoordinator.open(runtime, () => true);
 			await clock.tickAsync(2 * 60 * 1000);
-			await connection.ready;
-			assert.equal(connection.timedOut, true);
+			assert.equal(await connection.ready, "timeout");
 			assert.equal(connection.cancelled, true);
 			assertNoListeners(runtime);
 			assert.equal(clock.countTimers(), 0);
@@ -47,7 +46,7 @@ describe("Run While Connected Coordinator", () => {
 		const runtime = new Runtime();
 		const coordinator = RunWhileConnectedCoordinator.open(runtime, () => true);
 		coordinator.stop("notElectedParent");
-		await coordinator.ready;
+		assert.equal(await coordinator.ready, "stopped");
 		assert.equal(await coordinator.waitCancelled, "notElectedParent");
 		assertNoListeners(runtime);
 	});

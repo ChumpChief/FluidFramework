@@ -59,20 +59,22 @@ describe("Runtime", () => {
 					const logger = new MockLogger();
 					const cancellation = new Deferred<SummarizerStopReason>();
 					let cancelled = false;
-					let readiness: Promise<void> = Promise.resolve();
+					let readiness: Promise<"connected" | "stopped" | "timeout"> =
+						Promise.resolve("connected");
 					const stop = sinon.stub().callsFake((reason: SummarizerStopReason) => {
 						cancelled = true;
 						cancellation.resolve(reason);
 					});
 					const controller: ICancellableSummarizerController & {
-						ready: Promise<void>;
-						timedOut: boolean;
+						ready: Promise<"connected" | "stopped" | "timeout">;
 					} = {
-						timedOut: false,
 						get ready() {
-							return Promise.race([readiness, cancellation.promise.then(() => {})]);
+							return Promise.race([
+								readiness,
+								cancellation.promise.then(() => "stopped" as const),
+							]);
 						},
-						set ready(value: Promise<void>) {
+						set ready(value: Promise<"connected" | "stopped" | "timeout">) {
 							readiness = value;
 						},
 						get cancelled() {
@@ -148,7 +150,7 @@ describe("Runtime", () => {
 
 					it(`releases ${mode} connection startup immediately on disposal`, async () => {
 						const test = createTestSummarizer();
-						const creation = new Deferred<void>();
+						const creation = new Deferred<"connected" | "stopped" | "timeout">();
 						test.controller.ready = creation.promise;
 						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
 						const request =
@@ -169,7 +171,7 @@ describe("Runtime", () => {
 						}
 						assert.equal(test.start.callCount, 0);
 						assert.equal(clock.countTimers(), 0);
-						creation.resolve();
+						creation.resolve("connected");
 						await clock.tickAsync(0);
 						assert.equal(test.stop.calledWith("summarizerClientDisconnected"), true);
 					});
@@ -219,14 +221,14 @@ describe("Runtime", () => {
 
 					it(`does not start ${mode} execution after disposal during connection startup`, async () => {
 						const test = createTestSummarizer();
-						const creation = new Deferred<void>();
+						const creation = new Deferred<"connected" | "stopped" | "timeout">();
 						test.controller.ready = creation.promise;
 						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
 						if (mode === "on-demand") {
 							test.summarizer.summarizeOnDemand({ reason: "test" });
 						}
 						test.summarizer.dispose();
-						creation.resolve();
+						creation.resolve("connected");
 						await clock.tickAsync(0);
 						await run;
 						assert.equal(test.start.callCount, 0);
@@ -253,7 +255,7 @@ describe("Runtime", () => {
 
 					it(`bounds ${mode} connection startup and cancels its immediately owned controller`, async () => {
 						const test = createTestSummarizer();
-						const creation = new Deferred<void>();
+						const creation = new Deferred<"connected" | "stopped" | "timeout">();
 						test.controller.ready = creation.promise;
 						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
 						const results =
@@ -261,8 +263,7 @@ describe("Runtime", () => {
 								? test.summarizer.summarizeOnDemand({ reason: "test" })
 								: undefined;
 						await clock.tickAsync(2 * 60 * 1000);
-						test.controller.timedOut = true;
-						creation.resolve();
+						creation.resolve("timeout");
 						await clock.tickAsync(0);
 						if (results === undefined) {
 							assert.equal(await run, "summarizerClientDisconnected");
@@ -274,7 +275,7 @@ describe("Runtime", () => {
 						}
 						assert.equal(test.dispose.callCount, 1);
 						assert.equal(test.start.callCount, 0);
-						creation.resolve();
+						creation.resolve("connected");
 						await clock.tickAsync(0);
 						assert.equal(test.stop.calledWith("summarizerClientDisconnected"), true);
 					});
@@ -298,12 +299,12 @@ describe("Runtime", () => {
 
 				it("shares connection and executor startup between simultaneous explicit requests", async () => {
 					const test = createTestSummarizer();
-					const creation = new Deferred<void>();
+					const creation = new Deferred<"connected" | "stopped" | "timeout">();
 					test.controller.ready = creation.promise;
 					const first = test.summarizer.summarizeOnDemand({ reason: "first" });
 					const second = test.summarizer.summarizeOnDemand({ reason: "second" });
 					assert.equal(test.createController.callCount, 1);
-					creation.resolve();
+					creation.resolve("connected");
 					await clock.tickAsync(0);
 					assert.equal(test.start.callCount, 1);
 					assert.equal(test.executor.summarizeOnDemand.callCount, 2);
@@ -325,11 +326,11 @@ describe("Runtime", () => {
 
 				it("lets an explicit request share automatic startup without changing last-summary policy", async () => {
 					const test = createTestSummarizer();
-					const creation = new Deferred<void>();
+					const creation = new Deferred<"connected" | "stopped" | "timeout">();
 					test.controller.ready = creation.promise;
 					const run = test.summarizer.run("parent");
 					test.summarizer.summarizeOnDemand({ reason: "explicit" });
-					creation.resolve();
+					creation.resolve("connected");
 					await clock.tickAsync(0);
 					assert.equal(test.createController.callCount, 1);
 					assert.equal(test.start.callCount, 1);
@@ -343,7 +344,7 @@ describe("Runtime", () => {
 
 				it("fails every waiting request when shared startup fails", async () => {
 					const test = createTestSummarizer();
-					const creation = new Deferred<void>();
+					const creation = new Deferred<"connected" | "stopped" | "timeout">();
 					test.controller.ready = creation.promise;
 					const first = test.summarizer.summarizeOnDemand({ reason: "first" });
 					const second = test.summarizer.summarizeOnDemand({ reason: "second" });

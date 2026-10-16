@@ -185,15 +185,15 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		try {
 			runCoordinator = RunWhileConnectedCoordinator.open(this.runtime, this.active);
 			this.runCoordinator = runCoordinator;
-			await runCoordinator.ready;
-			if (runCoordinator.timedOut) {
+			const readiness = await runCoordinator.ready;
+			if (readiness === "timeout") {
 				this.logger.sendTelemetryEvent({
 					eventName: "CreateRunCoordinatorTimeout",
 					onBehalfOf,
 					timeoutMs: 2 * 60 * 1000,
 				});
 			}
-			if (this._disposed || runCoordinator.timedOut) {
+			if (this._disposed || readiness === "timeout") {
 				stopReason = "summarizerClientDisconnected";
 				return "summarizerClientDisconnected";
 			}

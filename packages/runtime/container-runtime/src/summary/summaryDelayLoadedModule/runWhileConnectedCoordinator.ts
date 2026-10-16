@@ -22,8 +22,7 @@ export interface ICancellableSummarizerController extends ISummaryCancellationTo
  * @internal
  */
 export interface SummarizerConnection extends ICancellableSummarizerController {
-	readonly ready: Promise<void>;
-	readonly timedOut: boolean;
+	readonly ready: Promise<"connected" | "stopped" | "timeout">;
 }
 
 /**
@@ -43,33 +42,20 @@ export const neverCancelledSummaryToken: ISummaryCancellationToken = {
  * when disconnected or if stop() is called.
  */
 export class RunWhileConnectedCoordinator implements SummarizerConnection {
-	public readonly ready: Promise<void>;
+	private readonly readiness = new Deferred<"connected" | "stopped" | "timeout">();
+	public readonly ready = this.readiness.promise;
 	private _cancelled = false;
-	private _timedOut = false;
 	private connectionTimer: ReturnType<typeof setTimeout> | undefined;
-	public get timedOut(): boolean {
-		return this._timedOut;
-	}
 	private readonly stopDeferred = new Deferred<SummarizerStopReason>();
 	private readonly disconnected = (): void => this.stop("summarizerClientDisconnected");
-	private readonly connected = new Deferred<void>();
-	private readonly onConnected = (): void => this.connected.resolve();
+	private readonly onConnected = (): void => {
+		this.clearConnectionTimer();
+		this.readiness.resolve("connected");
+	};
 
 	public get cancelled(): boolean {
 		if (!this._cancelled) {
 			assert(this.active(), 0x25d /* "We should never connect as 'read'" */);
-
-			// This check can't be enabled in current design due to lastSummary flow, where
-			// summarizer for closed container stays around and can produce one more summary.
-			// Currently we solve the problem of overlapping summarizer by doing wait in
-			// SummaryManager.createSummarizer()
-			// Better solution would involve these steps:
-			// 1. Summarizer selection logic should chose summarizing client (with clientType === "summarizer")
-			// if such client exists.
-			// 2. Summarizer should be updated about such changes (to update onBehalfOfClientId)
-			//
-			// assert(this.runtime.summarizerClientId === this.onBehalfOfClientId ||
-			//    this.runtime.summarizerClientId === this.runtime.clientId, "onBehalfOfClientId");
 		}
 
 		return this._cancelled;
@@ -103,23 +89,8 @@ export class RunWhileConnectedCoordinator implements SummarizerConnection {
 		private readonly runtime: IConnectableRuntime,
 		private readonly active: () => boolean,
 	) {
-		this.ready = this.waitStart();
-	}
-
-	/**
-	 * Starts and waits for a promise which resolves when connected.
-	 * The promise will also resolve if stopped either externally or by disconnect.
-	 *
-	 * We only listen on disconnected event for clientType === "summarizer" container!
-	 * And only do it here - no other place should check it! That way we have only one place
-	 * that controls policy and it's easy to change policy in the future if we want to!
-	 * We do not listen for "main" (aka interactive) container disconnect here, as it's
-	 * responsibility of SummaryManager to decide if that's material or not. There are cases
-	 * like "lastSummary", or main client experiencing nacks / disconnects due to hitting limit
-	 * of non-summarized ops, where can make determination to continue with summary even if main
-	 * client is disconnected.
-	 */
-	protected async waitStart(): Promise<void> {
+		// Only the child connection cancels execution. The supervisor separately decides
+		// whether parent disconnection permits graceful draining or a last summary.
 		if (this.runtime.disposed) {
 			this.stop("summarizerClientDisconnected");
 			return;
@@ -129,18 +100,17 @@ export class RunWhileConnectedCoordinator implements SummarizerConnection {
 		// Observe disconnection before waiting so a connect/disconnect pair in one turn cannot be missed.
 		this.runtime.once("disconnected", this.disconnected);
 
-		if (!this.runtime.connected) {
+		if (this.runtime.connected) {
+			this.onConnected();
+		} else {
 			this.connectionTimer = setTimeout(
 				() => {
-					this._timedOut = true;
+					this.readiness.resolve("timeout");
 					this.stop("summarizerClientDisconnected");
 				},
 				2 * 60 * 1000,
 			);
 			this.runtime.once("connected", this.onConnected);
-			await Promise.race([this.connected.promise, this.waitCancelled]);
-			this.runtime.off("connected", this.onConnected);
-			this.clearConnectionTimer();
 		}
 	}
 
@@ -150,6 +120,7 @@ export class RunWhileConnectedCoordinator implements SummarizerConnection {
 	public stop(reason: SummarizerStopReason): void {
 		if (!this._cancelled) {
 			this._cancelled = true;
+			this.readiness.resolve("stopped");
 			this.clearConnectionTimer();
 			this.runtime.off("connected", this.onConnected);
 			this.runtime.off("disconnected", this.disconnected);
