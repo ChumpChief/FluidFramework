@@ -28,7 +28,6 @@ import type {
 	ISummarizerInternalsProvider,
 	ISummarizerRuntime,
 	ISummarizingWarning,
-	IRetriableFailureError,
 	ISummaryConfiguration,
 } from "../summarizerTypes.js";
 import type { SummaryCollection } from "../summaryCollection.js";
@@ -165,40 +164,10 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 	}
 
 	private async runCore(onBehalfOf: string): Promise<SummarizerStopReason> {
-		// Race coordinator creation against a timeout to ensure we don't hang indefinitely
-		// if the summarizer container fails to connect.
-		let coordinatorTimedOut = false;
-		const coordinatorTimeoutMs = 2 * 60 * 1000; // 2 minutes
-		const coordinatorResult = await Promise.race([
-			this.runCoordinatorCreateFn(this.runtime).then((coordinator) => {
-				if (coordinatorTimedOut) {
-					coordinator.stop("summarizerClientDisconnected");
-				}
-				return coordinator;
-			}),
-			new Promise<undefined>((resolve) =>
-				setTimeout(() => {
-					coordinatorTimedOut = true;
-					resolve(undefined);
-				}, coordinatorTimeoutMs),
-			),
-		]);
-
-		// If we timed out before coordinator was created, exit early
-		if (coordinatorTimedOut) {
-			this.logger.sendTelemetryEvent({
-				eventName: "CreateRunCoordinatorTimeout",
-				onBehalfOf,
-				timeoutMs: coordinatorTimeoutMs,
-			});
+		const runCoordinator = await this.createRunCoordinator(onBehalfOf);
+		if (runCoordinator === undefined) {
 			return "summarizerClientDisconnected";
 		}
-
-		assert(
-			coordinatorResult !== undefined,
-			0xcd6 /* Expect coordinatorResult to be defined */,
-		);
-		const runCoordinator = coordinatorResult;
 
 		// Wait for either external signal to cancel, or loss of connectivity.
 		const stopP = Promise.race([runCoordinator.waitCancelled, this.stopDeferred.promise]);
@@ -227,47 +196,97 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		});
 
 		const runningSummarizer = await this.start(onBehalfOf, runCoordinator);
-
-		// Wait for either external signal to cancel, or loss of connectivity.
 		const stopReason = await stopP;
-
-		// There are two possible approaches here:
-		// 1. Propagate cancellation from this.stopDeferred to runCoordinator. This will ensure that we move to the exit
-		//    faster, including breaking out of the RunningSummarizer.trySummarize() faster.
-		//    We could create new coordinator and pass it to waitStop() -> trySummarizeOnce("lastSummary") flow.
-		//    The con of this approach is that we might cancel active summary, and lastSummary will fail because it
-		//    did not wait for ack/nack from previous summary. Plus we disregard any 429 kind of info from service
-		//    that way (i.e. trySummarize() loop might have been waiting for 5 min because storage told us so).
-		//    In general, it's more wasted resources.
-		// 2. We can not do it and make waitStop() do last summary only if there was no active summary. This ensures
-		//    that client behaves properly (from server POV) and we do not waste resources. But, it may mean we wait
-		//    substantially longer for trySummarize() retries to play out and thus this summary loop may run into
-		//    conflict with new summarizer client starting on different client.
-		// As of now, #2 is implemented. It's more forward looking, as issue #7279 suggests changing design for new
-		// summarizer client to not be created until current summarizer fully moves to exit, and that would reduce
-		// cons of #2 substantially.
-
-		// Cleanup after running with a timeout to prevent hanging
-		const waitStopPromise = runningSummarizer.waitStop(
-			!runCoordinator.cancelled && Summarizer.stopReasonCanRunLastSummary(stopReason),
+		await this.drain(
+			runningSummarizer,
+			runCoordinator,
+			stopReason,
+			onBehalfOf,
+			Summarizer.stopReasonCanRunLastSummary(stopReason),
 		);
-		const summarizerStopTimeoutMs = 2 * 60 * 1000; // 2 minutes
-		const timeoutPromise = new Promise<"timeout">((resolve) =>
-			setTimeout(() => resolve("timeout"), summarizerStopTimeoutMs),
-		);
-		const waitStopResult = await Promise.race([waitStopPromise, timeoutPromise]);
-		if (waitStopResult === "timeout") {
-			this.logger.sendTelemetryEvent({
-				eventName: "SummarizerStopTimeout",
-				onBehalfOf,
-				timeoutMs: summarizerStopTimeoutMs,
-			});
+		return stopReason;
+	}
+
+	/** Creates the connection controller with the same bounded wait for either execution mode. */
+	private async createRunCoordinator(
+		onBehalfOf: string,
+	): Promise<ICancellableSummarizerController | undefined> {
+		// Race coordinator creation against a timeout to ensure we don't hang indefinitely
+		// if the summarizer container fails to connect.
+		let coordinatorTimedOut = false;
+		const coordinatorTimeoutMs = 2 * 60 * 1000; // 2 minutes
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let coordinatorResult: ICancellableSummarizerController | undefined;
+		try {
+			coordinatorResult = await Promise.race([
+				this.runCoordinatorCreateFn(this.runtime).then((coordinator) => {
+					if (coordinatorTimedOut || this._disposed) {
+						coordinator.stop("summarizerClientDisconnected");
+					}
+					return coordinator;
+				}),
+				new Promise<undefined>((resolve) => {
+					timer = setTimeout(() => {
+						coordinatorTimedOut = true;
+						resolve(undefined);
+					}, coordinatorTimeoutMs);
+				}),
+			]);
+		} finally {
+			if (timer !== undefined) {
+				clearTimeout(timer);
+			}
 		}
 
-		// Propagate reason and ensure that if someone is waiting for cancellation token, they are moving to exit
-		runCoordinator.stop(stopReason);
+		// If we timed out before coordinator was created, exit early
+		if (coordinatorTimedOut) {
+			this.logger.sendTelemetryEvent({
+				eventName: "CreateRunCoordinatorTimeout",
+				onBehalfOf,
+				timeoutMs: coordinatorTimeoutMs,
+			});
+			return undefined;
+		}
 
-		return stopReason;
+		assert(
+			coordinatorResult !== undefined,
+			0xcd6 /* Expect coordinatorResult to be defined */,
+		);
+		return this._disposed ? undefined : coordinatorResult;
+	}
+
+	/** Drains execution before cancelling its connection controller, with a bounded wait. */
+	private async drain(
+		runningSummarizer: RunningSummarizer,
+		runCoordinator: ICancellableSummarizerController,
+		stopReason: SummarizerStopReason,
+		onBehalfOf: string,
+		allowLastSummary: boolean,
+	): Promise<void> {
+		// Graceful stopping must not cancel an active attempt before its ack or retry delay completes.
+		const waitStopPromise = runningSummarizer.waitStop(
+			!runCoordinator.cancelled && allowLastSummary,
+		);
+		const summarizerStopTimeoutMs = 2 * 60 * 1000; // 2 minutes
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const timeoutPromise = new Promise<"timeout">((resolve) => {
+			timer = setTimeout(() => resolve("timeout"), summarizerStopTimeoutMs);
+		});
+		try {
+			const waitStopResult = await Promise.race([waitStopPromise, timeoutPromise]);
+			if (waitStopResult === "timeout") {
+				this.logger.sendTelemetryEvent({
+					eventName: "SummarizerStopTimeout",
+					onBehalfOf,
+					timeoutMs: summarizerStopTimeoutMs,
+				});
+			}
+		} finally {
+			if (timer !== undefined) {
+				clearTimeout(timer);
+			}
+			runCoordinator.stop(stopReason);
+		}
 	}
 
 	/**
@@ -288,7 +307,6 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 	 * (in the on-demand case).
 	 * @param onBehalfOf - ID of the client that requested that the summarizer start
 	 * @param runCoordinator - cancellation token
-	 * @param newConfig - Summary configuration to override the existing config when invoking the RunningSummarizer.
 	 * @returns A promise that is fulfilled when the RunningSummarizer is ready.
 	 */
 	private async start(
@@ -296,6 +314,9 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 
 		runCoordinator: ICancellableSummarizerController,
 	): Promise<RunningSummarizer> {
+		if (this._disposed) {
+			throw new UsageError("Starting a disposed summarizer");
+		}
 		if (this.runningSummarizer) {
 			if (this.runningSummarizer.disposed) {
 				throw new UsageError("Starting a disposed summarizer");
@@ -343,6 +364,10 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			(reason) => runCoordinator.stop(reason) /* stopSummarizerCallback */,
 			this.runtime,
 		);
+		if (this._disposed) {
+			runningSummarizer.dispose();
+			throw new UsageError("Summarizer was disposed during startup");
+		}
 		this.runningSummarizer = runningSummarizer;
 		this.setupForwardedEvents(runningSummarizer);
 		this.starting = false;
@@ -393,37 +418,45 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			// Manage the promise related to creating the cancellation token here.
 			// The promises related to starting, summarizing,
 			// and submitting are communicated to the caller through the results builder.
-			const coordinatorCreateP = this.runCoordinatorCreateFn(this.runtime);
-
-			coordinatorCreateP
-				.then((runCoordinator) => {
-					// Successfully created the cancellation token. Start the summarizer.
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-					const startP = this.start(this.runtime.clientId!, runCoordinator);
-					startP
-						.then(async (runningSummarizer) => {
-							// Successfully started the summarizer. Run it.
-							runningSummarizer.summarizeOnDemand(options, builder);
-							// Wait for a command to stop or loss of connectivity before tearing down the summarizer and client.
-							const stopReason = await Promise.race([
-								this.stopDeferred.promise,
-								runCoordinator.waitCancelled,
-							]);
-							await runningSummarizer.waitStop(false);
-							runCoordinator.stop(stopReason);
-							this.close();
-						})
-						.catch((error: IRetriableFailureError) => {
-							builder.fail("Failed to start summarizer", error);
-						});
-				})
-				.catch((error: IRetriableFailureError) => {
-					builder.fail("Failed to create cancellation token", error);
-				});
+			// eslint-disable-next-line no-void
+			void this.runOnDemand(options, builder);
 
 			return builder.build();
 		} catch (error) {
 			throw SummarizingWarning.wrap(error, false /* logged */, this.logger);
+		}
+	}
+
+	/** Uses the automatic path's connection and drain policies without enabling a last summary. */
+	private async runOnDemand(
+		options: IOnDemandSummarizeOptions,
+		builder: SummarizeResultBuilder,
+	): Promise<void> {
+		let coordinator: ICancellableSummarizerController | undefined;
+		try {
+			coordinator = await this.createRunCoordinator(this.runtime.clientId ?? "");
+			if (coordinator === undefined || coordinator.cancelled) {
+				throw new UsageError("Summarizer did not become connected");
+			}
+			const clientId = this.runtime.clientId;
+			assert(clientId !== undefined, "A connected summarizer must have a client ID.");
+			const runningSummarizer = await this.start(clientId, coordinator);
+			runningSummarizer.summarizeOnDemand(options, builder);
+			const stopReason = await Promise.race([
+				this.stopDeferred.promise,
+				coordinator.waitCancelled,
+			]);
+			await this.drain(runningSummarizer, coordinator, stopReason, clientId, false);
+		} catch (error) {
+			if (!builder.receivedSummaryAckOrNack.isCompleted) {
+				builder.fail(
+					"Failed to run on-demand summarizer",
+					SummarizingWarning.wrap(error, false, this.logger),
+				);
+			}
+		} finally {
+			coordinator?.stop("summarizerClientDisconnected");
+			this.close();
 		}
 	}
 

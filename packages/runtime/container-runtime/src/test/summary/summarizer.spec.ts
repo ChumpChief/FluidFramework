@@ -6,8 +6,16 @@
 import { strict as assert } from "node:assert";
 
 import type { SummarizerStopReason } from "@fluidframework/container-runtime-definitions/internal";
+import { Deferred } from "@fluidframework/core-utils/internal";
+import { MockLogger } from "@fluidframework/telemetry-utils/internal";
+import sinon from "sinon";
 
-import { Summarizer } from "../../summary/index.js";
+import {
+	DefaultSummaryConfiguration,
+	RunningSummarizer,
+	Summarizer,
+	type ICancellableSummarizerController,
+} from "../../summary/index.js";
 
 describe("Runtime", () => {
 	describe("Summarization", () => {
@@ -35,6 +43,149 @@ describe("Runtime", () => {
 					Summarizer.stopReasonCanRunLastSummary("parentNotConnected") === true,
 					"should run last summary when stop reason is parentNotConnected",
 				);
+			});
+
+			describe("Shared child lifecycle", () => {
+				let clock: sinon.SinonFakeTimers;
+				beforeEach(() => {
+					clock = sinon.useFakeTimers();
+				});
+				afterEach(() => {
+					sinon.restore();
+				});
+
+				function createTestSummarizer() {
+					const logger = new MockLogger();
+					const cancellation = new Deferred<SummarizerStopReason>();
+					let cancelled = false;
+					const stop = sinon.stub().callsFake((reason: SummarizerStopReason) => {
+						cancelled = true;
+						cancellation.resolve(reason);
+					});
+					const controller: ICancellableSummarizerController = {
+						get cancelled() {
+							return cancelled;
+						},
+						waitCancelled: cancellation.promise,
+						stop,
+					};
+					const createController = sinon.stub().resolves(controller);
+					const dispose = sinon.stub();
+					const runtime = {
+						baseLogger: logger,
+						clientId: "child",
+						deltaManager: { initialSequenceNumber: 0, lastSequenceNumber: 0 },
+						disposeFn: dispose,
+					} as unknown as ConstructorParameters<typeof Summarizer>[0];
+					const executor = {
+						disposed: false,
+						waitStop: sinon.stub().resolves(),
+						dispose: sinon.stub(),
+						on: sinon.stub(),
+						off: sinon.stub(),
+						summarizeOnDemand: sinon.stub(),
+					};
+					const start = sinon
+						.stub(RunningSummarizer, "start")
+						.resolves(executor as unknown as RunningSummarizer);
+					const summarizer = new Summarizer(
+						runtime,
+						() => DefaultSummaryConfiguration,
+						{} as unknown as ConstructorParameters<typeof Summarizer>[2],
+						{} as unknown as ConstructorParameters<typeof Summarizer>[3],
+						{ createWatcher: sinon.stub() } as unknown as ConstructorParameters<
+							typeof Summarizer
+						>[4],
+						createController,
+					);
+					return {
+						summarizer,
+						createController,
+						controller,
+						stop,
+						start,
+						executor,
+						dispose,
+						logger,
+					};
+				}
+
+				for (const mode of ["automatic", "on-demand"] as const) {
+					it(`does not start ${mode} execution after disposal during connection startup`, async () => {
+						const test = createTestSummarizer();
+						const creation = new Deferred<ICancellableSummarizerController>();
+						test.createController.returns(creation.promise);
+						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
+						if (mode === "on-demand") {
+							test.summarizer.summarizeOnDemand({ reason: "test" });
+						}
+						test.summarizer.dispose();
+						creation.resolve(test.controller);
+						await clock.tickAsync(0);
+						await run;
+						assert.equal(test.start.callCount, 0);
+						assert.equal(test.stop.calledWith("summarizerClientDisconnected"), true);
+						assert.equal(clock.countTimers(), 0);
+					});
+
+					it(`clears connection and drain timers after ${mode} execution stops`, async () => {
+						const test = createTestSummarizer();
+						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
+						if (mode === "on-demand") {
+							test.summarizer.summarizeOnDemand({ reason: "test" });
+						}
+						await clock.tickAsync(0);
+						assert.equal(test.start.callCount, 1);
+						assert.equal(clock.countTimers(), 0, "connection deadline is cleared");
+						test.summarizer.stop("parentNotConnected");
+						await clock.tickAsync(0);
+						await run;
+						assert.deepEqual(test.executor.waitStop.args, [[mode === "automatic"]]);
+						assert.equal(clock.countTimers(), 0, "drain deadline is cleared");
+						assert.equal(test.dispose.callCount, 1);
+					});
+
+					it(`bounds ${mode} connection startup and cancels a late controller`, async () => {
+						const test = createTestSummarizer();
+						const creation = new Deferred<ICancellableSummarizerController>();
+						test.createController.returns(creation.promise);
+						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
+						const results =
+							mode === "on-demand"
+								? test.summarizer.summarizeOnDemand({ reason: "test" })
+								: undefined;
+						await clock.tickAsync(2 * 60 * 1000);
+						if (results === undefined) {
+							assert.equal(await run, "summarizerClientDisconnected");
+						} else {
+							const submitted = await results.summarySubmitted;
+							const ack = await results.receivedSummaryAckOrNack;
+							assert.equal(submitted.success, false);
+							assert.equal(ack.success, false);
+						}
+						assert.equal(test.dispose.callCount, 1);
+						assert.equal(test.start.callCount, 0);
+						creation.resolve(test.controller);
+						await clock.tickAsync(0);
+						assert.equal(test.stop.calledWith("summarizerClientDisconnected"), true);
+					});
+
+					it(`bounds ${mode} draining without changing its last-summary policy`, async () => {
+						const test = createTestSummarizer();
+						test.executor.waitStop.returns(new Promise(() => {}));
+						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
+						if (mode === "on-demand") {
+							test.summarizer.summarizeOnDemand({ reason: "test" });
+						}
+						await clock.tickAsync(0);
+						test.summarizer.stop("parentNotConnected");
+						await clock.tickAsync(2 * 60 * 1000);
+						await run;
+						assert.deepEqual(test.executor.waitStop.args, [[mode === "automatic"]]);
+						assert.equal(test.dispose.callCount, 1);
+						test.logger.assertMatch([{ eventName: "Summarizer:SummarizerStopTimeout" }]);
+					});
+				}
 			});
 		});
 	});
