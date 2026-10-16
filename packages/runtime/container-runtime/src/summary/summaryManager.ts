@@ -24,12 +24,11 @@ import {
 
 import type { IThrottler } from "../throttler.js";
 
-import { SummarizationSession } from "./summarizationSession.js";
+import type { SummarizationSession } from "./summarizationSession.js";
 import type { ISummarizerClientElection } from "./summarizerClientElection.js";
 import type {
 	IEnqueueSummarizeOptions,
 	IOnDemandSummarizeOptions,
-	ISummarizer,
 } from "./summarizerTypes.js";
 import { stopReasonCanRunLastSummary } from "./summarizerUtils.js";
 import type { SummaryCollection } from "./summaryCollection.js";
@@ -123,10 +122,9 @@ export class SummaryManager
 		>,
 		parentLogger: ITelemetryBaseLogger,
 		/**
-		 * Creates summarizer by asking interactive container to spawn summarizing container and
-		 * get back its Summarizer instance.
+		 * Opens an owned session immediately, while its second client loads asynchronously.
 		 */
-		private readonly createSummarizerFn: (signal?: AbortSignal) => Promise<ISummarizer>,
+		private readonly openSession: () => SummarizationSession,
 		private readonly startThrottler: IThrottler,
 		{
 			initialDelayMs = defaultInitialDelayMs,
@@ -276,7 +274,7 @@ export class SummaryManager
 				assert(this.state === SummaryManagerState.Starting, 0x263 /* "Expected: starting" */);
 				this.state = SummaryManagerState.Running;
 
-				const session = new SummarizationSession(this.createSummarizerFn);
+				const session = this.openSession();
 				this.session = session;
 				this.setupForwardedEvents(session);
 				// Completion describes local ownership only; election still gates replacement on quorum.

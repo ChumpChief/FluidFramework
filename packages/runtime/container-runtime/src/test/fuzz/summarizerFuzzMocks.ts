@@ -45,6 +45,7 @@ import {
 	Summarizer,
 	SummaryCollection,
 	SummaryManager,
+	SummarizationSession,
 } from "../../summary/index.js";
 import type { IThrottler } from "../../throttler.js";
 
@@ -124,7 +125,7 @@ export class MockContainerRuntimeForSummarizer
 			this.connectedState,
 			this.summaryCollection,
 			this.baseLogger,
-			async () => this.summarizer,
+			() => new SummarizationSession(async () => this.summarizer),
 			new MockThrottler(),
 		);
 		this.summaryManager.start();

@@ -10,9 +10,37 @@ import type { FluidObject } from "@fluidframework/core-interfaces";
 import { Deferred } from "@fluidframework/core-utils/internal";
 import sinon from "sinon";
 
-import { formCreateSummarizerFn, SummarizationSession } from "../../summary/index.js";
+import {
+	createSummarizationSessionFactory,
+	formCreateSummarizerFn,
+	SummarizationSession,
+} from "../../summary/index.js";
 
 describe("Summarizer loading ownership", () => {
+	it("opens independent sessions without starting loader work until after ownership is returned", async () => {
+		const first = createLoader(async () => ({}));
+		const second = createLoader(async () => ({}));
+		const resolve = sinon.stub();
+		resolve.onFirstCall().returns(first.resolution.promise);
+		resolve.onSecondCall().returns(second.resolution.promise);
+		const openSession = createSummarizationSessionFactory({ resolve } as unknown as ILoader);
+		const firstSession = openSession();
+		const secondSession = openSession();
+		assert.notEqual(firstSession, secondSession);
+		assert.equal(resolve.callCount, 0);
+		await new Promise((resolveTick) => process.nextTick(resolveTick));
+		assert.equal(resolve.callCount, 2);
+		firstSession.close();
+		first.resolution.resolve(first.container);
+		await new Promise((resolveTick) => process.nextTick(resolveTick));
+		assert.equal(first.dispose.callCount, 1);
+		assert.equal(second.dispose.callCount, 0);
+		secondSession.close();
+		second.resolution.resolve(second.container);
+		await new Promise((resolveTick) => process.nextTick(resolveTick));
+		assert.equal(second.dispose.callCount, 1);
+	});
+
 	function createLoader(getEntryPoint: () => Promise<FluidObject>) {
 		const dispose = sinon.stub();
 		let disposed = false;
@@ -85,7 +113,8 @@ describe("Summarizer loading ownership", () => {
 
 	it("does not start a loader request for a session closed before creation starts", async () => {
 		const test = createLoader(async () => ({}));
-		const session = new SummarizationSession(formCreateSummarizerFn(test.loader));
+		const openSession = createSummarizationSessionFactory(test.loader);
+		const session = openSession();
 		session.close();
 		assert.equal(await session.loaded, false);
 		await new Promise((resolve) => process.nextTick(resolve));

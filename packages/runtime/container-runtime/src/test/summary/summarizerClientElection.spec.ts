@@ -23,6 +23,7 @@ import {
 	type ISummaryCollectionOpEvents,
 	SummarizerClientElection,
 	SummaryManager,
+	SummarizationSession,
 	summarizerClientType,
 } from "../../summary/index.js";
 
@@ -192,7 +193,7 @@ describe("Summarizer Client Election", () => {
 			connectedState,
 			summaryCollection,
 			mockLogger,
-			requestSummarizer,
+			() => new SummarizationSession(requestSummarizer),
 			throttler,
 			{
 				initialDelayMs: 0,

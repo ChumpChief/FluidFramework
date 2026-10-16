@@ -88,6 +88,7 @@ export {
 } from "./summaryFormat.js";
 export {
 	formCreateSummarizerFn,
+	createSummarizationSessionFactory,
 	validateSummaryHeuristicConfiguration,
 	summarizerRequestUrl,
 	DefaultSummaryConfiguration,

@@ -36,6 +36,7 @@ import {
 	SummaryCollection,
 	SummaryManager,
 	SummaryManagerState,
+	SummarizationSession,
 	neverCancelledSummaryToken,
 	DefaultSummaryConfiguration,
 	RunningSummarizer,
@@ -271,7 +272,7 @@ describe("Summary Manager", () => {
 			connectedState,
 			summaryCollection,
 			mockLogger,
-			requestSummarizer,
+			() => new SummarizationSession(requestSummarizer),
 			throttler,
 			config,
 		);

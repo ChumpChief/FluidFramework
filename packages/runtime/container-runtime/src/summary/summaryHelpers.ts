@@ -9,6 +9,7 @@ import { DriverHeader } from "@fluidframework/driver-definitions/internal";
 import { responseToException } from "@fluidframework/runtime-utils/internal";
 import { UsageError } from "@fluidframework/telemetry-utils/internal";
 
+import { SummarizationSession } from "./summarizationSession.js";
 import {
 	summarizerClientType,
 	type ISummarizer,
@@ -57,6 +58,17 @@ export const DefaultSummaryConfiguration: ISummaryConfiguration = {
 
 	nonRuntimeHeuristicThreshold: 20,
 };
+
+/**
+ * Creates a factory that opens an owned session for a second client of the same document.
+ * The returned handle owns loading immediately; callers need not manage loader requests or entrypoints.
+ */
+export function createSummarizationSessionFactory(
+	loader: ILoader,
+): () => SummarizationSession {
+	const createSummarizer = formCreateSummarizerFn(loader);
+	return () => new SummarizationSession(createSummarizer);
+}
 
 /**
  * Returns a function that creates and retrieves a summarizer.
