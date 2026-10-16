@@ -30,7 +30,6 @@ import { v4 as uuid } from "uuid";
 
 import type { ISummaryConfiguration } from "../../index.js";
 import {
-	type IConnectableRuntime,
 	type IConnectedEvents,
 	type IConnectedState,
 	type IGeneratedSummaryStats,
@@ -40,7 +39,6 @@ import {
 	type ISummarizerClientElectionEvents,
 	type ISummarizerInternalsProvider,
 	type ISummarizerRuntime,
-	RunWhileConnectedCoordinator,
 	type SubmitSummaryResult,
 	Summarizer,
 	SummaryCollection,
@@ -116,8 +114,7 @@ export class MockContainerRuntimeForSummarizer
 			this /* ISummarizerInternalsProvider */,
 			{} as unknown as IFluidHandleContext /* handleContext */,
 			this.summaryCollection,
-			(runtime: IConnectableRuntime) =>
-				RunWhileConnectedCoordinator.open(runtime, () => this.deltaManager.active),
+			() => this.deltaManager.active,
 		);
 
 		this.summaryManager = new SummaryManager(

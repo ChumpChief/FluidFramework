@@ -23,6 +23,7 @@ export interface ICancellableSummarizerController extends ISummaryCancellationTo
  */
 export interface SummarizerConnection extends ICancellableSummarizerController {
 	readonly ready: Promise<void>;
+	readonly timedOut: boolean;
 }
 
 /**
@@ -44,6 +45,11 @@ export const neverCancelledSummaryToken: ISummaryCancellationToken = {
 export class RunWhileConnectedCoordinator implements SummarizerConnection {
 	public readonly ready: Promise<void>;
 	private _cancelled = false;
+	private _timedOut = false;
+	private connectionTimer: ReturnType<typeof setTimeout> | undefined;
+	public get timedOut(): boolean {
+		return this._timedOut;
+	}
 	private readonly stopDeferred = new Deferred<SummarizerStopReason>();
 	private readonly disconnected = (): void => this.stop("summarizerClientDisconnected");
 	private readonly connected = new Deferred<void>();
@@ -124,9 +130,17 @@ export class RunWhileConnectedCoordinator implements SummarizerConnection {
 		this.runtime.once("disconnected", this.disconnected);
 
 		if (!this.runtime.connected) {
+			this.connectionTimer = setTimeout(
+				() => {
+					this._timedOut = true;
+					this.stop("summarizerClientDisconnected");
+				},
+				2 * 60 * 1000,
+			);
 			this.runtime.once("connected", this.onConnected);
 			await Promise.race([this.connected.promise, this.waitCancelled]);
 			this.runtime.off("connected", this.onConnected);
+			this.clearConnectionTimer();
 		}
 	}
 
@@ -136,10 +150,18 @@ export class RunWhileConnectedCoordinator implements SummarizerConnection {
 	public stop(reason: SummarizerStopReason): void {
 		if (!this._cancelled) {
 			this._cancelled = true;
+			this.clearConnectionTimer();
 			this.runtime.off("connected", this.onConnected);
 			this.runtime.off("disconnected", this.disconnected);
 			this.runtime.off("dispose", this.disconnected);
 			this.stopDeferred.resolve(reason);
+		}
+	}
+
+	private clearConnectionTimer(): void {
+		if (this.connectionTimer !== undefined) {
+			clearTimeout(this.connectionTimer);
+			this.connectionTimer = undefined;
 		}
 	}
 }

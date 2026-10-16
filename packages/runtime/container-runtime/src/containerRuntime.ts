@@ -288,7 +288,6 @@ import {
 	extractSummaryMetadataMessage,
 	createSummarizationSessionFactory,
 	type IBaseSummarizeResult,
-	type IConnectableRuntime,
 	type IContainerRuntimeMetadata,
 	type ICreateContainerMetadata,
 	idCompressorBlobName,
@@ -2527,13 +2526,8 @@ export class ContainerRuntime
 				this.handleContext,
 				summaryCollection,
 
-				(runtime: IConnectableRuntime) =>
-					module.RunWhileConnectedCoordinator.open(
-						runtime,
-						// Summarization runs in summarizer client and needs access to the real (non-proxy) active
-						// information. The proxy delta manager would always return false for summarizer client.
-						() => this.innerDeltaManager.active,
-					),
+				// Lower runtime layers see a read-only proxy; summary execution needs real connection state.
+				() => this.innerDeltaManager.active,
 			);
 		} else if (
 			!onRequestMode &&

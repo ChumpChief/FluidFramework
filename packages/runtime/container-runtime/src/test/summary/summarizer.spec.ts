@@ -13,6 +13,7 @@ import sinon from "sinon";
 import {
 	DefaultSummaryConfiguration,
 	RunningSummarizer,
+	RunWhileConnectedCoordinator,
 	Summarizer,
 	type ICancellableSummarizerController,
 } from "../../summary/index.js";
@@ -58,19 +59,31 @@ describe("Runtime", () => {
 					const logger = new MockLogger();
 					const cancellation = new Deferred<SummarizerStopReason>();
 					let cancelled = false;
+					let readiness: Promise<void> = Promise.resolve();
 					const stop = sinon.stub().callsFake((reason: SummarizerStopReason) => {
 						cancelled = true;
 						cancellation.resolve(reason);
 					});
-					const controller: ICancellableSummarizerController & { ready: Promise<void> } = {
-						ready: Promise.resolve(),
+					const controller: ICancellableSummarizerController & {
+						ready: Promise<void>;
+						timedOut: boolean;
+					} = {
+						timedOut: false,
+						get ready() {
+							return Promise.race([readiness, cancellation.promise.then(() => {})]);
+						},
+						set ready(value: Promise<void>) {
+							readiness = value;
+						},
 						get cancelled() {
 							return cancelled;
 						},
 						waitCancelled: cancellation.promise,
 						stop,
 					};
-					const createController = sinon.stub().returns(controller);
+					const createController = sinon
+						.stub(RunWhileConnectedCoordinator, "open")
+						.returns(controller as unknown as RunWhileConnectedCoordinator);
 					const dispose = sinon.stub();
 					const runtime = {
 						baseLogger: logger,
@@ -97,7 +110,7 @@ describe("Runtime", () => {
 						{ createWatcher: sinon.stub() } as unknown as ConstructorParameters<
 							typeof Summarizer
 						>[4],
-						createController,
+						() => true,
 					);
 					return {
 						summarizer,
@@ -248,6 +261,9 @@ describe("Runtime", () => {
 								? test.summarizer.summarizeOnDemand({ reason: "test" })
 								: undefined;
 						await clock.tickAsync(2 * 60 * 1000);
+						test.controller.timedOut = true;
+						creation.resolve();
+						await clock.tickAsync(0);
 						if (results === undefined) {
 							assert.equal(await run, "summarizerClientDisconnected");
 						} else {

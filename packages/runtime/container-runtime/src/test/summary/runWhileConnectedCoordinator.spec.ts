@@ -7,6 +7,7 @@ import { strict as assert } from "node:assert";
 
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IEvent } from "@fluidframework/core-interfaces";
+import sinon from "sinon";
 
 import { RunWhileConnectedCoordinator } from "../../summary/index.js";
 
@@ -15,6 +16,21 @@ interface RuntimeEvents extends IEvent {
 }
 
 describe("Run While Connected Coordinator", () => {
+	it("owns its connection deadline and detaches all listeners on timeout", async () => {
+		const clock = sinon.useFakeTimers();
+		try {
+			const runtime = new Runtime();
+			const connection = RunWhileConnectedCoordinator.open(runtime, () => true);
+			await clock.tickAsync(2 * 60 * 1000);
+			await connection.ready;
+			assert.equal(connection.timedOut, true);
+			assert.equal(connection.cancelled, true);
+			assertNoListeners(runtime);
+			assert.equal(clock.countTimers(), 0);
+		} finally {
+			clock.restore();
+		}
+	});
 	class Runtime extends TypedEventEmitter<RuntimeEvents> {
 		public connected = false;
 		public disposed = false;

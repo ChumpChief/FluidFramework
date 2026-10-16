@@ -20,7 +20,6 @@ import {
 } from "@fluidframework/telemetry-utils/internal";
 
 import type {
-	IConnectableRuntime,
 	IEnqueueSummarizeOptions,
 	IOnDemandSummarizeOptions,
 	ISummarizeHeuristicData,
@@ -32,9 +31,10 @@ import type {
 } from "../summarizerTypes.js";
 import type { SummaryCollection } from "../summaryCollection.js";
 
-import type {
-	ICancellableSummarizerController,
-	SummarizerConnection,
+import {
+	RunWhileConnectedCoordinator,
+	type ICancellableSummarizerController,
+	type SummarizerConnection,
 } from "./runWhileConnectedCoordinator.js";
 import { RunningSummarizer } from "./runningSummarizer.js";
 import { SummarizeHeuristicData } from "./summarizerHeuristics.js";
@@ -121,9 +121,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		private readonly internalsProvider: ISummarizerInternalsProvider,
 		handleContext: IFluidHandleContext,
 		public readonly summaryCollection: SummaryCollection,
-		private readonly runCoordinatorCreateFn: (
-			runtime: IConnectableRuntime,
-		) => SummarizerConnection,
+		private readonly active: () => boolean,
 	) {
 		super();
 		this.logger = createChildLogger({
@@ -185,9 +183,17 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		let stopReason: SummarizerStopReason = "summarizerException";
 		let failure: unknown;
 		try {
-			runCoordinator = this.runCoordinatorCreateFn(this.runtime);
+			runCoordinator = RunWhileConnectedCoordinator.open(this.runtime, this.active);
 			this.runCoordinator = runCoordinator;
-			if (!(await this.waitForConnection(runCoordinator, onBehalfOf))) {
+			await runCoordinator.ready;
+			if (runCoordinator.timedOut) {
+				this.logger.sendTelemetryEvent({
+					eventName: "CreateRunCoordinatorTimeout",
+					onBehalfOf,
+					timeoutMs: 2 * 60 * 1000,
+				});
+			}
+			if (this._disposed || runCoordinator.timedOut) {
 				stopReason = "summarizerClientDisconnected";
 				return "summarizerClientDisconnected";
 			}
@@ -256,38 +262,6 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			runCoordinator?.stop(stopReason);
 			this.runCoordinator = undefined;
 			this.close();
-		}
-	}
-
-	/** Bounds connection readiness while the lifecycle already owns its cancellation handle. */
-	private async waitForConnection(
-		connection: SummarizerConnection,
-		onBehalfOf: string | undefined,
-	): Promise<boolean> {
-		const coordinatorTimeoutMs = 2 * 60 * 1000; // 2 minutes
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		try {
-			const result = await Promise.race([
-				connection.ready.then(() => "ready" as const),
-				connection.waitCancelled.then(() => "cancelled" as const),
-				new Promise<"timeout">((resolve) => {
-					timer = setTimeout(() => {
-						resolve("timeout");
-					}, coordinatorTimeoutMs);
-				}),
-			]);
-			if (result === "timeout") {
-				this.logger.sendTelemetryEvent({
-					eventName: "CreateRunCoordinatorTimeout",
-					onBehalfOf,
-					timeoutMs: coordinatorTimeoutMs,
-				});
-			}
-			return result !== "timeout" && !this._disposed;
-		} finally {
-			if (timer !== undefined) {
-				clearTimeout(timer);
-			}
 		}
 	}
 
