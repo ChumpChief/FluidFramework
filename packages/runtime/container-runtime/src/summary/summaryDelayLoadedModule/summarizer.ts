@@ -100,6 +100,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 
 	private readonly stopDeferred = new Deferred<SummarizerStopReason>();
 	private readonly disposedDeferred = new Deferred<undefined>();
+	private runCoordinator: ICancellableSummarizerController | undefined;
 
 	constructor(
 		/**
@@ -187,6 +188,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 				return "summarizerClientDisconnected";
 			}
 			const parentId = onBehalfOf ?? this.runtime.clientId;
+			this.runCoordinator = runCoordinator;
 			assert(parentId !== undefined, "A connected summarizer must have a parent client ID.");
 
 			// Wait for either external signal to cancel, or loss of connectivity.
@@ -249,6 +251,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 				numUnsummarizedNonRuntimeOps: this._heuristicData?.numNonRuntimeOps,
 			});
 			runCoordinator?.stop(stopReason);
+			this.runCoordinator = undefined;
 			this.close();
 		}
 	}
@@ -431,6 +434,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		this.stop("summarizerClientDisconnected");
 
 		this._disposed = true;
+		this.runCoordinator?.stop("summarizerClientDisconnected");
 		this.disposedDeferred.resolve(undefined);
 		this.executorReady.resolve({
 			error: new UsageError("Summarizer was disposed before becoming ready"),

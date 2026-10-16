@@ -113,6 +113,7 @@ export interface IConnectableRuntime {
 	readonly connected: boolean;
 	readonly clientId: string | undefined;
 	once(event: "connected" | "disconnected" | "dispose", listener: () => void): this;
+	off(event: "connected" | "disconnected" | "dispose", listener: () => void): this;
 }
 
 /**
@@ -133,6 +134,7 @@ export interface ISummarizerRuntime extends IConnectableRuntime {
 		event: "op",
 		listener: (op: ISequencedDocumentMessage, runtimeMessage?: boolean) => void,
 	): this;
+	off(event: "connected" | "disconnected" | "dispose", listener: () => void): this;
 	off(
 		event: "op",
 		listener: (op: ISequencedDocumentMessage, runtimeMessage?: boolean) => void,

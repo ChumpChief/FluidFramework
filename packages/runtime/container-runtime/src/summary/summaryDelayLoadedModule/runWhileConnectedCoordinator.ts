@@ -36,6 +36,9 @@ export const neverCancelledSummaryToken: ISummaryCancellationToken = {
 export class RunWhileConnectedCoordinator implements ICancellableSummarizerController {
 	private _cancelled = false;
 	private readonly stopDeferred = new Deferred<SummarizerStopReason>();
+	private readonly disconnected = (): void => this.stop("summarizerClientDisconnected");
+	private readonly connected = new Deferred<void>();
+	private readonly onConnected = (): void => this.connected.resolve();
 
 	public get cancelled(): boolean {
 		if (!this._cancelled) {
@@ -97,15 +100,15 @@ export class RunWhileConnectedCoordinator implements ICancellableSummarizerContr
 			return;
 		}
 
-		this.runtime.once("dispose", () => this.stop("summarizerClientDisconnected"));
+		this.runtime.once("dispose", this.disconnected);
+		// Observe disconnection before waiting so a connect/disconnect pair in one turn cannot be missed.
+		this.runtime.once("disconnected", this.disconnected);
 
 		if (!this.runtime.connected) {
-			const waitConnected = new Promise<void>((resolve) =>
-				this.runtime.once("connected", resolve),
-			);
-			await Promise.race([waitConnected, this.waitCancelled]);
+			this.runtime.once("connected", this.onConnected);
+			await Promise.race([this.connected.promise, this.waitCancelled]);
+			this.runtime.off("connected", this.onConnected);
 		}
-		this.runtime.once("disconnected", () => this.stop("summarizerClientDisconnected"));
 	}
 
 	/**
@@ -114,6 +117,9 @@ export class RunWhileConnectedCoordinator implements ICancellableSummarizerContr
 	public stop(reason: SummarizerStopReason): void {
 		if (!this._cancelled) {
 			this._cancelled = true;
+			this.runtime.off("connected", this.onConnected);
+			this.runtime.off("disconnected", this.disconnected);
+			this.runtime.off("dispose", this.disconnected);
 			this.stopDeferred.resolve(reason);
 		}
 	}

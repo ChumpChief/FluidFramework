@@ -111,6 +111,27 @@ describe("Runtime", () => {
 				}
 
 				for (const mode of ["automatic", "on-demand"] as const) {
+					it(`cancels the active ${mode} controller immediately when disposed during executor startup`, async () => {
+						const test = createTestSummarizer();
+						const startup = new Deferred<RunningSummarizer>();
+						test.start.returns(startup.promise);
+						const run = mode === "automatic" ? test.summarizer.run("parent") : undefined;
+						if (mode === "on-demand") {
+							test.summarizer.summarizeOnDemand({ reason: "test" });
+						}
+						await clock.tickAsync(0);
+						assert.equal(test.start.callCount, 1);
+						test.summarizer.stop("parentNotConnected");
+						assert.equal(test.stop.callCount, 0, "graceful stop must not cancel active work");
+						test.summarizer.dispose();
+						assert.equal(test.stop.calledWith("summarizerClientDisconnected"), true);
+						await clock.tickAsync(0);
+						await run;
+						startup.resolve(test.executor as unknown as RunningSummarizer);
+						await clock.tickAsync(0);
+						assert.equal(test.executor.dispose.callCount, 1);
+					});
+
 					it(`releases ${mode} connection startup immediately on disposal`, async () => {
 						const test = createTestSummarizer();
 						const creation = new Deferred<ICancellableSummarizerController>();
