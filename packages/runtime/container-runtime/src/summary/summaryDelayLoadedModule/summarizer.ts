@@ -126,24 +126,13 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 
 	public async run(onBehalfOf: string): Promise<SummarizerStopReason> {
 		try {
-			const stopReason = await this.runCore(onBehalfOf);
-			this.emit("summarizerStop", {
-				stopReason,
-				numUnsummarizedRuntimeOps: this._heuristicData?.numRuntimeOps,
-				numUnsummarizedNonRuntimeOps: this._heuristicData?.numNonRuntimeOps,
+			return await this.runLifecycle({
+				onBehalfOf,
+				allowLastSummary: true,
+				onReady: () => {},
 			});
-			return stopReason;
 		} catch (error) {
-			this.stop("summarizerException");
-			this.emit("summarizerStop", {
-				stopReason: "summarizerException",
-				error,
-				numUnsummarizedRuntimeOps: this._heuristicData?.numRuntimeOps,
-				numUnsummarizedNonRuntimeOps: this._heuristicData?.numNonRuntimeOps,
-			});
 			throw SummarizingWarning.wrap(error, false /* logged */, this.logger);
-		} finally {
-			this.close();
 		}
 	}
 
@@ -163,53 +152,84 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		this.runtime.disposeFn();
 	}
 
-	private async runCore(onBehalfOf: string): Promise<SummarizerStopReason> {
-		const runCoordinator = await this.createRunCoordinator(onBehalfOf);
-		if (runCoordinator === undefined) {
-			return "summarizerClientDisconnected";
-		}
+	/** Owns connection, executor startup, graceful drain, and closure for either invocation mode. */
+	private async runLifecycle({
+		onBehalfOf,
+		allowLastSummary,
+		onReady,
+	}: {
+		onBehalfOf: string | undefined;
+		allowLastSummary: boolean;
+		onReady: (executor: RunningSummarizer) => void;
+	}): Promise<SummarizerStopReason> {
+		let runCoordinator: ICancellableSummarizerController | undefined;
+		let stopReason: SummarizerStopReason = "summarizerException";
+		let failure: unknown;
+		try {
+			runCoordinator = await this.createRunCoordinator(onBehalfOf);
+			if (runCoordinator === undefined) {
+				stopReason = "summarizerClientDisconnected";
+				return "summarizerClientDisconnected";
+			}
+			const parentId = onBehalfOf ?? this.runtime.clientId;
+			assert(parentId !== undefined, "A connected summarizer must have a parent client ID.");
 
-		// Wait for either external signal to cancel, or loss of connectivity.
-		const stopP = Promise.race([runCoordinator.waitCancelled, this.stopDeferred.promise]);
-		// eslint-disable-next-line no-void
-		void stopP.then((reason) => {
-			this.logger.sendTelemetryEvent({
-				eventName: "StoppingSummarizer",
-				onBehalfOf,
-				reason,
+			// Wait for either external signal to cancel, or loss of connectivity.
+			const stopP = Promise.race([runCoordinator.waitCancelled, this.stopDeferred.promise]);
+			// eslint-disable-next-line no-void
+			void stopP.then((reason) => {
+				this.logger.sendTelemetryEvent({
+					eventName: "StoppingSummarizer",
+					onBehalfOf,
+					reason,
+				});
 			});
-		});
 
-		if (runCoordinator.cancelled) {
-			this.emit("summarizerStartupFailed", {
-				reason: await runCoordinator.waitCancelled,
+			if (runCoordinator.cancelled) {
+				stopReason = await runCoordinator.waitCancelled;
+				this.emit("summarizerStartupFailed", {
+					reason: stopReason,
+					numUnsummarizedRuntimeOps: this._heuristicData?.numRuntimeOps,
+					numUnsummarizedNonRuntimeOps: this._heuristicData?.numNonRuntimeOps,
+				});
+				return stopReason;
+			}
+
+			this.emit("summarizerStart", {
+				onBehalfOf,
 				numUnsummarizedRuntimeOps: this._heuristicData?.numRuntimeOps,
 				numUnsummarizedNonRuntimeOps: this._heuristicData?.numNonRuntimeOps,
 			});
-			return runCoordinator.waitCancelled;
+
+			const runningSummarizer = await this.start(parentId, runCoordinator);
+			onReady(runningSummarizer);
+			stopReason = await stopP;
+			await this.drain(
+				runningSummarizer,
+				runCoordinator,
+				parentId,
+				allowLastSummary && Summarizer.stopReasonCanRunLastSummary(stopReason),
+			);
+			return stopReason;
+		} catch (error) {
+			failure = error;
+			this.stop("summarizerException");
+			throw error;
+		} finally {
+			this.emit("summarizerStop", {
+				stopReason,
+				error: failure,
+				numUnsummarizedRuntimeOps: this._heuristicData?.numRuntimeOps,
+				numUnsummarizedNonRuntimeOps: this._heuristicData?.numNonRuntimeOps,
+			});
+			runCoordinator?.stop(stopReason);
+			this.close();
 		}
-
-		this.emit("summarizerStart", {
-			onBehalfOf,
-			numUnsummarizedRuntimeOps: this._heuristicData?.numRuntimeOps,
-			numUnsummarizedNonRuntimeOps: this._heuristicData?.numNonRuntimeOps,
-		});
-
-		const runningSummarizer = await this.start(onBehalfOf, runCoordinator);
-		const stopReason = await stopP;
-		await this.drain(
-			runningSummarizer,
-			runCoordinator,
-			stopReason,
-			onBehalfOf,
-			Summarizer.stopReasonCanRunLastSummary(stopReason),
-		);
-		return stopReason;
 	}
 
 	/** Creates the connection controller with the same bounded wait for either execution mode. */
 	private async createRunCoordinator(
-		onBehalfOf: string,
+		onBehalfOf: string | undefined,
 	): Promise<ICancellableSummarizerController | undefined> {
 		// Race coordinator creation against a timeout to ensure we don't hang indefinitely
 		// if the summarizer container fails to connect.
@@ -259,7 +279,6 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 	private async drain(
 		runningSummarizer: RunningSummarizer,
 		runCoordinator: ICancellableSummarizerController,
-		stopReason: SummarizerStopReason,
 		onBehalfOf: string,
 		allowLastSummary: boolean,
 	): Promise<void> {
@@ -285,7 +304,6 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			if (timer !== undefined) {
 				clearTimeout(timer);
 			}
-			runCoordinator.stop(stopReason);
 		}
 	}
 
@@ -419,44 +437,33 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			// The promises related to starting, summarizing,
 			// and submitting are communicated to the caller through the results builder.
 			// eslint-disable-next-line no-void
-			void this.runOnDemand(options, builder);
+			void this.runLifecycle({
+				onBehalfOf: undefined,
+				allowLastSummary: false,
+				onReady: (executor) => {
+					executor.summarizeOnDemand(options, builder);
+				},
+			})
+				.then(() => {
+					if (!builder.receivedSummaryAckOrNack.isCompleted) {
+						builder.fail(
+							"On-demand summarizer stopped before the request completed",
+							new UsageError("Summarizer stopped before the request completed"),
+						);
+					}
+				})
+				.catch((error: unknown) => {
+					if (!builder.receivedSummaryAckOrNack.isCompleted) {
+						builder.fail(
+							"Failed to run on-demand summarizer",
+							SummarizingWarning.wrap(error, false, this.logger),
+						);
+					}
+				});
 
 			return builder.build();
 		} catch (error) {
 			throw SummarizingWarning.wrap(error, false /* logged */, this.logger);
-		}
-	}
-
-	/** Uses the automatic path's connection and drain policies without enabling a last summary. */
-	private async runOnDemand(
-		options: IOnDemandSummarizeOptions,
-		builder: SummarizeResultBuilder,
-	): Promise<void> {
-		let coordinator: ICancellableSummarizerController | undefined;
-		try {
-			coordinator = await this.createRunCoordinator(this.runtime.clientId ?? "");
-			if (coordinator === undefined || coordinator.cancelled) {
-				throw new UsageError("Summarizer did not become connected");
-			}
-			const clientId = this.runtime.clientId;
-			assert(clientId !== undefined, "A connected summarizer must have a client ID.");
-			const runningSummarizer = await this.start(clientId, coordinator);
-			runningSummarizer.summarizeOnDemand(options, builder);
-			const stopReason = await Promise.race([
-				this.stopDeferred.promise,
-				coordinator.waitCancelled,
-			]);
-			await this.drain(runningSummarizer, coordinator, stopReason, clientId, false);
-		} catch (error) {
-			if (!builder.receivedSummaryAckOrNack.isCompleted) {
-				builder.fail(
-					"Failed to run on-demand summarizer",
-					SummarizingWarning.wrap(error, false, this.logger),
-				);
-			}
-		} finally {
-			coordinator?.stop("summarizerClientDisconnected");
-			this.close();
 		}
 	}
 

@@ -111,6 +111,27 @@ describe("Runtime", () => {
 				}
 
 				for (const mode of ["automatic", "on-demand"] as const) {
+					it(`cleans up ${mode} executor startup failure and emits its terminal event before disposal`, async () => {
+						const test = createTestSummarizer();
+						const error = new Error("Executor startup failed");
+						test.start.rejects(error);
+						const events: string[] = [];
+						test.summarizer.on("summarizerStop", ({ stopReason }) => {
+							events.push(stopReason);
+						});
+						test.dispose.callsFake(() => events.push("disposed"));
+						if (mode === "automatic") {
+							await assert.rejects(test.summarizer.run("parent"), /Executor startup failed/);
+						} else {
+							const results = test.summarizer.summarizeOnDemand({ reason: "test" });
+							const submitted = await results.summarySubmitted;
+							assert.equal(submitted.success, false);
+						}
+						assert.deepEqual(events, ["summarizerException", "disposed"]);
+						assert.equal(test.stop.calledWith("summarizerException"), true);
+						assert.equal(clock.countTimers(), 0);
+					});
+
 					it(`does not start ${mode} execution after disposal during connection startup`, async () => {
 						const test = createTestSummarizer();
 						const creation = new Deferred<ICancellableSummarizerController>();
