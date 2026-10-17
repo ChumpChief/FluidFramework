@@ -286,7 +286,7 @@ import {
 	electedSummarizerBlobName,
 	type EnqueueSummarizeResult,
 	extractSummaryMetadataMessage,
-	createSummarizationSessionFactory,
+	createSummaryClientScope,
 	type IBaseSummarizeResult,
 	type IContainerRuntimeMetadata,
 	type ICreateContainerMetadata,
@@ -2573,7 +2573,7 @@ export class ContainerRuntime
 				this, // IConnectedState
 				summaryCollection,
 				this.baseLogger,
-				createSummarizationSessionFactory(loader),
+				createSummaryClientScope(loader),
 				new Throttler(
 					60 * 1000, // 60 sec delay window
 					30 * 1000, // 30 sec max delay

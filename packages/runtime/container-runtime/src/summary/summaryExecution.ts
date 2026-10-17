@@ -7,24 +7,58 @@ import type { SummarizerStopReason } from "@fluidframework/container-runtime-def
 import type { ISummarizer } from "./summarizerTypes.js";
 
 /**
- * Child execution lifetime. Its caller owns the container and the overall drain deadline.
+ * Summary commands available within a connected child's resource scope.
  * @internal
  */
-export interface SummaryExecution {
-	readonly ready: Promise<void>;
-	readonly closed: Promise<SummarizerStopReason>;
-	stop(reason: SummarizerStopReason): void;
-	summarizeOnDemand: ISummarizer["summarizeOnDemand"];
-	enqueueSummarize: ISummarizer["enqueueSummarize"];
-}
+export type SummaryClient = Pick<ISummarizer, "summarizeOnDemand" | "enqueueSummarize">;
 
 /**
- * Optional execution capability, adapted to ISummarizer only for older callers.
+ * Runs work with a connected summary client. Returning from the callback drains and releases it.
+ * The caller owns the container and supplies cancellation separately from graceful stopping.
  * @internal
  */
 export interface SummaryExecutionSource {
-	openSummaryExecution(options: {
-		onBehalfOf: string | undefined;
-		allowLastSummary: boolean;
-	}): SummaryExecution;
+	withSummarizer<T>(
+		options: {
+			onBehalfOf: string | undefined;
+			stop: AbortSignal;
+			abort: AbortSignal;
+			allowLastSummary: boolean;
+			/** False for a host that intentionally releases the client at broadcast rather than acknowledgment. */
+			drain?: boolean;
+		},
+		action: (client: SummaryClient) => Promise<T>,
+	): Promise<T>;
+}
+
+/** Adapts an external abort event to an awaited operation, removing the listener afterward. */
+export async function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+	let onAbort: () => void = () => {};
+	try {
+		return await Promise.race([
+			work,
+			new Promise<never>((_resolve, reject) => {
+				onAbort = () =>
+					reject(
+						signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason)),
+					);
+				signal.addEventListener("abort", onAbort, { once: true });
+				if (signal.aborted) {
+					onAbort();
+				}
+			}),
+		]);
+	} finally {
+		signal.removeEventListener("abort", onAbort);
+	}
+}
+
+/** Waits for an external stop request; this does not start or complete another lifecycle. */
+export async function waitForStop(signal: AbortSignal): Promise<SummarizerStopReason> {
+	if (!signal.aborted) {
+		await new Promise<void>((resolve) =>
+			signal.addEventListener("abort", () => resolve(), { once: true }),
+		);
+	}
+	return signal.reason as SummarizerStopReason;
 }

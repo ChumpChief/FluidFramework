@@ -86,14 +86,16 @@ interface OnDemandSummarizeOptions {
 interface SummarizerLike {
 	readonly ISummarizer?: SummarizerLike;
 	summarizeOnDemand(options: OnDemandSummarizeOptions): OnDemandSummarizeResultsPromises;
-	openSummaryExecution?(options: {
-		onBehalfOf: string | undefined;
-		allowLastSummary: boolean;
-	}): {
-		readonly ready: Promise<void>;
-		readonly closed: Promise<unknown>;
-		stop(reason: string): void;
-	};
+	withSummarizer?<T>(
+		options: {
+			onBehalfOf: string | undefined;
+			allowLastSummary: boolean;
+			drain?: boolean;
+			stop: AbortSignal;
+			abort: AbortSignal;
+		},
+		action: (client: SummarizerLike) => Promise<T>,
+	): Promise<T>;
 }
 
 /**
@@ -823,8 +825,6 @@ async function loadSummarizerContainerAndMakeSummaryInternal(
 				request,
 			});
 
-			let summarySubmitted: SummarizeOnDemandResults["summarySubmitted"];
-			let summaryOpBroadcasted: SummarizeOnDemandResults["summaryOpBroadcasted"];
 			try {
 				if (container.getEntryPoint === undefined) {
 					throw new GenericError("container.getEntryPoint() is undefined");
@@ -838,31 +838,43 @@ async function loadSummarizerContainerAndMakeSummaryInternal(
 				}
 				// The loader owns this container. Capable children supply execution without another
 				// container lifetime or shutdown deadline; legacy children retain their adapter path.
-				const execution = summarizer.openSummaryExecution?.({
-					onBehalfOf: undefined,
-					allowLastSummary: false,
-				});
-				if (execution !== undefined) {
-					// Observe failure before awaiting readiness; never leave a rejecting lifetime unobserved.
-					// eslint-disable-next-line no-void
-					void execution.closed.catch(() => {});
-					await execution.ready;
-				}
 				// Host controlled feature gate for fullTree
 				// Default value will be false
 				const fullTreeGate =
 					mc.config.getBoolean("Fluid.Summarizer.FullTree.OnDemand") === true;
 
-				const summarizeResults: OnDemandSummarizeResultsPromises =
-					summarizer.summarizeOnDemand({
+				const summarize = async (
+					client: SummarizerLike,
+				): Promise<
+					[
+						SummarizeOnDemandResults["summarySubmitted"],
+						SummarizeOnDemandResults["summaryOpBroadcasted"],
+					]
+				> => {
+					const summarizeResults: OnDemandSummarizeResultsPromises = client.summarizeOnDemand({
 						reason: "summaryOnRequest",
 						retryOnFailure: true,
 						fullTree: fullTreeGate,
 					});
-				[summarySubmitted, summaryOpBroadcasted] = await Promise.all([
-					summarizeResults.summarySubmitted,
-					summarizeResults.summaryOpBroadcasted,
-				]);
+					return Promise.all([
+						summarizeResults.summarySubmitted,
+						summarizeResults.summaryOpBroadcasted,
+					]);
+				};
+				const stop = new AbortController();
+				const [summarySubmitted, summaryOpBroadcasted] =
+					summarizer.withSummarizer === undefined
+						? await summarize(summarizer)
+						: await summarizer.withSummarizer(
+								{
+									onBehalfOf: undefined,
+									allowLastSummary: false,
+									drain: false,
+									stop: stop.signal,
+									abort: stop.signal,
+								},
+								summarize,
+							);
 
 				const summaryResults: OnDemandSummaryResults = {
 					summarySubmitted: summarySubmitted.success,

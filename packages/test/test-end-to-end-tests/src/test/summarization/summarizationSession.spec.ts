@@ -8,9 +8,12 @@ import { strict as assert } from "assert";
 import { describeCompat } from "@fluid-private/test-version-utils";
 import { LoaderHeader } from "@fluidframework/container-definitions/internal";
 import type { SummaryExecutionProvider } from "@fluidframework/container-definitions/internal";
-import type { ISummarizer } from "@fluidframework/container-runtime/internal";
+import type {
+	ISummarizer,
+	SummaryExecutionSource,
+} from "@fluidframework/container-runtime/internal";
 import type { FluidObject } from "@fluidframework/core-interfaces";
-import { SummarizationSession } from "@fluidframework/container-runtime/internal/test/summary";
+import { withSummaryClient } from "@fluidframework/container-runtime/internal/test/summary";
 import {
 	createSummarizer,
 	getContainerEntryPointBackCompat,
@@ -30,7 +33,7 @@ describeCompat("Owned summarization session", "NoCompat", (getProvider) => {
 			const { container: child } = await createSummarizer(provider, parent);
 			data.root.set("session-job", "persisted");
 			await provider.ensureSynchronized();
-			const session = new SummarizationSession(async () => {
+			const load = async () => {
 				const execution = await (
 					child as typeof child & SummaryExecutionProvider
 				).getSummaryExecution();
@@ -38,29 +41,30 @@ describeCompat("Owned summarization session", "NoCompat", (getProvider) => {
 				const summarizer = (execution as FluidObject<ISummarizer>).ISummarizer;
 				assert(summarizer !== undefined);
 				return summarizer;
+			};
+			const stop = new AbortController();
+			const version = await withSummaryClient(load, stop.signal, async (childClient) => {
+				return (childClient as ISummarizer & SummaryExecutionSource).withSummarizer(
+					{
+						onBehalfOf: mode === "automatic" ? parent.clientId : undefined,
+						stop: stop.signal,
+						abort: stop.signal,
+						allowLastSummary: false,
+					},
+					async (client) => {
+						const results = client.summarizeOnDemand({ reason: "scoped-round-trip" });
+						const ack = await results.receivedSummaryAckOrNack;
+						assert(ack.success, "the session summary must be acknowledged");
+						return ack.data.summaryAckOp.contents.handle;
+					},
+				);
 			});
-			try {
-				if (mode === "automatic") {
-					assert(parent.clientId !== undefined);
-					session.start(parent.clientId);
-				}
-				const results = await session.requestSummary({ reason: "session-round-trip" });
-				assert.deepEqual(await session.ready, { kind: "ready" });
-				const ack = await results.receivedSummaryAckOrNack;
-				assert(ack.success, "the session summary must be acknowledged");
-				const version = ack.data.summaryAckOp.contents.handle;
-				session.stop("parentNotConnected");
-				const closed = await session.closed;
-				assert.equal(closed.kind, "completed");
-				assert.equal(child.disposed, true, "the session releases its child container");
-				const loaded = await provider.loadTestContainer(config, {
-					[LoaderHeader.version]: version,
-				});
-				const restored = await getContainerEntryPointBackCompat<ITestFluidObject>(loaded);
-				assert.equal(restored.root.get("session-job"), "persisted");
-			} finally {
-				session.close();
-			}
+			assert.equal(child.disposed, true, "the session releases its child container");
+			const loaded = await provider.loadTestContainer(config, {
+				[LoaderHeader.version]: version,
+			});
+			const restored = await getContainerEntryPointBackCompat<ITestFluidObject>(loaded);
+			assert.equal(restored.root.get("session-job"), "persisted");
 		});
 	}
 });

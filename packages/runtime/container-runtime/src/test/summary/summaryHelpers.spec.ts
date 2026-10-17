@@ -11,9 +11,9 @@ import { Deferred } from "@fluidframework/core-utils/internal";
 import sinon from "sinon";
 
 import {
-	createSummarizationSessionFactory,
+	createSummaryClientScope,
 	formCreateSummarizerFn,
-	SummarizationSession,
+	withSummaryClient,
 } from "../../summary/index.js";
 
 describe("Summarizer loading ownership", () => {
@@ -60,25 +60,27 @@ describe("Summarizer loading ownership", () => {
 		await assert.rejects(formCreateSummarizerFn(loader)(), error);
 		assert.equal(test.resolve.callCount, 0);
 	});
-	it("opens independent sessions without starting loader work until after ownership is returned", async () => {
+	it("owns independent loader scopes and releases each container", async () => {
 		const first = createLoader(async () => ({}));
 		const second = createLoader(async () => ({}));
 		const resolve = sinon.stub();
 		resolve.onFirstCall().returns(first.resolution.promise);
 		resolve.onSecondCall().returns(second.resolution.promise);
-		const openSession = createSummarizationSessionFactory({ resolve } as unknown as ILoader);
-		const firstSession = openSession();
-		const secondSession = openSession();
-		assert.notEqual(firstSession, secondSession);
-		assert.equal(resolve.callCount, 0);
+		const openSession = createSummaryClientScope({ resolve } as unknown as ILoader);
+		const firstAbort = new AbortController();
+		const secondAbort = new AbortController();
+		const firstTask = openSession(firstAbort.signal, async () => {});
+		const secondTask = openSession(secondAbort.signal, async () => {});
 		await new Promise((resolveTick) => process.nextTick(resolveTick));
 		assert.equal(resolve.callCount, 2);
-		firstSession.close();
+		firstAbort.abort(new Error("Cancelled"));
+		await assert.rejects(firstTask, /Cancelled/);
 		first.resolution.resolve(first.container);
 		await new Promise((resolveTick) => process.nextTick(resolveTick));
 		assert.equal(first.dispose.callCount, 1);
 		assert.equal(second.dispose.callCount, 0);
-		secondSession.close();
+		secondAbort.abort(new Error("Cancelled"));
+		await assert.rejects(secondTask, /Cancelled/);
 		second.resolution.resolve(second.container);
 		await new Promise((resolveTick) => process.nextTick(resolveTick));
 		assert.equal(second.dispose.callCount, 1);
@@ -125,11 +127,16 @@ describe("Summarizer loading ownership", () => {
 	it("disposes a container returned after its owning session closes", async () => {
 		const getEntryPoint = sinon.stub().resolves({});
 		const test = createLoader(getEntryPoint);
-		const session = new SummarizationSession(formCreateSummarizerFn(test.loader));
+		const abort = new AbortController();
+		const task = withSummaryClient(
+			formCreateSummarizerFn(test.loader),
+			abort.signal,
+			async () => {},
+		);
 		await new Promise((resolve) => process.nextTick(resolve));
 		assert.equal(test.resolve.callCount, 1);
-		session.close();
-		assert.equal(await session.loaded, false);
+		abort.abort(new Error("Cancelled"));
+		await assert.rejects(task, /Cancelled/);
 		test.resolution.resolve(test.container);
 		await new Promise((resolve) => process.nextTick(resolve));
 		assert.equal(test.dispose.callCount, 1);
@@ -143,12 +150,17 @@ describe("Summarizer loading ownership", () => {
 			entryPointStarted.resolve();
 			return entryPoint.promise;
 		});
-		const session = new SummarizationSession(formCreateSummarizerFn(test.loader));
+		const abort = new AbortController();
+		const task = withSummaryClient(
+			formCreateSummarizerFn(test.loader),
+			abort.signal,
+			async () => {},
+		);
 		test.resolution.resolve(test.container);
 		await entryPointStarted.promise;
-		session.close();
+		abort.abort(new Error("Cancelled"));
 		assert.equal(test.dispose.callCount, 1);
-		assert.equal(await session.loaded, false);
+		await assert.rejects(task, /Cancelled/);
 		entryPoint.reject(new Error("Discovery failed after disposal"));
 		await new Promise((resolve) => process.nextTick(resolve));
 		assert.equal(test.dispose.callCount, 1);
@@ -156,10 +168,13 @@ describe("Summarizer loading ownership", () => {
 
 	it("does not start a loader request for a session closed before creation starts", async () => {
 		const test = createLoader(async () => ({}));
-		const openSession = createSummarizationSessionFactory(test.loader);
-		const session = openSession();
-		session.close();
-		assert.equal(await session.loaded, false);
+		const openSession = createSummaryClientScope(test.loader);
+		const abort = new AbortController();
+		abort.abort(new Error("Cancelled"));
+		await assert.rejects(
+			openSession(abort.signal, async () => {}),
+			/Cancelled/,
+		);
 		await new Promise((resolve) => process.nextTick(resolve));
 		assert.equal(test.resolve.callCount, 0);
 	});

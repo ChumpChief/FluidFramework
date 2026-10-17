@@ -13,7 +13,7 @@ import { DriverHeader } from "@fluidframework/driver-definitions/internal";
 import { responseToException } from "@fluidframework/runtime-utils/internal";
 import { UsageError } from "@fluidframework/telemetry-utils/internal";
 
-import { SummarizationSession } from "./summarizationSession.js";
+import { withSummaryClient } from "./withSummaryClient.js";
 import {
 	summarizerClientType,
 	type ISummarizer,
@@ -64,14 +64,13 @@ export const DefaultSummaryConfiguration: ISummaryConfiguration = {
 };
 
 /**
- * Creates a factory that opens an owned session for a second client of the same document.
- * The returned handle owns loading immediately; callers need not manage loader requests or entrypoints.
+ * Binds the loader to an awaited second-client scope, including cleanup on return or failure.
  */
-export function createSummarizationSessionFactory(
+export function createSummaryClientScope(
 	loader: ILoader,
-): () => SummarizationSession {
+): <T>(signal: AbortSignal, action: (client: ISummarizer) => Promise<T>) => Promise<T> {
 	const createSummarizer = formCreateSummarizerFn(loader);
-	return () => new SummarizationSession(createSummarizer);
+	return async (signal, action) => withSummaryClient(createSummarizer, signal, action);
 }
 
 /**

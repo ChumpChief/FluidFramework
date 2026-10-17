@@ -2,273 +2,93 @@
  * Copyright (c) Microsoft Corporation and contributors. All rights reserved.
  * Licensed under the MIT License.
  */
-
 import { strict as assert } from "node:assert";
-
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
-import type {
-	ISummarizerEvents,
-	SummarizerStopReason,
-} from "@fluidframework/container-runtime-definitions/internal";
+import type { ISummarizerEvents } from "@fluidframework/container-runtime-definitions/internal";
 import { Deferred } from "@fluidframework/core-utils/internal";
 import sinon from "sinon";
+import { type ISummarizer, withSummaryClient } from "../../summary/index.js";
 
-import { type ISummarizer, SummarizationSession } from "../../summary/index.js";
-
-describe("Summarization Session", () => {
-	it("starts only one execution while all observers share its terminal outcome", async () => {
-		const summarizer = new TestSummarizer();
-		const session = new SummarizationSession(async () => summarizer);
-		session.start("first-parent");
-		session.start("second-parent");
-		await session.loaded;
-		await new Promise((resolve) => process.nextTick(resolve));
-		assert.deepEqual(summarizer.run.args, [["first-parent"]]);
-		summarizer.runResult.resolve("parentNotConnected");
-		const outcome = await session.closed;
-		assert.deepEqual(outcome, { kind: "completed", reason: "parentNotConnected" });
-		session.start("third-parent");
-		assert.equal(await session.closed, outcome);
-		assert.equal(summarizer.run.callCount, 1);
-	});
-	class TestSummarizer extends TypedEventEmitter<ISummarizerEvents> implements ISummarizer {
-		public readonly runResult = new Deferred<SummarizerStopReason>();
-		public readonly run = sinon
-			.stub()
-			.callsFake(async (_onBehalfOf: string) => this.runResult.promise);
-		public readonly stop = sinon.stub<[SummarizerStopReason], void>();
-		public readonly close = sinon.stub<[], void>();
-		public readonly summarizeOnDemand = sinon.stub<
-			Parameters<ISummarizer["summarizeOnDemand"]>,
-			ReturnType<ISummarizer["summarizeOnDemand"]>
-		>();
-		public readonly enqueueSummarize = sinon.stub<
-			Parameters<ISummarizer["enqueueSummarize"]>,
-			ReturnType<ISummarizer["enqueueSummarize"]>
-		>();
+describe("Scoped summary client", () => {
+	function child(): ISummarizer & { close: sinon.SinonStub } {
+		return Object.assign(new TypedEventEmitter<ISummarizerEvents>(), {
+			close: sinon.stub(),
+			stop: sinon.stub(),
+			run: sinon.stub().resolves("parentNotConnected"),
+			summarizeOnDemand: sinon.stub(),
+			enqueueSummarize: sinon.stub(),
+		});
 	}
-
-	it("delivers the first graceful stop requested during creation and still allows run", async () => {
-		const creation = new Deferred<ISummarizer>();
-		const summarizer = new TestSummarizer();
-		const session = new SummarizationSession(async () => creation.promise);
-		session.stop("parentNotConnected");
-		session.stop("notElectedParent");
-		creation.resolve(summarizer);
-		assert.equal(await session.loaded, true);
-		assert.deepEqual(summarizer.stop.args, [["parentNotConnected"]]);
-		session.start("parent");
-		summarizer.runResult.resolve("parentNotConnected");
-		assert.deepEqual(await session.closed, {
-			kind: "completed",
-			reason: "parentNotConnected",
-		});
-		assert.deepEqual(summarizer.run.args, [["parent"]]);
-		assert.equal(summarizer.close.callCount, 1);
-		assert.equal(session.isLoaded, false);
-	});
-
-	it("closes a late-created summarizer without running it", async () => {
-		const creation = new Deferred<ISummarizer>();
-		const summarizer = new TestSummarizer();
-		const session = new SummarizationSession(async () => creation.promise);
-		session.close();
-		assert.equal(await session.loaded, false);
-		creation.resolve(summarizer);
-		await new Promise((resolve) => process.nextTick(resolve));
-		session.start("parent");
-		assert.equal(summarizer.run.callCount, 0);
-		assert.equal(summarizer.close.callCount, 1);
-	});
-
-	it("closes a loaded summarizer if abandoned before run", async () => {
-		const summarizer = new TestSummarizer();
-		const session = new SummarizationSession(async () => summarizer);
-		await session.loaded;
-		session.close();
-		session.close();
-		session.start("parent");
-		assert.equal(summarizer.run.callCount, 0);
-		assert.equal(summarizer.close.callCount, 1);
-	});
-
-	it("releases the summarizer when execution fails", async () => {
-		const error = new Error("Execution failed");
-		const summarizer = new TestSummarizer();
-		const session = new SummarizationSession(async () => summarizer);
-		await session.loaded;
-		session.start("parent");
-		summarizer.runResult.reject(error);
-		assert.deepEqual(await session.closed, { kind: "failed", error });
-		assert.equal(summarizer.close.callCount, 1);
-	});
-
-	it("reports creation failures", async () => {
-		const error = new Error("Load failed");
-		const session = new SummarizationSession(async () => {
-			throw error;
-		});
-		await assert.rejects(session.loaded, error);
-		assert.deepEqual(await session.closed, { kind: "failed", error });
-		session.close();
-	});
-
-	it("distinguishes loading from executor readiness without starting execution", async () => {
-		const summarizer = new TestSummarizer();
-		const executorReady = new Deferred<void>();
-		const child = Object.assign(summarizer, {
-			waitUntilReady: async () => executorReady.promise,
-		});
-		const session = new SummarizationSession(async () => child);
-		assert.equal(await session.loaded, true);
-		let ready = false;
-		const readiness = session.ready.then((result) => {
-			ready = true;
-			return result;
-		});
-		await new Promise((resolve) => process.nextTick(resolve));
-		assert.equal(ready, false);
-		assert.equal(summarizer.run.callCount, 0);
-		executorReady.resolve();
-		assert.deepEqual(await readiness, { kind: "ready" });
-		session.close();
-	});
-
-	it("reports legacy loading honestly when the child has no readiness capability", async () => {
-		const session = new SummarizationSession(async () => new TestSummarizer());
-		assert.deepEqual(await session.ready, { kind: "legacy-loaded" });
-		session.close();
-	});
-
-	it("releases readiness on closure and observes late child readiness failures", async () => {
-		const executorReady = new Deferred<void>();
-		const child = Object.assign(new TestSummarizer(), {
-			waitUntilReady: async () => executorReady.promise,
-		});
-		const session = new SummarizationSession(async () => child);
-		await session.loaded;
-		session.close();
-		assert.deepEqual(await session.ready, { kind: "closed" });
-		executorReady.reject(new Error("Late executor failure"));
-		await new Promise((resolve) => process.nextTick(resolve));
-	});
-
-	it("reports child startup failure through readiness", async () => {
-		const error = new Error("Executor startup failed");
-		const child = Object.assign(new TestSummarizer(), {
-			waitUntilReady: async () => {
-				throw error;
+	it("returns the callback result and releases the child in finally", async () => {
+		const client = child();
+		const result = await withSummaryClient(
+			async () => client,
+			new AbortController().signal,
+			async (loaded) => {
+				assert.equal(loaded, client);
+				assert.equal(client.close.callCount, 0);
+				return 42;
 			},
-		});
-		const session = new SummarizationSession(async () => child);
-		assert.deepEqual(await session.ready, { kind: "failed", error });
-		session.close();
+		);
+		assert.equal(result, 42);
+		assert.equal(client.close.callCount, 1);
 	});
-
-	it("forwards events from stop intent delivered during loading and detaches on closure", async () => {
-		const creation = new Deferred<ISummarizer>();
-		const summarizer = new TestSummarizer();
-		const session = new SummarizationSession(async () => creation.promise);
-		const reasons: SummarizerStopReason[] = [];
-		session.on("summarizerStop", ({ stopReason }) => reasons.push(stopReason));
-		summarizer.stop.callsFake((reason) => {
-			summarizer.emit("summarizerStop", { stopReason: reason });
-		});
-		session.stop("parentNotConnected");
-		creation.resolve(summarizer);
-		await session.loaded;
-		assert.deepEqual(reasons, ["parentNotConnected"]);
-		session.close();
-		assert.equal(summarizer.listenerCount("summarizerStop"), 0);
-		summarizer.emit("summarizerStop", { stopReason: "notElectedParent" });
-		assert.deepEqual(reasons, ["parentNotConnected"]);
+	it("releases the child when the callback throws", async () => {
+		const client = child();
+		const error = new Error("Summary failed");
+		await assert.rejects(
+			withSummaryClient(
+				async () => client,
+				new AbortController().signal,
+				async () => {
+					throw error;
+				},
+			),
+			error,
+		);
+		assert.equal(client.close.callCount, 1);
 	});
-
-	it("delegates summary requests only while a child is loaded", async () => {
-		const creation = new Deferred<ISummarizer>();
-		const summarizer = new TestSummarizer();
-		const session = new SummarizationSession(async () => creation.promise);
-		const options = { reason: "explicit request" };
-		assert.throws(() => session.summarizeOnDemand(options), /not loaded or has closed/);
-		assert.throws(() => session.enqueueSummarize(options), /not loaded or has closed/);
-		creation.resolve(summarizer);
-		await session.loaded;
-		session.summarizeOnDemand(options);
-		session.enqueueSummarize(options);
-		assert.deepEqual(summarizer.summarizeOnDemand.args, [[options]]);
-		assert.deepEqual(summarizer.enqueueSummarize.args, [[options]]);
-		session.close();
-		assert.throws(() => session.summarizeOnDemand(options), /not loaded or has closed/);
-		assert.throws(() => session.enqueueSummarize(options), /not loaded or has closed/);
+	it("does not load after cancellation", async () => {
+		const abort = new AbortController();
+		abort.abort(new Error("Cancelled"));
+		const load = sinon.stub();
+		await assert.rejects(
+			withSummaryClient(load, abort.signal, async () => {}),
+			/Cancelled/,
+		);
+		assert.equal(load.callCount, 0);
 	});
-
-	it("observes a creation failure after closure", async () => {
-		const creation = new Deferred<ISummarizer>();
-		const session = new SummarizationSession(async () => creation.promise);
-		session.close();
-		assert.equal(await session.loaded, false);
-		creation.reject(new Error("Late load failure"));
+	it("releases a pending load immediately and closes its late child", async () => {
+		const loading = new Deferred<ISummarizer>();
+		const abort = new AbortController();
+		const client = child();
+		const action = sinon.stub().resolves();
+		const task = withSummaryClient(async () => loading.promise, abort.signal, action);
+		abort.abort(new Error("Cancelled"));
+		await assert.rejects(task, /Cancelled/);
+		loading.resolve(client);
 		await new Promise((resolve) => process.nextTick(resolve));
+		assert.equal(client.close.callCount, 1);
+		assert.equal(action.callCount, 0);
 	});
-
-	it("bounds graceful stopping during creation and closes a late result", async () => {
-		const clock = sinon.useFakeTimers();
-		try {
-			const creation = new Deferred<ISummarizer>();
-			const summarizer = new TestSummarizer();
-			const session = new SummarizationSession(async () => creation.promise);
-			session.stop("parentNotConnected");
-			await clock.tickAsync(2 * 60 * 1000);
-			assert.deepEqual(await session.closed, {
-				kind: "timeout",
-				reason: "parentNotConnected",
-			});
-			assert.equal(await session.loaded, false);
-			creation.resolve(summarizer);
-			await clock.tickAsync(0);
-			assert.equal(summarizer.close.callCount, 1);
-			assert.equal(summarizer.run.callCount, 0);
-		} finally {
-			clock.restore();
-		}
-	});
-
-	it("settles run at the stop deadline even if the underlying run never completes", async () => {
-		const clock = sinon.useFakeTimers();
-		try {
-			const summarizer = new TestSummarizer();
-			const session = new SummarizationSession(async () => summarizer);
-			await session.loaded;
-			session.start("parent");
-			session.stop("notElectedParent");
-			await clock.tickAsync(2 * 60 * 1000);
-			const outcome = await session.closed;
-			assert.deepEqual(outcome, { kind: "timeout", reason: "notElectedParent" });
-			summarizer.runResult.reject(new Error("Late execution failure"));
-			await clock.tickAsync(0);
-			assert.equal(await session.closed, outcome);
-			assert.equal(summarizer.close.callCount, 1);
-			assert.equal(clock.countTimers(), 0);
-		} finally {
-			clock.restore();
-		}
-	});
-
-	it("clears the stop deadline when graceful execution completes", async () => {
-		const clock = sinon.useFakeTimers();
-		try {
-			const summarizer = new TestSummarizer();
-			const session = new SummarizationSession(async () => summarizer);
-			await session.loaded;
-			session.start("parent");
-			session.stop("parentNotConnected");
-			summarizer.runResult.resolve("parentNotConnected");
-			await session.closed;
-			assert.equal(clock.countTimers(), 0);
-			const outcome = await session.closed;
-			assert.equal(outcome.kind, "completed");
-		} finally {
-			clock.restore();
-		}
+	it("closes the owned child when pending work is cancelled and observes late failure", async () => {
+		const work = new Deferred<void>();
+		const client = child();
+		const abort = new AbortController();
+		const started = new Deferred<void>();
+		const task = withSummaryClient(
+			async () => client,
+			abort.signal,
+			async () => {
+				started.resolve();
+				await work.promise;
+			},
+		);
+		await started.promise;
+		abort.abort(new Error("Cancelled"));
+		await assert.rejects(task, /Cancelled/);
+		assert.equal(client.close.callCount, 1);
+		work.reject(new Error("Late failure"));
+		await new Promise((resolve) => process.nextTick(resolve));
 	});
 });

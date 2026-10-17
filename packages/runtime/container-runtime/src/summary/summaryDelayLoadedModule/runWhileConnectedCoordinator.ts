@@ -4,7 +4,8 @@
  */
 
 import type { SummarizerStopReason } from "@fluidframework/container-runtime-definitions/internal";
-import { assert, Deferred } from "@fluidframework/core-utils/internal";
+import { assert } from "@fluidframework/core-utils/internal";
+import { waitForStop } from "../summaryExecution.js";
 
 import type { IConnectableRuntime, ISummaryCancellationToken } from "../summarizerTypes.js";
 
@@ -42,30 +43,37 @@ export const neverCancelledSummaryToken: ISummaryCancellationToken = {
  * when disconnected or if stop() is called.
  */
 export class RunWhileConnectedCoordinator implements SummarizerConnection {
-	private readonly readiness = new Deferred<"connected" | "stopped" | "timeout">();
-	public readonly ready = this.readiness.promise;
-	private _cancelled = false;
+	/** Child connectivity cancellation for scoped callers; graceful parent stop is separate. */
+	public get signal(): AbortSignal {
+		return this.transport.signal;
+	}
+	private readonly transport = new AbortController();
+	private readonly cancellation = new AbortController();
+	private readonly connection = new AbortController();
+	public readonly ready: Promise<"connected" | "stopped" | "timeout">;
 	private connectionTimer: ReturnType<typeof setTimeout> | undefined;
-	private readonly stopDeferred = new Deferred<SummarizerStopReason>();
-	private readonly disconnected = (): void => this.stop("summarizerClientDisconnected");
+	private readonly disconnected = (): void => {
+		this.transport.abort(new Error("Summary client disconnected"));
+		this.stop("summarizerClientDisconnected");
+	};
 	private readonly onConnected = (): void => {
 		this.clearConnectionTimer();
-		this.readiness.resolve("connected");
+		this.connection.abort("connected");
 	};
 
 	public get cancelled(): boolean {
-		if (!this._cancelled) {
+		if (!this.cancellation.signal.aborted) {
 			assert(this.active(), 0x25d /* "We should never connect as 'read'" */);
 		}
 
-		return this._cancelled;
+		return this.cancellation.signal.aborted;
 	}
 
 	/**
 	 * Returns a promise that resolves once stopped either externally or by disconnect.
 	 */
 	public get waitCancelled(): Promise<SummarizerStopReason> {
-		return this.stopDeferred.promise;
+		return waitForStop(this.cancellation.signal);
 	}
 
 	public static async create(
@@ -89,6 +97,8 @@ export class RunWhileConnectedCoordinator implements SummarizerConnection {
 		private readonly runtime: IConnectableRuntime,
 		private readonly active: () => boolean,
 	) {
+		// This promise adapts external connection events, rather than announcing internal work.
+		this.ready = this.waitForConnection();
 		// Only the child connection cancels execution. The supervisor separately decides
 		// whether parent disconnection permits graceful draining or a last summary.
 		if (this.runtime.disposed) {
@@ -105,7 +115,7 @@ export class RunWhileConnectedCoordinator implements SummarizerConnection {
 		} else {
 			this.connectionTimer = setTimeout(
 				() => {
-					this.readiness.resolve("timeout");
+					this.connection.abort("timeout");
 					this.stop("summarizerClientDisconnected");
 				},
 				2 * 60 * 1000,
@@ -118,15 +128,23 @@ export class RunWhileConnectedCoordinator implements SummarizerConnection {
 	 * Stops running.
 	 */
 	public stop(reason: SummarizerStopReason): void {
-		if (!this._cancelled) {
-			this._cancelled = true;
-			this.readiness.resolve("stopped");
+		if (!this.cancellation.signal.aborted) {
+			this.connection.abort("stopped");
 			this.clearConnectionTimer();
 			this.runtime.off("connected", this.onConnected);
 			this.runtime.off("disconnected", this.disconnected);
 			this.runtime.off("dispose", this.disconnected);
-			this.stopDeferred.resolve(reason);
+			this.cancellation.abort(reason);
 		}
+	}
+
+	private async waitForConnection(): Promise<"connected" | "stopped" | "timeout"> {
+		if (!this.connection.signal.aborted) {
+			await new Promise<void>((resolve) =>
+				this.connection.signal.addEventListener("abort", () => resolve(), { once: true }),
+			);
+		}
+		return this.connection.signal.reason as "connected" | "stopped" | "timeout";
 	}
 
 	private clearConnectionTimer(): void {
