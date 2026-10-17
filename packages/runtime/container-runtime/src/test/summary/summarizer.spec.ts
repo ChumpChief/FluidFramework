@@ -14,6 +14,7 @@ import {
 	DefaultSummaryConfiguration,
 	RunningSummarizer,
 	RunWhileConnectedCoordinator,
+	SummarizationSession,
 	Summarizer,
 	type ICancellableSummarizerController,
 } from "../../summary/index.js";
@@ -322,6 +323,53 @@ describe("Runtime", () => {
 					assert.equal(secondResult.success, false);
 					assert.deepEqual(test.executor.waitStop.args, [[false]]);
 					assert.equal(test.dispose.callCount, 1);
+				});
+
+				it("uses one session deadline and one container owner for automatic execution", async () => {
+					const test = createTestSummarizer();
+					test.executor.waitStop.returns(new Promise(() => {}));
+					const session = new SummarizationSession(async () => test.summarizer);
+					session.start("parent");
+					assert.deepEqual(await session.ready, { kind: "ready" });
+					session.stop("parentNotConnected");
+					await clock.tickAsync(0);
+					assert.deepEqual(test.executor.waitStop.args, [[true]]);
+					assert.equal(clock.countTimers(), 1, "only the session owns the drain deadline");
+					await clock.tickAsync(2 * 60 * 1000);
+					assert.deepEqual(await session.closed, {
+						kind: "timeout",
+						reason: "parentNotConnected",
+					});
+					assert.equal(test.dispose.callCount, 1);
+					assert.equal(clock.countTimers(), 0);
+				});
+
+				it("runs an explicit job through session loading and executor readiness", async () => {
+					const test = createTestSummarizer();
+					const session = new SummarizationSession(async () => test.summarizer);
+					const request = session.requestSummary({ reason: "one-shot" });
+					await clock.tickAsync(0);
+					await request;
+					assert.equal(test.start.callCount, 1);
+					assert.equal(test.executor.summarizeOnDemand.callCount, 1);
+					session.stop("parentNotConnected");
+					await session.closed;
+					assert.deepEqual(test.executor.waitStop.args, [[false]]);
+					assert.equal(test.dispose.callCount, 1);
+				});
+
+				it("leaves container disposal to the caller of a dedicated execution handle", async () => {
+					const test = createTestSummarizer();
+					const execution = test.summarizer.openSummaryExecution({
+						onBehalfOf: undefined,
+						allowLastSummary: false,
+					});
+					await execution.ready;
+					execution.stop("parentNotConnected");
+					await execution.closed;
+					assert.equal(test.dispose.callCount, 0, "the host owns its container");
+					assert.equal(test.executor.dispose.callCount, 1);
+					assert.equal(clock.countTimers(), 0);
 				});
 
 				it("reports readiness only after connection and executor initialization", async () => {

@@ -226,7 +226,8 @@ export class SummaryManager
 		assert(this.session === undefined, "The previous summarization session must be closed.");
 
 		this.task = this.superviseSession()
-			.then((reason) => {
+			.then((outcome) => {
+				const reason = outcome === undefined ? undefined : this.reportSessionOutcome(outcome);
 				this.logger.sendTelemetryEvent({
 					eventName: "EndingSummarizer",
 					reason,
@@ -264,31 +265,31 @@ export class SummaryManager
 	}
 
 	/** One task owns delay, opening, execution, and draining before eligibility is reconsidered. */
-	private async superviseSession(): Promise<string | undefined> {
+	private async superviseSession(): Promise<SummarizationSessionOutcome | undefined> {
 		const delayed = await this.delayBeforeCreatingSummarizer();
 		if (this.disposed) {
-			return "early exit (disposed)";
+			return undefined;
 		}
 		const eligibility = this.getOpeningEligibility();
 		// Urgent startup is allowed to finish a last summary even if its parent has disconnected.
 		// Preserve that recovery policy when the service is rejecting unsummarized ops.
 		if (delayed && !eligibility.shouldSummarize) {
-			return `early exit ${eligibility.stopReason}`;
+			return undefined;
 		}
 
 		const session = this.openSession();
 		this.session = session;
 		this.setupForwardedEvents(session);
 		if (!(await session.loaded)) {
-			this.reportSessionOutcome(await session.closed);
-			return "session closed during creation";
+			return session.closed;
 		}
 
 		const responsibility = this.getResponsibility();
 		if (!responsibility.shouldSummarize) {
 			session.stop(responsibility.stopReason);
 			if (delayed || !stopReasonCanRunLastSummary(responsibility.stopReason)) {
-				return `early exit after starting summarizer ${responsibility.stopReason}`;
+				session.close();
+				return session.closed;
 			}
 			this.logger.sendTelemetryEvent({ eventName: "LastAttemptToSummarize" });
 		}
@@ -299,7 +300,7 @@ export class SummaryManager
 			{ eventName: "RunningSummarizer", attempt: this.startThrottler.numAttempts },
 			async () => {
 				session.start(clientId);
-				return this.reportSessionOutcome(await session.closed);
+				return session.closed;
 			},
 		);
 	}

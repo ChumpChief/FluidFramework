@@ -30,6 +30,7 @@ import type {
 	ISummaryConfiguration,
 } from "../summarizerTypes.js";
 import type { SummaryCollection } from "../summaryCollection.js";
+import type { SummaryExecution, SummaryExecutionSource } from "../summaryExecution.js";
 
 import {
 	RunWhileConnectedCoordinator,
@@ -88,7 +89,10 @@ export const createSummarizingWarning = (
  * It is created only by summarizing container (i.e. one with clientType === "summarizer")
  * @internal
  */
-export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements ISummarizer {
+export class Summarizer
+	extends TypedEventEmitter<ISummarizerEvents>
+	implements ISummarizer, SummaryExecutionSource
+{
 	public get ISummarizer(): this {
 		return this;
 	}
@@ -141,6 +145,20 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		}
 	}
 
+	/** Opens execution without taking ownership of the caller's container or drain deadline. */
+	public openSummaryExecution(options: {
+		onBehalfOf: string | undefined;
+		allowLastSummary: boolean;
+	}): SummaryExecution {
+		return {
+			ready: this.waitUntilReady(),
+			closed: this.ensureLifecycle({ ...options, ownsContainer: false }),
+			stop: (reason) => this.stop(reason),
+			summarizeOnDemand: (request) => this.summarizeOnDemand(request),
+			enqueueSummarize: (request) => this.enqueueSummarize(request),
+		};
+	}
+
 	/**
 	 * Stops the summarizer from running.  This will complete
 	 * the run promise, and also close the container.
@@ -172,6 +190,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 	private async ensureLifecycle(options: {
 		onBehalfOf: string | undefined;
 		allowLastSummary: boolean;
+		ownsContainer?: boolean;
 	}): Promise<SummarizerStopReason> {
 		if (this.lifecycle === undefined) {
 			this.lifecycle = this.runLifecycle(options);
@@ -186,9 +205,11 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 	private async runLifecycle({
 		onBehalfOf,
 		allowLastSummary,
+		ownsContainer = true,
 	}: {
 		onBehalfOf: string | undefined;
 		allowLastSummary: boolean;
+		ownsContainer?: boolean;
 	}): Promise<SummarizerStopReason> {
 		let runCoordinator: SummarizerConnection | undefined;
 		let stopReason: SummarizerStopReason = "summarizerException";
@@ -253,6 +274,7 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 				runCoordinator,
 				parentId,
 				allowLastSummary && Summarizer.stopReasonCanRunLastSummary(stopReason),
+				ownsContainer,
 			);
 			return stopReason;
 		} catch (error) {
@@ -272,7 +294,11 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 			});
 			runCoordinator?.stop(stopReason);
 			this.runCoordinator = undefined;
-			this.close();
+			if (ownsContainer) {
+				this.close();
+			} else {
+				this.dispose();
+			}
 		}
 	}
 
@@ -282,11 +308,16 @@ export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements 
 		runCoordinator: ICancellableSummarizerController,
 		onBehalfOf: string,
 		allowLastSummary: boolean,
+		bounded: boolean,
 	): Promise<void> {
 		// Graceful stopping must not cancel an active attempt before its ack or retry delay completes.
 		const waitStopPromise = runningSummarizer.waitStop(
 			!runCoordinator.cancelled && allowLastSummary,
 		);
+		if (!bounded) {
+			await Promise.race([waitStopPromise, this.disposedDeferred.promise]);
+			return;
+		}
 		const summarizerStopTimeoutMs = 2 * 60 * 1000; // 2 minutes
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		const timeoutPromise = new Promise<"timeout">((resolve) => {

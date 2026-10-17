@@ -97,6 +97,8 @@ export {
 	type OpActionEventName,
 	type ICancellableSummarizerController,
 	type SummarizerConnection,
+	type SummaryExecution,
+	type SummaryExecutionSource,
 	type SubmitSummaryFailureData,
 	type SummaryStage,
 	type IRetriableFailureError,

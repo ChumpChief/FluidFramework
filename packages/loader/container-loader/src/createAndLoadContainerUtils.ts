@@ -86,6 +86,14 @@ interface OnDemandSummarizeOptions {
 interface SummarizerLike {
 	readonly ISummarizer?: SummarizerLike;
 	summarizeOnDemand(options: OnDemandSummarizeOptions): OnDemandSummarizeResultsPromises;
+	openSummaryExecution?(options: {
+		onBehalfOf: string | undefined;
+		allowLastSummary: boolean;
+	}): {
+		readonly ready: Promise<void>;
+		readonly closed: Promise<unknown>;
+		stop(reason: string): void;
+	};
 }
 
 /**
@@ -827,6 +835,18 @@ async function loadSummarizerContainerAndMakeSummaryInternal(
 				const summarizer = fluidObject?.ISummarizer;
 				if (summarizer === undefined) {
 					throw new GenericError("Summarizer entry point not available");
+				}
+				// The loader owns this container. Capable children supply execution without another
+				// container lifetime or shutdown deadline; legacy children retain their adapter path.
+				const execution = summarizer.openSummaryExecution?.({
+					onBehalfOf: undefined,
+					allowLastSummary: false,
+				});
+				if (execution !== undefined) {
+					// Observe failure before awaiting readiness; never leave a rejecting lifetime unobserved.
+					// eslint-disable-next-line no-void
+					void execution.closed.catch(() => {});
+					await execution.ready;
 				}
 				// Host controlled feature gate for fullTree
 				// Default value will be false
