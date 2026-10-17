@@ -114,7 +114,7 @@ export class Summarizer
 		options: Parameters<SummaryExecutionSource["withSummarizer"]>[0],
 		action: (client: SummaryClient) => Promise<T>,
 	): Promise<T> {
-		if (this.inUse) {
+		if (this.inUse || this.legacyTask !== undefined) {
 			throw new UsageError("This summary client is already owned by another invocation.");
 		}
 		this.inUse = true;
@@ -124,15 +124,22 @@ export class Summarizer
 		abort.addEventListener("abort", cancel, { once: true });
 		let reason: SummarizerStopReason = "summarizerException";
 		let failure: unknown;
+		let executor: RunningSummarizer | undefined;
+		let draining = false;
 		try {
 			abort.throwIfAborted();
-			const executor = await this.connect(connection, options.onBehalfOf, abort);
-			const result = await untilAborted(action(executor), abort);
+			executor = await this.connect(connection, options.onBehalfOf, abort);
+			const client: SummaryClient = {
+				summarizeOnDemand: (request) => this.summarizeOnDemand(request),
+				enqueueSummarize: (request) => this.enqueueSummarize(request),
+			};
+			const result = await untilAborted(action(client), abort);
 			reason = options.stop.aborted
 				? (options.stop.reason as SummarizerStopReason)
 				: "notElectedParent";
 			// Parent stop drains; child disconnect/abort cancels the existing executor token.
 			if (options.drain !== false) {
+				draining = true;
 				await untilAborted(
 					executor.waitStop(
 						!connection.cancelled &&
@@ -146,6 +153,15 @@ export class Summarizer
 		} catch (error) {
 			failure = error;
 			reason = abort.aborted ? "summarizerClientDisconnected" : "summarizerException";
+			// An ordinary caller failure does not invalidate an already submitted summary.
+			// Drain without adding a last summary, preserving the original caller error.
+			if (!abort.aborted && executor !== undefined && !draining && options.drain !== false) {
+				try {
+					await untilAborted(executor.waitStop(false), abort);
+				} catch (drainError) {
+					this.logger.sendErrorEvent({ eventName: "DrainAfterCallbackFailure" }, drainError);
+				}
+			}
 			throw error;
 		} finally {
 			this.emit("summarizerStop", { stopReason: reason, error: failure });
@@ -170,6 +186,7 @@ export class Summarizer
 			});
 		}
 		if (connected !== "connected" || connection.cancelled) {
+			this.emit("summarizerStartupFailed", { reason: "summarizerClientDisconnected" });
 			throw new UsageError("Summarizer disconnected before startup");
 		}
 		this.emit("summarizerStart", { onBehalfOf: parent ?? this.runtime.clientId });
@@ -245,6 +262,9 @@ export class Summarizer
 		allowLastSummary: boolean,
 	): Promise<SummarizerStopReason> {
 		if (this.legacyTask === undefined) {
+			if (this.inUse) {
+				throw new UsageError("A scoped caller already owns this summary client");
+			}
 			this.legacyConnection = RunWhileConnectedCoordinator.open(this.runtime, this.active);
 			this.legacyClient = this.connect(this.legacyConnection, parent, this.disposed.signal);
 			this.legacyTask = this.runLegacy(allowLastSummary);
@@ -259,13 +279,26 @@ export class Summarizer
 		if (connection === undefined || this.legacyClient === undefined) {
 			throw new UsageError("Legacy startup missing");
 		}
+		let stopReason: SummarizerStopReason = "summarizerException";
+		let failure: unknown;
 		try {
 			const executor = await this.legacyClient;
 			const reason = await Promise.race([
 				waitForStop(this.legacyStop.signal),
 				connection.waitCancelled,
 			]);
-			const timeout = setTimeout(() => this.dispose(), 2 * 60 * 1000);
+			stopReason = reason;
+			this.logger.sendTelemetryEvent({ eventName: "StoppingSummarizer", reason });
+			const timeout = setTimeout(
+				() => {
+					this.logger.sendTelemetryEvent({
+						eventName: "SummarizerStopTimeout",
+						timeoutMs: 2 * 60 * 1000,
+					});
+					this.dispose();
+				},
+				2 * 60 * 1000,
+			);
 			try {
 				await untilAborted(
 					executor.waitStop(
@@ -275,11 +308,19 @@ export class Summarizer
 					),
 					this.disposed.signal,
 				);
+			} catch (error) {
+				if (!this.disposed.signal.aborted) {
+					throw error;
+				}
 			} finally {
 				clearTimeout(timeout);
 			}
 			return reason;
+		} catch (error) {
+			failure = error;
+			throw error;
 		} finally {
+			this.emit("summarizerStop", { stopReason, error: failure });
 			connection.stop("summarizerClientDisconnected");
 			this.close();
 		}
@@ -312,24 +353,32 @@ export class Summarizer
 				this.logger,
 			);
 		}
-		if (
-			this.runtime.summarizerClientId !== undefined &&
-			this.runtime.summarizerClientId !== this.runtime.clientId
-		) {
-			throw SummarizingWarning.wrap(
-				new UsageError("On-demand summary attempted while an elected summarizer is present"),
-				false,
-				this.logger,
-			);
-		}
+		this.checkOnDemandPermission();
 		if (this.runningSummarizer !== undefined) {
 			return this.runningSummarizer.summarizeOnDemand(options);
 		}
 		const builder = new SummarizeResultBuilder();
 		this.startLegacy(undefined, false).catch(() => {});
 		this.legacyClient
-			?.then((executor) => executor.summarizeOnDemand(options, builder))
+			?.then(async (executor) => {
+				if (this.disposed.signal.aborted) {
+					throw new UsageError("Summarizer closed before request dispatch");
+				}
+				// Reuse the same guard as direct and already-started requests.
+				this.checkOnDemandPermission();
+				executor.summarizeOnDemand(options, builder);
+				await this.legacyTask;
+				if (!builder.receivedSummaryAckOrNack.isCompleted) {
+					builder.fail(
+						"Summarizer stopped before the request completed",
+						new UsageError("Summarizer stopped before request completion"),
+					);
+				}
+			})
 			.catch((error: unknown) => {
+				if (builder.receivedSummaryAckOrNack.isCompleted) {
+					return;
+				}
 				builder.fail(
 					"Failed to start summarizer",
 					SummarizingWarning.wrap(error, false, this.logger),
@@ -343,6 +392,19 @@ export class Summarizer
 			throw new UsageError("Summarizer is not running");
 		}
 		return this.runningSummarizer.enqueueSummarize(options);
+	}
+
+	private checkOnDemandPermission(): void {
+		if (
+			this.runtime.summarizerClientId !== undefined &&
+			this.runtime.summarizerClientId !== this.runtime.clientId
+		) {
+			throw SummarizingWarning.wrap(
+				new UsageError("On-demand summary attempted while an elected summarizer is present"),
+				false,
+				this.logger,
+			);
+		}
 	}
 	public recordSummaryAttempt(summaryRefSeqNum?: number): void {
 		this.heuristicData?.recordAttempt(summaryRefSeqNum);

@@ -8,6 +8,7 @@ import type { ISummarizer } from "./summarizerTypes.js";
 
 /**
  * Summary commands available within a connected child's resource scope.
+ * Do not retain the client beyond the callback or launch work that the callback does not await.
  * @internal
  */
 export type SummaryClient = Pick<ISummarizer, "summarizeOnDemand" | "enqueueSummarize">;
@@ -15,6 +16,8 @@ export type SummaryClient = Pick<ISummarizer, "summarizeOnDemand" | "enqueueSumm
 /**
  * Runs work with a connected summary client. Returning from the callback drains and releases it.
  * The caller owns the container and supplies cancellation separately from graceful stopping.
+ * Ordinary callback failures drain existing summary work before propagating the failure.
+ * Abort skips draining; non-cancellable startup can finish later and is disposed on arrival.
  * @internal
  */
 export interface SummaryExecutionSource {
