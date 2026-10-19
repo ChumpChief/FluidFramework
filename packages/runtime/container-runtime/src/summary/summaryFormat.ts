@@ -216,6 +216,18 @@ export const metadataBlobName = ".metadata";
 export const chunksBlobName = ".chunks";
 export const recentBatchInfoBlobName = ".recentBatchInfo";
 export const electedSummarizerBlobName = ".electedSummarizer";
+
+/**
+ * Persisted summary-progress baseline and compatibility identities.
+ * @internal
+ */
+export interface ISerializedElection {
+	readonly electionSequenceNumber: number;
+	/** Retain until supported snapshot readers no longer require identities. */
+	readonly electedClientId: string | undefined;
+	readonly electedParentId: string | undefined;
+}
+
 export const idCompressorBlobName = ".idCompressor";
 
 export function rootHasIsolatedChannels(metadata?: IContainerRuntimeMetadata): boolean {

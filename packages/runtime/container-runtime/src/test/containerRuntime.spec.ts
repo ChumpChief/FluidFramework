@@ -354,6 +354,143 @@ describe("Runtime", () => {
 
 	describe("Container Runtime", () => {
 		describe("election snapshot interoperability", () => {
+			it("restores the progress baseline while deriving identities from quorum", async () => {
+				const context = getMockContext({
+					connected: false,
+					baseSnapshot: { trees: {}, blobs: { [electedSummarizerBlobName]: "election" } },
+					mockStorage: {
+						readBlob: async () =>
+							stringToBuffer(
+								JSON.stringify({
+									electionSequenceNumber: 50,
+									electedClientId: "missing",
+									electedParentId: "missing",
+								}),
+								"utf8",
+							),
+					},
+				});
+				assert(context.quorum instanceof MockQuorumClients);
+				context.quorum.addMember("a", {
+					sequenceNumber: 1,
+					client: {
+						mode: "write",
+						permission: [],
+						scopes: [],
+						user: { id: "a" },
+						details: { capabilities: { interactive: true } },
+					},
+				});
+				const { runtime } = await ContainerRuntime.loadRuntime2({
+					context: context as IContainerContext,
+					registry: new FluidDataStoreRegistry([]),
+					existing: false,
+					provideEntryPoint: mockProvideEntryPoint,
+				});
+				const summary = runtime.createSummary();
+				const blob: SummaryObject | undefined = summary.tree[electedSummarizerBlobName];
+				assert(blob?.type === SummaryType.Blob);
+				assert.deepEqual(JSON.parse(blob.content as string), {
+					electionSequenceNumber: 50,
+					electedClientId: "a",
+					electedParentId: "a",
+				});
+				runtime.dispose();
+			});
+
+			it("tracks summary progress through parent churn, rate limits warnings, and persists ack progress", async () => {
+				const logger = new MockLogger();
+				const context = getMockContext({ connected: false, logger });
+				assert(context.quorum instanceof MockQuorumClients);
+				assert(context.deltaManager instanceof MockDeltaManager);
+				const quorum = context.quorum;
+				const delta = context.deltaManager;
+				for (const [id, seq, summarizer] of [
+					["a", 1, false],
+					["b", 2, false],
+					["c", 3, false],
+					["s", 4, true],
+				] as const) {
+					quorum.addMember(id, {
+						sequenceNumber: seq,
+						client: {
+							mode: "write",
+							permission: [],
+							scopes: [],
+							user: { id },
+							details: {
+								capabilities: { interactive: !summarizer },
+								type: summarizer ? "summarizer" : undefined,
+							},
+						},
+					});
+				}
+				const { runtime } = await ContainerRuntime.loadRuntime2({
+					context: context as IContainerContext,
+					registry: new FluidDataStoreRegistry([]),
+					existing: false,
+					provideEntryPoint: mockProvideEntryPoint,
+					runtimeOptions: {
+						summaryOptions: {
+							summaryConfigOverrides: {
+								state: "disableHeuristics",
+								initialSummarizerDelayMs: 5000,
+								maxAckWaitTime: 180000,
+								maxOpsSinceLastSummary: 1000,
+							},
+						},
+					},
+				});
+				const op = (
+					sequenceNumber: number,
+					type = MessageType.NoOp,
+					contents?: unknown,
+				): void => {
+					delta.lastSequenceNumber = sequenceNumber;
+					assert(delta.lastMessage !== undefined);
+					const message: ISequencedDocumentMessage = {
+						...delta.lastMessage,
+						sequenceNumber,
+						type,
+						contents,
+					};
+					delta.emit("op", message);
+				};
+				const warnings = () =>
+					logger.events.filter(
+						(event) =>
+							event.eventName === "SummarizerClientElection:ElectedClientNotSummarizing",
+					);
+				op(900);
+				quorum.removeMember("a");
+				op(1800);
+				quorum.removeMember("b");
+				op(2700);
+				assert.equal(warnings().length, 1);
+				op(2800);
+				assert.equal(warnings().length, 1);
+				op(2800, MessageType.Summarize, {
+					handle: "proposal",
+					head: "parent",
+					parents: ["parent"],
+					message: "test",
+				});
+				op(2801, MessageType.SummaryAck, {
+					handle: "ack",
+					summaryProposal: { summarySequenceNumber: 2800 },
+				});
+				op(3801);
+				assert.equal(warnings().length, 1);
+				op(3802);
+				assert.equal(warnings().length, 2);
+				const summary = runtime.createSummary();
+				const blob: SummaryObject | undefined = summary.tree[electedSummarizerBlobName];
+				assert(blob?.type === SummaryType.Blob);
+				const state = JSON.parse(blob.content as string) as ISerializedElection;
+				assert.equal(state.electionSequenceNumber, 2801);
+				runtime.dispose();
+			});
+
 			for (const occupied of [false, true]) {
 				it(`writes an old-reader compatible interactive summary (occupied=${occupied})`, async () => {
 					const context = getMockContext({ connected: false });

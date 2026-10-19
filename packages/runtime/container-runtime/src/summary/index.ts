@@ -56,7 +56,6 @@ export {
 	type OpActionEventName,
 } from "./summaryCollection.js";
 export {
-	type ISerializedElection,
 	type ISummarizerClientElection,
 	type ISummarizerClientElectionEvents,
 	SummarizerClientElection,
@@ -67,6 +66,7 @@ export {
 	recentBatchInfoBlobName,
 	dataStoreAttributesBlobName,
 	electedSummarizerBlobName,
+	type ISerializedElection,
 	extractSummaryMetadataMessage,
 	getAttributesFormatVersion,
 	getFluidDataStoreAttributes,
