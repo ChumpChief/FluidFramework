@@ -476,7 +476,7 @@ describe("Summarizer Client Election", () => {
 			assertState("recorded", "a", 3, "serialized election identity retained");
 		});
 
-		it("Should preserve the ack baseline on ignored joins and no-op resets", () => {
+		it("Should preserve the ack baseline on ignored joins", () => {
 			createElection([["a", 1, true]]);
 			addClient("s", 2, false, summarizerClientType);
 			summaryAck(10);
@@ -484,7 +484,6 @@ describe("Summarizer Client Election", () => {
 			let eventCount = 0;
 			election.on("electedSummarizerChanged", () => eventCount++);
 			addClient("other", 13, false, summarizerClientType);
-			election.resetElectedClient(14);
 			assert.deepEqual(election.serialize(), state);
 			assert.equal(eventCount, 0);
 			defaultOp(maxOps + 1);

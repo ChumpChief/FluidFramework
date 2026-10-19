@@ -184,9 +184,9 @@ export class SummarizerClientElection
 
 			if (clientId === this.electedClientId) {
 				const parentId =
-					clientId === this.electedParentId
+					(clientId === this.electedParentId
 						? this.findNextEligibleParent()
-						: this.electedParentId;
+						: this.electedParentId) ?? this.findOldestEligibleParent();
 				this.updateElection(parentId, parentId, sequenceNumber);
 			} else if (clientId === this.electedParentId) {
 				this.updateElection(
@@ -200,7 +200,8 @@ export class SummarizerClientElection
 		// Op monitoring: recover if no client is elected but eligible clients exist
 		this.summaryCollection.on("default", ({ sequenceNumber }) => {
 			if (this.electedClientId === undefined) {
-				this.resetElectedClient(sequenceNumber);
+				const parentId = this.findOldestEligibleParent();
+				this.updateElection(parentId, parentId, sequenceNumber);
 				return;
 			}
 
@@ -299,24 +300,7 @@ export class SummarizerClientElection
 		this._electedClientId = clientId;
 		this.setElectedParent(parentId);
 		this.lastSummaryAckSeqForClient = undefined;
-		if (clientId === undefined) {
-			this.resetElectedClient(sequenceNumber);
-		}
 		this.emit("electedSummarizerChanged");
-	}
-
-	/**
-	 * Resets the parent to the oldest eligible interactive client, retaining an elected summarizer.
-	 */
-	public resetElectedClient(sequenceNumber: number): void {
-		const parentId = this.findOldestEligibleParent();
-		this.updateElection(
-			this.electedClientId === undefined || this.electedClientId === this.electedParentId
-				? parentId
-				: this.electedClientId,
-			parentId,
-			sequenceNumber,
-		);
 	}
 
 	/**
