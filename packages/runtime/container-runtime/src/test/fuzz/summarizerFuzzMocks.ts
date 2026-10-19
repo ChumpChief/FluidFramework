@@ -265,7 +265,7 @@ class MockSummarizerClientElection
 	extends TypedEventEmitter<ISummarizerClientElectionEvents>
 	implements ISummarizerClientElection
 {
-	public electedClientId: string | undefined;
+	public hasSummarizer = false;
 	public electedParentId: string | undefined;
 
 	constructor(clientId: string) {
@@ -274,7 +274,6 @@ class MockSummarizerClientElection
 	}
 
 	public setClientId(clientId: string) {
-		this.electedClientId = clientId;
 		this.electedParentId = clientId;
 	}
 }

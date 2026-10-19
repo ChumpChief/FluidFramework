@@ -10,53 +10,22 @@ import type {
 	IEventProvider,
 	ITelemetryBaseLogger,
 } from "@fluidframework/core-interfaces";
-import type {
-	IClient,
-	IClientDetails,
-	IQuorumClients,
-	ISequencedClient,
-} from "@fluidframework/driver-definitions";
+import type { IClientDetails, IQuorumClients } from "@fluidframework/driver-definitions";
 import { MessageType } from "@fluidframework/driver-definitions/internal";
-import {
-	createChildLogger,
-	type TelemetryLoggerExt,
-} from "@fluidframework/telemetry-utils/internal";
+import { createChildLogger } from "@fluidframework/telemetry-utils/internal";
 
 import { summarizerClientType } from "./summarizerTypes.js";
 import type { ISummaryCollectionOpEvents } from "./summaryCollection.js";
 
-function isClientEligible(client: ISequencedClient): boolean {
-	const details: IClient["details"] | undefined = client.client.details;
-	return (
-		details === undefined || SummarizerClientElection.clientDetailsPermitElection(details)
-	);
-}
-
 /**
- * Serialized state of the summarizer election.
+ * Persisted summary-progress baseline.
  * @internal
  */
 export interface ISerializedElection {
-	/**
-	 * Summary-progress baseline: the latest observed summary ack sequence number, or the
-	 * elected-client transition sequence number if no ack has been observed since the election changed.
-	 */
 	readonly electionSequenceNumber: number;
-
-	/**
-	 * Most recently elected client id. This is either:
-	 *
-	 * 1. the interactive elected parent client, in which case electedClientId === electedParentId,
-	 * and the SummaryManager on the elected client will spawn a summarizer client, or
-	 *
-	 * 2. the non-interactive summarizer client itself.
-	 */
+	/** Quorum-derived compatibility fields; retain until supported readers no longer require identities. */
 	readonly electedClientId: string | undefined;
-
-	/**
-	 * Parent recorded by older writers. Current elections derive the parent from quorum.
-	 */
-	readonly electedParentId?: string | undefined;
+	readonly electedParentId: string | undefined;
 }
 
 export interface ISummarizerClientElectionEvents extends IEvent {
@@ -65,267 +34,127 @@ export interface ISummarizerClientElectionEvents extends IEvent {
 
 export interface ISummarizerClientElection
 	extends IEventProvider<ISummarizerClientElectionEvents> {
-	readonly electedClientId: string | undefined;
 	readonly electedParentId: string | undefined;
+	readonly hasSummarizer: boolean;
 }
 
 /**
- * Maintains the elected parent and summarizer by reading quorum members. The parent is the oldest
- * eligible interactive client. Restored elections retain a valid recorded summarizer identity.
- * Observes quorum membership events to detect when summarizer clients join or leave, enabling the
- * graceful handoff protocol. Logs summary-progress telemetry when ops since the latest summary ack
- * or election baseline exceed the configured threshold.
+ * Elects the oldest eligible interactive quorum member to own automatic summarization.
+ * The parent may create a child only when no summarizer clients are present in quorum.
+ * An existing child continues under its owner's management until stopped or disconnected.
  *
- * This class tracks electedParent and electedClient separately. This
- * allows us to handle the case where a new interactive parent client has been elected, but the
- * summarizer is still doing work, so a new summarizer should not yet be spawned. In this case,
- * changing electedParent will cause SummaryManager to stop the current summarizer, but a new
- * summarizer will not be spawned until the old summarizer client has left the quorum.
- *
- * Details:
- *
- * electedParent is the interactive client that has been elected to spawn a summarizer. It is
- * the oldest eligible interactive client in the quorum. Only the electedParent is
- * permitted to spawn an automatic summarizer. When it leaves, the oldest remaining eligible
- * interactive client becomes the parent.
- *
- * electedClient is the incumbent non-interactive summarizer client once elected. Additional
- * summarizer joins do not displace it. If no summarizer is elected, then
- * electedClient is equal to electedParent. If electedParent === electedClient, this is the
- * signal for electedParent to spawn a new electedClient. Once a summarizer client becomes
- * electedClient, a new summarizer will not be spawned until electedClient leaves the quorum.
- *
- * A typical sequence looks like this:
- *
- * i. Begin by electing A. electedParent === A, electedClient === A.
- *
- * ii. SummaryManager running on A spawns a summarizer client, A'. electedParent === A, electedClient === A'
- *
- * iii. A leaves the quorum. A new parent client, B, is elected. electedParent === B, electedClient === A'
- *
- * iv. SummaryManager running on A detects the change to electedParent and tells the summarizer to stop, but A'
- * is in mid-summarization. No new summarizer is spawned, as electedParent !== electedClient.
- *
- * v. A' completes its summary, and the summarizer and backing client are torn down.
- *
- * vi. A' leaves the quorum, and B takes its place as electedClient. electedParent === B, electedClient === B
- *
- * vii. SummaryManager running on B spawns a summarizer client, B'. electedParent === B, electedClient === B'
+ * When the parent leaves, the oldest remaining eligible interactive client becomes parent.
+ * It waits for all existing summarizers to leave quorum before creating a replacement.
+ * Each child's creator owns its cleanup, including manual/on-demand children. Any connected
+ * summarizer, even an idle one, blocks replacement until its sequenced quorum departure.
+ * Summary-progress telemetry uses an op baseline retained across snapshot loads.
  */
 export class SummarizerClientElection
 	extends TypedEventEmitter<ISummarizerClientElectionEvents>
 	implements ISummarizerClientElection
 {
 	private _electedParentId: string | undefined;
-	private _electedClientId: string | undefined;
-	private _electionSequenceNumber: number;
-	/**
-	 * Latest observed summary ack sequence number, cleared when either election identity changes.
-	 * Used as the summary-progress baseline for telemetry and serialization.
-	 */
-	private lastSummaryAckSequenceNumber: number | undefined;
-	/**
-	 * Sequence number of the last progress warning, limiting repeated telemetry to one report
-	 * per configured op window while summaries remain stalled.
-	 */
-	private lastReportedSeq = 0;
-
-	private readonly logger: TelemetryLoggerExt;
-
-	public get electedClientId(): string | undefined {
-		return this._electedClientId;
-	}
+	private _hasSummarizer = false;
+	private progressSequenceNumber: number;
+	private lastReportedSequenceNumber = 0;
 
 	public get electedParentId(): string | undefined {
 		return this._electedParentId;
+	}
+
+	public get hasSummarizer(): boolean {
+		return this._hasSummarizer;
 	}
 
 	constructor(
 		logger: ITelemetryBaseLogger,
 		deltaManager: Pick<IDeltaManager<unknown, unknown>, "lastSequenceNumber">,
 		private readonly quorum: Pick<IQuorumClients, "getMembers" | "on">,
-		private readonly summaryCollection: IEventProvider<ISummaryCollectionOpEvents>,
-		private readonly maxOpsSinceLastSummary: number,
-		initialState: ISerializedElection | number,
+		summaryCollection: IEventProvider<ISummaryCollectionOpEvents>,
+		maxOpsSinceLastSummary: number,
+		initialState: Pick<ISerializedElection, "electionSequenceNumber"> | number,
 	) {
 		super();
-		this.logger = createChildLogger({ logger, namespace: "SummarizerClientElection" });
-		this._electedParentId = this.findOldestEligibleParent();
-
-		if (typeof initialState === "number") {
-			this._electionSequenceNumber = initialState;
-			this._electedClientId = this.findSummarizerInQuorum() ?? this._electedParentId;
-		} else {
-			this._electionSequenceNumber = initialState.electionSequenceNumber;
-			this.initFromSerializedState(initialState);
-		}
-		quorum.on("addMember", (clientId: string, client: ISequencedClient) => {
-			const sequenceNumber = deltaManager.lastSequenceNumber;
-			if (!isClientEligible(client)) {
-				return;
-			}
-			const isSummarizer = client.client.details.type === summarizerClientType;
-			const electedClientIsSummarizer =
-				this.electedClientId !== undefined && this.electedClientId !== this.electedParentId;
-			const parentId = this.findOldestEligibleParent();
-			if (this.electedClientId === undefined || (isSummarizer && !electedClientIsSummarizer)) {
-				this.updateElection(isSummarizer ? clientId : parentId, parentId, sequenceNumber);
-			} else if (this.electedParentId === undefined && !isSummarizer) {
-				this.updateElection(this.electedClientId, parentId, sequenceNumber);
-			}
-		});
-
-		quorum.on("removeMember", (clientId: string) => {
-			const sequenceNumber = deltaManager.lastSequenceNumber;
-
-			if (clientId === this.electedClientId) {
-				const parentId = this.findOldestEligibleParent();
-				this.updateElection(parentId, parentId, sequenceNumber);
-			} else if (clientId === this.electedParentId) {
-				this.updateElection(
-					this.electedClientId,
-					this.findOldestEligibleParent(),
-					sequenceNumber,
-				);
-			}
-		});
-
-		// Recover an absent election; otherwise report summary progress.
-		this.summaryCollection.on("default", ({ sequenceNumber }) => {
-			if (this.electedClientId === undefined) {
-				const parentId = this.findOldestEligibleParent();
-				this.updateElection(parentId, parentId, sequenceNumber);
-				return;
-			}
-
-			const baseline = this.lastSummaryAckSequenceNumber ?? this._electionSequenceNumber;
-			const opsWithoutSummary = sequenceNumber - baseline;
-			if (opsWithoutSummary > this.maxOpsSinceLastSummary) {
-				const opsSinceLastReport = sequenceNumber - this.lastReportedSeq;
-				if (opsSinceLastReport > this.maxOpsSinceLastSummary) {
-					this.logger.sendTelemetryEvent({
-						eventName: "ElectedClientNotSummarizing",
-						electedClientId: this.electedClientId,
-						lastSummaryAckSeqForClient: this.lastSummaryAckSequenceNumber,
-						electionSequenceNumber: this._electionSequenceNumber,
-						opsWithoutSummary,
-					});
-					this.lastReportedSeq = sequenceNumber;
+		const childLogger = createChildLogger({ logger, namespace: "SummarizerClientElection" });
+		this.progressSequenceNumber =
+			typeof initialState === "number" ? initialState : initialState.electionSequenceNumber;
+		this.readQuorum();
+		const refresh = (): void => {
+			const parentId = this.electedParentId;
+			const hasSummarizer = this.hasSummarizer;
+			this.readQuorum();
+			if (parentId !== this.electedParentId || hasSummarizer !== this.hasSummarizer) {
+				// Parent succession while children remain does not represent summary progress.
+				if (!hasSummarizer || !this.hasSummarizer) {
+					this.progressSequenceNumber = deltaManager.lastSequenceNumber;
 				}
+				this.emit("electedSummarizerChanged");
+			}
+		};
+		quorum.on("addMember", refresh);
+		quorum.on("removeMember", refresh);
+		summaryCollection.on("default", ({ sequenceNumber }) => {
+			if (this.electedParentId === undefined && !this.hasSummarizer) {
+				return;
+			}
+			const opsWithoutSummary = sequenceNumber - this.progressSequenceNumber;
+			if (
+				opsWithoutSummary > maxOpsSinceLastSummary &&
+				sequenceNumber - this.lastReportedSequenceNumber > maxOpsSinceLastSummary
+			) {
+				childLogger.sendTelemetryEvent({
+					eventName: "ElectedClientNotSummarizing",
+					electedParentId: this.electedParentId,
+					hasSummarizer: this.hasSummarizer,
+					electionSequenceNumber: this.progressSequenceNumber,
+					opsWithoutSummary,
+				});
+				this.lastReportedSequenceNumber = sequenceNumber;
 			}
 		});
-
-		// Summary ack resets the op counter
-		this.summaryCollection.on(MessageType.SummaryAck, (op) => {
-			this.lastSummaryAckSequenceNumber = op.sequenceNumber;
+		summaryCollection.on(MessageType.SummaryAck, (op) => {
+			this.progressSequenceNumber = op.sequenceNumber;
 		});
 	}
 
-	/**
-	 * Restore the recorded elected client, using the quorum-derived parent for interactive clients.
-	 */
-	private initFromSerializedState(state: ISerializedElection): void {
-		const members = this.quorum.getMembers();
-
-		if (state.electedClientId === undefined) {
-			// Serialized state explicitly indicates no one is elected.
-			// Leave as undefined — the op handler will recover if needed.
-			return;
+	private readQuorum(): void {
+		let parentId: string | undefined;
+		let parentSequenceNumber = Number.POSITIVE_INFINITY;
+		let hasSummarizer = false;
+		for (const [clientId, member] of this.quorum.getMembers()) {
+			const details = member.client.details;
+			if (details?.type === summarizerClientType) {
+				hasSummarizer = true;
+			} else if (
+				(details === undefined || details.capabilities.interactive) &&
+				member.sequenceNumber < parentSequenceNumber
+			) {
+				parentId = clientId;
+				parentSequenceNumber = member.sequenceNumber;
+			}
 		}
-
-		const member = members.get(state.electedClientId);
-		if (member === undefined) {
-			// Leave the elected client undefined so the next op can recover from quorum.
-			this.logger.sendErrorEvent({
-				eventName: "InitialElectedClientNotFound",
-				electionSequenceNumber: state.electionSequenceNumber,
-				expectedClientId: state.electedClientId,
-				electedClientId: undefined,
-				clientCount: members.size,
-			});
-		} else if (isClientEligible(member)) {
-			this._electedClientId =
-				member.client.details.type === summarizerClientType
-					? state.electedClientId
-					: this.electedParentId;
-		} else {
-			// The recorded client is ineligible; use the quorum-derived parent.
-			const fallbackId = this.electedParentId;
-			this.logger.sendErrorEvent({
-				eventName: "InitialElectedClientIneligible",
-				electionSequenceNumber: state.electionSequenceNumber,
-				expectedClientId: state.electedClientId,
-				electedClientId: fallbackId,
-			});
-			this._electedClientId = fallbackId;
-		}
-	}
-
-	/**
-	 * Applies an election transition while preserving the elected-client sequence baseline.
-	 * Parent-only changes reset the summary-ack baseline without changing that sequence number.
-	 */
-	private updateElection(
-		clientId: string | undefined,
-		parentId: string | undefined,
-		sequenceNumber: number,
-	): void {
-		if (clientId === this.electedClientId && parentId === this.electedParentId) {
-			return;
-		}
-		if (clientId !== this.electedClientId) {
-			this._electionSequenceNumber = sequenceNumber;
-		}
-		this._electedClientId = clientId;
 		this._electedParentId = parentId;
-		this.lastSummaryAckSequenceNumber = undefined;
-		this.emit("electedSummarizerChanged");
-	}
-
-	/**
-	 * Find the oldest eligible interactive (non-summarizer) client in the quorum.
-	 * @returns the client id of the oldest eligible parent, or undefined if none are eligible.
-	 */
-	private findOldestEligibleParent(): string | undefined {
-		let nextId: string | undefined;
-		let nextSeq = Number.POSITIVE_INFINITY;
-
-		for (const [clientId, client] of this.quorum.getMembers()) {
-			if (
-				isClientEligible(client) &&
-				client.client.details.type !== summarizerClientType &&
-				client.sequenceNumber < nextSeq
-			) {
-				nextId = clientId;
-				nextSeq = client.sequenceNumber;
-			}
-		}
-		return nextId;
-	}
-
-	/**
-	 * Find any summarizer-type client currently in the quorum.
-	 */
-	private findSummarizerInQuorum(): string | undefined {
-		let oldestId: string | undefined;
-		let oldestSequenceNumber = Number.POSITIVE_INFINITY;
-		for (const [clientId, client] of this.quorum.getMembers()) {
-			if (
-				client.client.details.type === summarizerClientType &&
-				client.sequenceNumber < oldestSequenceNumber
-			) {
-				oldestId = clientId;
-				oldestSequenceNumber = client.sequenceNumber;
-			}
-		}
-		return oldestId;
+		this._hasSummarizer = hasSummarizer;
 	}
 
 	public serialize(): ISerializedElection {
+		// Older readers require an elected identity to retain their creation gate on load.
+		// This representative is derived only for compatibility, not used for election decisions.
+		let summarizerId: string | undefined;
+		let sequenceNumber = Number.POSITIVE_INFINITY;
+		for (const [id, member] of this.quorum.getMembers()) {
+			if (
+				member.client.details?.type === summarizerClientType &&
+				member.sequenceNumber < sequenceNumber
+			) {
+				summarizerId = id;
+				sequenceNumber = member.sequenceNumber;
+			}
+		}
 		return {
-			electionSequenceNumber:
-				this.lastSummaryAckSequenceNumber ?? this._electionSequenceNumber,
-			electedClientId: this.electedClientId,
+			electionSequenceNumber: this.progressSequenceNumber,
+			electedClientId: summarizerId ?? this.electedParentId,
+			electedParentId: this.electedParentId,
 		};
 	}
 

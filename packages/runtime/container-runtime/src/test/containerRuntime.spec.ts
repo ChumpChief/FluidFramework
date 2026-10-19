@@ -116,6 +116,8 @@ import {
 	idCompressorBlobName,
 	metadataBlobName,
 	recentBatchInfoBlobName,
+	electedSummarizerBlobName,
+	type ISerializedElection,
 	type IRefreshSummaryAckOptions,
 } from "../summary/index.js";
 
@@ -349,6 +351,59 @@ describe("Runtime", () => {
 	});
 
 	describe("Container Runtime", () => {
+		describe("election snapshot interoperability", () => {
+			for (const occupied of [false, true]) {
+				it(`writes an old-reader compatible interactive summary (occupied=${occupied})`, async () => {
+					const context = getMockContext({ connected: false });
+					assert(context.quorum instanceof MockQuorumClients);
+					const quorum = context.quorum;
+					const add = (id: string, seq: number, summarizer = false): void =>
+						quorum.addMember(id, {
+							sequenceNumber: seq,
+							client: {
+								mode: "write",
+								permission: [],
+								scopes: [],
+								user: { id },
+								details: {
+									capabilities: { interactive: !summarizer },
+									type: summarizer ? "summarizer" : undefined,
+								},
+							},
+						});
+					if (occupied) {
+						add("a", 1);
+						add("s", 2, true);
+					}
+					const { runtime } = await ContainerRuntime.loadRuntime2({
+						context: context as IContainerContext,
+						registry: new FluidDataStoreRegistry([]),
+						existing: false,
+						provideEntryPoint: mockProvideEntryPoint,
+					});
+					const summarized = occupied
+						? await runtime.summarize({ fullTree: true })
+						: undefined;
+					const summary = summarized?.summary ?? runtime.createSummary();
+					const blob: SummaryObject | undefined = summary.tree[electedSummarizerBlobName];
+					assert(blob?.type === SummaryType.Blob);
+					const state = JSON.parse(blob.content as string) as ISerializedElection;
+					assert.deepEqual(
+						state,
+						occupied
+							? { electionSequenceNumber: 0, electedClientId: "s", electedParentId: "a" }
+							: { electionSequenceNumber: 0 },
+					);
+					assert.equal(runtime.summarizerClientId, occupied ? "s" : undefined);
+					if (occupied) {
+						quorum.removeMember("s");
+						assert.equal(runtime.summarizerClientId, "a");
+					}
+					runtime.dispose();
+				});
+			}
+		});
+
 		describe("legacy loader compatibility", () => {
 			for (const [name, settings] of [
 				["strict compatibility enabled by default", {}],

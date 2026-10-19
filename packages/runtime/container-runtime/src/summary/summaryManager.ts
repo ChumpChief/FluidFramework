@@ -190,22 +190,9 @@ export class SummaryManager
 			return { shouldSummarize: false, stopReason: "parentNotConnected" };
 		}
 
-		// Note that if we're in the Running state, the electedClient may be a summarizer client, so we can't
-		// enforce connectedState.clientId === clientElection.electedClientId. But once we're Running, we should
-		// only transition to Stopping when the electedParentId changes. Stopping the summarizer without
-		// changing the electedParent will just cause us to transition to Starting again.
-
 		// New Parent has been elected and it is not the current client, or
 		if (this.connectedState.clientId !== this.clientElection.electedParentId) {
 			return { shouldSummarize: false, stopReason: "notElectedParent" };
-		}
-
-		// We are not already running the summarizer and we are not the current elected client id.
-		if (
-			this.state !== SummaryManagerState.Running &&
-			this.connectedState.clientId !== this.clientElection.electedClientId
-		) {
-			return { shouldSummarize: false, stopReason: "notElectedClient" };
 		}
 
 		if (!this.connectedState.connected) {
@@ -221,7 +208,7 @@ export class SummaryManager
 		const shouldSummarizeState = this.getShouldSummarizeState();
 		switch (this.state) {
 			case SummaryManagerState.Off: {
-				if (shouldSummarizeState.shouldSummarize) {
+				if (shouldSummarizeState.shouldSummarize && !this.clientElection.hasSummarizer) {
 					this.startSummarization();
 				}
 				return;
@@ -262,25 +249,19 @@ export class SummaryManager
 					return "early exit (disposed)";
 				}
 
-				// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
-				// but only if creation was delayed. If it was not, then we want to ensure we always create
-				// a summarizer to kick off lastSummary. Without that, we would not be able to summarize and get
-				// document out of broken state if it has too many ops and ordering service keeps nacking main
-				// container (and thus it goes into cycle of reconnects)
-				// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
-				// the summarizer at all.
+				// Check creation permission after the delay. A disconnected parent may still request
+				// a last summary when many ops remain; a parent that lost election may not.
 				const shouldSummarizeStateEarlyStage = this.getShouldSummarizeState();
 				if (
-					startWithInitialDelay &&
-					shouldSummarizeStateEarlyStage.shouldSummarize === false
+					this.clientElection.hasSummarizer ||
+					(!shouldSummarizeStateEarlyStage.shouldSummarize &&
+						(startWithInitialDelay ||
+							!stopReasonCanRunLastSummary(shouldSummarizeStateEarlyStage.stopReason)))
 				) {
-					return `early exit ${shouldSummarizeStateEarlyStage.stopReason}`;
+					return "early exit before summarizer creation";
 				}
 
-				// We transition to Running before requesting the summarizer, because after requesting we can't predict
-				// when the electedClient will be replaced with the new summarizer client.
-				// The alternative would be to let connectedState.clientId !== clientElection.electedClientId when
-				// state === Starting || state === Running.
+				// Adopt ownership before loading: our child may join quorum before creation returns.
 				assert(this.state === SummaryManagerState.Starting, 0x263 /* "Expected: starting" */);
 				this.state = SummaryManagerState.Running;
 
@@ -395,7 +376,7 @@ export class SummaryManager
 		this.summarizer?.close();
 		this.summarizer = undefined;
 
-		if (this.getShouldSummarizeState().shouldSummarize) {
+		if (this.getShouldSummarizeState().shouldSummarize && !this.clientElection.hasSummarizer) {
 			this.startSummarization();
 		}
 	}
@@ -448,18 +429,11 @@ export class SummaryManager
 			opsSinceLastAck: this.summaryCollection.opsSinceLastAck,
 			opsToBypassInitialDelay: this.opsToBypassInitialDelay,
 			electedParentId: this.clientElection.electedParentId,
-			electedClientId: this.clientElection.electedClientId,
+			hasSummarizer: this.clientElection.hasSummarizer,
 		});
 
-		// This delay helps ensure that last summarizer that might be left from previous client
-		// has enough time to complete its last summary and thus new summarizer not conflict with previous one.
-		// If, however, there are too many unsummarized ops, try to resolve it as quickly as possible, with
-		// understanding that we may see nacks because of such quick action.
-		// A better design would be for summarizer election logic to always select current summarizer as
-		// summarizing client (i.e. clientType === "summarizer" can be elected) to ensure that nobody else can
-		// summarizer while it finishes its work and moves to exit.
-		// It also helps with pure boot scenario (single client) to offset expensive work a bit out from
-		// critical boot sequence.
+		// Offset expensive work from the critical boot sequence. With many unsummarized ops,
+		// bypass the initial delay to start recovery promptly.
 		let startWithInitialDelay = false;
 		if (this.summaryCollection.opsSinceLastAck < this.opsToBypassInitialDelay) {
 			startWithInitialDelay = true;
