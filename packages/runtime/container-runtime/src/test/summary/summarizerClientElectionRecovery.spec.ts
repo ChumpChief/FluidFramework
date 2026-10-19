@@ -81,12 +81,6 @@ describe("Summarizer Client Election Recovery", () => {
 		election.on("electedSummarizerChanged", () => electionEventCount++);
 		return election;
 	}
-	function resetElectedClient(sequenceNumber = currentSequenceNumber) {
-		if (sequenceNumber > currentSequenceNumber) {
-			currentSequenceNumber = sequenceNumber;
-		}
-		election.resetElectedClient(sequenceNumber);
-	}
 	function assertElectionState(
 		expectedElectedClientId: string | undefined,
 		expectedElectionSequenceNumber: number,
@@ -152,11 +146,6 @@ describe("Summarizer Client Election Recovery", () => {
 
 			removeClient("a");
 			assertElectionState("b", 10, "next oldest parent elected");
-			assert.equal(election.electedParentId, "b");
-			assertEvents(1);
-
-			resetElectedClient(100);
-			assertElectionState("b", 10, "reset retains oldest remaining parent");
 			assert.equal(election.electedParentId, "b");
 			assertEvents(1);
 		});
@@ -259,10 +248,8 @@ describe("Summarizer Client Election Recovery", () => {
 				addClient("b", 101);
 				assert.equal(election.electedClientId, "s");
 				assert.equal(election.electedParentId, "b");
-				resetElectedClient(102);
-				assert.equal(election.electedClientId, "s");
 				removeClient("s");
-				assertElectionState("b", 103, "new parent takes over after summarizer leaves");
+				assertElectionState("b", 102, "new parent takes over after summarizer leaves");
 				assert.equal(election.electedParentId, "b");
 			});
 		}
@@ -488,89 +475,64 @@ describe("Summarizer Client Election Recovery", () => {
 		});
 	});
 
-	describe("Reset elected client", () => {
-		it("Should reset a younger parent without displacing its active summarizer", () => {
+	describe("Recover absent elected client", () => {
+		for (const electedClientId of ["b", "s"]) {
+			it(`Should leave a valid restored election unchanged on ops (${electedClientId})`, () => {
+				addClient("a", 1);
+				addClient("b", 2);
+				addClient("s", 3, false, summarizerClientType);
+				const state: ISerializedElection = {
+					electedClientId,
+					electedParentId: "b",
+					electionSequenceNumber: 50,
+				};
+				createElection([], state);
+				for (const sequenceNumber of [100, 2000]) {
+					currentSequenceNumber = sequenceNumber;
+					summaryCollection.emit("default", { sequenceNumber });
+					assert.deepEqual(election.serialize(), state);
+					assertEvents(0);
+				}
+			});
+		}
+
+		it("Should elect an existing parent in one transition when a parentless summarizer leaves", () => {
 			addClient("a", 1);
-			addClient("b", 2);
-			addClient("s", 3, false, summarizerClientType);
+			addClient("s", 2, false, summarizerClientType);
 			createElection([], {
 				electedClientId: "s",
-				electedParentId: "b",
+				electedParentId: undefined,
 				electionSequenceNumber: 50,
 			});
 			const observedStates: ISerializedElection[] = [];
 			election.on("electedSummarizerChanged", () => {
 				observedStates.push(election.serialize());
 			});
-
-			resetElectedClient(100);
-			assert.deepEqual(election.serialize(), {
-				electedClientId: "s",
-				electedParentId: "a",
-				electionSequenceNumber: 50,
-			});
-			assertEvents(1);
-			assert.deepEqual(observedStates, [
-				{ electedClientId: "s", electedParentId: "a", electionSequenceNumber: 50 },
-			]);
-
 			removeClient("s");
-			assert.deepEqual(election.serialize(), {
-				electedClientId: "a",
-				electedParentId: "a",
-				electionSequenceNumber: 101,
-			});
-			assertEvents(2);
-		});
-
-		it("Should not emit elections or change serialized state when repeatedly resetting the elected interactive client", () => {
-			createElection([
-				["a", 1, true],
-				["b", 2, true],
+			assert.deepEqual(observedStates, [
+				{
+					electedClientId: "a",
+					electedParentId: "a",
+					electionSequenceNumber: 51,
+				},
 			]);
-			const initialState = election.serialize();
-			assert.equal(initialState.electedClientId, "a");
-			assert.equal(initialState.electedParentId, "a");
-
-			for (let i = 0; i < 2; i++) {
-				resetElectedClient(100);
-				assert.deepEqual(election.serialize(), initialState);
-				assertEvents(0);
-			}
+			assertEvents(1);
 		});
 
-		it("Should not emit elections or displace the summarizer when repeatedly resetting its unchanged parent", () => {
-			addClient("a", 1);
-			addClient("s", 2, false, summarizerClientType);
-			createElection([], {
-				electedClientId: "s",
-				electedParentId: "a",
-				electionSequenceNumber: 50,
-			});
-			const initialState = election.serialize();
-			assert.equal(initialState.electedClientId, "s");
-			assert.equal(initialState.electedParentId, "a");
-
-			for (let i = 0; i < 2; i++) {
-				resetElectedClient(100);
-				assert.deepEqual(election.serialize(), initialState);
-				assertEvents(0);
-			}
-		});
-
-		it("Should reset to first when ineligible client is elected", () => {
+		it("Should recover on an op when no eligible client follows the ineligible serialized client", () => {
 			createElection(
 				[
 					["a", 1, true],
-					["s", 2, false],
 					["b", 5, true],
 					["c", 9, true],
+					["s", 10, false],
 				],
 				{ electedClientId: "s", electedParentId: "s", electionSequenceNumber: 4321 },
 			);
-			assertElectionState("b", 4321, "before reset");
-			resetElectedClient(7777);
-			assertElectionState("a", 7777, "after reset");
+			assertElectionState(undefined, 4321, "before recovery");
+			currentSequenceNumber = 7777;
+			summaryCollection.emit("default", { sequenceNumber: currentSequenceNumber });
+			assertElectionState("a", 7777, "after recovery");
 			assertEvents(1);
 		});
 	});

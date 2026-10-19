@@ -157,7 +157,8 @@ export class SummarizerClientElection
 		// Recover an absent election; otherwise monitor summary progress.
 		this.summaryCollection.on("default", ({ sequenceNumber }) => {
 			if (this.electedClientId === undefined) {
-				this.resetElectedClient(sequenceNumber);
+				const parentId = this.findOldestEligibleParent();
+				this.updateElection(parentId, parentId, sequenceNumber);
 				return;
 			}
 
@@ -259,24 +260,7 @@ export class SummarizerClientElection
 			electedParentId: this.electedParentId,
 			sequenceNumber,
 		});
-		if (clientId === undefined) {
-			this.resetElectedClient(sequenceNumber);
-		}
 		this.emit("electedSummarizerChanged");
-	}
-
-	/**
-	 * Resets the parent to the oldest eligible interactive client, retaining an elected summarizer.
-	 */
-	public resetElectedClient(sequenceNumber: number): void {
-		const parentId = this.findOldestEligibleParent();
-		this.updateElection(
-			this.electedClientId === undefined || this.electedClientId === this.electedParentId
-				? parentId
-				: this.electedClientId,
-			parentId,
-			sequenceNumber,
-		);
 	}
 
 	/** Retains the parent's join sequence for succession after its quorum departure. */
