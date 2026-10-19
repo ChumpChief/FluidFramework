@@ -38,7 +38,8 @@ function isClientEligible(client: ISequencedClient): boolean {
  */
 export interface ISerializedElection {
 	/**
-	 * Sequence number at the time of the latest election.
+	 * Summary-progress baseline: the latest observed summary ack sequence number, or the
+	 * elected-client transition sequence number if no ack has been observed since the election changed.
 	 */
 	readonly electionSequenceNumber: number;
 
@@ -69,10 +70,11 @@ export interface ISummarizerClientElection
 }
 
 /**
- * Determines the elected parent (oldest eligible interactive client) by reading quorum members.
+ * Maintains the elected parent and summarizer by reading quorum members. Fresh elections choose
+ * the oldest eligible interactive parent; restored elections retain their recorded identities when valid.
  * Observes quorum membership events to detect when summarizer clients join or leave, enabling the
- * graceful handoff protocol. Monitors ops and logs telemetry when the elected client has not
- * produced a summary ack within a configured number of ops.
+ * graceful handoff protocol. Logs summary-progress telemetry when ops since the latest summary ack
+ * or election baseline exceed the configured threshold.
  *
  * This class tracks electedParent and electedClient separately. This
  * allows us to handle the case where a new interactive parent client has been elected, but the
@@ -84,9 +86,11 @@ export interface ISummarizerClientElection
  *
  * electedParent is the interactive client that has been elected to spawn a summarizer. It is
  * typically the oldest eligible interactive client in the quorum. Only the electedParent is
- * permitted to spawn a summarizer.
+ * permitted to spawn an automatic summarizer. An elected parent remains in place until it leaves
+ * the quorum. Its successor is the next-younger eligible parent, wrapping to the oldest if needed.
  *
- * electedClient is the non-interactive summarizer client if one exists. If not, then
+ * electedClient is the incumbent non-interactive summarizer client once elected. Additional
+ * summarizer joins do not displace it. If no summarizer is elected, then
  * electedClient is equal to electedParent. If electedParent === electedClient, this is the
  * signal for electedParent to spawn a new electedClient. Once a summarizer client becomes
  * electedClient, a new summarizer will not be spawned until electedClient leaves the quorum.
@@ -113,21 +117,18 @@ export class SummarizerClientElection
 	implements ISummarizerClientElection
 {
 	private _electedParentId: string | undefined;
-	/** Join sequence number of the elected parent, used for wrap-around election. */
+	/** Join sequence number of the elected parent, used to select its successor on departure. */
 	private _electedParentSeq: number | undefined;
 	private _electedClientId: string | undefined;
 	private _electionSequenceNumber: number;
 	/**
-	 * Used to calculate number of ops since last summary ack for the current elected client.
-	 * This will be undefined if there is no elected summarizer, or no summary ack has been
-	 * observed since this client was elected.
-	 * When a summary ack comes in, this will be set to the sequence number of the summary ack.
+	 * Latest observed summary ack sequence number, cleared when either election identity changes.
+	 * Used as the summary-progress baseline for telemetry and serialization.
 	 */
-	private lastSummaryAckSeqForClient: number | undefined;
+	private lastSummaryAckSequenceNumber: number | undefined;
 	/**
-	 * Used to prevent excess logging by recording the sequence number that we last reported at,
-	 * and making sure we don't report another event to telemetry. If things work as intended,
-	 * this is not needed, otherwise it could report an event on every op in worst case scenario.
+	 * Sequence number of the last progress warning, limiting repeated telemetry to one report
+	 * per configured op window while summaries remain stalled.
 	 */
 	private lastReportedSeq = 0;
 
@@ -197,7 +198,7 @@ export class SummarizerClientElection
 			}
 		});
 
-		// Op monitoring: recover if no client is elected but eligible clients exist
+		// Recover an absent election; otherwise report summary progress.
 		this.summaryCollection.on("default", ({ sequenceNumber }) => {
 			if (this.electedClientId === undefined) {
 				const parentId = this.findOldestEligibleParent();
@@ -205,7 +206,7 @@ export class SummarizerClientElection
 				return;
 			}
 
-			const baseline = this.lastSummaryAckSeqForClient ?? this._electionSequenceNumber;
+			const baseline = this.lastSummaryAckSequenceNumber ?? this._electionSequenceNumber;
 			const opsWithoutSummary = sequenceNumber - baseline;
 			if (opsWithoutSummary > this.maxOpsSinceLastSummary) {
 				const opsSinceLastReport = sequenceNumber - this.lastReportedSeq;
@@ -213,9 +214,8 @@ export class SummarizerClientElection
 					this.logger.sendTelemetryEvent({
 						eventName: "ElectedClientNotSummarizing",
 						electedClientId: this.electedClientId,
-						lastSummaryAckSeqForClient: this.lastSummaryAckSeqForClient,
+						lastSummaryAckSeqForClient: this.lastSummaryAckSequenceNumber,
 						electionSequenceNumber: this._electionSequenceNumber,
-						nextElectedClientId: this.findNextEligibleParent(),
 						opsWithoutSummary,
 					});
 					this.lastReportedSeq = sequenceNumber;
@@ -225,7 +225,7 @@ export class SummarizerClientElection
 
 		// Summary ack resets the op counter
 		this.summaryCollection.on(MessageType.SummaryAck, (op) => {
-			this.lastSummaryAckSeqForClient = op.sequenceNumber;
+			this.lastSummaryAckSequenceNumber = op.sequenceNumber;
 		});
 	}
 
@@ -299,7 +299,7 @@ export class SummarizerClientElection
 		}
 		this._electedClientId = clientId;
 		this.setElectedParent(parentId);
-		this.lastSummaryAckSeqForClient = undefined;
+		this.lastSummaryAckSequenceNumber = undefined;
 		this.emit("electedSummarizerChanged");
 	}
 
@@ -380,7 +380,8 @@ export class SummarizerClientElection
 
 	public serialize(): ISerializedElection {
 		return {
-			electionSequenceNumber: this.lastSummaryAckSeqForClient ?? this._electionSequenceNumber,
+			electionSequenceNumber:
+				this.lastSummaryAckSequenceNumber ?? this._electionSequenceNumber,
 			electedClientId: this.electedClientId,
 			electedParentId: this._electedParentId,
 		};
