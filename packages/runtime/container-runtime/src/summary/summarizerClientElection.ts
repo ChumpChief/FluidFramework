@@ -54,9 +54,9 @@ export interface ISerializedElection {
 	readonly electedClientId: string | undefined;
 
 	/**
-	 * Most recently elected parent client id. This is always an interactive client.
+	 * Parent recorded by older writers. Current elections derive the parent from quorum.
 	 */
-	readonly electedParentId: string | undefined;
+	readonly electedParentId?: string | undefined;
 }
 
 export interface ISummarizerClientElectionEvents extends IEvent {
@@ -70,8 +70,8 @@ export interface ISummarizerClientElection
 }
 
 /**
- * Maintains the elected parent and summarizer by reading quorum members. Fresh elections choose
- * the oldest eligible interactive parent; restored elections retain their recorded identities when valid.
+ * Maintains the elected parent and summarizer by reading quorum members. The parent is the oldest
+ * eligible interactive client. Restored elections retain a valid recorded summarizer identity.
  * Observes quorum membership events to detect when summarizer clients join or leave, enabling the
  * graceful handoff protocol. Logs summary-progress telemetry when ops since the latest summary ack
  * or election baseline exceed the configured threshold.
@@ -85,9 +85,9 @@ export interface ISummarizerClientElection
  * Details:
  *
  * electedParent is the interactive client that has been elected to spawn a summarizer. It is
- * typically the oldest eligible interactive client in the quorum. Only the electedParent is
- * permitted to spawn an automatic summarizer. An elected parent remains in place until it leaves
- * the quorum. Its successor is the next-younger eligible parent, wrapping to the oldest if needed.
+ * the oldest eligible interactive client in the quorum. Only the electedParent is
+ * permitted to spawn an automatic summarizer. When it leaves, the oldest remaining eligible
+ * interactive client becomes the parent.
  *
  * electedClient is the incumbent non-interactive summarizer client once elected. Additional
  * summarizer joins do not displace it. If no summarizer is elected, then
@@ -117,8 +117,6 @@ export class SummarizerClientElection
 	implements ISummarizerClientElection
 {
 	private _electedParentId: string | undefined;
-	/** Join sequence number of the elected parent, used to select its successor on departure. */
-	private _electedParentSeq: number | undefined;
 	private _electedClientId: string | undefined;
 	private _electionSequenceNumber: number;
 	/**
@@ -152,10 +150,10 @@ export class SummarizerClientElection
 	) {
 		super();
 		this.logger = createChildLogger({ logger, namespace: "SummarizerClientElection" });
+		this._electedParentId = this.findOldestEligibleParent();
 
 		if (typeof initialState === "number") {
 			this._electionSequenceNumber = initialState;
-			this.setElectedParent(this.findOldestEligibleParent());
 			this._electedClientId = this.findSummarizerInQuorum() ?? this._electedParentId;
 		} else {
 			this._electionSequenceNumber = initialState.electionSequenceNumber;
@@ -169,14 +167,11 @@ export class SummarizerClientElection
 			const isSummarizer = client.client.details.type === summarizerClientType;
 			const electedClientIsSummarizer =
 				this.electedClientId !== undefined && this.electedClientId !== this.electedParentId;
+			const parentId = this.findOldestEligibleParent();
 			if (this.electedClientId === undefined || (isSummarizer && !electedClientIsSummarizer)) {
-				this.updateElection(
-					clientId,
-					isSummarizer ? this.electedParentId : clientId,
-					sequenceNumber,
-				);
+				this.updateElection(isSummarizer ? clientId : parentId, parentId, sequenceNumber);
 			} else if (this.electedParentId === undefined && !isSummarizer) {
-				this.updateElection(this.electedClientId, clientId, sequenceNumber);
+				this.updateElection(this.electedClientId, parentId, sequenceNumber);
 			}
 		});
 
@@ -184,15 +179,12 @@ export class SummarizerClientElection
 			const sequenceNumber = deltaManager.lastSequenceNumber;
 
 			if (clientId === this.electedClientId) {
-				const parentId =
-					(clientId === this.electedParentId
-						? this.findNextEligibleParent()
-						: this.electedParentId) ?? this.findOldestEligibleParent();
+				const parentId = this.findOldestEligibleParent();
 				this.updateElection(parentId, parentId, sequenceNumber);
 			} else if (clientId === this.electedParentId) {
 				this.updateElection(
 					this.electedClientId,
-					this.findNextEligibleParent(),
+					this.findOldestEligibleParent(),
 					sequenceNumber,
 				);
 			}
@@ -230,18 +222,10 @@ export class SummarizerClientElection
 	}
 
 	/**
-	 * Initialize from serialized state, validating the elected parent is still in quorum.
+	 * Restore the recorded elected client, using the quorum-derived parent for interactive clients.
 	 */
 	private initFromSerializedState(state: ISerializedElection): void {
 		const members = this.quorum.getMembers();
-
-		// Try to restore the elected parent directly
-		if (state.electedParentId !== undefined) {
-			const parentMember = members.get(state.electedParentId);
-			if (parentMember !== undefined && isClientEligible(parentMember)) {
-				this.setElectedParent(state.electedParentId);
-			}
-		}
 
 		if (state.electedClientId === undefined) {
 			// Serialized state explicitly indicates no one is elected.
@@ -260,24 +244,19 @@ export class SummarizerClientElection
 				clientCount: members.size,
 			});
 		} else if (isClientEligible(member)) {
-			this._electedClientId = state.electedClientId;
-			if (
-				this.electedParentId === undefined &&
-				member.client.details.type !== summarizerClientType
-			) {
-				this.setElectedParent(state.electedClientId);
-			}
+			this._electedClientId =
+				member.client.details.type === summarizerClientType
+					? state.electedClientId
+					: this.electedParentId;
 		} else {
-			// The elected client is in quorum but ineligible — log an error
-			// and elect the next eligible client after it.
-			const fallbackId = this.findNextEligibleParentAfter(member.sequenceNumber);
+			// The recorded client is ineligible; use the quorum-derived parent.
+			const fallbackId = this.electedParentId;
 			this.logger.sendErrorEvent({
 				eventName: "InitialElectedClientIneligible",
 				electionSequenceNumber: state.electionSequenceNumber,
 				expectedClientId: state.electedClientId,
 				electedClientId: fallbackId,
 			});
-			this.setElectedParent(fallbackId);
 			this._electedClientId = fallbackId;
 		}
 	}
@@ -298,22 +277,9 @@ export class SummarizerClientElection
 			this._electionSequenceNumber = sequenceNumber;
 		}
 		this._electedClientId = clientId;
-		this.setElectedParent(parentId);
+		this._electedParentId = parentId;
 		this.lastSummaryAckSequenceNumber = undefined;
 		this.emit("electedSummarizerChanged");
-	}
-
-	/**
-	 * Sets the elected parent and tracks its join sequence number for wrap-around election.
-	 */
-	private setElectedParent(clientId: string | undefined): void {
-		this._electedParentId = clientId;
-		if (clientId === undefined) {
-			this._electedParentSeq = undefined;
-		} else {
-			const member = this.quorum.getMembers().get(clientId);
-			this._electedParentSeq = member?.sequenceNumber;
-		}
 	}
 
 	/**
@@ -321,28 +287,6 @@ export class SummarizerClientElection
 	 * @returns the client id of the oldest eligible parent, or undefined if none are eligible.
 	 */
 	private findOldestEligibleParent(): string | undefined {
-		return this.findNextEligibleParentAfter(-1);
-	}
-
-	/**
-	 * Find the next eligible parent after the current one, wrapping around to
-	 * the oldest if no younger client is found.
-	 * @returns the client id of the next eligible parent, or undefined if none are eligible.
-	 */
-	private findNextEligibleParent(): string | undefined {
-		const currentParentSeq = this._electedParentSeq ?? -1;
-		return (
-			this.findNextEligibleParentAfter(currentParentSeq) ?? this.findOldestEligibleParent()
-		);
-	}
-
-	/**
-	 * Find the next eligible interactive client after the given sequence number.
-	 * @param sequenceNumber - sequence number to start searching after.
-	 * @returns the client id of the next eligible parent, or undefined if none are found
-	 * with a higher sequence number.
-	 */
-	private findNextEligibleParentAfter(sequenceNumber: number): string | undefined {
 		let nextId: string | undefined;
 		let nextSeq = Number.POSITIVE_INFINITY;
 
@@ -350,7 +294,6 @@ export class SummarizerClientElection
 			if (
 				isClientEligible(client) &&
 				client.client.details.type !== summarizerClientType &&
-				client.sequenceNumber > sequenceNumber &&
 				client.sequenceNumber < nextSeq
 			) {
 				nextId = clientId;
@@ -383,7 +326,6 @@ export class SummarizerClientElection
 			electionSequenceNumber:
 				this.lastSummaryAckSequenceNumber ?? this._electionSequenceNumber,
 			electedClientId: this.electedClientId,
-			electedParentId: this._electedParentId,
 		};
 	}
 

@@ -187,10 +187,10 @@ describe("Summarizer Client Election Recovery", () => {
 				],
 				{ electedClientId: "b", electedParentId: "b", electionSequenceNumber: 4321 },
 			);
-			assertElectionState("b", 4321, "initial state elects b");
+			assertElectionState("a", 4321, "oldest parent derived from quorum");
 		});
 
-		it("Should log error and elect next eligible when initially elected client is ineligible", () => {
+		it("Should log error and elect oldest parent when initially elected client is ineligible", () => {
 			createElection(
 				[
 					["a", 1, true],
@@ -201,19 +201,19 @@ describe("Summarizer Client Election Recovery", () => {
 				],
 				{ electedClientId: "s", electedParentId: "s", electionSequenceNumber: 4321 },
 			);
-			assertElectionState("c", 4321, "elect next eligible after ineligible");
+			assertElectionState("a", 4321, "elect oldest eligible parent");
 			mockLogger.assertMatch([
 				{
 					eventName: "SummarizerClientElection:InitialElectedClientIneligible",
 					electionSequenceNumber: 4321,
 					expectedClientId: "s",
-					electedClientId: "c",
+					electedClientId: "a",
 				},
 			]);
 		});
 
-		for (const electedParentId of [undefined, "missing", "ineligible"]) {
-			it(`Should use the restored interactive client as parent when the recorded parent is ${electedParentId}`, () => {
+		for (const electedParentId of [undefined, "missing", "ineligible", "b"]) {
+			it(`Should derive the oldest parent when the recorded parent is ${electedParentId}`, () => {
 				createElection(
 					[
 						["a", 1, true],
@@ -223,13 +223,13 @@ describe("Summarizer Client Election Recovery", () => {
 					{ electedClientId: "b", electedParentId, electionSequenceNumber: 100 },
 				);
 				assert.deepEqual(election.serialize(), {
-					electedClientId: "b",
-					electedParentId: "b",
+					electedClientId: "a",
 					electionSequenceNumber: 100,
 				});
-				removeClient("b");
-				assertElectionState("a", 101, "wrap around after recovered client leaves");
 				assert.equal(election.electedParentId, "a");
+				removeClient("a");
+				assertElectionState("b", 101, "oldest remaining parent elected");
+				assert.equal(election.electedParentId, "b");
 			});
 
 			it(`Should preserve a restored summarizer when the recorded parent is ${electedParentId}`, () => {
@@ -242,7 +242,6 @@ describe("Summarizer Client Election Recovery", () => {
 				});
 				assert.deepEqual(election.serialize(), {
 					electedClientId: "s",
-					electedParentId: undefined,
 					electionSequenceNumber: 100,
 				});
 				addClient("b", 101);
@@ -275,7 +274,7 @@ describe("Summarizer Client Election Recovery", () => {
 			});
 		}
 
-		it("Should advance past an ineligible elected client rather than reuse its older parent", () => {
+		it("Should use the oldest parent when the recorded client is ineligible", () => {
 			createElection(
 				[
 					["a", 1, true],
@@ -289,16 +288,15 @@ describe("Summarizer Client Election Recovery", () => {
 				},
 			);
 			assert.deepEqual(election.serialize(), {
-				electedClientId: "b",
-				electedParentId: "b",
+				electedClientId: "a",
 				electionSequenceNumber: 100,
 			});
-			removeClient("b");
-			assertElectionState("a", 101, "wrap around after fallback client leaves");
-			assert.equal(election.electedParentId, "a");
+			removeClient("a");
+			assertElectionState("b", 101, "oldest remaining parent elected");
+			assert.equal(election.electedParentId, "b");
 		});
 
-		it("Should log error and elect undefined when initially elected client is ineligible and last", () => {
+		it("Should use the oldest parent when the ineligible recorded client is youngest", () => {
 			createElection(
 				[
 					["a", 1, true],
@@ -308,13 +306,13 @@ describe("Summarizer Client Election Recovery", () => {
 				],
 				{ electedClientId: "s", electedParentId: "s", electionSequenceNumber: 4321 },
 			);
-			assertElectionState(undefined, 4321, "no eligible after ineligible");
+			assertElectionState("a", 4321, "oldest eligible parent elected");
 			mockLogger.assertMatch([
 				{
 					eventName: "SummarizerClientElection:InitialElectedClientIneligible",
 					electionSequenceNumber: 4321,
 					expectedClientId: "s",
-					electedClientId: undefined,
+					electedClientId: "a",
 				},
 			]);
 		});
@@ -468,10 +466,10 @@ describe("Summarizer Client Election Recovery", () => {
 				{ electedClientId: "s", electedParentId: "s", electionSequenceNumber: 4321 },
 			);
 			removeClient("s", 1111);
-			assertElectionState("c", 4321, "after removing ineligible elected");
+			assertElectionState("a", 4321, "after removing ineligible recorded client");
 			removeClient("c", 1111);
-			assertElectionState("a", 6543, "after removing next elected");
-			assertEvents(1);
+			assertElectionState("a", 4321, "after removing unelected client");
+			assertEvents(0);
 		});
 	});
 
@@ -487,16 +485,18 @@ describe("Summarizer Client Election Recovery", () => {
 					electionSequenceNumber: 50,
 				};
 				createElection([], state);
+				const restoredState = election.serialize();
+				assert.equal(election.electedParentId, "a");
 				for (const sequenceNumber of [100, 2000]) {
 					currentSequenceNumber = sequenceNumber;
 					summaryCollection.emit("default", { sequenceNumber });
-					assert.deepEqual(election.serialize(), state);
+					assert.deepEqual(election.serialize(), restoredState);
 					assertEvents(0);
 				}
 			});
 		}
 
-		it("Should elect an existing parent in one transition when a parentless summarizer leaves", () => {
+		it("Should elect the derived parent in one transition when the restored summarizer leaves", () => {
 			addClient("a", 1);
 			addClient("s", 2, false, summarizerClientType);
 			createElection([], {
@@ -512,14 +512,13 @@ describe("Summarizer Client Election Recovery", () => {
 			assert.deepEqual(observedStates, [
 				{
 					electedClientId: "a",
-					electedParentId: "a",
 					electionSequenceNumber: 51,
 				},
 			]);
 			assertEvents(1);
 		});
 
-		it("Should recover on an op when no eligible client follows the ineligible serialized client", () => {
+		it("Should recover on an op when the serialized client is missing", () => {
 			createElection(
 				[
 					["a", 1, true],
@@ -527,7 +526,7 @@ describe("Summarizer Client Election Recovery", () => {
 					["c", 9, true],
 					["s", 10, false],
 				],
-				{ electedClientId: "s", electedParentId: "s", electionSequenceNumber: 4321 },
+				{ electedClientId: "missing", electionSequenceNumber: 4321 },
 			);
 			assertElectionState(undefined, 4321, "before recovery");
 			currentSequenceNumber = 7777;
