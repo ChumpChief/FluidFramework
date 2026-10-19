@@ -164,7 +164,7 @@ export class SummaryManager
 	 * a window between construction and starting where the caller can attach listeners.
 	 */
 	public start(): void {
-		this.clientElection.on("electedSummarizerChanged", this.refreshSummarizer);
+		this.clientElection.events.on("electedSummarizerChanged", this.refreshSummarizer);
 		this.refreshSummarizer();
 	}
 
@@ -482,7 +482,7 @@ export class SummaryManager
 	}
 
 	public dispose(): void {
-		this.clientElection.off("electedSummarizerChanged", this.refreshSummarizer);
+		this.clientElection.events.off("electedSummarizerChanged", this.refreshSummarizer);
 		this.connectedState.off("connected", this.handleConnected);
 		this.connectedState.off("disconnected", this.handleDisconnected);
 		this.cleanupForwardedEvents();

@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import { createEmitter, TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IFluidHandleContext } from "@fluidframework/core-interfaces/internal";
 import { SummaryType } from "@fluidframework/driver-definitions";
 import {
@@ -261,15 +261,12 @@ export class MockContainerRuntimeForSummarizer
 	}
 }
 
-class MockSummarizerClientElection
-	extends TypedEventEmitter<ISummarizerClientElectionEvents>
-	implements ISummarizerClientElection
-{
+class MockSummarizerClientElection implements ISummarizerClientElection {
+	public readonly events = createEmitter<ISummarizerClientElectionEvents>();
 	public hasSummarizer = false;
 	public electedParentId: string | undefined;
 
 	constructor(clientId: string) {
-		super();
 		this.setClientId(clientId);
 	}
 

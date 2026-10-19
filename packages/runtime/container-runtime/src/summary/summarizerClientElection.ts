@@ -3,13 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import { createEmitter } from "@fluid-internal/client-utils";
 import type { IDeltaManager } from "@fluidframework/container-definitions/internal";
-import type {
-	IEvent,
-	IEventProvider,
-	ITelemetryBaseLogger,
-} from "@fluidframework/core-interfaces";
+import type { IEventProvider, ITelemetryBaseLogger } from "@fluidframework/core-interfaces";
+import type { Listenable } from "@fluidframework/core-interfaces/internal";
 import type { IClientDetails, IQuorumClients } from "@fluidframework/driver-definitions";
 import { MessageType } from "@fluidframework/driver-definitions/internal";
 import { createChildLogger } from "@fluidframework/telemetry-utils/internal";
@@ -28,12 +25,12 @@ export interface ISerializedElection {
 	readonly electedParentId: string | undefined;
 }
 
-export interface ISummarizerClientElectionEvents extends IEvent {
-	(event: "electedSummarizerChanged", handler: () => void): void;
+export interface ISummarizerClientElectionEvents {
+	electedSummarizerChanged: () => void;
 }
 
-export interface ISummarizerClientElection
-	extends IEventProvider<ISummarizerClientElectionEvents> {
+export interface ISummarizerClientElection {
+	readonly events: Listenable<ISummarizerClientElectionEvents>;
 	readonly electedParentId: string | undefined;
 	readonly hasSummarizer: boolean;
 }
@@ -49,10 +46,11 @@ export interface ISummarizerClientElection
  * summarizer, even an idle one, blocks replacement until its sequenced quorum departure.
  * Summary-progress telemetry uses an op baseline retained across snapshot loads.
  */
-export class SummarizerClientElection
-	extends TypedEventEmitter<ISummarizerClientElectionEvents>
-	implements ISummarizerClientElection
-{
+export class SummarizerClientElection implements ISummarizerClientElection {
+	private readonly emitter = createEmitter<ISummarizerClientElectionEvents>();
+	public get events(): Listenable<ISummarizerClientElectionEvents> {
+		return this.emitter;
+	}
 	private _electedParentId: string | undefined;
 	private _hasSummarizer = false;
 	private progressSequenceNumber: number;
@@ -74,7 +72,6 @@ export class SummarizerClientElection
 		maxOpsSinceLastSummary: number,
 		initialState: Pick<ISerializedElection, "electionSequenceNumber"> | number,
 	) {
-		super();
 		const childLogger = createChildLogger({ logger, namespace: "SummarizerClientElection" });
 		this.progressSequenceNumber =
 			typeof initialState === "number" ? initialState : initialState.electionSequenceNumber;
@@ -88,7 +85,7 @@ export class SummarizerClientElection
 				if (!hasSummarizer || !this.hasSummarizer) {
 					this.progressSequenceNumber = deltaManager.lastSequenceNumber;
 				}
-				this.emit("electedSummarizerChanged");
+				this.emitter.emit("electedSummarizerChanged");
 			}
 		};
 		quorum.on("addMember", refresh);
