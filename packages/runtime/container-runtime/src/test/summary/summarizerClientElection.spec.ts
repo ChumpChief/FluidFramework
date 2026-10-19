@@ -128,26 +128,4 @@ describe("Summarizer Client Election", () => {
 		assert.equal(restored.hasSummarizer, false);
 		assert.equal(restored.hasSummarizer, test.election.hasSummarizer);
 	});
-
-	it("permits interactive and summarizer client details", () => {
-		assert.equal(
-			SummarizerClientElection.clientDetailsPermitElection({
-				capabilities: { interactive: true },
-			}),
-			true,
-		);
-		assert.equal(
-			SummarizerClientElection.clientDetailsPermitElection({
-				capabilities: { interactive: false },
-				type: summarizerClientType,
-			}),
-			true,
-		);
-		assert.equal(
-			SummarizerClientElection.clientDetailsPermitElection({
-				capabilities: { interactive: false },
-			}),
-			false,
-		);
-	});
 });

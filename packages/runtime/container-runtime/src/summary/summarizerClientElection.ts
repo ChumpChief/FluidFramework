@@ -5,7 +5,7 @@
 
 import { createEmitter } from "@fluid-internal/client-utils";
 import type { Listenable } from "@fluidframework/core-interfaces/internal";
-import type { IClientDetails, IQuorumClients } from "@fluidframework/driver-definitions";
+import type { IQuorumClients } from "@fluidframework/driver-definitions";
 
 import { summarizerClientType } from "./summarizerTypes.js";
 
@@ -78,7 +78,4 @@ export class SummarizerClientElection implements ISummarizerClientElection {
 		this._electedParentId = parentId;
 		this._hasSummarizer = hasSummarizer;
 	}
-
-	public static readonly clientDetailsPermitElection = (details: IClientDetails): boolean =>
-		details.capabilities.interactive || details.type === summarizerClientType;
 }
