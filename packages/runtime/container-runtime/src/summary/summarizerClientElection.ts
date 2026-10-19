@@ -46,20 +46,12 @@ export class SummarizerClientElection implements ISummarizerClientElection {
 	}
 
 	constructor(private readonly quorum: Pick<IQuorumClients, "getMembers" | "on">) {
-		this.readQuorum();
-		const refresh = (): void => {
-			const parentId = this.electedParentId;
-			const hasSummarizer = this.hasSummarizer;
-			this.readQuorum();
-			if (parentId !== this.electedParentId || hasSummarizer !== this.hasSummarizer) {
-				this.emitter.emit("electedSummarizerChanged");
-			}
-		};
-		quorum.on("addMember", refresh);
-		quorum.on("removeMember", refresh);
+		this.refresh();
+		quorum.on("addMember", this.refresh);
+		quorum.on("removeMember", this.refresh);
 	}
 
-	private readQuorum(): void {
+	private readonly refresh = (): void => {
 		let parentId: string | undefined;
 		let parentSequenceNumber = Number.POSITIVE_INFINITY;
 		let hasSummarizer = false;
@@ -75,7 +67,10 @@ export class SummarizerClientElection implements ISummarizerClientElection {
 				parentSequenceNumber = member.sequenceNumber;
 			}
 		}
-		this._electedParentId = parentId;
-		this._hasSummarizer = hasSummarizer;
-	}
+		if (parentId !== this._electedParentId || hasSummarizer !== this._hasSummarizer) {
+			this._electedParentId = parentId;
+			this._hasSummarizer = hasSummarizer;
+			this.emitter.emit("electedSummarizerChanged");
+		}
+	};
 }
