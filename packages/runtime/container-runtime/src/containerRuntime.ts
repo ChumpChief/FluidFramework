@@ -1568,10 +1568,11 @@ export class ContainerRuntime
 	}
 
 	/**
-	 * clientId of parent (non-summarizing) container that owns summarizer container
+	 * Quorum-derived summarizer representative, or the elected parent when none is present.
+	 * Undefined on dedicated summarizer runtimes, which do not construct the election observer.
 	 */
 	public get summarizerClientId(): string | undefined {
-		return this.summarizerClientElection?.electedClientId;
+		return this.summarizerClientElection?.serialize().electedClientId;
 	}
 
 	private _disposed = false;
