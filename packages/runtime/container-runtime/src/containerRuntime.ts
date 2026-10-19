@@ -1517,9 +1517,8 @@ export class ContainerRuntime
 
 	private summarizerClientElection?: SummarizerClientElection;
 	/**
-	 * summaryManager will only be created if this client is permitted to spawn a summarizing client
-	 * It is created only by interactive client, i.e. summarizer client, as well as non-interactive bots
-	 * do not create it (see SummarizerClientElection.clientDetailsPermitElection() for details)
+	 * Created for interactive clients with automatic summarization enabled.
+	 * Dedicated summarizer clients run the summary executor instead.
 	 */
 	private summaryManager?: SummaryManager;
 
@@ -2565,12 +2564,8 @@ export class ContainerRuntime
 						() => this.innerDeltaManager.active,
 					),
 			);
-		} else if (
-			!onRequestMode &&
-			SummarizerClientElection.clientDetailsPermitElection(this.clientDetails)
-		) {
-			// Only create a SummaryManager and SummarizerClientElection
-			// if summaries are enabled and we are not the summarizer client.
+		} else if (!onRequestMode && this.clientDetails.capabilities.interactive) {
+			// Interactive clients elect the parent and manage automatic summarizer creation.
 			const election = new SummarizerClientElection(this._quorum);
 			this.summarizerClientElection = election;
 			this.summaryProgressSequenceNumber =
