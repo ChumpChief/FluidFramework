@@ -5,7 +5,7 @@
 
 import { strict as assert } from "node:assert";
 
-import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import { createEmitter, TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IDeltaManager } from "@fluidframework/container-definitions/internal";
 import type {
 	ISummarizerEvents,
@@ -212,21 +212,19 @@ describe("Summary Manager", () => {
 		}
 	}
 
-	class TestSummarizerClientElection
-		extends TypedEventEmitter<ISummarizerClientElectionEvents>
-		implements ISummarizerClientElection
-	{
+	class TestSummarizerClientElection implements ISummarizerClientElection {
+		public readonly events = createEmitter<ISummarizerClientElectionEvents>();
 		public hasSummarizer = false;
 		public electedParentId: string | undefined;
 
 		public electClient(clientId: string | undefined) {
 			this.electedParentId = clientId;
-			this.emit("electedSummarizerChanged");
+			this.events.emit("electedSummarizerChanged");
 		}
 
 		public setHasSummarizer(present: boolean) {
 			this.hasSummarizer = present;
-			this.emit("electedSummarizerChanged");
+			this.events.emit("electedSummarizerChanged");
 		}
 	}
 
@@ -287,7 +285,6 @@ describe("Summary Manager", () => {
 	}
 
 	afterEach(() => {
-		clientElection.removeAllListeners();
 		summarizer?.removeAllListeners();
 		connectedState.removeAllListeners();
 		throttler.delayMs = 0;

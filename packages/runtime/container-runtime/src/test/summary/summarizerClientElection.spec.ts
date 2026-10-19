@@ -55,7 +55,7 @@ describe("Summarizer Client Election", () => {
 			initialState,
 		);
 		let events = 0;
-		election.on("electedSummarizerChanged", () => events++);
+		election.events.on("electedSummarizerChanged", () => events++);
 		return {
 			election,
 			quorum,
