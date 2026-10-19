@@ -1570,8 +1570,24 @@ export class ContainerRuntime
 	 * Undefined on dedicated summarizer runtimes, which do not construct the election observer.
 	 */
 	public get summarizerClientId(): string | undefined {
-		return this.summarizerClientElection?.serialize().electedClientId;
+		if (this.summarizerClientElection === undefined) {
+			return undefined;
+		}
+		let summarizerId: string | undefined;
+		let sequenceNumber = Number.POSITIVE_INFINITY;
+		for (const [id, member] of this._quorum.getMembers()) {
+			if (
+				member.client.details?.type === "summarizer" &&
+				member.sequenceNumber < sequenceNumber
+			) {
+				summarizerId = id;
+				sequenceNumber = member.sequenceNumber;
+			}
+		}
+		return summarizerId ?? this.summarizerClientElection.electedParentId;
 	}
+
+	private summaryProgressSequenceNumber = 0;
 
 	private _disposed = false;
 	public get disposed(): boolean {
@@ -2542,14 +2558,46 @@ export class ContainerRuntime
 		) {
 			// Only create a SummaryManager and SummarizerClientElection
 			// if summaries are enabled and we are not the summarizer client.
-			this.summarizerClientElection = new SummarizerClientElection(
-				this.baseLogger,
-				this.innerDeltaManager,
-				this._quorum,
-				summaryCollection,
-				maxOpsSinceLastSummary,
-				this.electedSummarizerData ?? this.innerDeltaManager.lastSequenceNumber,
-			);
+			const election = new SummarizerClientElection(this._quorum);
+			this.summarizerClientElection = election;
+			this.summaryProgressSequenceNumber =
+				this.electedSummarizerData?.electionSequenceNumber ??
+				this.innerDeltaManager.lastSequenceNumber;
+			let lastReportedSequenceNumber = 0;
+			let hadSummarizer = election.hasSummarizer;
+			const progressLogger = createChildLogger({
+				logger: this.baseLogger,
+				namespace: "SummarizerClientElection",
+			});
+			election.events.on("electedSummarizerChanged", () => {
+				// Preserve the stall baseline through parent succession while children remain.
+				if (!hadSummarizer || !election.hasSummarizer) {
+					this.summaryProgressSequenceNumber = this.innerDeltaManager.lastSequenceNumber;
+				}
+				hadSummarizer = election.hasSummarizer;
+			});
+			summaryCollection.on("default", ({ sequenceNumber }) => {
+				if (election.electedParentId === undefined && !election.hasSummarizer) {
+					return;
+				}
+				const opsWithoutSummary = sequenceNumber - this.summaryProgressSequenceNumber;
+				if (
+					opsWithoutSummary > maxOpsSinceLastSummary &&
+					sequenceNumber - lastReportedSequenceNumber > maxOpsSinceLastSummary
+				) {
+					progressLogger.sendTelemetryEvent({
+						eventName: "ElectedClientNotSummarizing",
+						electedParentId: election.electedParentId,
+						hasSummarizer: election.hasSummarizer,
+						electionSequenceNumber: this.summaryProgressSequenceNumber,
+						opsWithoutSummary,
+					});
+					lastReportedSequenceNumber = sequenceNumber;
+				}
+			});
+			summaryCollection.on(MessageType.SummaryAck, (op) => {
+				this.summaryProgressSequenceNumber = op.sequenceNumber;
+			});
 
 			const defaultAction = (): void => {
 				if (summaryCollection.opsSinceLastAck > maxOpsSinceLastSummary) {
@@ -2927,9 +2975,13 @@ export class ContainerRuntime
 		}
 
 		if (this.summarizerClientElection) {
-			const electedSummarizerContent = JSON.stringify(
-				this.summarizerClientElection?.serialize(),
-			);
+			// Retain quorum-derived identities until supported snapshot readers no longer require them.
+			const electionState: ISerializedElection = {
+				electionSequenceNumber: this.summaryProgressSequenceNumber,
+				electedClientId: this.summarizerClientId,
+				electedParentId: this.summarizerClientElection.electedParentId,
+			};
+			const electedSummarizerContent = JSON.stringify(electionState);
 			addBlobToSummary(summaryTree, electedSummarizerBlobName, electedSummarizerContent);
 		}
 

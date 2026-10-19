@@ -13,7 +13,6 @@ import sinon from "sinon";
 import {
 	type IConnectedEvents,
 	type ISummarizer,
-	type ISummaryCollectionOpEvents,
 	SummarizerClientElection,
 	SummaryManager,
 	SummaryManagerState,
@@ -57,14 +56,8 @@ describe("Quorum summarizer creation integration", () => {
 	}
 	function setup() {
 		const quorum = new TestQuorumClients();
-		const summaries = new TypedEventEmitter<ISummaryCollectionOpEvents>();
 		const logger = new MockLogger();
 		let sequenceNumber = 0;
-		const delta = {
-			get lastSequenceNumber() {
-				return sequenceNumber;
-			},
-		};
 		function add(id: string, summarizer = false): void {
 			const client: ISequencedClient = {
 				sequenceNumber: ++sequenceNumber,
@@ -86,14 +79,7 @@ describe("Quorum summarizer creation integration", () => {
 			quorum.removeClient(id);
 		}
 		function election() {
-			return new SummarizerClientElection(
-				logger,
-				delta,
-				quorum,
-				summaries,
-				1000,
-				sequenceNumber,
-			);
+			return new SummarizerClientElection(quorum);
 		}
 		function parent(id: string, delay = 0, initialDelay = 0) {
 			const connection = new Connection(id);
