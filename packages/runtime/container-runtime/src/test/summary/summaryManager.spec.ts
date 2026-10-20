@@ -406,6 +406,48 @@ describe("Summary Manager", () => {
 	});
 
 	describe("Start Summarizer Delay", () => {
+		it("allows ops to bypass throttling without changing disconnected recovery eligibility", async () => {
+			mockDeltaManager.lastSequenceNumber = 500;
+			throttler.delayMs = 5000;
+			const listeners = mockDeltaManager.listenerCount("op");
+			createSummaryManager({
+				connected: true,
+				initialDelayMs: 2000,
+				opsToBypassInitialDelay: 1000,
+			});
+			clientElection.electClient(thisClientId);
+			await flushPromises();
+			assert.equal(mockDeltaManager.listenerCount("op"), listeners + 1);
+			mockDeltaManager.lastSequenceNumber = 1000;
+			mockDeltaManager.emit("op", summaryOp);
+			connectedState.disconnect();
+			await flushPromises();
+			assertRequests(
+				0,
+				"crossing threshold ends wait but does not permit disconnected recovery",
+			);
+			assert.equal(mockDeltaManager.listenerCount("op"), listeners);
+			assert.equal(clock.countTimers(), 0);
+		});
+
+		it("removes the op listener when the startup timer completes", async () => {
+			mockDeltaManager.lastSequenceNumber = 500;
+			const listeners = mockDeltaManager.listenerCount("op");
+			createSummaryManager({
+				connected: true,
+				initialDelayMs: 2000,
+				opsToBypassInitialDelay: 1000,
+			});
+			clientElection.electClient(thisClientId);
+			await flushPromises();
+			assert.equal(mockDeltaManager.listenerCount("op"), listeners + 1);
+			clock.tick(2000);
+			await flushPromises();
+			assertRequests(1);
+			assert.equal(mockDeltaManager.listenerCount("op"), listeners);
+			assert.equal(clock.countTimers(), 0);
+		});
+
 		it("Should wait for initial delay before first start", async () => {
 			mockDeltaManager.lastSequenceNumber = 999; // 999 < 1000, so do not bypass
 			createSummaryManager({
@@ -459,7 +501,7 @@ describe("Summary Manager", () => {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
 			(summaryManager as any).delayBeforeCreatingSummarizer = async (...args) => {
 				// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
-				const result = await summaryManager_delayBeforeCreatingSummarizer(args);
+				const result = await summaryManager_delayBeforeCreatingSummarizer(...args);
 				summaryManager.dispose();
 				// eslint-disable-next-line @typescript-eslint/no-unsafe-return
 				return result;

@@ -242,9 +242,12 @@ export class SummaryManager
 		assert(this.summarizer === undefined, 0x262 /* "Old summarizer is still working!" */);
 
 		const generation = this.summarizerGeneration;
+		// Capture urgency once; later ops may shorten waiting but do not enable recovery.
+		const allowDisconnectedRecovery =
+			this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay;
 
-		this.delayBeforeCreatingSummarizer()
-			.then(async (startWithInitialDelay: boolean) => {
+		this.delayBeforeCreatingSummarizer(allowDisconnectedRecovery)
+			.then(async () => {
 				if (this.disposed) {
 					return "early exit (disposed)";
 				}
@@ -255,7 +258,7 @@ export class SummaryManager
 				if (
 					this.clientElection.hasSummarizer ||
 					(!shouldSummarizeStateEarlyStage.shouldSummarize &&
-						(startWithInitialDelay ||
+						(!allowDisconnectedRecovery ||
 							!stopReasonCanRunLastSummary(shouldSummarizeStateEarlyStage.stopReason)))
 				) {
 					return "early exit before summarizer creation";
@@ -281,11 +284,9 @@ export class SummaryManager
 				// the summarizer at all.
 				const shouldSummarizeState = this.getShouldSummarizeState();
 				if (shouldSummarizeState.shouldSummarize === false) {
-					// In order to allow the last summary to run, we not only need a stop reason that would
-					// allow it but also, startWithInitialDelay to be false (start the summarization immediately),
-					// which would happen when we have a high enough number of unsummarized ops.
+					// Disconnected recovery requires both an eligible stop reason and urgent startup.
 					if (
-						startWithInitialDelay ||
+						!allowDisconnectedRecovery ||
 						!stopReasonCanRunLastSummary(shouldSummarizeState.stopReason)
 					) {
 						this.state = SummaryManagerState.Starting;
@@ -411,11 +412,10 @@ export class SummaryManager
 	}
 
 	/**
-	 * Implements initial delay before creating summarizer
-	 * @returns `true`, if creation is delayed due to heuristics (not many ops to summarize).
-	 * `false` if summarizer should start immediately due to too many unsummarized ops.
+	 * Waits for startup delay or the op threshold, whichever occurs first.
+	 * @param urgent - Whether the initial op count permits bypassing the boot delay.
 	 */
-	private async delayBeforeCreatingSummarizer(): Promise<boolean> {
+	private async delayBeforeCreatingSummarizer(urgent: boolean): Promise<void> {
 		// throttle creation of new summarizer containers to prevent spamming the server with websocket connections
 		let delayMs = this.startThrottler.getDelay();
 
@@ -432,37 +432,27 @@ export class SummaryManager
 			hasSummarizer: this.clientElection.hasSummarizer,
 		});
 
-		// Offset expensive work from the critical boot sequence. With many unsummarized ops,
-		// bypass the initial delay to start recovery promptly.
-		let startWithInitialDelay = false;
-		if (this.summaryCollection.opsSinceLastAck < this.opsToBypassInitialDelay) {
-			startWithInitialDelay = true;
+		if (!urgent) {
 			delayMs = Math.max(delayMs, this.initialDelayMs);
 		}
 
 		if (delayMs > 0) {
-			let timer: number | undefined;
-			let resolveOpPromiseFn: (value: void | PromiseLike<void>) => void;
-			// Create a listener that will break the delay if we've exceeded the initial delay ops count.
-			const opsListenerFn = (): void => {
-				if (this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay) {
+			await new Promise<void>((resolve) => {
+				const complete = (): void => {
 					clearTimeout(timer);
-					resolveOpPromiseFn();
-				}
-			};
-			// Create a Promise that will resolve when the delay expires.
-			const delayPromise = new Promise<void>((resolve) => {
-				timer = setTimeout(() => resolve(), delayMs);
+					this.summaryCollection.removeOpListener(opsListener);
+					resolve();
+				};
+				const timer = setTimeout(complete, delayMs);
+				// An incoming op crossing the threshold bypasses both initial delay and throttling.
+				const opsListener = (): void => {
+					if (this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay) {
+						complete();
+					}
+				};
+				this.summaryCollection.addOpListener(opsListener);
 			});
-			// Create a Promise that will resolve if the ops count passes the threshold.
-			const opPromise = new Promise<void>((resolve) => {
-				resolveOpPromiseFn = resolve;
-			});
-			this.summaryCollection.addOpListener(opsListenerFn);
-			await Promise.race([delayPromise, opPromise]);
-			this.summaryCollection.removeOpListener(opsListenerFn);
 		}
-		return startWithInitialDelay;
 	}
 
 	public summarizeOnDemand(options: IOnDemandSummarizeOptions): ISummarizeResults {
