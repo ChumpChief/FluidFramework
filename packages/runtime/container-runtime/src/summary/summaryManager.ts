@@ -275,25 +275,23 @@ export class SummaryManager
 					eventName: "EndingSummarizer",
 					reason: "early exit (disposed)",
 				});
-			} else {
-				// A disconnected parent may still request a last summary when many ops remain.
-				const stopReason = checkForStopReason();
-				if (
-					this.clientElection.hasSummarizer ||
-					(stopReason !== undefined &&
-						(!startup.allowLastSummaryAfterParentDisconnect ||
-							stopReason !== "parentNotConnected"))
-				) {
-					this.logger.sendTelemetryEvent({
-						eventName: "EndingSummarizer",
-						reason: "early exit before summarizer creation",
-					});
-					return false;
-				} else {
-					return true;
-				}
+				return false;
 			}
-			return false;
+
+			// A disconnected parent may still request a last summary when many ops remain.
+			const stopReason = checkForStopReason();
+			const canAttemptLastSummary =
+				startup.allowLastSummaryAfterParentDisconnect && stopReason === "parentNotConnected";
+			const canCreate =
+				!this.clientElection.hasSummarizer &&
+				(stopReason === undefined || canAttemptLastSummary);
+			if (!canCreate) {
+				this.logger.sendTelemetryEvent({
+					eventName: "EndingSummarizer",
+					reason: "early exit before summarizer creation",
+				});
+			}
+			return canCreate;
 		};
 
 		const runSummarization = async (
@@ -368,20 +366,19 @@ export class SummaryManager
 				// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
 				// the summarizer at all.
 				const currentStopReason = checkForStopReason();
+				const canAttemptLastSummary =
+					allowLastSummaryAfterParentDisconnect && currentStopReason === "parentNotConnected";
 				if (currentStopReason !== undefined) {
-					// Disconnected recovery requires both an eligible stop reason and urgent startup.
-					if (
-						!allowLastSummaryAfterParentDisconnect ||
-						currentStopReason !== "parentNotConnected"
-					) {
+					if (canAttemptLastSummary) {
+						this.logger.sendTelemetryEvent({
+							eventName: "LastAttemptToSummarize",
+						});
+					} else {
 						this.state = SummaryManagerState.Stopping;
 						summarizer.stop(currentStopReason);
 						reason = `early exit after starting summarizer ${currentStopReason}`;
 						return;
 					}
-					this.logger.sendTelemetryEvent({
-						eventName: "LastAttemptToSummarize",
-					});
 				}
 
 				const child = summarizer;
