@@ -33,6 +33,8 @@ Automatic summarization elects the oldest eligible interactive quorum member as 
 
 When the parent leaves quorum, the next parent waits for all existing summarizer clients to leave quorum before creating a replacement. Local completion, close, or a stop timeout does not replace that sequenced departure. Creation requests already in flight can still overlap.
 
+Election and occupancy authorize creation. After a request is issued, the owning parent's disconnection requests graceful shutdown; later election changes do not control that child. A late-loaded child may attempt its permitted last summary even after parent succession, while the new parent waits for its quorum departure. Reconnection does not erase the original cycle's disconnect.
+
 The creator of each child owns its cleanup. Automatic children are managed by `SummaryManager`; callers creating manual/on-demand children must close their containers when finished (the host one-shot helper does this in `finally`). A connected idle or unmanaged child blocks automatic replacement indefinitely. This policy favors avoiding redundant loaded clients and uploads over bypassing a child whose progress is unknown.
 
 Election decisions use quorum-derived parent identity and occupancy. The summary blob retains quorum-derived identity fields for older snapshot readers, alongside the progress baseline. Older live parents retain their incumbent-only rule: during mixed-version sessions they can create a replacement after their tracked child leaves even if another remains. New parents wait for every child. Snapshot compatibility fields preserve old-reader initialization, not identical rolling-version policy.

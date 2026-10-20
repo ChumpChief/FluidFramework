@@ -356,6 +356,7 @@ describe("Quorum summarizer creation integration", () => {
 			assert.equal(request.child.run.callCount, 1);
 			test.add("s2", true);
 			const restored = test.election();
+			a.connection.disconnect();
 			test.remove("a");
 			assert.equal(request.child.stop.callCount, 1);
 			request.child.finished.resolve();
@@ -393,7 +394,7 @@ describe("Quorum summarizer creation integration", () => {
 		assert.equal(a.requests.length, 1);
 	});
 
-	it("closes an in-flight child without running it after parent responsibility changes", async () => {
+	it("lets a late child attempt its last summary while the next parent waits", async () => {
 		const test = setup();
 		test.add("a");
 		test.add("b");
@@ -403,15 +404,39 @@ describe("Quorum summarizer creation integration", () => {
 		const request = a.requests[0];
 		assert(request !== undefined);
 		test.add("s", true);
+		a.connection.disconnect();
 		test.remove("a");
 		request.loaded.resolve(request.child);
 		await clock.tickAsync(0);
-		assert.equal(request.child.run.callCount, 0);
+		assert.deepEqual(request.child.run.firstCall.args, ["a"]);
+		assert.equal(request.child.stop.firstCall.args[0], "parentNotConnected");
+		assert.equal(request.child.close.callCount, 0);
+		assert.equal(b.requests.length, 0);
+		request.child.finished.resolve();
+		await clock.tickAsync(0);
 		assert.equal(request.child.close.callCount, 1);
 		assert.equal(b.requests.length, 0);
 		test.remove("s");
 		await clock.tickAsync(0);
 		assert.equal(b.requests.length, 1);
+	});
+
+	it("closes a late-loaded non-urgent child after disconnect even if the parent reconnects", async () => {
+		const test = setup();
+		test.add("a");
+		const a = test.parent("a", 0, 1);
+		await clock.tickAsync(1);
+		const request = a.requests[0];
+		assert(request !== undefined);
+		test.add("s", true);
+		a.connection.disconnect();
+		a.connection.connected = true;
+		a.connection.emit("connected", "a");
+		request.loaded.resolve(request.child);
+		await clock.tickAsync(0);
+		assert.equal(request.child.run.callCount, 0);
+		assert.equal(request.child.close.callCount, 1);
+		assert.equal(a.manager.currentState, SummaryManagerState.Idle);
 	});
 
 	it("keeps the original stop intent when a disconnected parent reconnects during creation", async () => {
@@ -476,6 +501,15 @@ describe("Quorum summarizer creation integration", () => {
 		a.connection.disconnect();
 		await clock.tickAsync(100);
 		assert.equal(a.requests.length, 1);
+		const request = a.requests[0];
+		assert(request !== undefined);
+		request.loaded.resolve(request.child);
+		await clock.tickAsync(0);
+		assert.equal(request.child.stop.firstCall.args[0], "parentNotConnected");
+		assert.equal(request.child.run.callCount, 1);
+		assert.equal(a.manager.currentState, SummaryManagerState.Stopping);
+		request.child.finished.resolve();
+		await clock.tickAsync(0);
 	});
 
 	it("skips low-op creation when disconnected during the initial delay", async () => {
@@ -499,6 +533,7 @@ describe("Quorum summarizer creation integration", () => {
 		test.add("s", true);
 		request.loaded.resolve(request.child);
 		await clock.tickAsync(0);
+		a.connection.disconnect();
 		test.remove("a");
 		await clock.tickAsync(120000);
 		assert.equal(request.child.close.callCount, 1);

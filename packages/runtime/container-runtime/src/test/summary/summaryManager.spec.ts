@@ -358,7 +358,7 @@ describe("Summary Manager", () => {
 		assertRequests(1, "should not have requested summarizer again");
 	});
 
-	it("Should become summarizer if elected, then connected; stop summarizer after unelected", async () => {
+	it("uses election for creation and disconnection to stop an owned child", async () => {
 		createSummaryManager({ opsToBypassInitialDelay: 0, initialDelayMs: 0 });
 		assertState(SummaryManagerState.Idle, "should start idle");
 		clientElection.electClient(thisClientId);
@@ -373,7 +373,13 @@ describe("Summary Manager", () => {
 		assertState(SummaryManagerState.Running, "summarizer should be running");
 		clientElection.electClient("other");
 		await flushPromises();
-		assertState(SummaryManagerState.Stopping, "should be stopping after other client elected");
+		assertState(
+			SummaryManagerState.Running,
+			"election does not control an already-owned child",
+		);
+		connectedState.disconnect();
+		await flushPromises();
+		assertState(SummaryManagerState.Stopping, "parent disconnection stops the owned child");
 		summarizer.runDeferred.resolve();
 		await flushPromises();
 		assertState(SummaryManagerState.Idle, "should be idle after summarizer finishes running");
@@ -559,7 +565,10 @@ describe("Summary Manager", () => {
 			assertRequests(1, "should request summarizer and run the last summary.");
 			completeSummarizerRequest();
 			await flushPromises();
-			assertState(SummaryManagerState.Running, "summarizer should be running");
+			assertState(
+				SummaryManagerState.Stopping,
+				"last-summary attempt belongs to a disconnected cycle",
+			);
 		});
 
 		it("Should create last summary when summarizer created without delay, then disconnected", async () => {

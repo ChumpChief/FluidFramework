@@ -4,10 +4,7 @@
  */
 
 import { createEmitter, TypedEventEmitter } from "@fluid-internal/client-utils";
-import type {
-	ISummarizerEvents,
-	SummarizerStopReason,
-} from "@fluidframework/container-runtime-definitions/internal";
+import type { ISummarizerEvents } from "@fluidframework/container-runtime-definitions/internal";
 import type {
 	IDisposable,
 	IEvent,
@@ -51,11 +48,6 @@ export enum SummaryManagerState {
 	/** Committed to ending the cycle, including pending load, drain, and cleanup. */
 	Stopping,
 }
-
-// Please note that all reasons in this list are not errors,
-// and thus they are not raised today to parent container as error.
-// If this needs to be changed in future, we should re-evaluate what and how we raise to summarizer
-type StopReason = Extract<SummarizerStopReason, "parentNotConnected" | "notElectedParent">;
 
 export interface IConnectedEvents extends IEvent {
 	(event: "connected", listener: (clientId: string) => void);
@@ -169,23 +161,6 @@ export class SummaryManager
 					allowLastSummaryAfterParentDisconnect: boolean;
 			  };
 
-		const checkForStopReason = (): StopReason | undefined => {
-			if (this.disposed) {
-				return "parentNotConnected";
-			}
-
-			// New Parent has been elected and it is not the current client, or
-			if (this.connectedState.clientId !== this.clientElection.electedParentId) {
-				return "notElectedParent";
-			}
-
-			if (!this.connectedState.connected) {
-				return "parentNotConnected";
-			}
-
-			return undefined;
-		};
-
 		/**
 		 * Waits for startup delay or the op threshold, whichever occurs first.
 		 * @param urgent - Whether the initial op count permits bypassing the boot delay.
@@ -245,7 +220,9 @@ export class SummaryManager
 					const parentClientId = this.connectedState.clientId;
 					if (
 						parentClientId === undefined ||
-						checkForStopReason() !== undefined ||
+						this.disposed ||
+						!this.connectedState.connected ||
+						parentClientId !== this.clientElection.electedParentId ||
 						this.clientElection.hasSummarizer
 					) {
 						return;
@@ -279,12 +256,10 @@ export class SummaryManager
 			}
 
 			// A disconnected parent may still request a last summary when many ops remain.
-			const stopReason = checkForStopReason();
-			const canAttemptLastSummary =
-				startup.allowLastSummaryAfterParentDisconnect && stopReason === "parentNotConnected";
 			const canCreate =
+				this.connectedState.clientId === this.clientElection.electedParentId &&
 				!this.clientElection.hasSummarizer &&
-				(stopReason === undefined || canAttemptLastSummary);
+				(this.connectedState.connected || startup.allowLastSummaryAfterParentDisconnect);
 			if (!canCreate) {
 				this.logger.sendTelemetryEvent({
 					eventName: "EndingSummarizer",
@@ -303,21 +278,19 @@ export class SummaryManager
 			this.state = SummaryManagerState.Loading;
 			let summarizer: ISummarizer | undefined;
 			let reason = "exception";
-			let requestedStopReason: SummarizerStopReason | undefined;
+			let parentDisconnected = !this.connectedState.connected;
 			let removeListeners = (): void => {};
 			try {
 				const stopTimeout = new Promise<string>((resolve) => {
 					let timer: ReturnType<typeof setTimeout> | undefined;
 					const clearTimer = (): void => clearTimeout(timer);
-					const onResponsibilityChanged = (): void => {
-						if (requestedStopReason !== undefined) {
+					let stopRequested = false;
+					const onDisconnected = (): void => {
+						if (stopRequested) {
 							return;
 						}
-						const stopReason = checkForStopReason();
-						if (stopReason === undefined) {
-							return;
-						}
-						requestedStopReason = stopReason;
+						stopRequested = true;
+						parentDisconnected = true;
 						this.state = SummaryManagerState.Stopping;
 						timer = setTimeout(
 							() => {
@@ -325,31 +298,28 @@ export class SummaryManager
 									this.logger.sendTelemetryEvent({
 										eventName: "SummarizerStopTimeout",
 										timeoutMs: 2 * 60 * 1000,
-										stopReason,
+										stopReason: "parentNotConnected",
 									});
 									resolve("summarizerStopTimeout");
 								}
 							},
 							2 * 60 * 1000,
 						);
-						summarizer?.stop(stopReason);
+						summarizer?.stop("parentNotConnected");
 					};
 					removeListeners = () => {
 						clearTimer();
-						this.connectedState.off("disconnected", onResponsibilityChanged);
-						this.clientElection.events.off(
-							"electedSummarizerChanged",
-							onResponsibilityChanged,
-						);
+						this.connectedState.off("disconnected", onDisconnected);
 						this.internalEvents.off("disposed", onDisposed);
 					};
 					const onDisposed = (): void => {
-						requestedStopReason = undefined;
 						removeListeners();
 					};
-					this.connectedState.on("disconnected", onResponsibilityChanged);
-					this.clientElection.events.on("electedSummarizerChanged", onResponsibilityChanged);
+					this.connectedState.on("disconnected", onDisconnected);
 					this.internalEvents.on("disposed", onDisposed);
+					if (parentDisconnected) {
+						onDisconnected();
+					}
 				});
 
 				summarizer = await this.createSummarizerFn();
@@ -358,25 +328,21 @@ export class SummaryManager
 
 				// A stop may have been requested while we were awaiting summarizer creation.
 				// Replay it now so the summarizer can observe the stop intent and move to exit.
-				if (requestedStopReason !== undefined) {
-					summarizer.stop(requestedStopReason);
+				if (parentDisconnected) {
+					summarizer.stop("parentNotConnected");
 				}
 
-				// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
-				// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
-				// the summarizer at all.
-				const currentStopReason = checkForStopReason();
-				const canAttemptLastSummary =
-					allowLastSummaryAfterParentDisconnect && currentStopReason === "parentNotConnected";
-				if (currentStopReason !== undefined) {
-					if (canAttemptLastSummary) {
+				// This cycle's disconnect remains authoritative even after reconnect or parent succession.
+				// Only urgent startups may run a late child for a last-summary attempt.
+				if (this.disposed || parentDisconnected) {
+					if (allowLastSummaryAfterParentDisconnect) {
 						this.logger.sendTelemetryEvent({
 							eventName: "LastAttemptToSummarize",
 						});
 					} else {
 						this.state = SummaryManagerState.Stopping;
-						summarizer.stop(currentStopReason);
-						reason = `early exit after starting summarizer ${currentStopReason}`;
+						summarizer.stop("parentNotConnected");
+						reason = "early exit after starting summarizer parentNotConnected";
 						return;
 					}
 				}
@@ -410,7 +376,7 @@ export class SummaryManager
 				// means it also lost connection), and error happened on load (we do not have summarizer).
 				// We could annotate the error raised in Container.load where the container closed during load with no error
 				// and check for that case here, but that does not seem to be necessary.
-				if (checkForStopReason() === undefined || summarizer !== undefined) {
+				if ((!this.disposed && !parentDisconnected) || summarizer !== undefined) {
 					// Report any failure as an error unless it was due to cancellation (like "disconnected" error)
 					// If failure happened on container load, we may not yet realized that socket disconnected, so check
 					// offlineError.
