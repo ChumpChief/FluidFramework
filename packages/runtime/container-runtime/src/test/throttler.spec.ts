@@ -35,7 +35,7 @@ describe("Throttler", () => {
 	}
 
 	function getDelayAndTick(): number {
-		const delay = throttler.getDelay();
+		const delay = throttler.recordAttemptAndGetDelay();
 		clock.tick(delay);
 		assert.strictEqual(
 			throttler.latestAttemptTime,
@@ -68,7 +68,7 @@ describe("Throttler", () => {
 				attempt >= expectedMaxAttempts ? maxDelayMs : expectedDelays[attempt];
 
 			it("Should initially have zero delay", () => {
-				assert.strictEqual(throttler.getDelay(), 0);
+				assert.strictEqual(throttler.recordAttemptAndGetDelay(), 0);
 			});
 
 			it("Should increase as expected with instant failures", () => {
@@ -83,7 +83,7 @@ describe("Throttler", () => {
 				}
 			});
 
-			it("Should remain zero delay with long pauses between getDelay calls", () => {
+			it("Should remain zero delay with long pauses between attempts", () => {
 				for (let i = 0; i < 5; i++) {
 					assert.strictEqual(getDelayAndTick(), 0, `iteration ${i}`);
 					clock.tick(delayWindowMs);
@@ -95,7 +95,7 @@ describe("Throttler", () => {
 				assert.strictEqual(getDelayAndTick(), expectedDelayAt(1));
 			});
 
-			it("Should not increase with long pauses between getDelay calls", () => {
+			it("Should not increase with long pauses between attempts", () => {
 				const oneThirdTicks = Math.floor(delayWindowMs / 3);
 				const remainingTicks = delayWindowMs - 2 * oneThirdTicks;
 
@@ -136,7 +136,7 @@ describe("Throttler", () => {
 			it("State should be corrected if delay is bypassed", () => {
 				// First 2 attempts are allowed to be instant.
 				assert.strictEqual(getDelayAndTick(), 0);
-				assert.strictEqual(throttler.getDelay(), expectedDelayAt(1));
+				assert.strictEqual(throttler.recordAttemptAndGetDelay(), expectedDelayAt(1));
 
 				// This attempt is too soon, since we have not delayed 20ms.
 				assert.strictEqual(getDelayAndTick(), expectedDelayAt(2));

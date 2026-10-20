@@ -96,7 +96,7 @@ describe("Quorum summarizer creation integration", () => {
 					return request.loaded.promise;
 				},
 				{
-					getDelay: () => delay,
+					recordAttemptAndGetDelay: () => delay,
 					maxDelayMs: delay,
 					numAttempts: 0,
 				},

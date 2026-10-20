@@ -86,7 +86,7 @@ describe("Summary Manager", () => {
 	const throttler = {
 		delayMs: 0,
 		numAttempts: 0,
-		getDelay() {
+		recordAttemptAndGetDelay() {
 			return this.delayMs;
 		},
 		maxDelayMs: 0,

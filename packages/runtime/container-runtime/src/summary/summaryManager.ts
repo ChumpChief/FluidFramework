@@ -417,7 +417,7 @@ export class SummaryManager
 	 */
 	private async delayBeforeCreatingSummarizer(urgent: boolean): Promise<void> {
 		// throttle creation of new summarizer containers to prevent spamming the server with websocket connections
-		let delayMs = this.startThrottler.getDelay();
+		let delayMs = this.startThrottler.recordAttemptAndGetDelay();
 
 		// We have been elected the summarizer. Some day we may be able to summarize with a live document but for
 		// now we play it safe and launch a second copy.

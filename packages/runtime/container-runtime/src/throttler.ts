@@ -10,7 +10,7 @@ export interface IThrottler {
 	 * Computes what the throttle delay should be, and records an attempt
 	 * which will be used for calculating future attempt delays.
 	 */
-	getDelay(): number;
+	recordAttemptAndGetDelay(): number;
 
 	/**
 	 * Number of attempts that occurred within the sliding window as of
@@ -70,12 +70,12 @@ export class Throttler implements IThrottler {
 		private readonly delayFn: DelayFunction,
 	) {}
 
-	public getDelay(): number {
+	public recordAttemptAndGetDelay(): number {
 		const now = Date.now();
 
 		const latestAttemptTime = this.latestAttemptTime;
 		if (latestAttemptTime !== undefined) {
-			// If getDelay was called sooner than the most recent delay,
+			// If a new attempt was recorded sooner than the most recent delay,
 			// subtract the remaining time, since we previously added it.
 			const earlyMs = latestAttemptTime - now;
 			if (earlyMs > 0) {
