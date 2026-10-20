@@ -301,7 +301,5 @@ class MockConnectedState
 class MockThrottler implements IThrottler {
 	public getDelay = () => 0;
 	public numAttempts = 3;
-	public delayWindowMs = 0;
 	public maxDelayMs = 0;
-	public delayFn = () => 0;
 }

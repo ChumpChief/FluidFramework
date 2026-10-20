@@ -90,8 +90,6 @@ describe("Summary Manager", () => {
 			return this.delayMs;
 		},
 		maxDelayMs: 0,
-		delayWindowMs: 0,
-		delayFn: () => 0,
 	};
 
 	const summaryOp: ISummaryOpMessage = {

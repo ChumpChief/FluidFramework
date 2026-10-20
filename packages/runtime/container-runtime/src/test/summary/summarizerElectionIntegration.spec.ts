@@ -98,9 +98,7 @@ describe("Quorum summarizer creation integration", () => {
 				{
 					getDelay: () => delay,
 					maxDelayMs: delay,
-					delayWindowMs: 0,
 					numAttempts: 0,
-					delayFn: () => delay,
 				},
 				{
 					initialDelayMs: initialDelay,

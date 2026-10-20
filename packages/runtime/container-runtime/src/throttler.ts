@@ -3,6 +3,8 @@
  * Licensed under the MIT License.
  */
 
+export type DelayFunction = (numAttempts: number) => number;
+
 export interface IThrottler {
 	/**
 	 * Computes what the throttle delay should be, and records an attempt
@@ -17,19 +19,9 @@ export interface IThrottler {
 	readonly numAttempts: number;
 
 	/**
-	 * Width of sliding delay window in milliseconds.
-	 */
-	readonly delayWindowMs: number;
-	/**
 	 * Maximum delay allowed in milliseconds.
 	 */
 	readonly maxDelayMs: number;
-	/**
-	 * Delay function used to calculate what the delay should be.
-	 * The input is the number of attempts that occurred within the sliding window.
-	 * The result is the calculated delay in milliseconds.
-	 */
-	readonly delayFn: (numAttempts: number) => number;
 }
 
 /**
@@ -65,7 +57,7 @@ export class Throttler implements IThrottler {
 		/**
 		 * Width of sliding delay window in milliseconds.
 		 */
-		public readonly delayWindowMs: number,
+		private readonly delayWindowMs: number,
 		/**
 		 * Maximum delay allowed in milliseconds.
 		 */
@@ -75,7 +67,7 @@ export class Throttler implements IThrottler {
 		 * The input is the number of attempts that occurred within the sliding window.
 		 * The result is the calculated delay in milliseconds.
 		 */
-		public readonly delayFn: (numAttempts: number) => number,
+		private readonly delayFn: DelayFunction,
 	) {}
 
 	public getDelay(): number {
@@ -130,7 +122,7 @@ export const formExponentialFn =
 		coefficient = 1,
 		offset = 0,
 		initialDelay = undefined as number | undefined,
-	} = {}): IThrottler["delayFn"] =>
+	} = {}): DelayFunction =>
 	(numAttempts) =>
 		Math.max(
 			0,
@@ -150,7 +142,7 @@ export const formExponentialFnWithAttemptOffset = (
 		offset = 0,
 		initialDelay = undefined as number | undefined,
 	} = {},
-): IThrottler["delayFn"] =>
+): DelayFunction =>
 	formExponentialFn({
 		multiplier,
 		coefficient: coefficient * Math.pow(multiplier, attemptOffset),
@@ -166,7 +158,7 @@ export const formExponentialFnWithAttemptOffset = (
  * 0 ms, 1 ms, 2 ms, 3 ms, ..., n ms delays; a linear back-off.
  */
 export const formLinearFn =
-	({ coefficient = 1, offset = 0 } = {}): IThrottler["delayFn"] =>
+	({ coefficient = 1, offset = 0 } = {}): DelayFunction =>
 	(numAttempts) =>
 		Math.max(0, coefficient * numAttempts + offset);
 
@@ -176,7 +168,7 @@ export const formLinearFn =
 export const formLinearFnWithAttemptOffset = (
 	attemptOffset: number,
 	{ coefficient = 1, offset = 0 } = {},
-): IThrottler["delayFn"] =>
+): DelayFunction =>
 	formLinearFn({
 		coefficient,
 		offset: coefficient * attemptOffset + offset,
