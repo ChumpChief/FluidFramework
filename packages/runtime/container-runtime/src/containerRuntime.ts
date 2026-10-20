@@ -284,7 +284,6 @@ import {
 	DefaultSummaryConfiguration,
 	DocumentsSchemaController,
 	electedSummarizerBlobName,
-	type EnqueueSummarizeResult,
 	extractSummaryMetadataMessage,
 	formCreateSummarizerFn,
 	type IBaseSummarizeResult,
@@ -296,7 +295,6 @@ import {
 	type IDocumentSchemaChangeMessageIncoming,
 	type IDocumentSchemaCurrent,
 	type IDocumentSchemaFeatures,
-	type IEnqueueSummarizeOptions,
 	type IGeneratedSummaryStats,
 	type IGenerateSummaryTreeResult,
 	type IOnDemandSummarizeOptions,
@@ -5866,19 +5864,6 @@ export class ContainerRuntime
 			throw new UsageError(`Can't summarize, disableSummaries: ${this.summariesDisabled}`);
 		} else {
 			return this.summaryManager.summarizeOnDemand(options);
-		}
-	}
-
-	public enqueueSummarize(options: IEnqueueSummarizeOptions): EnqueueSummarizeResult {
-		if (this._summarizer !== undefined) {
-			return this._summarizer.enqueueSummarize(options);
-		} else if (this.summaryManager === undefined) {
-			// If we're not the summarizer, and we don't have a summaryManager, we expect that
-			// generateSummaries is turned off. We are throwing instead of returning a failure here,
-			// because it is a misuse of the API rather than an expected failure.
-			throw new UsageError(`Can't summarize, disableSummaries: ${this.summariesDisabled}`);
-		} else {
-			return this.summaryManager.enqueueSummarize(options);
 		}
 	}
 

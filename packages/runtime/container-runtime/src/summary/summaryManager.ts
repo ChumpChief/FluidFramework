@@ -22,16 +22,9 @@ import {
 import type { IThrottler } from "../throttler.js";
 
 import type { ISummarizerClientElection } from "./summarizerClientElection.js";
-import type {
-	IEnqueueSummarizeOptions,
-	IOnDemandSummarizeOptions,
-	ISummarizer,
-} from "./summarizerTypes.js";
+import type { IOnDemandSummarizeOptions, ISummarizer } from "./summarizerTypes.js";
 import type { SummaryCollection } from "./summaryCollection.js";
-import type {
-	EnqueueSummarizeResult,
-	ISummarizeResults,
-} from "./summaryDelayLoadedModule/index.js";
+import type { ISummarizeResults } from "./summaryDelayLoadedModule/index.js";
 
 const defaultInitialDelayMs = 5000;
 const defaultOpsToBypassInitialDelay = 4000;
@@ -433,14 +426,6 @@ export class SummaryManager
 			// TODO: could spawn a summarizer client temporarily.
 		}
 		return this.summarizer.summarizeOnDemand(options);
-	}
-
-	public enqueueSummarize(options: IEnqueueSummarizeOptions): EnqueueSummarizeResult {
-		if (this.summarizer === undefined) {
-			throw new Error("No running summarizer client");
-			// TODO: could spawn a summarizer client temporarily.
-		}
-		return this.summarizer.enqueueSummarize(options);
 	}
 
 	public dispose(): void {
