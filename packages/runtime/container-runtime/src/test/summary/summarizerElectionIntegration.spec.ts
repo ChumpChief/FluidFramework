@@ -437,6 +437,28 @@ describe("Quorum summarizer creation integration", () => {
 		assert.equal(a.requests.length, 2);
 	});
 
+	it("passes the captured parent identity to a child loaded across a new connection identity", async () => {
+		const test = setup();
+		test.add("a");
+		const a = test.parent("a");
+		await clock.tickAsync(0);
+		const request = a.requests[0];
+		assert(request !== undefined);
+		test.add("s", true);
+		a.connection.disconnect();
+		test.remove("a");
+		test.add("a2");
+		a.connection.clientId = "a2";
+		a.connection.connected = true;
+		a.connection.emit("connected", "a2");
+		request.loaded.resolve(request.child);
+		await clock.tickAsync(0);
+		assert.deepEqual(request.child.run.firstCall.args, ["a"]);
+		assert.equal(request.child.stop.firstCall.args[0], "parentNotConnected");
+		request.child.finished.resolve();
+		await clock.tickAsync(0);
+	});
+
 	it("does not issue a new creation after losing election during throttling", async () => {
 		const test = setup();
 		test.add("a");

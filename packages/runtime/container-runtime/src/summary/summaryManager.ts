@@ -56,13 +56,7 @@ export enum SummaryManagerState {
 // Please note that all reasons in this list are not errors,
 // and thus they are not raised today to parent container as error.
 // If this needs to be changed in future, we should re-evaluate what and how we raise to summarizer
-type StopReason = Extract<
-	SummarizerStopReason,
-	"parentNotConnected" | "notElectedParent" | "notElectedClient"
->;
-type ShouldSummarizeState =
-	| { shouldSummarize: true }
-	| { shouldSummarize: false; stopReason: StopReason };
+type StopReason = Extract<SummarizerStopReason, "parentNotConnected" | "notElectedParent">;
 
 export interface IConnectedEvents extends IEvent {
 	(event: "connected", listener: (clientId: string) => void);
@@ -170,7 +164,7 @@ export class SummaryManager
 	private async supervise(): Promise<void> {
 		type StartupDecision =
 			| { outcome: "disposed" }
-			| { outcome: "eligible"; allowDisconnectedRecovery: boolean };
+			| { outcome: "eligible"; parentClientId: string; allowDisconnectedRecovery: boolean };
 
 		while (!this.disposed) {
 			const startup = await new Promise<StartupDecision>((resolve) => {
@@ -184,17 +178,20 @@ export class SummaryManager
 					resolve({ outcome: "disposed" });
 				};
 				const checkEligibility = (): void => {
+					const parentClientId = this.connectedState.clientId;
 					if (
-						!this.getShouldSummarizeState().shouldSummarize ||
+						parentClientId === undefined ||
+						this.checkForStopReason() !== undefined ||
 						this.clientElection.hasSummarizer
 					) {
 						return;
 					}
 					removeListeners();
-					this.parentClientId = this.connectedState.clientId;
+					this.parentClientId = parentClientId;
 					this.state = SummaryManagerState.Waiting;
 					resolve({
 						outcome: "eligible",
+						parentClientId,
 						allowDisconnectedRecovery:
 							this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay,
 					});
@@ -208,7 +205,7 @@ export class SummaryManager
 				return;
 			}
 			try {
-				await this.runSummarization(startup.allowDisconnectedRecovery);
+				await this.runSummarization(startup.parentClientId, startup.allowDisconnectedRecovery);
 			} catch (error) {
 				this.logger.sendErrorEvent({ eventName: "SummarizerCleanupException" }, error);
 			} finally {
@@ -217,24 +214,27 @@ export class SummaryManager
 		}
 	}
 
-	private getShouldSummarizeState(): ShouldSummarizeState {
+	private checkForStopReason(): StopReason | undefined {
 		if (this.disposed) {
-			return { shouldSummarize: false, stopReason: "parentNotConnected" };
+			return "parentNotConnected";
 		}
 
 		// New Parent has been elected and it is not the current client, or
 		if (this.connectedState.clientId !== this.clientElection.electedParentId) {
-			return { shouldSummarize: false, stopReason: "notElectedParent" };
+			return "notElectedParent";
 		}
 
 		if (!this.connectedState.connected) {
-			return { shouldSummarize: false, stopReason: "parentNotConnected" };
+			return "parentNotConnected";
 		}
 
-		return { shouldSummarize: true };
+		return undefined;
 	}
 
-	private async runSummarization(allowDisconnectedRecovery: boolean): Promise<void> {
+	private async runSummarization(
+		parentClientId: string,
+		allowDisconnectedRecovery: boolean,
+	): Promise<void> {
 		let summarizer: ISummarizer | undefined;
 		let reason = "early exit (disposed)";
 		let requestedStopReason: SummarizerStopReason | undefined;
@@ -247,12 +247,11 @@ export class SummaryManager
 
 			// Check creation permission after the delay. A disconnected parent may still request
 			// a last summary when many ops remain; a parent that lost election may not.
-			const shouldSummarizeStateEarlyStage = this.getShouldSummarizeState();
+			const initialStopReason = this.checkForStopReason();
 			if (
 				this.clientElection.hasSummarizer ||
-				(!shouldSummarizeStateEarlyStage.shouldSummarize &&
-					(!allowDisconnectedRecovery ||
-						!stopReasonCanRunLastSummary(shouldSummarizeStateEarlyStage.stopReason)))
+				(initialStopReason !== undefined &&
+					(!allowDisconnectedRecovery || !stopReasonCanRunLastSummary(initialStopReason)))
 			) {
 				reason = "early exit before summarizer creation";
 				return;
@@ -268,11 +267,10 @@ export class SummaryManager
 					if (requestedStopReason !== undefined) {
 						return;
 					}
-					const responsibility = this.getShouldSummarizeState();
-					if (responsibility.shouldSummarize) {
+					const stopReason = this.checkForStopReason();
+					if (stopReason === undefined) {
 						return;
 					}
-					const stopReason = responsibility.stopReason;
 					requestedStopReason = stopReason;
 					this.state = SummaryManagerState.Stopping;
 					timer = setTimeout(
@@ -318,25 +316,19 @@ export class SummaryManager
 			// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
 			// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
 			// the summarizer at all.
-			const shouldSummarizeState = this.getShouldSummarizeState();
-			if (shouldSummarizeState.shouldSummarize === false) {
+			const currentStopReason = this.checkForStopReason();
+			if (currentStopReason !== undefined) {
 				// Disconnected recovery requires both an eligible stop reason and urgent startup.
-				if (
-					!allowDisconnectedRecovery ||
-					!stopReasonCanRunLastSummary(shouldSummarizeState.stopReason)
-				) {
+				if (!allowDisconnectedRecovery || !stopReasonCanRunLastSummary(currentStopReason)) {
 					this.state = SummaryManagerState.Stopping;
-					summarizer.stop(shouldSummarizeState.stopReason);
-					reason = `early exit after starting summarizer ${shouldSummarizeState.stopReason}`;
+					summarizer.stop(currentStopReason);
+					reason = `early exit after starting summarizer ${currentStopReason}`;
 					return;
 				}
 				this.logger.sendTelemetryEvent({
 					eventName: "LastAttemptToSummarize",
 				});
 			}
-
-			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-			const clientId = this.parentClientId!;
 
 			const child = summarizer;
 			// Stop intent is sticky even if the parent reconnects while creation is pending.
@@ -347,7 +339,7 @@ export class SummaryManager
 			reason = await PerformanceEvent.timedExecAsync(
 				this.logger,
 				{ eventName: "RunningSummarizer", attempt: this.startThrottler.numAttempts },
-				async () => Promise.race([child.run(clientId), stopTimeout]),
+				async () => Promise.race([child.run(parentClientId), stopTimeout]),
 			);
 		} catch (error) {
 			reason = "exception";
@@ -367,7 +359,7 @@ export class SummaryManager
 			// means it also lost connection), and error happened on load (we do not have summarizer).
 			// We could annotate the error raised in Container.load where the container closed during load with no error
 			// and check for that case here, but that does not seem to be necessary.
-			if (this.getShouldSummarizeState().shouldSummarize || summarizer !== undefined) {
+			if (this.checkForStopReason() === undefined || summarizer !== undefined) {
 				// Report any failure as an error unless it was due to cancellation (like "disconnected" error)
 				// If failure happened on container load, we may not yet realized that socket disconnected, so check
 				// offlineError.
