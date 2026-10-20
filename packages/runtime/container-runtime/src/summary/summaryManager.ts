@@ -204,13 +204,36 @@ export class SummaryManager
 			if (startup.outcome === "disposed") {
 				return;
 			}
-			try {
-				await this.runSummarization(startup.parentClientId, startup.allowDisconnectedRecovery);
-			} catch (error) {
-				this.logger.sendErrorEvent({ eventName: "SummarizerCleanupException" }, error);
-			} finally {
-				this.state = SummaryManagerState.Idle;
+			await this.delayBeforeCreatingSummarizer(startup.allowDisconnectedRecovery);
+			if (this.disposed) {
+				this.logger.sendTelemetryEvent({
+					eventName: "EndingSummarizer",
+					reason: "early exit (disposed)",
+				});
+			} else {
+				// A disconnected parent may still request a last summary when many ops remain.
+				const stopReason = this.checkForStopReason();
+				if (
+					this.clientElection.hasSummarizer ||
+					(stopReason !== undefined &&
+						(!startup.allowDisconnectedRecovery || !stopReasonCanRunLastSummary(stopReason)))
+				) {
+					this.logger.sendTelemetryEvent({
+						eventName: "EndingSummarizer",
+						reason: "early exit before summarizer creation",
+					});
+				} else {
+					try {
+						await this.runSummarization(
+							startup.parentClientId,
+							startup.allowDisconnectedRecovery,
+						);
+					} catch (error) {
+						this.logger.sendErrorEvent({ eventName: "SummarizerCleanupException" }, error);
+					}
+				}
 			}
+			this.state = SummaryManagerState.Idle;
 		}
 	}
 
@@ -235,31 +258,14 @@ export class SummaryManager
 		parentClientId: string,
 		allowDisconnectedRecovery: boolean,
 	): Promise<void> {
+		// Creation has been authorized; adopt ownership before the child can join quorum.
+		assert(this.state === SummaryManagerState.Waiting, 0x263 /* "Expected: waiting" */);
+		this.state = SummaryManagerState.Loading;
 		let summarizer: ISummarizer | undefined;
-		let reason = "early exit (disposed)";
+		let reason = "exception";
 		let requestedStopReason: SummarizerStopReason | undefined;
 		let removeListeners = (): void => {};
 		try {
-			await this.delayBeforeCreatingSummarizer(allowDisconnectedRecovery);
-			if (this.disposed) {
-				return;
-			}
-
-			// Check creation permission after the delay. A disconnected parent may still request
-			// a last summary when many ops remain; a parent that lost election may not.
-			const initialStopReason = this.checkForStopReason();
-			if (
-				this.clientElection.hasSummarizer ||
-				(initialStopReason !== undefined &&
-					(!allowDisconnectedRecovery || !stopReasonCanRunLastSummary(initialStopReason)))
-			) {
-				reason = "early exit before summarizer creation";
-				return;
-			}
-
-			// Adopt ownership before loading: our child may join quorum before creation returns.
-			assert(this.state === SummaryManagerState.Waiting, 0x263 /* "Expected: waiting" */);
-			this.state = SummaryManagerState.Loading;
 			const stopTimeout = new Promise<string>((resolve) => {
 				let timer: ReturnType<typeof setTimeout> | undefined;
 				const clearTimer = (): void => clearTimeout(timer);
