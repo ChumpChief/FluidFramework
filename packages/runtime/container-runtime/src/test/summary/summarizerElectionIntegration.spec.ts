@@ -292,10 +292,20 @@ describe("Quorum summarizer creation integration", () => {
 		);
 		assert.equal(a.manager.currentState, SummaryManagerState.Running);
 		assert.equal(first.child.close.callCount, 1);
+		assert.equal(
+			a.connection.listenerCount("disconnected"),
+			1,
+			"only the replacement lifecycle observes disconnect",
+		);
 		assert.equal(second.child.close.callCount, 0);
 		assert.equal(first.child.listenerCount("summarize"), 0);
 		second.child.finished.resolve();
 		await clock.tickAsync(0);
+		assert.equal(
+			a.connection.listenerCount("disconnected"),
+			0,
+			"completed lifecycle removes its disconnect listener",
+		);
 	});
 
 	for (const first of ["s1", "s2"]) {

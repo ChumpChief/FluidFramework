@@ -108,10 +108,8 @@ export class SummaryManager
 	private latestClientId: string | undefined;
 	private state = SummaryManagerState.Idle;
 	private summarizer?: ISummarizer;
-	private pendingStopReason?: SummarizerStopReason;
 	private _disposed = false;
 	private readonly internalEvents = createEmitter<{
-		stopRequested: (reason: SummarizerStopReason) => void;
 		disposed: () => void;
 	}>();
 
@@ -153,7 +151,6 @@ export class SummaryManager
 		});
 
 		this.connectedState.on("connected", this.handleConnected);
-		this.connectedState.on("disconnected", this.handleDisconnected);
 		this.latestClientId = this.connectedState.clientId;
 
 		this.opsToBypassInitialDelay = opsToBypassInitialDelay;
@@ -165,8 +162,8 @@ export class SummaryManager
 	 * a window between construction and starting where the caller can attach listeners.
 	 */
 	public start(): void {
-		this.clientElection.events.on("electedSummarizerChanged", this.refreshSummarizer);
-		this.refreshSummarizer();
+		this.clientElection.events.on("electedSummarizerChanged", this.tryStart);
+		this.tryStart();
 	}
 
 	private readonly handleConnected = (clientId: string): void => {
@@ -174,11 +171,7 @@ export class SummaryManager
 		// If we have a summarizer, it should have been either cancelled on disconnected by now.
 		// But because of lastSummary process, it can still hang around, so there is not much we can
 		// check or assert.
-		this.refreshSummarizer();
-	};
-
-	private readonly handleDisconnected = (): void => {
-		this.refreshSummarizer();
+		this.tryStart();
 	};
 
 	private getShouldSummarizeState(): ShouldSummarizeState {
@@ -198,36 +191,13 @@ export class SummaryManager
 		return { shouldSummarize: true };
 	}
 
-	private readonly refreshSummarizer = (): void => {
-		// Transition states depending on shouldSummarize, which is a calculated property
-		// that is only true if this client is connected and is the elected summarizer.
-		const shouldSummarizeState = this.getShouldSummarizeState();
-		switch (this.state) {
-			case SummaryManagerState.Idle: {
-				if (shouldSummarizeState.shouldSummarize && !this.clientElection.hasSummarizer) {
-					this.startSummarization();
-				}
-				return;
-			}
-			case SummaryManagerState.Waiting: {
-				// Recheck creation permission when the startup wait completes.
-				return;
-			}
-			case SummaryManagerState.Loading:
-			case SummaryManagerState.Running: {
-				if (shouldSummarizeState.shouldSummarize === false) {
-					this.stop(shouldSummarizeState.stopReason);
-				}
-				return;
-			}
-			case SummaryManagerState.Stopping: {
-				// Cannot take any action until running summarizer finishes
-				// state transition will occur after it stops
-				return;
-			}
-			default: {
-				return;
-			}
+	private readonly tryStart = (): void => {
+		if (
+			this.state === SummaryManagerState.Idle &&
+			this.getShouldSummarizeState().shouldSummarize &&
+			!this.clientElection.hasSummarizer
+		) {
+			this.startSummarization();
 		}
 	};
 
@@ -249,11 +219,25 @@ export class SummaryManager
 	private async runSummarization(allowDisconnectedRecovery: boolean): Promise<void> {
 		let summarizer: ISummarizer | undefined;
 		let reason = "early exit (disposed)";
+		let pendingStopReason: SummarizerStopReason | undefined;
 		let removeListeners = (): void => {};
 		const stopTimeout = new Promise<string>((resolve) => {
 			let timer: ReturnType<typeof setTimeout> | undefined;
 			const clearTimer = (): void => clearTimeout(timer);
-			const onStopRequested = (stopReason: SummarizerStopReason): void => {
+			const onResponsibilityChanged = (): void => {
+				if (
+					this.state !== SummaryManagerState.Loading &&
+					this.state !== SummaryManagerState.Running
+				) {
+					return;
+				}
+				const responsibility = this.getShouldSummarizeState();
+				if (responsibility.shouldSummarize) {
+					return;
+				}
+				const stopReason = responsibility.stopReason;
+				pendingStopReason = stopReason;
+				this.state = SummaryManagerState.Stopping;
 				clearTimer();
 				timer = setTimeout(
 					() => {
@@ -268,14 +252,21 @@ export class SummaryManager
 					},
 					2 * 60 * 1000,
 				);
+				summarizer?.stop(stopReason);
 			};
 			removeListeners = () => {
 				clearTimer();
-				this.internalEvents.off("stopRequested", onStopRequested);
-				this.internalEvents.off("disposed", clearTimer);
+				this.connectedState.off("disconnected", onResponsibilityChanged);
+				this.clientElection.events.off("electedSummarizerChanged", onResponsibilityChanged);
+				this.internalEvents.off("disposed", onDisposed);
 			};
-			this.internalEvents.on("stopRequested", onStopRequested);
-			this.internalEvents.on("disposed", clearTimer);
+			const onDisposed = (): void => {
+				pendingStopReason = undefined;
+				removeListeners();
+			};
+			this.connectedState.on("disconnected", onResponsibilityChanged);
+			this.clientElection.events.on("electedSummarizerChanged", onResponsibilityChanged);
+			this.internalEvents.on("disposed", onDisposed);
 		});
 		try {
 			await this.delayBeforeCreatingSummarizer(allowDisconnectedRecovery);
@@ -306,9 +297,9 @@ export class SummaryManager
 
 			// A stop may have been requested while we were awaiting summarizer creation.
 			// Replay it now so the summarizer can observe the stop intent and move to exit.
-			if (this.pendingStopReason !== undefined) {
-				summarizer.stop(this.pendingStopReason);
-				this.pendingStopReason = undefined;
+			if (pendingStopReason !== undefined) {
+				summarizer.stop(pendingStopReason);
+				pendingStopReason = undefined;
 			}
 
 			// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
@@ -394,27 +385,10 @@ export class SummaryManager
 				summarizer?.close();
 			} finally {
 				this.summarizer = undefined;
-				this.pendingStopReason = undefined;
 				this.state = SummaryManagerState.Idle;
-				this.refreshSummarizer();
+				this.tryStart();
 			}
 		}
-	}
-
-	private stop(reason: SummarizerStopReason): void {
-		if (
-			this.state !== SummaryManagerState.Loading &&
-			this.state !== SummaryManagerState.Running
-		) {
-			return;
-		}
-		this.state = SummaryManagerState.Stopping;
-		this.pendingStopReason = reason;
-		this.internalEvents.emit("stopRequested", reason);
-
-		// Stopping the running summarizer client should trigger a change
-		// in states when the running summarizer closes
-		this.summarizer?.stop(reason);
 	}
 
 	/**
@@ -478,11 +452,9 @@ export class SummaryManager
 	}
 
 	public dispose(): void {
-		this.clientElection.events.off("electedSummarizerChanged", this.refreshSummarizer);
+		this.clientElection.events.off("electedSummarizerChanged", this.tryStart);
 		this.connectedState.off("connected", this.handleConnected);
-		this.connectedState.off("disconnected", this.handleDisconnected);
 		this.cleanupForwardedEvents();
-		this.pendingStopReason = undefined;
 		this.internalEvents.emit("disposed");
 		this._disposed = true;
 	}
