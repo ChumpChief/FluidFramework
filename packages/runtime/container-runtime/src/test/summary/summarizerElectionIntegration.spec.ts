@@ -222,7 +222,7 @@ describe("Quorum summarizer creation integration", () => {
 		request.child.finished.resolve();
 		await clock.tickAsync(0);
 		assert.equal(request.child.close.callCount, 1);
-		assert.equal(a.manager.currentState, SummaryManagerState.Off);
+		assert.equal(a.manager.currentState, SummaryManagerState.Idle);
 		assert.equal(a.requests.length, 1);
 	});
 
@@ -337,8 +337,10 @@ describe("Quorum summarizer creation integration", () => {
 		await clock.tickAsync(0);
 		const request = a.requests[0];
 		assert(request !== undefined);
+		assert.equal(a.manager.currentState, SummaryManagerState.Loading);
 		test.add("s", true);
 		a.connection.disconnect();
+		assert.equal(a.manager.currentState, SummaryManagerState.Stopping);
 		request.loaded.resolve(request.child);
 		await clock.tickAsync(0);
 		assert.equal(request.child.run.callCount, 1);

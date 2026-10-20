@@ -41,10 +41,16 @@ const defaultInitialDelayMs = 5000;
 const defaultOpsToBypassInitialDelay = 4000;
 
 export enum SummaryManagerState {
-	Off = 0,
-	Starting = 1,
-	Running = 2,
-	Stopping = 3,
+	/** No active lifecycle or owned child. */
+	Idle,
+	/** Waiting before issuing a creation request. */
+	Waiting,
+	/** Creation requested; the child reference is not yet available. */
+	Loading,
+	/** The returned child's run() lifetime has begun. */
+	Running,
+	/** Committed to ending the cycle, including pending load, drain, and cleanup. */
+	Stopping,
 }
 
 // Please note that all reasons in this list are not errors,
@@ -100,7 +106,7 @@ export class SummaryManager
 	private readonly opsToBypassInitialDelay: number;
 	private readonly initialDelayMs: number;
 	private latestClientId: string | undefined;
-	private state = SummaryManagerState.Off;
+	private state = SummaryManagerState.Idle;
 	private summarizer?: ISummarizer;
 	private pendingStopReason?: SummarizerStopReason;
 	private _disposed = false;
@@ -175,11 +181,6 @@ export class SummaryManager
 		this.refreshSummarizer();
 	};
 
-	private static readonly isStartingOrRunning = (
-		state: SummaryManagerState,
-	): state is SummaryManagerState.Starting | SummaryManagerState.Running =>
-		state === SummaryManagerState.Starting || state === SummaryManagerState.Running;
-
 	private getShouldSummarizeState(): ShouldSummarizeState {
 		if (this.disposed) {
 			return { shouldSummarize: false, stopReason: "parentNotConnected" };
@@ -202,17 +203,17 @@ export class SummaryManager
 		// that is only true if this client is connected and is the elected summarizer.
 		const shouldSummarizeState = this.getShouldSummarizeState();
 		switch (this.state) {
-			case SummaryManagerState.Off: {
+			case SummaryManagerState.Idle: {
 				if (shouldSummarizeState.shouldSummarize && !this.clientElection.hasSummarizer) {
 					this.startSummarization();
 				}
 				return;
 			}
-			case SummaryManagerState.Starting: {
-				// Cannot take any action until summarizer is created
-				// state transition will occur after creation
+			case SummaryManagerState.Waiting: {
+				// Recheck creation permission when the startup wait completes.
 				return;
 			}
+			case SummaryManagerState.Loading:
 			case SummaryManagerState.Running: {
 				if (shouldSummarizeState.shouldSummarize === false) {
 					this.stop(shouldSummarizeState.stopReason);
@@ -231,8 +232,8 @@ export class SummaryManager
 	};
 
 	private startSummarization(): void {
-		assert(this.state === SummaryManagerState.Off, 0x261 /* "Expected: off" */);
-		this.state = SummaryManagerState.Starting;
+		assert(this.state === SummaryManagerState.Idle, 0x261 /* "Expected: idle" */);
+		this.state = SummaryManagerState.Waiting;
 
 		assert(this.summarizer === undefined, 0x262 /* "Old summarizer is still working!" */);
 
@@ -296,8 +297,8 @@ export class SummaryManager
 			}
 
 			// Adopt ownership before loading: our child may join quorum before creation returns.
-			assert(this.state === SummaryManagerState.Starting, 0x263 /* "Expected: starting" */);
-			this.state = SummaryManagerState.Running;
+			assert(this.state === SummaryManagerState.Waiting, 0x263 /* "Expected: waiting" */);
+			this.state = SummaryManagerState.Loading;
 
 			summarizer = await this.createSummarizerFn();
 			this.summarizer = summarizer;
@@ -334,6 +335,10 @@ export class SummaryManager
 			const clientId = this.latestClientId!;
 
 			const child = summarizer;
+			// Stop intent is sticky even if the parent reconnects while creation is pending.
+			if (this.state === SummaryManagerState.Loading) {
+				this.state = SummaryManagerState.Running;
+			}
 			// This performance interval ends when manager ownership ends, including forced timeout.
 			reason = await PerformanceEvent.timedExecAsync(
 				this.logger,
@@ -390,14 +395,17 @@ export class SummaryManager
 			} finally {
 				this.summarizer = undefined;
 				this.pendingStopReason = undefined;
-				this.state = SummaryManagerState.Off;
+				this.state = SummaryManagerState.Idle;
 				this.refreshSummarizer();
 			}
 		}
 	}
 
 	private stop(reason: SummarizerStopReason): void {
-		if (!SummaryManager.isStartingOrRunning(this.state)) {
+		if (
+			this.state !== SummaryManagerState.Loading &&
+			this.state !== SummaryManagerState.Running
+		) {
 			return;
 		}
 		this.state = SummaryManagerState.Stopping;
