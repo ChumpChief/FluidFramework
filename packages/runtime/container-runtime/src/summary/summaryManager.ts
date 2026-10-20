@@ -320,7 +320,7 @@ export class SummaryManager
 					!allowDisconnectedRecovery ||
 					!stopReasonCanRunLastSummary(shouldSummarizeState.stopReason)
 				) {
-					this.state = SummaryManagerState.Starting;
+					this.state = SummaryManagerState.Stopping;
 					summarizer.stop(shouldSummarizeState.stopReason);
 					reason = `early exit after starting summarizer ${shouldSummarizeState.stopReason}`;
 					return;
