@@ -79,11 +79,8 @@ export interface IConnectedState extends IEventProvider<IConnectedEvents> {
 	readonly connected: boolean;
 
 	/**
-	 * Under current implementation this is undefined if we've never connected, otherwise it's the clientId from our
-	 * latest connection (even if we've since disconnected!).  Although this happens to be the behavior we want in
-	 * SummaryManager, I suspect that globally we may eventually want to modify this behavior (e.g. make clientId
-	 * undefined while disconnected).  To protect against this, let's assume this field can't be trusted while
-	 * disconnected and instead separately track "latest clientId" in SummaryManager.
+	 * Local connection identity. The manager captures it when eligible to start a lifecycle,
+	 * retaining that parent identity even if the connection subsequently changes.
 	 */
 	readonly clientId: string | undefined;
 }
@@ -105,10 +102,12 @@ export class SummaryManager
 	private readonly logger: TelemetryLoggerExt;
 	private readonly opsToBypassInitialDelay: number;
 	private readonly initialDelayMs: number;
-	private latestClientId: string | undefined;
+	/** Parent identity captured at lifecycle eligibility and retained through disconnect/reconnect. */
+	private parentClientId: string | undefined;
 	private state = SummaryManagerState.Idle;
 	private summarizer?: ISummarizer;
 	private _disposed = false;
+	private started = false;
 	private readonly internalEvents = createEmitter<{
 		disposed: () => void;
 	}>();
@@ -146,12 +145,9 @@ export class SummaryManager
 			logger: parentLogger,
 			namespace: "SummaryManager",
 			properties: {
-				all: { clientId: () => this.latestClientId },
+				all: { clientId: () => this.parentClientId },
 			},
 		});
-
-		this.connectedState.on("connected", this.handleConnected);
-		this.latestClientId = this.connectedState.clientId;
 
 		this.opsToBypassInitialDelay = opsToBypassInitialDelay;
 		this.initialDelayMs = initialDelayMs;
@@ -162,17 +158,62 @@ export class SummaryManager
 	 * a window between construction and starting where the caller can attach listeners.
 	 */
 	public start(): void {
-		this.clientElection.events.on("electedSummarizerChanged", this.tryStart);
-		this.tryStart();
+		if (this.started || this.disposed) {
+			return;
+		}
+		this.started = true;
+		this.supervise().catch((error) => {
+			this.logger.sendErrorEvent({ eventName: "SummarizerSupervisorException" }, error);
+		});
 	}
 
-	private readonly handleConnected = (clientId: string): void => {
-		this.latestClientId = clientId;
-		// If we have a summarizer, it should have been either cancelled on disconnected by now.
-		// But because of lastSummary process, it can still hang around, so there is not much we can
-		// check or assert.
-		this.tryStart();
-	};
+	private async supervise(): Promise<void> {
+		type StartupDecision =
+			| { outcome: "disposed" }
+			| { outcome: "eligible"; allowDisconnectedRecovery: boolean };
+
+		while (!this.disposed) {
+			const startup = await new Promise<StartupDecision>((resolve) => {
+				const removeListeners = (): void => {
+					this.connectedState.off("connected", checkEligibility);
+					this.clientElection.events.off("electedSummarizerChanged", checkEligibility);
+					this.internalEvents.off("disposed", onDisposed);
+				};
+				const onDisposed = (): void => {
+					removeListeners();
+					resolve({ outcome: "disposed" });
+				};
+				const checkEligibility = (): void => {
+					if (
+						!this.getShouldSummarizeState().shouldSummarize ||
+						this.clientElection.hasSummarizer
+					) {
+						return;
+					}
+					removeListeners();
+					this.parentClientId = this.connectedState.clientId;
+					this.state = SummaryManagerState.Waiting;
+					resolve({
+						outcome: "eligible",
+						allowDisconnectedRecovery:
+							this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay,
+					});
+				};
+				this.connectedState.on("connected", checkEligibility);
+				this.clientElection.events.on("electedSummarizerChanged", checkEligibility);
+				this.internalEvents.on("disposed", onDisposed);
+				checkEligibility();
+			});
+			if (startup.outcome === "disposed") {
+				return;
+			}
+			try {
+				await this.runSummarization(startup.allowDisconnectedRecovery);
+			} catch (error) {
+				this.logger.sendErrorEvent({ eventName: "SummarizerCleanupException" }, error);
+			}
+		}
+	}
 
 	private getShouldSummarizeState(): ShouldSummarizeState {
 		if (this.disposed) {
@@ -189,31 +230,6 @@ export class SummaryManager
 		}
 
 		return { shouldSummarize: true };
-	}
-
-	private readonly tryStart = (): void => {
-		if (
-			this.state === SummaryManagerState.Idle &&
-			this.getShouldSummarizeState().shouldSummarize &&
-			!this.clientElection.hasSummarizer
-		) {
-			this.startSummarization();
-		}
-	};
-
-	private startSummarization(): void {
-		assert(this.state === SummaryManagerState.Idle, 0x261 /* "Expected: idle" */);
-		this.state = SummaryManagerState.Waiting;
-
-		assert(this.summarizer === undefined, 0x262 /* "Old summarizer is still working!" */);
-
-		// Capture urgency once; later ops may shorten waiting but do not enable recovery.
-		const allowDisconnectedRecovery =
-			this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay;
-
-		this.runSummarization(allowDisconnectedRecovery).catch((error) => {
-			this.logger.sendErrorEvent({ eventName: "SummarizerCleanupException" }, error);
-		});
 	}
 
 	private async runSummarization(allowDisconnectedRecovery: boolean): Promise<void> {
@@ -318,7 +334,7 @@ export class SummaryManager
 			}
 
 			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-			const clientId = this.latestClientId!;
+			const clientId = this.parentClientId!;
 
 			const child = summarizer;
 			// Stop intent is sticky even if the parent reconnects while creation is pending.
@@ -381,7 +397,6 @@ export class SummaryManager
 			} finally {
 				this.summarizer = undefined;
 				this.state = SummaryManagerState.Idle;
-				this.tryStart();
 			}
 		}
 	}
@@ -447,8 +462,6 @@ export class SummaryManager
 	}
 
 	public dispose(): void {
-		this.clientElection.events.off("electedSummarizerChanged", this.tryStart);
-		this.connectedState.off("connected", this.handleConnected);
 		this.cleanupForwardedEvents();
 		this.internalEvents.emit("disposed");
 		this._disposed = true;

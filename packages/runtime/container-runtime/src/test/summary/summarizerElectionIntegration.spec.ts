@@ -81,7 +81,7 @@ describe("Quorum summarizer creation integration", () => {
 		function election() {
 			return new SummarizerClientElection(quorum);
 		}
-		function parent(id: string, delay = 0, initialDelay = 0) {
+		function parent(id: string, delay = 0, initialDelay = 0, start = true) {
 			const connection = new Connection(id);
 			const observer = election();
 			const requests: { child: Child; loaded: Deferred<ISummarizer> }[] = [];
@@ -106,11 +106,43 @@ describe("Quorum summarizer creation integration", () => {
 				},
 			);
 			managers.push(manager);
-			manager.start();
+			if (start) {
+				manager.start();
+			}
 			return { manager, connection, observer, requests };
 		}
 		return { add, remove, parent, election, logger };
 	}
+
+	it("does not observe connections or create children before activation, and starts only once", async () => {
+		const test = setup();
+		test.add("a");
+		const a = test.parent("a", 0, 0, false);
+		a.connection.emit("connected", "a");
+		await clock.tickAsync(0);
+		assert.equal(a.requests.length, 0);
+		assert.equal(a.connection.listenerCount("connected"), 0);
+		a.manager.start();
+		a.manager.start();
+		await clock.tickAsync(0);
+		assert.equal(a.requests.length, 1);
+		const request = a.requests[0];
+		assert(request !== undefined);
+		test.add("s", true);
+		request.loaded.resolve(request.child);
+		await clock.tickAsync(0);
+		request.child.finished.resolve();
+		await clock.tickAsync(0);
+		assert.equal(a.manager.currentState, SummaryManagerState.Idle);
+		assert.equal(a.connection.listenerCount("connected"), 1);
+		a.manager.dispose();
+		await clock.tickAsync(0);
+		assert.equal(a.connection.listenerCount("connected"), 0);
+		test.remove("s");
+		a.manager.start();
+		await clock.tickAsync(0);
+		assert.equal(a.requests.length, 1);
+	});
 
 	it("retries after creation rejects and runs the replacement", async () => {
 		const test = setup();
