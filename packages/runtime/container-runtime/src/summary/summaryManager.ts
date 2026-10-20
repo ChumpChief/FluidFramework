@@ -211,6 +211,8 @@ export class SummaryManager
 				await this.runSummarization(startup.allowDisconnectedRecovery);
 			} catch (error) {
 				this.logger.sendErrorEvent({ eventName: "SummarizerCleanupException" }, error);
+			} finally {
+				this.state = SummaryManagerState.Idle;
 			}
 		}
 	}
@@ -392,12 +394,8 @@ export class SummaryManager
 			this.state = SummaryManagerState.Stopping;
 			removeListeners();
 			this.cleanupForwardedEvents();
-			try {
-				summarizer?.close();
-			} finally {
-				this.summarizer = undefined;
-				this.state = SummaryManagerState.Idle;
-			}
+			this.summarizer = undefined;
+			summarizer?.close();
 		}
 	}
 
