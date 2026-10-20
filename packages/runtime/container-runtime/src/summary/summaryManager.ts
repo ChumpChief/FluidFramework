@@ -30,7 +30,6 @@ import type {
 	IOnDemandSummarizeOptions,
 	ISummarizer,
 } from "./summarizerTypes.js";
-import { stopReasonCanRunLastSummary } from "./summarizerUtils.js";
 import type { SummaryCollection } from "./summaryCollection.js";
 import type {
 	EnqueueSummarizeResult,
@@ -164,7 +163,11 @@ export class SummaryManager
 	private async supervise(): Promise<void> {
 		type StartupDecision =
 			| { outcome: "disposed" }
-			| { outcome: "eligible"; parentClientId: string; allowDisconnectedRecovery: boolean };
+			| {
+					outcome: "eligible";
+					parentClientId: string;
+					allowLastSummaryAfterParentDisconnect: boolean;
+			  };
 
 		const checkForStopReason = (): StopReason | undefined => {
 			if (this.disposed) {
@@ -253,7 +256,7 @@ export class SummaryManager
 					resolve({
 						outcome: "eligible",
 						parentClientId,
-						allowDisconnectedRecovery:
+						allowLastSummaryAfterParentDisconnect:
 							this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay,
 					});
 				};
@@ -266,7 +269,7 @@ export class SummaryManager
 		const prepareCreation = async (
 			startup: Extract<StartupDecision, { outcome: "eligible" }>,
 		): Promise<boolean> => {
-			await delayBeforeCreatingSummarizer(startup.allowDisconnectedRecovery);
+			await delayBeforeCreatingSummarizer(startup.allowLastSummaryAfterParentDisconnect);
 			if (this.disposed) {
 				this.logger.sendTelemetryEvent({
 					eventName: "EndingSummarizer",
@@ -278,7 +281,8 @@ export class SummaryManager
 				if (
 					this.clientElection.hasSummarizer ||
 					(stopReason !== undefined &&
-						(!startup.allowDisconnectedRecovery || !stopReasonCanRunLastSummary(stopReason)))
+						(!startup.allowLastSummaryAfterParentDisconnect ||
+							stopReason !== "parentNotConnected"))
 				) {
 					this.logger.sendTelemetryEvent({
 						eventName: "EndingSummarizer",
@@ -294,7 +298,7 @@ export class SummaryManager
 
 		const runSummarization = async (
 			parentClientId: string,
-			allowDisconnectedRecovery: boolean,
+			allowLastSummaryAfterParentDisconnect: boolean,
 		): Promise<void> => {
 			// Creation has been authorized; adopt ownership before the child can join quorum.
 			assert(this.state === SummaryManagerState.Waiting, 0x263 /* "Expected: waiting" */);
@@ -366,7 +370,10 @@ export class SummaryManager
 				const currentStopReason = checkForStopReason();
 				if (currentStopReason !== undefined) {
 					// Disconnected recovery requires both an eligible stop reason and urgent startup.
-					if (!allowDisconnectedRecovery || !stopReasonCanRunLastSummary(currentStopReason)) {
+					if (
+						!allowLastSummaryAfterParentDisconnect ||
+						currentStopReason !== "parentNotConnected"
+					) {
 						this.state = SummaryManagerState.Stopping;
 						summarizer.stop(currentStopReason);
 						reason = `early exit after starting summarizer ${currentStopReason}`;
@@ -445,7 +452,10 @@ export class SummaryManager
 			}
 			if (await prepareCreation(startup)) {
 				try {
-					await runSummarization(startup.parentClientId, startup.allowDisconnectedRecovery);
+					await runSummarization(
+						startup.parentClientId,
+						startup.allowLastSummaryAfterParentDisconnect,
+					);
 				} catch (error) {
 					this.logger.sendErrorEvent({ eventName: "SummarizerCleanupException" }, error);
 				}

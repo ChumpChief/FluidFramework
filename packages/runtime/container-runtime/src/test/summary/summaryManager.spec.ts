@@ -552,7 +552,7 @@ describe("Summary Manager", () => {
 				connected: true,
 			});
 			clientElection.electClient(thisClientId);
-			connectedState.disconnect(); // To enforce stopReasonCanRunLastSummary == true.
+			connectedState.disconnect(); // Parent disconnection permits a last-summary attempt.
 			await flushPromises();
 			mockDeltaManager.emit("op", summaryOp);
 			await flushPromises();

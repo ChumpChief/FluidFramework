@@ -3,7 +3,6 @@
  * Licensed under the MIT License.
  */
 
-import type { SummarizerStopReason } from "@fluidframework/container-runtime-definitions/internal";
 import type { ITelemetryBaseProperties } from "@fluidframework/core-interfaces";
 import type { IPromiseTimerResult } from "@fluidframework/core-utils/internal";
 import { LoggingError } from "@fluidframework/telemetry-utils/internal";
@@ -34,16 +33,6 @@ export async function raceTimer<T>(
 		);
 	}
 	return Promise.race(promises);
-}
-
-/**
- * Should we try to run a last summary for the given stop reason?
- * Currently only allows "parentNotConnected"
- * @param stopReason - SummarizerStopReason
- * @returns `true` if the stop reason can run a last summary, otherwise `false`.
- */
-export function stopReasonCanRunLastSummary(stopReason: SummarizerStopReason): boolean {
-	return stopReason === "parentNotConnected";
 }
 
 export type SummarizeReason =
