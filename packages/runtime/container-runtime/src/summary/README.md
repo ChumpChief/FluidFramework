@@ -39,6 +39,10 @@ Election decisions use quorum-derived parent identity and occupancy. The summary
 
 Pending creation has an inherited cleanup limitation: if loading never returns a usable child, the manager's stop timeout cannot close that partially loaded container. Cancellation, disposal, and late-result cleanup at the loading boundary need a separate lifecycle follow-up. Quorum scans on membership changes also remain a potential measurement target for large, high-churn sessions.
 
+That loading follow-up must also cover a child returned after the stop deadline: the current timer does nothing while creation is pending, so a subsequently returned child can run without a remaining manager stop deadline. Preserve the expired deadline and handle the eventual child; racing creation and discarding its late result would leak ownership of a potentially connected container.
+
+`SummaryManager:RunningSummarizer` measures the manager's ownership interval. A forced stop timeout ends that interval and reports `EndingSummarizer` with reason `summarizerStopTimeout`, even if the child's `run()` promise is still pending. Later settlement of that promise does not produce another manager ending/error event or clean up a replacement child.
+
 ## When are summaries generated?
 
 The summarizer client periodically generates summary based on heuristics calculated based on configurations such as the number of user or system operations received, the amount of time a client has been idle (hasn't received any ops), the maximum time since last summary, maximum number of ops since last summary, etc. The heuristic configurations are defined by an `ISummaryConfigurationHeuristics` interface defined in [containerRuntime.ts in the container-runtime package][container-runtime].

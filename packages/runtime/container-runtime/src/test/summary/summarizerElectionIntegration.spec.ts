@@ -109,8 +109,194 @@ describe("Quorum summarizer creation integration", () => {
 			manager.start();
 			return { manager, connection, observer, requests };
 		}
-		return { add, remove, parent, election };
+		return { add, remove, parent, election, logger };
 	}
+
+	it("retries after creation rejects and runs the replacement", async () => {
+		const test = setup();
+		test.add("a");
+		const a = test.parent("a");
+		await clock.tickAsync(0);
+		const first = a.requests[0];
+		assert(first !== undefined);
+		first.loaded.reject(new Error("Creation failed"));
+		await clock.tickAsync(0);
+		const second = a.requests[1];
+		assert(second !== undefined);
+		test.add("s2", true);
+		second.loaded.resolve(second.child);
+		await clock.tickAsync(0);
+		assert.equal(second.child.run.callCount, 1);
+		assert.equal(a.manager.currentState, SummaryManagerState.Running);
+		assert.equal(first.child.close.callCount, 0, "rejected creation supplied no owned child");
+		second.child.finished.resolve();
+		await clock.tickAsync(0);
+	});
+
+	it("releases ownership and retries even when close throws", async () => {
+		const test = setup();
+		test.add("a");
+		const a = test.parent("a");
+		await clock.tickAsync(0);
+		const first = a.requests[0];
+		assert(first !== undefined);
+		test.add("s1", true);
+		first.loaded.resolve(first.child);
+		await clock.tickAsync(0);
+		first.child.close.callsFake(() => {
+			assert.equal(a.manager.currentState, SummaryManagerState.Stopping);
+			test.remove("s1");
+			throw new Error("Close failed");
+		});
+		first.child.finished.resolve();
+		await clock.tickAsync(0);
+		assert.equal(first.child.listenerCount("summarize"), 0);
+		assert.equal(first.child.close.callCount, 1);
+		assert.equal(a.requests.length, 2);
+		assert.equal(
+			test.logger.events.filter(
+				(event) => event.eventName === "SummaryManager:SummarizerCleanupException",
+			).length,
+			1,
+		);
+		const second = a.requests[1];
+		assert(second !== undefined);
+		test.add("s2", true);
+		second.loaded.resolve(second.child);
+		await clock.tickAsync(0);
+		assert.equal(second.child.run.callCount, 1);
+		second.child.finished.resolve();
+		await clock.tickAsync(0);
+	});
+
+	it("cancels the old stop timer on normal completion before replacement", async () => {
+		const test = setup();
+		test.add("a");
+		const a = test.parent("a");
+		await clock.tickAsync(0);
+		const first = a.requests[0];
+		assert(first !== undefined);
+		test.add("s1", true);
+		first.loaded.resolve(first.child);
+		await clock.tickAsync(0);
+		a.connection.disconnect();
+		a.connection.connected = true;
+		a.connection.emit("connected", "a");
+		first.child.close.callsFake(() => test.remove("s1"));
+		first.child.finished.resolve();
+		await clock.tickAsync(0);
+		assert.equal(clock.countTimers(), 0);
+		const second = a.requests[1];
+		assert(second !== undefined);
+		test.add("s2", true);
+		second.loaded.resolve(second.child);
+		await clock.tickAsync(120000);
+		assert.equal(second.child.close.callCount, 0);
+		assert.equal(a.manager.currentState, SummaryManagerState.Running);
+		assert.equal(
+			test.logger.events.filter(
+				(event) => event.eventName === "SummaryManager:SummarizerStopTimeout",
+			).length,
+			0,
+		);
+		second.child.finished.resolve();
+		await clock.tickAsync(0);
+	});
+
+	it("cancels an armed stop timer when disposed", async () => {
+		const test = setup();
+		test.add("a");
+		const a = test.parent("a");
+		await clock.tickAsync(0);
+		const request = a.requests[0];
+		assert(request !== undefined);
+		test.add("s", true);
+		request.loaded.resolve(request.child);
+		await clock.tickAsync(0);
+		a.connection.disconnect();
+		assert.equal(clock.countTimers(), 1);
+		a.manager.dispose();
+		assert.equal(clock.countTimers(), 0);
+		await clock.tickAsync(120000);
+		assert.equal(request.child.close.callCount, 0);
+		request.child.finished.resolve();
+		await clock.tickAsync(0);
+		assert.equal(request.child.close.callCount, 1);
+		assert.equal(a.manager.currentState, SummaryManagerState.Off);
+		assert.equal(a.requests.length, 1);
+	});
+
+	it("releases the old child before synchronous close callbacks can start a replacement", async () => {
+		const test = setup();
+		test.add("a");
+		const a = test.parent("a");
+		await clock.tickAsync(0);
+		const first = a.requests[0];
+		assert(first !== undefined);
+		test.add("s1", true);
+		first.loaded.resolve(first.child);
+		await clock.tickAsync(0);
+		let stateDuringClose: SummaryManagerState | undefined;
+		first.child.close.callsFake(() => {
+			stateDuringClose = a.manager.currentState;
+			test.remove("s1");
+			assert.equal(a.requests.length, 1, "close callbacks must not start a second owner");
+		});
+		first.child.finished.resolve();
+		await clock.tickAsync(0);
+		assert.equal(stateDuringClose, SummaryManagerState.Stopping);
+		assert.equal(a.requests.length, 2);
+		assert.equal(first.child.close.callCount, 1);
+	});
+
+	it("ignores a late run rejection after timeout and replacement", async () => {
+		const test = setup();
+		test.add("a");
+		const a = test.parent("a");
+		await clock.tickAsync(0);
+		const first = a.requests[0];
+		assert(first !== undefined);
+		test.add("s1", true);
+		first.loaded.resolve(first.child);
+		await clock.tickAsync(0);
+		a.connection.disconnect();
+		a.connection.connected = true;
+		a.connection.emit("connected", "a");
+		first.child.close.callsFake(() => test.remove("s1"));
+		await clock.tickAsync(120000);
+		const ended = test.logger.events.filter(
+			(event) => event.eventName === "SummaryManager:RunningSummarizer_end",
+		);
+		assert.equal(ended.length, 1, "ownership interval ends at the stop deadline");
+		assert.equal(ended[0].duration, 120000);
+		assert.equal(
+			test.logger.events.filter(
+				(event) =>
+					event.eventName === "SummaryManager:EndingSummarizer" &&
+					event.reason === "summarizerStopTimeout",
+			).length,
+			1,
+		);
+		const second = a.requests[1];
+		assert(second !== undefined);
+		test.add("s2", true);
+		second.loaded.resolve(second.child);
+		await clock.tickAsync(0);
+		const eventsBeforeLateFailure = test.logger.events.length;
+		first.child.finished.reject(new Error("Late run failure"));
+		await clock.tickAsync(0);
+		assert.equal(
+			test.logger.events.length,
+			eventsBeforeLateFailure,
+			"late failure does not emit manager errors or another ending event",
+		);
+		assert.equal(a.manager.currentState, SummaryManagerState.Running);
+		assert.equal(first.child.close.callCount, 1);
+		assert.equal(second.child.close.callCount, 0);
+		assert.equal(first.child.listenerCount("summarize"), 0);
+		second.child.finished.resolve();
+		await clock.tickAsync(0);
+	});
 
 	for (const first of ["s1", "s2"]) {
 		it(`waits for the last sequenced child departure during handoff (${first} leaves first)`, async () => {
