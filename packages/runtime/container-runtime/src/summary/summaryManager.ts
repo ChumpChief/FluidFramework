@@ -219,55 +219,8 @@ export class SummaryManager
 	private async runSummarization(allowDisconnectedRecovery: boolean): Promise<void> {
 		let summarizer: ISummarizer | undefined;
 		let reason = "early exit (disposed)";
-		let pendingStopReason: SummarizerStopReason | undefined;
+		let requestedStopReason: SummarizerStopReason | undefined;
 		let removeListeners = (): void => {};
-		const stopTimeout = new Promise<string>((resolve) => {
-			let timer: ReturnType<typeof setTimeout> | undefined;
-			const clearTimer = (): void => clearTimeout(timer);
-			const onResponsibilityChanged = (): void => {
-				if (
-					this.state !== SummaryManagerState.Loading &&
-					this.state !== SummaryManagerState.Running
-				) {
-					return;
-				}
-				const responsibility = this.getShouldSummarizeState();
-				if (responsibility.shouldSummarize) {
-					return;
-				}
-				const stopReason = responsibility.stopReason;
-				pendingStopReason = stopReason;
-				this.state = SummaryManagerState.Stopping;
-				clearTimer();
-				timer = setTimeout(
-					() => {
-						if (summarizer !== undefined) {
-							this.logger.sendTelemetryEvent({
-								eventName: "SummarizerStopTimeout",
-								timeoutMs: 2 * 60 * 1000,
-								stopReason,
-							});
-							resolve("summarizerStopTimeout");
-						}
-					},
-					2 * 60 * 1000,
-				);
-				summarizer?.stop(stopReason);
-			};
-			removeListeners = () => {
-				clearTimer();
-				this.connectedState.off("disconnected", onResponsibilityChanged);
-				this.clientElection.events.off("electedSummarizerChanged", onResponsibilityChanged);
-				this.internalEvents.off("disposed", onDisposed);
-			};
-			const onDisposed = (): void => {
-				pendingStopReason = undefined;
-				removeListeners();
-			};
-			this.connectedState.on("disconnected", onResponsibilityChanged);
-			this.clientElection.events.on("electedSummarizerChanged", onResponsibilityChanged);
-			this.internalEvents.on("disposed", onDisposed);
-		});
 		try {
 			await this.delayBeforeCreatingSummarizer(allowDisconnectedRecovery);
 			if (this.disposed) {
@@ -290,6 +243,49 @@ export class SummaryManager
 			// Adopt ownership before loading: our child may join quorum before creation returns.
 			assert(this.state === SummaryManagerState.Waiting, 0x263 /* "Expected: waiting" */);
 			this.state = SummaryManagerState.Loading;
+			const stopTimeout = new Promise<string>((resolve) => {
+				let timer: ReturnType<typeof setTimeout> | undefined;
+				const clearTimer = (): void => clearTimeout(timer);
+				const onResponsibilityChanged = (): void => {
+					if (requestedStopReason !== undefined) {
+						return;
+					}
+					const responsibility = this.getShouldSummarizeState();
+					if (responsibility.shouldSummarize) {
+						return;
+					}
+					const stopReason = responsibility.stopReason;
+					requestedStopReason = stopReason;
+					this.state = SummaryManagerState.Stopping;
+					timer = setTimeout(
+						() => {
+							if (summarizer !== undefined) {
+								this.logger.sendTelemetryEvent({
+									eventName: "SummarizerStopTimeout",
+									timeoutMs: 2 * 60 * 1000,
+									stopReason,
+								});
+								resolve("summarizerStopTimeout");
+							}
+						},
+						2 * 60 * 1000,
+					);
+					summarizer?.stop(stopReason);
+				};
+				removeListeners = () => {
+					clearTimer();
+					this.connectedState.off("disconnected", onResponsibilityChanged);
+					this.clientElection.events.off("electedSummarizerChanged", onResponsibilityChanged);
+					this.internalEvents.off("disposed", onDisposed);
+				};
+				const onDisposed = (): void => {
+					requestedStopReason = undefined;
+					removeListeners();
+				};
+				this.connectedState.on("disconnected", onResponsibilityChanged);
+				this.clientElection.events.on("electedSummarizerChanged", onResponsibilityChanged);
+				this.internalEvents.on("disposed", onDisposed);
+			});
 
 			summarizer = await this.createSummarizerFn();
 			this.summarizer = summarizer;
@@ -297,9 +293,8 @@ export class SummaryManager
 
 			// A stop may have been requested while we were awaiting summarizer creation.
 			// Replay it now so the summarizer can observe the stop intent and move to exit.
-			if (pendingStopReason !== undefined) {
-				summarizer.stop(pendingStopReason);
-				pendingStopReason = undefined;
+			if (requestedStopReason !== undefined) {
+				summarizer.stop(requestedStopReason);
 			}
 
 			// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
