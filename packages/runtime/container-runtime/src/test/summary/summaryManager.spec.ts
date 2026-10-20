@@ -66,7 +66,7 @@ describe("Summary Manager", () => {
 		clock = sinon.useFakeTimers();
 	});
 	after(() => clock.restore());
-	const flushPromises = async () => new Promise((resolve) => process.nextTick(resolve));
+	const flushPromises = async () => clock.tickAsync(0);
 	const thisClientId = "this";
 	const mockLogger = new MockLogger();
 	const mockDeltaManager = new MockDeltaManager();
@@ -491,21 +491,9 @@ describe("Summary Manager", () => {
 				connected: true,
 			});
 
-			// Simulate disposing the summary manager in between (potential) initial delay and actually starting
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-			const summaryManager_delayBeforeCreatingSummarizer =
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-				(summaryManager as any).delayBeforeCreatingSummarizer.bind(summaryManager);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-			(summaryManager as any).delayBeforeCreatingSummarizer = async (...args) => {
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
-				const result = await summaryManager_delayBeforeCreatingSummarizer(...args);
-				summaryManager.dispose();
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-				return result;
-			};
-
 			clientElection.electClient(thisClientId);
+			// Startup continues asynchronously even when the initial delay is bypassed.
+			summaryManager.dispose();
 			await flushPromises(); // To get to the main continuation in startSummarization
 			await flushPromises(); // To get to the finally continuation in startSummarization
 			assertState(

@@ -166,8 +166,69 @@ export class SummaryManager
 			| { outcome: "disposed" }
 			| { outcome: "eligible"; parentClientId: string; allowDisconnectedRecovery: boolean };
 
-		while (!this.disposed) {
-			const startup = await new Promise<StartupDecision>((resolve) => {
+		const checkForStopReason = (): StopReason | undefined => {
+			if (this.disposed) {
+				return "parentNotConnected";
+			}
+
+			// New Parent has been elected and it is not the current client, or
+			if (this.connectedState.clientId !== this.clientElection.electedParentId) {
+				return "notElectedParent";
+			}
+
+			if (!this.connectedState.connected) {
+				return "parentNotConnected";
+			}
+
+			return undefined;
+		};
+
+		/**
+		 * Waits for startup delay or the op threshold, whichever occurs first.
+		 * @param urgent - Whether the initial op count permits bypassing the boot delay.
+		 */
+		const delayBeforeCreatingSummarizer = async (urgent: boolean): Promise<void> => {
+			// throttle creation of new summarizer containers to prevent spamming the server with websocket connections
+			let delayMs = this.startThrottler.recordAttemptAndGetDelay();
+
+			// We have been elected the summarizer. Some day we may be able to summarize with a live document but for
+			// now we play it safe and launch a second copy.
+			this.logger.sendTelemetryEvent({
+				eventName: "CreatingSummarizer",
+				throttlerDelay: delayMs,
+				initialDelay: this.initialDelayMs,
+				startThrottlerMaxDelayMs: this.startThrottler.maxDelayMs,
+				opsSinceLastAck: this.summaryCollection.opsSinceLastAck,
+				opsToBypassInitialDelay: this.opsToBypassInitialDelay,
+				electedParentId: this.clientElection.electedParentId,
+				hasSummarizer: this.clientElection.hasSummarizer,
+			});
+
+			if (!urgent) {
+				delayMs = Math.max(delayMs, this.initialDelayMs);
+			}
+
+			if (delayMs > 0) {
+				await new Promise<void>((resolve) => {
+					const complete = (): void => {
+						clearTimeout(timer);
+						this.summaryCollection.removeOpListener(opsListener);
+						resolve();
+					};
+					const timer = setTimeout(complete, delayMs);
+					// An incoming op crossing the threshold bypasses both initial delay and throttling.
+					const opsListener = (): void => {
+						if (this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay) {
+							complete();
+						}
+					};
+					this.summaryCollection.addOpListener(opsListener);
+				});
+			}
+		};
+
+		const waitForEligibility = async (): Promise<StartupDecision> =>
+			new Promise<StartupDecision>((resolve) => {
 				const removeListeners = (): void => {
 					this.connectedState.off("connected", checkEligibility);
 					this.clientElection.events.off("electedSummarizerChanged", checkEligibility);
@@ -181,7 +242,7 @@ export class SummaryManager
 					const parentClientId = this.connectedState.clientId;
 					if (
 						parentClientId === undefined ||
-						this.checkForStopReason() !== undefined ||
+						checkForStopReason() !== undefined ||
 						this.clientElection.hasSummarizer
 					) {
 						return;
@@ -201,10 +262,11 @@ export class SummaryManager
 				this.internalEvents.on("disposed", onDisposed);
 				checkEligibility();
 			});
-			if (startup.outcome === "disposed") {
-				return;
-			}
-			await this.delayBeforeCreatingSummarizer(startup.allowDisconnectedRecovery);
+
+		const prepareCreation = async (
+			startup: Extract<StartupDecision, { outcome: "eligible" }>,
+		): Promise<boolean> => {
+			await delayBeforeCreatingSummarizer(startup.allowDisconnectedRecovery);
 			if (this.disposed) {
 				this.logger.sendTelemetryEvent({
 					eventName: "EndingSummarizer",
@@ -212,7 +274,7 @@ export class SummaryManager
 				});
 			} else {
 				// A disconnected parent may still request a last summary when many ops remain.
-				const stopReason = this.checkForStopReason();
+				const stopReason = checkForStopReason();
 				if (
 					this.clientElection.hasSummarizer ||
 					(stopReason !== undefined &&
@@ -222,222 +284,173 @@ export class SummaryManager
 						eventName: "EndingSummarizer",
 						reason: "early exit before summarizer creation",
 					});
+					return false;
 				} else {
-					try {
-						await this.runSummarization(
-							startup.parentClientId,
-							startup.allowDisconnectedRecovery,
+					return true;
+				}
+			}
+			return false;
+		};
+
+		const runSummarization = async (
+			parentClientId: string,
+			allowDisconnectedRecovery: boolean,
+		): Promise<void> => {
+			// Creation has been authorized; adopt ownership before the child can join quorum.
+			assert(this.state === SummaryManagerState.Waiting, 0x263 /* "Expected: waiting" */);
+			this.state = SummaryManagerState.Loading;
+			let summarizer: ISummarizer | undefined;
+			let reason = "exception";
+			let requestedStopReason: SummarizerStopReason | undefined;
+			let removeListeners = (): void => {};
+			try {
+				const stopTimeout = new Promise<string>((resolve) => {
+					let timer: ReturnType<typeof setTimeout> | undefined;
+					const clearTimer = (): void => clearTimeout(timer);
+					const onResponsibilityChanged = (): void => {
+						if (requestedStopReason !== undefined) {
+							return;
+						}
+						const stopReason = checkForStopReason();
+						if (stopReason === undefined) {
+							return;
+						}
+						requestedStopReason = stopReason;
+						this.state = SummaryManagerState.Stopping;
+						timer = setTimeout(
+							() => {
+								if (summarizer !== undefined) {
+									this.logger.sendTelemetryEvent({
+										eventName: "SummarizerStopTimeout",
+										timeoutMs: 2 * 60 * 1000,
+										stopReason,
+									});
+									resolve("summarizerStopTimeout");
+								}
+							},
+							2 * 60 * 1000,
 						);
-					} catch (error) {
-						this.logger.sendErrorEvent({ eventName: "SummarizerCleanupException" }, error);
-					}
-				}
-			}
-			this.state = SummaryManagerState.Idle;
-		}
-	}
-
-	private checkForStopReason(): StopReason | undefined {
-		if (this.disposed) {
-			return "parentNotConnected";
-		}
-
-		// New Parent has been elected and it is not the current client, or
-		if (this.connectedState.clientId !== this.clientElection.electedParentId) {
-			return "notElectedParent";
-		}
-
-		if (!this.connectedState.connected) {
-			return "parentNotConnected";
-		}
-
-		return undefined;
-	}
-
-	private async runSummarization(
-		parentClientId: string,
-		allowDisconnectedRecovery: boolean,
-	): Promise<void> {
-		// Creation has been authorized; adopt ownership before the child can join quorum.
-		assert(this.state === SummaryManagerState.Waiting, 0x263 /* "Expected: waiting" */);
-		this.state = SummaryManagerState.Loading;
-		let summarizer: ISummarizer | undefined;
-		let reason = "exception";
-		let requestedStopReason: SummarizerStopReason | undefined;
-		let removeListeners = (): void => {};
-		try {
-			const stopTimeout = new Promise<string>((resolve) => {
-				let timer: ReturnType<typeof setTimeout> | undefined;
-				const clearTimer = (): void => clearTimeout(timer);
-				const onResponsibilityChanged = (): void => {
-					if (requestedStopReason !== undefined) {
-						return;
-					}
-					const stopReason = this.checkForStopReason();
-					if (stopReason === undefined) {
-						return;
-					}
-					requestedStopReason = stopReason;
-					this.state = SummaryManagerState.Stopping;
-					timer = setTimeout(
-						() => {
-							if (summarizer !== undefined) {
-								this.logger.sendTelemetryEvent({
-									eventName: "SummarizerStopTimeout",
-									timeoutMs: 2 * 60 * 1000,
-									stopReason,
-								});
-								resolve("summarizerStopTimeout");
-							}
-						},
-						2 * 60 * 1000,
-					);
-					summarizer?.stop(stopReason);
-				};
-				removeListeners = () => {
-					clearTimer();
-					this.connectedState.off("disconnected", onResponsibilityChanged);
-					this.clientElection.events.off("electedSummarizerChanged", onResponsibilityChanged);
-					this.internalEvents.off("disposed", onDisposed);
-				};
-				const onDisposed = (): void => {
-					requestedStopReason = undefined;
-					removeListeners();
-				};
-				this.connectedState.on("disconnected", onResponsibilityChanged);
-				this.clientElection.events.on("electedSummarizerChanged", onResponsibilityChanged);
-				this.internalEvents.on("disposed", onDisposed);
-			});
-
-			summarizer = await this.createSummarizerFn();
-			this.summarizer = summarizer;
-			this.setupForwardedEvents(summarizer);
-
-			// A stop may have been requested while we were awaiting summarizer creation.
-			// Replay it now so the summarizer can observe the stop intent and move to exit.
-			if (requestedStopReason !== undefined) {
-				summarizer.stop(requestedStopReason);
-			}
-
-			// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
-			// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
-			// the summarizer at all.
-			const currentStopReason = this.checkForStopReason();
-			if (currentStopReason !== undefined) {
-				// Disconnected recovery requires both an eligible stop reason and urgent startup.
-				if (!allowDisconnectedRecovery || !stopReasonCanRunLastSummary(currentStopReason)) {
-					this.state = SummaryManagerState.Stopping;
-					summarizer.stop(currentStopReason);
-					reason = `early exit after starting summarizer ${currentStopReason}`;
-					return;
-				}
-				this.logger.sendTelemetryEvent({
-					eventName: "LastAttemptToSummarize",
+						summarizer?.stop(stopReason);
+					};
+					removeListeners = () => {
+						clearTimer();
+						this.connectedState.off("disconnected", onResponsibilityChanged);
+						this.clientElection.events.off(
+							"electedSummarizerChanged",
+							onResponsibilityChanged,
+						);
+						this.internalEvents.off("disposed", onDisposed);
+					};
+					const onDisposed = (): void => {
+						requestedStopReason = undefined;
+						removeListeners();
+					};
+					this.connectedState.on("disconnected", onResponsibilityChanged);
+					this.clientElection.events.on("electedSummarizerChanged", onResponsibilityChanged);
+					this.internalEvents.on("disposed", onDisposed);
 				});
-			}
 
-			const child = summarizer;
-			// Stop intent is sticky even if the parent reconnects while creation is pending.
-			if (this.state === SummaryManagerState.Loading) {
-				this.state = SummaryManagerState.Running;
-			}
-			// This performance interval ends when manager ownership ends, including forced timeout.
-			reason = await PerformanceEvent.timedExecAsync(
-				this.logger,
-				{ eventName: "RunningSummarizer", attempt: this.startThrottler.numAttempts },
-				async () => Promise.race([child.run(parentClientId), stopTimeout]),
-			);
-		} catch (error) {
-			reason = "exception";
-			this.logger.sendTelemetryEvent(
-				{
-					eventName: "EndingSummarizer",
-					reason: "exception",
-				},
-				error,
-			);
+				summarizer = await this.createSummarizerFn();
+				this.summarizer = summarizer;
+				this.setupForwardedEvents(summarizer);
 
-			// Most of exceptions happen due to container being closed while loading it, due to
-			// summarizer container loosing connection while load.
-			// Not worth reporting such errors as errors. That said, we might miss some real errors if
-			// we ignore blindly, so try to narrow signature we are looking for - skip logging
-			// error only if this client should no longer be a summarizer (which in practice
-			// means it also lost connection), and error happened on load (we do not have summarizer).
-			// We could annotate the error raised in Container.load where the container closed during load with no error
-			// and check for that case here, but that does not seem to be necessary.
-			if (this.checkForStopReason() === undefined || summarizer !== undefined) {
-				// Report any failure as an error unless it was due to cancellation (like "disconnected" error)
-				// If failure happened on container load, we may not yet realized that socket disconnected, so check
-				// offlineError.
-				const category =
-					typeof error === "object" &&
-					error !== null &&
-					"errorType" in error &&
-					error.errorType === DriverErrorTypes.offlineError
-						? "generic"
-						: "error";
+				// A stop may have been requested while we were awaiting summarizer creation.
+				// Replay it now so the summarizer can observe the stop intent and move to exit.
+				if (requestedStopReason !== undefined) {
+					summarizer.stop(requestedStopReason);
+				}
+
+				// Re-validate that it need to be running. Due to asynchrony, it may be not the case anymore
+				// If we can't run the LastSummary, simply return as to avoid paying the cost of launching
+				// the summarizer at all.
+				const currentStopReason = checkForStopReason();
+				if (currentStopReason !== undefined) {
+					// Disconnected recovery requires both an eligible stop reason and urgent startup.
+					if (!allowDisconnectedRecovery || !stopReasonCanRunLastSummary(currentStopReason)) {
+						this.state = SummaryManagerState.Stopping;
+						summarizer.stop(currentStopReason);
+						reason = `early exit after starting summarizer ${currentStopReason}`;
+						return;
+					}
+					this.logger.sendTelemetryEvent({
+						eventName: "LastAttemptToSummarize",
+					});
+				}
+
+				const child = summarizer;
+				// Stop intent is sticky even if the parent reconnects while creation is pending.
+				if (this.state === SummaryManagerState.Loading) {
+					this.state = SummaryManagerState.Running;
+				}
+				// This performance interval ends when manager ownership ends, including forced timeout.
+				reason = await PerformanceEvent.timedExecAsync(
+					this.logger,
+					{ eventName: "RunningSummarizer", attempt: this.startThrottler.numAttempts },
+					async () => Promise.race([child.run(parentClientId), stopTimeout]),
+				);
+			} catch (error) {
+				reason = "exception";
 				this.logger.sendTelemetryEvent(
 					{
-						eventName: "SummarizerException",
-						category,
+						eventName: "EndingSummarizer",
+						reason: "exception",
 					},
 					error,
 				);
+
+				// Most of exceptions happen due to container being closed while loading it, due to
+				// summarizer container loosing connection while load.
+				// Not worth reporting such errors as errors. That said, we might miss some real errors if
+				// we ignore blindly, so try to narrow signature we are looking for - skip logging
+				// error only if this client should no longer be a summarizer (which in practice
+				// means it also lost connection), and error happened on load (we do not have summarizer).
+				// We could annotate the error raised in Container.load where the container closed during load with no error
+				// and check for that case here, but that does not seem to be necessary.
+				if (checkForStopReason() === undefined || summarizer !== undefined) {
+					// Report any failure as an error unless it was due to cancellation (like "disconnected" error)
+					// If failure happened on container load, we may not yet realized that socket disconnected, so check
+					// offlineError.
+					const category =
+						typeof error === "object" &&
+						error !== null &&
+						"errorType" in error &&
+						error.errorType === DriverErrorTypes.offlineError
+							? "generic"
+							: "error";
+					this.logger.sendTelemetryEvent(
+						{
+							eventName: "SummarizerException",
+							category,
+						},
+						error,
+					);
+				}
+			} finally {
+				if (reason !== "exception") {
+					this.logger.sendTelemetryEvent({ eventName: "EndingSummarizer", reason });
+				}
+				// Stay non-idle while close() can synchronously trigger connection or quorum callbacks.
+				this.state = SummaryManagerState.Stopping;
+				removeListeners();
+				this.cleanupForwardedEvents();
+				this.summarizer = undefined;
+				summarizer?.close();
 			}
-		} finally {
-			if (reason !== "exception") {
-				this.logger.sendTelemetryEvent({ eventName: "EndingSummarizer", reason });
+		};
+
+		while (!this.disposed) {
+			const startup = await waitForEligibility();
+			if (startup.outcome === "disposed") {
+				return;
 			}
-			// Stay non-idle while close() can synchronously trigger connection or quorum callbacks.
-			this.state = SummaryManagerState.Stopping;
-			removeListeners();
-			this.cleanupForwardedEvents();
-			this.summarizer = undefined;
-			summarizer?.close();
-		}
-	}
-
-	/**
-	 * Waits for startup delay or the op threshold, whichever occurs first.
-	 * @param urgent - Whether the initial op count permits bypassing the boot delay.
-	 */
-	private async delayBeforeCreatingSummarizer(urgent: boolean): Promise<void> {
-		// throttle creation of new summarizer containers to prevent spamming the server with websocket connections
-		let delayMs = this.startThrottler.recordAttemptAndGetDelay();
-
-		// We have been elected the summarizer. Some day we may be able to summarize with a live document but for
-		// now we play it safe and launch a second copy.
-		this.logger.sendTelemetryEvent({
-			eventName: "CreatingSummarizer",
-			throttlerDelay: delayMs,
-			initialDelay: this.initialDelayMs,
-			startThrottlerMaxDelayMs: this.startThrottler.maxDelayMs,
-			opsSinceLastAck: this.summaryCollection.opsSinceLastAck,
-			opsToBypassInitialDelay: this.opsToBypassInitialDelay,
-			electedParentId: this.clientElection.electedParentId,
-			hasSummarizer: this.clientElection.hasSummarizer,
-		});
-
-		if (!urgent) {
-			delayMs = Math.max(delayMs, this.initialDelayMs);
-		}
-
-		if (delayMs > 0) {
-			await new Promise<void>((resolve) => {
-				const complete = (): void => {
-					clearTimeout(timer);
-					this.summaryCollection.removeOpListener(opsListener);
-					resolve();
-				};
-				const timer = setTimeout(complete, delayMs);
-				// An incoming op crossing the threshold bypasses both initial delay and throttling.
-				const opsListener = (): void => {
-					if (this.summaryCollection.opsSinceLastAck >= this.opsToBypassInitialDelay) {
-						complete();
-					}
-				};
-				this.summaryCollection.addOpListener(opsListener);
-			});
+			if (await prepareCreation(startup)) {
+				try {
+					await runSummarization(startup.parentClientId, startup.allowDisconnectedRecovery);
+				} catch (error) {
+					this.logger.sendErrorEvent({ eventName: "SummarizerCleanupException" }, error);
+				}
+			}
+			this.state = SummaryManagerState.Idle;
 		}
 	}
 
