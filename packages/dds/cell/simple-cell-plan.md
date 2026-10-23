@@ -14,23 +14,42 @@ The goal is to establish a new pattern for a distributed data structure (DDS) th
   Do not add compatibility wrappers or preserve existing interfaces merely to avoid a breaking change.
 
 Use Cell's behavior as a reference, not its class hierarchy as a template.
-Do not build a general-purpose DDS framework or migrate other DDSs as part of this experiment.
+Keep reusable abstractions grounded in this experiment rather than building a general-purpose DDS framework.
+The exploration has extracted a generic ordered-operation contract and Fluid adapter, exercised by Cell and a test-only log.
+Do not migrate other production DDSs as part of this experiment.
 
-## Proposed structure
+## Current structure
 
 ```text
-Application
-    |
-    v
-SimpleCell<T>  <---->  Fluid adapter  <---->  Fluid runtime
-    |
-    +-- value, edits, events, operations, pending edits, acknowledgments
+Application                                    Fluid runtime
+    |                                                |
+    | SimpleCellView<T>                              | IChannel
+    v                                                v
++------------------------------+       +------------------------------+
+| SimpleCell<T>                |       | DdsChannel<TView>            |
+|                              |       |                              |
+| App-facing interface:        |       | Generic Fluid adapter        |
+|   SimpleCellView<T>           |       |                              |
+|                              |<----->| Uses ReplicatedDataStructure |
+| Host-facing interface:       |       | for replication and state    |
+|   ReplicatedDataStructure    |       |                              |
+|                              |       | entryPoint and handle.get()  |
+| Value, edits, events, ops,    |<------| expose the app-facing view   |
+| pending edits, ack/rollback  |       |                              |
++------------------------------+       +------------------------------+
+       One Cell instance
 ```
 
-The adapter contains a `SimpleCell`; it does not become the Cell by forwarding or merging all of its properties.
-The application can use the same Cell API with or without Fluid.
-A small replication-control interface may expose additional methods to the adapter, but it operates on the same Cell state and implementation.
-It is not a separate value model or replication engine.
+`DdsChannel<TView>` is generic: it has no Cell-specific imports or knowledge of Cell operations and snapshots.
+A `DataStructureDefinition<TView>` creates or restores `{ dds, value }` for the adapter.
+The adapter retains `dds` through the host-facing `ReplicatedDataStructure` contract and exposes `value` as its application entry point.
+For Cell, both are the same `SimpleCell<T>` instance, exposed through different interfaces; there is no separate view wrapper, value model, or replication engine.
+The generic contract also permits distinct DDS and application objects.
+
+Applications use `SimpleCellView<T>` for ordinary Cell operations, with the same API available in standalone use.
+The adapter does not become the Cell by forwarding or merging its properties.
+The Fluid creation helper returns `{ value, handle }`; both local and serialized handle resolution return the application-facing Cell.
+The runtime retains the adapter for channel management.
 
 | SimpleCell owns | Fluid adapter owns |
 | --- | --- |
@@ -161,14 +180,24 @@ The Fluid adapter should own integration policy, not a second implementation of 
 Record what the experiment establishes and which remaining dependencies prevent independent packaging.
 Do not generalize the adapter into a new framework until this concrete implementation exposes a useful reusable boundary.
 
-## Decisions to resolve during the experiment
+## Provisional decisions and remaining questions
 
-- What is the smallest host API that supports initial-state handoff, acknowledgments, and pending-edit replay?
-- Which callback and submission failure rules should the new Cell guarantee?
-- Should standalone values be unconstrained `T`, with serialization enforced by each host, or should the standalone API require a codec?
-- What explicit channel entry-point contract gives local creation and remote handle resolution the same app-facing object semantics?
+The prototype has selected the following answers, detailed in the implementation sections below:
 
-These are design questions for the prototype, not requirements to preserve the current inheritance-based architecture.
+- **Host boundary:** `ReplicatedDataStructure` covers replication startup, operation delivery, resubmission, replay, rollback, snapshots, and retained reference data.
+  The host establishes initial shared state and owns transport identity, delivery ordering, and duplicate suppression.
+  This boundary is exercised by Cell and a test-only log; it is not established as sufficient for other production DDSs.
+- **Failure rules:** publication and listener failures propagate and permanently fault Cell.
+  Submission must synchronously accept or queue operations and must not reenter editing or replication methods.
+  Event listeners may make nested edits.
+- **Values and encoding:** standalone values are unconstrained `T`, without a codec requirement.
+  Each host owns encoding and payload restrictions; Cell validates its own operation structure.
+- **Application identity:** `ChannelWithEntryPoint<T>` separates the runtime channel from its application value.
+  The creation helper returns the scoped application value and its handle, and both local and serialized handles resolve to that value.
+
+Remaining questions include whether this boundary generalizes to DDSs needing batching or sequencing information, how to support multipart and asynchronous or incremental snapshots, and how creation APIs such as `SharedObjectKind` and `fluid-static` should adopt separate application objects.
+Independent packaging also remains a later decision.
+These are provisional choices for the experiment, not commitments to a supported API or requirements to preserve the current inheritance-based architecture.
 
 ## Stage 1 implementation
 
