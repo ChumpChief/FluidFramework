@@ -88,6 +88,14 @@ export class SummarizerClientElection
 				if (!hasSummarizer || !this.hasSummarizer) {
 					this.progressSequenceNumber = deltaManager.lastSequenceNumber;
 				}
+				childLogger.sendTelemetryEvent({
+					eventName: "ElectionChanged",
+					previousElectedParentId: parentId,
+					electedParentId: this.electedParentId,
+					previousHasSummarizer: hasSummarizer,
+					hasSummarizer: this.hasSummarizer,
+					sequenceNumber: deltaManager.lastSequenceNumber,
+				});
 				this.emit("electedSummarizerChanged");
 			}
 		};

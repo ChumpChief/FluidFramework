@@ -61,6 +61,12 @@ describe("Summarizer Client Election", () => {
 			quorum,
 			summaries,
 			logger,
+			get progressWarnings() {
+				return logger.events.filter(
+					(event) =>
+						event.eventName === "SummarizerClientElection:ElectedClientNotSummarizing",
+				);
+			},
 			delta,
 			add,
 			get events() {
@@ -106,6 +112,55 @@ describe("Summarizer Client Election", () => {
 		test.remove("a");
 		assert.equal(test.election.electedParentId, undefined);
 		assert.equal(test.events, 2);
+	});
+
+	it("logs parent and occupancy transitions but ignores irrelevant membership changes", () => {
+		const test = setup([
+			["a", 1, true],
+			["b", 2, true],
+		]);
+		test.add("s1", 3, false, summarizerClientType);
+		test.add("s2", 4, false, summarizerClientType);
+		test.add("c", 5);
+		test.remove("c");
+		test.remove("a");
+		test.remove("s1");
+		test.remove("s2");
+		const transitions = test.logger.events.filter(
+			(event) => event.eventName === "SummarizerClientElection:ElectionChanged",
+		);
+		assert.deepEqual(
+			transitions.map((event) => ({
+				previousElectedParentId: event.previousElectedParentId,
+				electedParentId: event.electedParentId,
+				previousHasSummarizer: event.previousHasSummarizer,
+				hasSummarizer: event.hasSummarizer,
+				sequenceNumber: event.sequenceNumber,
+			})),
+			[
+				{
+					previousElectedParentId: "a",
+					electedParentId: "a",
+					previousHasSummarizer: false,
+					hasSummarizer: true,
+					sequenceNumber: 3,
+				},
+				{
+					previousElectedParentId: "a",
+					electedParentId: "b",
+					previousHasSummarizer: true,
+					hasSummarizer: true,
+					sequenceNumber: 7,
+				},
+				{
+					previousElectedParentId: "b",
+					electedParentId: "b",
+					previousHasSummarizer: true,
+					hasSummarizer: false,
+					sequenceNumber: 9,
+				},
+			],
+		);
 	});
 
 	it("retains occupancy until every summarizer leaves, in either departure order", () => {
@@ -185,15 +240,15 @@ describe("Summarizer Client Election", () => {
 	it("logs stalled progress at most once per op window and resets the baseline on ack", () => {
 		const test = setup([["a", 1, true]]);
 		test.op(1000);
-		assert.equal(test.logger.events.length, 1);
+		assert.equal(test.progressWarnings.length, 1);
 		test.op(10);
-		assert.equal(test.logger.events.length, 1);
+		assert.equal(test.progressWarnings.length, 1);
 		test.ack();
 		const baseline = test.election.serialize();
 		test.op(1000);
-		assert.equal(test.logger.events.length, 1);
+		assert.equal(test.progressWarnings.length, 1);
 		test.op();
-		assert.equal(test.logger.events.length, 2);
+		assert.equal(test.progressWarnings.length, 2);
 		assert.deepEqual(test.election.serialize(), baseline);
 		assert.equal(test.events, 0);
 	});
@@ -227,7 +282,7 @@ describe("Summarizer Client Election", () => {
 		test.remove("b");
 		test.op(900);
 		assert.equal(test.election.serialize().electionSequenceNumber, baseline);
-		assert.equal(test.logger.events.length, 1);
+		assert.equal(test.progressWarnings.length, 1);
 		assert.equal(test.election.electedParentId, "c");
 	});
 
