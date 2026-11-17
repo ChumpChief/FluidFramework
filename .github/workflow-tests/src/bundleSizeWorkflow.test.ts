@@ -491,35 +491,31 @@ describe("PR bundle-size comment workflow", () => {
 
 	it("filters exact public check names, event actions, and relevant conclusions", () => {
 		const project = "10f9b53e-c7fd-4538-9fff-13cd088a436c";
-		for (const name of [
-			"acknowledge-build",
-			"delete-sticky-on-neutral",
-			"identify-from-pr-build",
-			"identify-from-baseline-build",
-		]) {
-			const condition = jobs[name].if;
-			const check =
-				name === "identify-from-baseline-build"
-					? "Build - Client bundle size artifacts"
-					: "Build - client packages";
-			assert.ok(condition.includes(`github.event.check_run.name == '${check}'`));
-			assert.ok(
-				condition.includes(`contains(github.event.check_run.details_url, '${project}')`),
-			);
-			const action = name === "acknowledge-build" ? "created" : "completed";
-			assert.ok(condition.includes(`github.event.action == '${action}'`));
-		}
-		assert.ok(
-			jobs["delete-sticky-on-neutral"].if.includes(
+		const publicProject = `contains(github.event.check_run.details_url, '${project}')`;
+		const clientCheck = "github.event.check_run.name == 'Build - client packages'";
+		const completed = "github.event.action == 'completed'";
+		const comparisonConclusion =
+			"(github.event.check_run.conclusion == 'success' || github.event.check_run.conclusion == 'failure')";
+		const expected = {
+			"acknowledge-build": ["github.event.action == 'created'", clientCheck, publicProject],
+			"delete-sticky-on-neutral": [
+				completed,
+				clientCheck,
+				publicProject,
 				"github.event.check_run.conclusion == 'neutral'",
-			),
-		);
-		for (const name of ["identify-from-pr-build", "identify-from-baseline-build"]) {
-			assert.ok(
-				jobs[name].if.includes(
-					"(github.event.check_run.conclusion == 'success' || github.event.check_run.conclusion == 'failure')",
-				),
-			);
+			],
+			"identify-from-pr-build": [completed, clientCheck, publicProject, comparisonConclusion],
+			"identify-from-baseline-build": [
+				completed,
+				"github.event.check_run.name == 'Build - Client bundle size artifacts'",
+				publicProject,
+				comparisonConclusion,
+			],
+		};
+		// Compare the entire condition: predicate presence alone does not protect their
+		// Boolean relationship, such as an accidental || admitting unrelated checks.
+		for (const [name, predicates] of Object.entries(expected)) {
+			assert.equal(jobs[name].if.replace(/\s+/g, " ").trim(), predicates.join(" && "), name);
 		}
 	});
 
