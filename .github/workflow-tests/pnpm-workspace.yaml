@@ -1,0 +1,17 @@
+# Keep workflow-test dependencies independent of the product workspace.
+packages:
+  - "."
+
+# Shared install settings follow the root workspace; see /DEV.md.
+blockExoticSubdeps: true
+engineStrict: true
+frozenLockfile: true
+minimumReleaseAge: 0
+registry: https://pkgs.dev.azure.com/fluidframework/public/_packaging/publicPackages/npm/registry/
+resolutionMode: highest
+strictDepBuilds: true
+strictPeerDependencies: true
+# publicPackages does not preserve the metadata required by the trust policy.
+trustPolicy: off
+updateNotifier: false
+verifyDepsBeforeRun: false

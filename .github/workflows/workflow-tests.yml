@@ -1,0 +1,57 @@
+name: Workflow tests
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/scripts/**"
+      - ".github/workflow-tests/**"
+      - "tools/pipelines/**"
+      - "package.json"
+      - ".nvmrc"
+      - "scripts/only-pnpm.cjs"
+      - "scripts/install-no-frozen.cjs"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - ".github/scripts/**"
+      - ".github/workflow-tests/**"
+      - "tools/pipelines/**"
+      - "package.json"
+      - ".nvmrc"
+      - "scripts/only-pnpm.cjs"
+      - "scripts/install-no-frozen.cjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Workflow tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .github/workflow-tests
+    steps:
+      # release notes: https://github.com/actions/checkout/releases/tag/v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # release notes: https://github.com/pnpm/action-setup/releases/tag/v5.0.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        with:
+          package_json_file: package.json
+
+      # release notes: https://github.com/actions/setup-node/releases/tag/v6.3.0
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: .github/workflow-tests/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
